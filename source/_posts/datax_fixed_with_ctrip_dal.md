@@ -1,5 +1,5 @@
 ---
-title: DataX 兼容携程 Dal 数据访问框架
+title: DataX 兼容携程 Dal 数据库访问框架
 date: 2021-11-09 23:57:01
 tags: 数据同步
 categories: 数据库
@@ -88,30 +88,30 @@ public final class DBUtil {
     /**
      * 通过 titanKey 获取数据连接
      */
-	public static Connection getConnectionByTitanKey(final String titanKey) {
-	    try {
-	        DataSource dataSource = dsFactory.createDataSource(titanKey);
+    public static Connection getConnectionByTitanKey(final String titanKey) {
+        try {
+            DataSource dataSource = dsFactory.createDataSource(titanKey);
             return dataSource.getConnection();
-	    } catch (Exception e) {
+        } catch (Exception e) {
             throw DataXException
                 .asDataXException(DBUtilErrorCode.CONN_DB_ERROR,
-                String.format("数据库连接失败. 因为根据您配置的连接信息:%s获取数据库连接失败. 请检查您的配置并作出修改.", titanKey), e);
-	    }
-	}
+                                  String.format("数据库连接失败. 因为根据您配置的连接信息:%s获取数据库连接失败. 请检查您的配置并作出修改.", titanKey), e);
+        }
+    }
     
     /**
      * 通过 clusterName 获取数据连接
      */
-	public static Connection getConnectionByClusterName(final String clusterName) {
-	    try {
+    public static Connection getConnectionByClusterName(final String clusterName) {
+        try {
             DataSource ds = dsFactory.getOrCreateDataSource(clusterName);
             return dataSource.getConnection();
-	    } catch (Exception e) {
+        } catch (Exception e) {
             throw DataXException
                 .asDataXException(DBUtilErrorCode.CONN_DB_ERROR,
-                String.format("数据库连接失败. 因为根据您配置的连接信息:%s获取数据库连接失败. 请检查您的配置并作出修改.", clusterName), e);
-	    }
-	}
+                                  String.format("数据库连接失败. 因为根据您配置的连接信息:%s获取数据库连接失败. 请检查您的配置并作出修改.", clusterName), e);
+        }
+    }
 }
 ```
 
@@ -258,11 +258,10 @@ public final class DBUtil {
     }
     
     /**
-   	 * 获取数据源
-   	 *
-   	 * @param dsName 数据源名称
-   	 * @return 数据源
-  	 */
+     * 获取数据源
+     * @param dsName 数据源名称
+     * @return 数据源
+     */
     private static DataSource getDataSource(String dsName) {
         // 处理 jdbc 格式的数据源名称
         if (dsName.contains("?")) {
@@ -274,23 +273,22 @@ public final class DBUtil {
     
     /**
      * 通过数据源名称获取数据库连接
-     *
      * @param dsName 数据源名称
      * @return 数据库连接
      */
-	public static Connection getConnection(String dsName) {
-	    try {
+    public static Connection getConnection(String dsName) {
+        try {
             // 获取数据源
-	        DataSource dataSource = getDataSource(dsName);
+            DataSource dataSource = getDataSource(dsName);
             
             Assert.notNull(dataSource, String.format("获取数据源%s失败", dsName));
             
             return dataSource.getConnection();
-	    } catch (Exception e) {
+        } catch (Exception e) {
             throw DataXException
                 .asDataXException(DBUtilErrorCode.CONN_DB_ERROR,
-                String.format("数据库连接失败. 因为根据您配置的连接信息:%s获取数据库连接失败. 请检查您的配置并作出修改.", dsName), e);
-	    }
-	}
+                                  String.format("数据库连接失败. 因为根据您配置的连接信息:%s获取数据库连接失败. 请检查您的配置并作出修改.", dsName), e);
+        }
+    }
 }
 ```
