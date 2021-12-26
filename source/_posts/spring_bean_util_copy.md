@@ -155,8 +155,7 @@ return PropertyDescriptor;
 
 由此可以看出，一个类的方法名称、入参个数、反参类型是`JavaBean` 内省的主要要素，可以总结为：
 
-* 可以内省一个类暴露的 `public` 非静态方法；
-* 可以内省标准化的 `set` 方法，如 `setAge(Integer age)`；
+* 只能内省一个类暴露的 `public` 非静态方法；
 * 可以内省标准化的 `set` 方法，如  `void setAge(Integer age)`；
 * 可以内省标准化的 `get` 方法，如  `ResultType getAge()`；
 * 可以内省设置索引属性的方法，如 `setChild(Integer index, Child child)`；
@@ -165,4 +164,4 @@ return PropertyDescriptor;
 
 #### 五、总结
 
-`Spring` 对象拷贝，基于反射和内省机制，通过属性描述器，将源属性值写入目标属性。如今 `Spring` 架构已被广泛使用，旗下各种好用的工具也是顺手拈来，但无端的滥用也潜藏着一些问题。比如 `Spring` 对象拷贝，要求操作的对象必须符合 `JavaBean` 规范，否则将无法拷贝。如拷贝包装类型的布尔值，其读取方法为 `Boolean isMale` ，不符合 `JavaBean` 规范，目标对应的属性一定是 `null`。
+`Spring` 对象拷贝，基于反射和内省机制，通过属性描述器，将源属性值写入目标属性。如今 `Spring` 架构已被广泛使用，旗下各种好用的工具也是顺手拈来，但无端的滥用也潜藏着一些问题。比如 `Spring` 对象拷贝，要求操作的对象必须符合 `JavaBean` 规范，否则将无法拷贝。如拷贝包装类型的布尔值，其读取方法为 `Boolean isMale` ，不符合 `JavaBean` 规范，对应的目标属性值一定是 `null`。
