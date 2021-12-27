@@ -88,3 +88,17 @@ categories: 中间件
 我们选择一张图片上传，上传成功后，打开【相册】。在相册里，不仅可以看到已上传的所有图片，还可以拷贝、修改在线图片链接。
 
 ![](https://gitee.com/donehub/imgbed/raw/master/相册.png)
+
+##### 4. `Typora` 内嵌 `PicGo`
+
+虽然 `PicGo`  + `Gitee` 已经非常好用了，但我们依然需要手动上传图片并拷贝外链。既然图床是服务于内容，那么是否可以内嵌 `PicGo` 到编辑器内部呢？
+
+ `Typora` 是一款主流的 `Markdown` 编辑器， `0.9.98` 及以上版本可以内嵌 `PicGo` 工具。配置完成之后，只需要将图片拖入页面，即可自动上传图床并插入外链。
+
+配置方法：文件-》偏好设置-》图像-》插入图片时选择上传图片-》上传服务设定
+
+![](https://gitee.com/donehub/imgbed/raw/master/typora 配置 picgo.png)
+
+打开 `Test.md`，将图片拖入页面，可以看到短暂的 `loading` 提示，然后上传成功并替换图片外链。
+
+![](https://gitee.com/donehub/imgbed/raw/master/typora upload img.png)
