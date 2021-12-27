@@ -97,8 +97,8 @@ categories: 中间件
 
 配置方法：文件-》偏好设置-》图像-》插入图片时选择上传图片-》上传服务设定
 
-![](https://gitee.com/donehub/imgbed/raw/master/typora 配置 picgo.png)
+![](https://gitee.com/donehub/imgbed/raw/master/typora-picgo.png)
 
 打开 `Test.md`，将图片拖入页面，可以看到短暂的 `loading` 提示，然后上传成功并替换图片外链。
 
-![](https://gitee.com/donehub/imgbed/raw/master/typora upload img.png)
+![](https://gitee.com/donehub/imgbed/raw/master/typora-upload-img.png)
