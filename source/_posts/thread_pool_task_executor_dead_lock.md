@@ -49,14 +49,14 @@ http-nio-8080-exec-32" daemon prio=5 tid=1676 WAITING
 * `5` 个常开闸机若都有乘客进入，则安排后来者在进站围栏里排队等待；
 * 若进站围栏已经站满了乘客，则开启另外 `5` 个应急闸机（一个个开启）；
 
-![](http://assets.processon.com/chart_image/61c533717d9c08302267a3b7.png?_=1640315877626)
+![](https://gitee.com/donehub/imgbed/raw/master/thread_pool_change.jpg)
 
 为了模拟 `Task` 任务嵌套的场景，假设所有打工人都有一个同伴，而且都是走到闸机口才发现忘记买票，只能安排同伴去买票。这里：
 
 * 外层 `Task`：打工人进闸机；
 * 内层 `Task`：打工人的同伴出去买票；
 
-![](http://assets.processon.com/chart_image/61c53cd90791290c9e045a43.png?_=1640317613930)
+![](https://gitee.com/donehub/imgbed/raw/master/thread_pool_dead_lock_2.jpg)
 
 假设张三、李四等人走到闸机口时才发现忘了买票，于是便可能发生如下对话：
 

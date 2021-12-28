@@ -83,7 +83,7 @@ private static void copyProperties(Object source, Object target, Class<?> editab
 
 根据以上分析，整合出 `Spring` 对象拷贝的实现原理：
 
-![](http://assets.processon.com/chart_image/618cc3a7e0b34d73f7f1b7cd.png?_=1636695035876)
+![](https://gitee.com/donehub/imgbed/raw/master/introspector.jpg)
 
 通过内省机制，对 `Bean` 进行拆分，得到每个属性的描述器，缓存在 `Map` 中，`Key`为变量名，`Value`为属性描述器。属性描述器主要包括：属性名称、读取属性值的方法、设置属性值的方法。拷贝过程中，先获取目标属性的写入方法，再获取对应源属性的读取方法，最后通过反射拷贝属性值。
 

@@ -15,7 +15,7 @@ categories: 数据库
 
 `DataX` 是阿里巴巴开源出来的数据同步工具，主要解决解决各种异构数据源之间的同步难题。目前已经拥有比较完善的插件体系，包括常用的 `RDBMS` 数据库、`NOSQL`、大数据计算系统。良好的架构设计，方便开发者引入新插件，一步步构建起数据同步的生态圈。
 
-![](http://assets.processon.com/chart_image/606eb6bf63768979935073a2.png?_=1617871570522)
+![](https://gitee.com/donehub/imgbed/raw/master/DataX_introduction.png)
 
 ##### 二、目前支持的插件
 
@@ -50,13 +50,13 @@ categories: 数据库
 
 `DataX` 将数据同步过程中的读取和写入分别抽象为 `Reader`/`Writer`插件，并且以框架作为媒介，实现读取数据源和同步数据源的灵活组合。
 
-![](http://assets.processon.com/chart_image/606eba77079129117f1cb334.png?_=1617875757138)
+![](https://gitee.com/donehub/imgbed/raw/master/datax3.0.png)
 
  简单来说，`DataX` 的设计愿景，是建立一个万能数据池（图中的 `FrameWork`）：有无限根管道通往池子，负责导入数据；同时又有无限根管道负责向外导出数据。向池子里导入数据，依赖 `Reader` 插件；从池子向外导出数据，依赖 `Writer` 插件。这种设计的精妙之处，在于这个数据池子是万能的，就是说可以从任何一根管道导入数据，也可以将数据导出到任何一根管道。因此，我们只需要关心导入数据和导出数据的管道建设，也就是开发新的 `Reader`/`Writer`插件，便可实现多种数据源之间的同步。
 
 ##### 四、`DataX`数据同步过程
 
-![](http://assets.processon.com/chart_image/606ecc93f346fb575c701e31.png?_=1617875840785)
+![](https://gitee.com/donehub/imgbed/raw/master/datax_sync_flow.png)
 
 名词解释：
 
