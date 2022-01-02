@@ -1,5 +1,5 @@
 ---
-title: 用 freemarker 导出复杂 word 文档
+title: 用 freemarker 导出复杂的 word 文档
 date: 2021-07-12 21:57:01
 tags: freemarker
 categories: 后端
@@ -263,7 +263,7 @@ public class TemplateTest {
 }
 ```
 
-**注意：** 通过这种方式导出的 `Word` 文档，本质上还是 `xml` 文档，因此必须使用 `.doc` 后缀，具体请查看[上一小节](https://donehub.github.io/my-blog/2021/07/11/difference_btw_doc_docx/)
+**注意：** 通过这种方式导出的 `Word` 文档，本质上还是 `xml` 文档，因此必须使用 `.doc` 后缀，具体请查看[MsOffice Word docx 研究](https://donehub.github.io/my-blog/2021/07/11/difference_btw_doc_docx/)。
 
 运行起来，导出`租房合同-打工人.doc`。
 
@@ -271,7 +271,7 @@ public class TemplateTest {
 
 ##### 四、总结
 
-通过将目标模板转换为 `ftl` 文档，再解析得到目标文档的办法，理论上可以应对任何复杂程度的文档导出需求。但这种好办法也有弊端：`ftl` 文档包含太多内联样式、复杂标签等，可读性太差。当模板发生变化时，手动替换太多的模板参数将会是一种灾难。
+通过将目标模板转换为 `ftl` 文档，再解析得到目标文档的办法，理论上可以应对任何复杂程度的文档导出需求。但这种好办法也有弊端：`ftl` 文档包含太多的内联样式、复杂标签等，可读性太差。当模板发生变化时，手动替换太多的模板参数将会是一种灾难。
 
 
 
