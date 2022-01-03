@@ -11,13 +11,7 @@ categories: 后端
 
 `Freemarker` 是一款强大的模板引擎，可以用来生成网页、邮件、文档等。对于简单的 `Word` 文档导出，只需要手动编写 `ftl` 文件即可。但如果要导出复杂的文档，比如带有复杂样式、页眉页脚、内嵌图片、批注等，手动编写模板就行不通了。现在提出一个从目标文档出发的解决方案：先将目标 `Word` 模板文档转换为 `xml` 文档，然后将 `xml` 文档转换为 `ftl` 文档，手动替换模板中的变量之后即可导出复杂 `Word` 。
 
-```mermaid
-graph LR
-A[目标 Word 模板] --另存为-->B(xml 文档)
-B --另存为--> C(ftl文档)
-C --替换参数--> D(标准的 ftl 文档)
-D --引擎解析--> E(目标 Word 文档)
-```
+![](https://gitee.com/donehub/imgbed/raw/master/export_word_freemarker_flow.png)
 
 ##### 二、根据目标文档获取 `ftl` 文档
 
