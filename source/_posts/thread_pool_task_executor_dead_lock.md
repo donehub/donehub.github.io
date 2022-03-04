@@ -49,7 +49,7 @@ http-nio-8080-exec-32" daemon prio=5 tid=1676 WAITING
 * `5` 个常开闸机若都有乘客进入，则安排后来者在进站围栏里排队等待；
 * 若进站围栏已经站满了乘客，则开启另外 `5` 个应急闸机（一个个开启）；
 
-![](https://gitee.com/donehub/imgbed/raw/master/thread_pool_change.jpg)
+![](https://gitee.com/donehub/imgbed/raw/master/thread_pool_change.png)
 
 为了模拟 `Task` 任务嵌套的场景，假设所有打工人都有一个同伴，而且都是走到闸机口才发现忘记买票，只能安排同伴去买票。这里：
 
