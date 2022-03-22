@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="1、拥有个人图床的必要性图床是存储图片的服务器，可以生成外链供在线加载，被广泛用于网站建设。目前市面上主流的图床有 ImgURL、SM.MS、新浪微博、路过图床、七牛云等，主要有两个特点：免费图床广告多、不稳定；收费图床不适合打工人。作为搞技术的人，我们拥有开源精神的同时，也要利用好开源技术。GitHub、GitLab、Gitee 就是最干净的、最稳定的图床。由于GitHub、GitLab 在国">
+<meta property="og:type" content="article">
+<meta property="og:title" content="用 PicGo + Gitee 搭建个人图床">
+<meta property="og:url" content="https://donehub.github.io/2021/04/23/build_personal_img_bed/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="1、拥有个人图床的必要性图床是存储图片的服务器，可以生成外链供在线加载，被广泛用于网站建设。目前市面上主流的图床有 ImgURL、SM.MS、新浪微博、路过图床、七牛云等，主要有两个特点：免费图床广告多、不稳定；收费图床不适合打工人。作为搞技术的人，我们拥有开源精神的同时，也要利用好开源技术。GitHub、GitLab、Gitee 就是最干净的、最稳定的图床。由于GitHub、GitLab 在国">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/%E6%96%B0%E5%BB%BA%E4%BB%93%E5%BA%93%E5%85%A5%E5%8F%A3.png">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/PicGo%E4%B8%8B%E8%BD%BD%E6%8C%87%E5%AF%BC.png">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/%E6%96%B0%E5%BB%BA%E4%BB%93%E5%BA%93%E9%85%8D%E7%BD%AE.png">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20211226223238.png">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/%E5%9B%BE%E5%BA%8A%E8%AE%BE%E7%BD%AE.png">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/owner-repo.png">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E4%B8%80%E6%AD%A5.png">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E4%BA%8C%E6%AD%A5.png">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C-%E7%AC%AC%E4%B8%89%E6%AD%A5.png">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E5%9B%9B%E6%AD%A5.png">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/%E4%B8%8A%E4%BC%A0%E5%9B%BE%E7%89%87.png">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/%E7%9B%B8%E5%86%8C.png">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/typora-picgo.png">
+<meta property="og:image" content="https://gitee.com/donehub/imgbed/raw/master/typora-upload-img.png">
+<meta property="article:published_time" content="2021-04-23T06:57:05.000Z">
+<meta property="article:modified_time" content="2022-03-22T00:56:47.726Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="图床">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://gitee.com/donehub/imgbed/raw/master/%E6%96%B0%E5%BB%BA%E4%BB%93%E5%BA%93%E5%85%A5%E5%8F%A3.png">
+
+<link rel="canonical" href="https://donehub.github.io/2021/04/23/build_personal_img_bed/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>用 PicGo + Gitee 搭建个人图床 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/04/23/build_personal_img_bed/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          用 PicGo + Gitee 搭建个人图床
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-04-23 14:57:05" itemprop="dateCreated datePublished" datetime="2021-04-23T14:57:05+08:00">2021-04-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-03-22 08:56:47" itemprop="dateModified" datetime="2022-03-22T08:56:47+08:00">2022-03-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E4%B8%AD%E9%97%B4%E4%BB%B6/" itemprop="url" rel="index"><span itemprop="name">中间件</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2021/04/23/build_personal_img_bed/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2021/04/23/build_personal_img_bed/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <hr>
+<h5 id="1、拥有个人图床的必要性"><a href="#1、拥有个人图床的必要性" class="headerlink" title="1、拥有个人图床的必要性"></a>1、拥有个人图床的必要性</h5><p>图床是存储图片的服务器，可以生成外链供在线加载，被广泛用于网站建设。目前市面上主流的图床有 <a href="https://imgurl.org/" target="_blank" rel="noopener"><code>ImgURL</code></a>、<a href="https://sm.ms/" target="_blank" rel="noopener"><code>SM.MS</code></a>、<a href="https://weibo.com/" target="_blank" rel="noopener">新浪微博</a>、<a href="https://imgtu.com/" target="_blank" rel="noopener">路过图床</a>、<a href="https://www.qiniu.com/" target="_blank" rel="noopener">七牛云</a>等，主要有两个特点：免费图床广告多、不稳定；收费图床不适合打工人。作为搞技术的人，我们拥有开源精神的同时，也要利用好开源技术。<a href="https://github.com/" target="_blank" rel="noopener"><code>GitHub</code></a>、<a href="https://gitlab.com/" target="_blank" rel="noopener"><code>GitLab</code></a>、<a href="https://gitee.com/" target="_blank" rel="noopener"><code>Gitee</code></a> 就是最干净的、最稳定的图床。由于<code>GitHub</code>、<code>GitLab</code> 在国内的访问速度远不如 <code>Gitee</code>，所以我们选择搭建 <code>Gitee</code> 图床。 </p>
+<h5 id="2、图床工具-PicGo"><a href="#2、图床工具-PicGo" class="headerlink" title="2、图床工具-PicGo"></a>2、图床工具-<code>PicGo</code></h5><p>即使有了 <code>Gitee</code> 图床，我们仍然需要借助 <code>Git</code> 将图片 <code>Push</code> 到远端，然后再到仓库中 <code>Copy</code> 在线图片的加载地址。跟那些主流图床比起来，这样做只会显得更加傻蛋。为此，我们要借助一款优秀的图床工具 <code>PicGo</code>。</p>
+<blockquote>
+<p><code>PicGo</code>: 一个用于快速上传图片并获取图片 URL 链接的工具</p>
+</blockquote>
+<p>简单地说，<code>PicGo</code> 可以主动 <code>Push</code> 图片到远端，并主动获取远端图片的外链，不用我们操心。</p>
+<h5 id="3、搭建基于-Gitee-的图床"><a href="#3、搭建基于-Gitee-的图床" class="headerlink" title="3、搭建基于 Gitee 的图床"></a>3、搭建基于 <code>Gitee</code> 的图床</h5><h6 id="3-1-创建-Gitee-图床仓库"><a href="#3-1-创建-Gitee-图床仓库" class="headerlink" title="3.1 创建 Gitee 图床仓库"></a>3.1 创建 <code>Gitee</code> 图床仓库</h6><p>创建图床仓库，需要注意两点：仓库需要开源，否则别人没有权限查看你的图片；分支只需要初始化 <code>master</code> ，图床操作都在这个分支上。</p>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E6%96%B0%E5%BB%BA%E4%BB%93%E5%BA%93%E5%85%A5%E5%8F%A3.png" alt=""></p>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/PicGo%E4%B8%8B%E8%BD%BD%E6%8C%87%E5%AF%BC.png" alt=""></p>
+<h6 id="3-2-安装配置-PicGo"><a href="#3-2-安装配置-PicGo" class="headerlink" title="3.2 安装配置 PicGo"></a>3.2 安装配置 <code>PicGo</code></h6><p>下载安装包：<a href="https://github.com/Molunerfinn/PicGo/releases/tag/v2.3.0" target="_blank" rel="noopener">version: 2.3.0</a>；</p>
+<p><code>windows</code>平台请选择：</p>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E6%96%B0%E5%BB%BA%E4%BB%93%E5%BA%93%E9%85%8D%E7%BD%AE.png" alt=""></p>
+<p>运行软件，可以看到【图床设置】一栏是没有 <code>Gitee</code> 的，这需要额外安装插件。操作【插件设置】，输入 <code>gitee</code> 查询相关插件，选择安装 <code>gitee 2.0.5</code>。</p>
+<blockquote>
+<p>插件安装基于 <code>npm</code>，需要先安装 <code>Nodejs</code></p>
+</blockquote>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20211226223238.png" alt=""></p>
+<p>插件安装成功后重启软件，打开【图床设置】，选择【<code>Gitee</code>图床】，各项配置如下：</p>
+<p><code>owner</code>:  <code>Gitee</code>用户名 (<code>donehub</code>)；</p>
+<p><code>repo</code>: <code>Gitee</code> 图片仓库名 (<code>img-bed</code>)；</p>
+<p><code>path</code>: 图片存放的目录，可以不填写；</p>
+<p><code>token</code>: <code>Gitee</code> 上生成的私有令牌，用于授权 <code>PicGo</code> 操作 <code>Gitee</code> 图床；</p>
+<p><code>message</code>: 用默认证即可；</p>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E5%9B%BE%E5%BA%8A%E8%AE%BE%E7%BD%AE.png" alt=""></p>
+<p>具体配置方法：</p>
+<p><code>owner</code> 、<code>repo</code> 容易写错，建议直接到 <code>Gitee</code> 上 <code>Copy</code>：</p>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/owner-repo.png" alt=""></p>
+<p><code>Gitee</code> 生成私有令牌：</p>
+<p>步骤：个人主页-》个人设置-》安全设置-》私有令牌-》配置权限-》提交；</p>
+<p>注意：私有令牌只会展示一次，建议复制下来长久保存；</p>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E4%B8%80%E6%AD%A5.png" alt=""></p>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E4%BA%8C%E6%AD%A5.png" alt=""></p>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C-%E7%AC%AC%E4%B8%89%E6%AD%A5.png" alt=""></p>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E5%9B%9B%E6%AD%A5.png" alt=""></p>
+<h6 id="3-3-上传图片"><a href="#3-3-上传图片" class="headerlink" title="3.3 上传图片"></a>3.3 上传图片</h6><p>打开【上传区】，可以看到 <code>PicGo</code> 支持四种图片上传方式：拖拽上传、选择上传、剪切上传、<code>URL</code> 上传。返回的在线图片链接格式有 <code>Markdown</code>、<code>HTML</code> 等。</p>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E4%B8%8A%E4%BC%A0%E5%9B%BE%E7%89%87.png" alt=""></p>
+<p>我们选择一张图片上传，上传成功后，打开【相册】。在相册里，不仅可以看到已上传的所有图片，还可以拷贝、修改在线图片链接。</p>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E7%9B%B8%E5%86%8C.png" alt=""></p>
+<h5 id="4-Typora-内嵌-PicGo"><a href="#4-Typora-内嵌-PicGo" class="headerlink" title="4. Typora 内嵌 PicGo"></a>4. <code>Typora</code> 内嵌 <code>PicGo</code></h5><p>虽然 <code>PicGo</code>  + <code>Gitee</code> 已经非常好用了，但我们依然需要手动上传图片并拷贝外链。既然图床是服务于内容，那么是否可以内嵌 <code>PicGo</code> 到编辑器内部呢？</p>
+<p> <code>Typora</code> 是一款主流的 <code>Markdown</code> 编辑器， <code>0.9.98</code> 及以上版本可以内嵌 <code>PicGo</code> 工具。配置完成之后，只需要将图片拖入页面，即可自动上传图床并插入外链。</p>
+<p>配置方法：文件-》偏好设置-》图像-》插入图片时选择上传图片-》上传服务设定</p>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/typora-picgo.png" alt=""></p>
+<p>打开 <code>Test.md</code>，将图片拖入页面，可以看到短暂的 <code>loading</code> 提示，然后上传成功并替换图片外链。</p>
+<p><img src="https://gitee.com/donehub/imgbed/raw/master/typora-upload-img.png" alt=""></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/%E5%9B%BE%E5%BA%8A/" rel="tag"><i class="fa fa-tag"></i> 图床</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/12/14/async_thread_local/" rel="prev" title="在异步线程或线程池中传输 ThreadLocal 上下文">
+      <i class="fa fa-chevron-left"></i> 在异步线程或线程池中传输 ThreadLocal 上下文
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/05/03/dataX_introduction/" rel="next" title="DataX 的设计与简单使用">
+      DataX 的设计与简单使用 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-5"><a class="nav-link" href="#1、拥有个人图床的必要性"><span class="nav-number">1.</span> <span class="nav-text">1、拥有个人图床的必要性</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#2、图床工具-PicGo"><span class="nav-number">2.</span> <span class="nav-text">2、图床工具-PicGo</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#3、搭建基于-Gitee-的图床"><span class="nav-number">3.</span> <span class="nav-text">3、搭建基于 Gitee 的图床</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#3-1-创建-Gitee-图床仓库"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 创建 Gitee 图床仓库</span></a></li><li class="nav-item nav-level-6"><a class="nav-link" href="#3-2-安装配置-PicGo"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 安装配置 PicGo</span></a></li><li class="nav-item nav-level-6"><a class="nav-link" href="#3-3-上传图片"><span class="nav-number">3.3.</span> <span class="nav-text">3.3 上传图片</span></a></li></ol></li><li class="nav-item nav-level-5"><a class="nav-link" href="#4-Typora-内嵌-PicGo"><span class="nav-number">4.</span> <span class="nav-text">4. Typora 内嵌 PicGo</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">21</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'naWrDRGa7bbNwXENT37YmHmo-gzGzoHsz',
+      appKey     : 'UkBYXBAr3F8KetKjejwAoDnz',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>

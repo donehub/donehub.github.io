@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="一、 携程 Dal 开源框架Dal 是携程开源的数据库访问框架，为大规模的 DB 管理和使用提供一套优质的解决方案。 首先在 DB 管理方面，Dal 统一集成了主流程的数据访问：支持 Java 和 C# 客户端；支持 MySQL 、SQLServer 数据库；支持 ORM 和非 ORM 方式的数据访问；使用了 Emit 映射技术，提供高性能 ORM；多数据源访问和主从分离（读写分离）；日志、监控">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DataX 兼容携程 Dal 数据库访问框架">
+<meta property="og:url" content="https://donehub.github.io/2021/11/09/datax_fixed_with_ctrip_dal/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="一、 携程 Dal 开源框架Dal 是携程开源的数据库访问框架，为大规模的 DB 管理和使用提供一套优质的解决方案。 首先在 DB 管理方面，Dal 统一集成了主流程的数据访问：支持 Java 和 C# 客户端；支持 MySQL 、SQLServer 数据库；支持 ORM 和非 ORM 方式的数据访问；使用了 Emit 映射技术，提供高性能 ORM；多数据源访问和主从分离（读写分离）；日志、监控">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2021-11-09T15:57:01.000Z">
+<meta property="article:modified_time" content="2022-03-22T00:56:47.729Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="数据同步">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2021/11/09/datax_fixed_with_ctrip_dal/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>DataX 兼容携程 Dal 数据库访问框架 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/11/09/datax_fixed_with_ctrip_dal/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          DataX 兼容携程 Dal 数据库访问框架
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-11-09 23:57:01" itemprop="dateCreated datePublished" datetime="2021-11-09T23:57:01+08:00">2021-11-09</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-03-22 08:56:47" itemprop="dateModified" datetime="2022-03-22T08:56:47+08:00">2022-03-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/" itemprop="url" rel="index"><span itemprop="name">数据库</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2021/11/09/datax_fixed_with_ctrip_dal/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2021/11/09/datax_fixed_with_ctrip_dal/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <hr>
+<h4 id="一、-携程-Dal-开源框架"><a href="#一、-携程-Dal-开源框架" class="headerlink" title="一、 携程 Dal 开源框架"></a>一、 携程 <code>Dal</code> 开源框架</h4><p><code>Dal</code> 是携程开源的数据库访问框架，为大规模的 <code>DB</code> 管理和使用提供一套优质的解决方案。</p>
+<p>首先在 <code>DB</code> 管理方面，<code>Dal</code> 统一集成了主流程的数据访问：支持 <code>Java</code> 和 <code>C#</code> 客户端；支持 <code>MySQL</code> 、<code>SQLServer</code> 数据库；支持 <code>ORM</code> 和非 <code>ORM</code> 方式的数据访问；使用了 <code>Emit</code> 映射技术，提供高性能 <code>ORM</code>；多数据源访问和主从分离（读写分离）；日志、监控集成。</p>
+<p>其次在 <code>DB</code> 使用方面， <code>Dal</code> 支持代码生成。通过 <code>Dal</code> 平台，可一键生成 <code>Entity</code>、<code>Dao</code>、<code>Unit Test</code>。这不仅可以让开发者脱离 <code>DB</code> 编程、提升开发效率，还可以统一面向 <code>DB</code> 的代码风格和代码质量。</p>
+<h4 id="二、-DataX-与-Dal-的兼容"><a href="#二、-DataX-与-Dal-的兼容" class="headerlink" title="二、 DataX 与 Dal 的兼容"></a>二、 <code>DataX</code> 与 <code>Dal</code> 的兼容</h4><p><code>Dal</code> 的主要特点是统一收口和集中管理，在 <code>DB</code> 连接方面，客户端无需配置 <code>DB</code> 的用户名和密码，只需要配置 <code>Dal</code> 提供的 <code>TitanKey</code> 或 <code>ClusterName</code> 即可。简单来说，<code>TitanKey</code> 或 <code>ClusterName</code> 就是 <code>Dal</code> 生成的，供客户端的访问 <code>DB</code> 的钥匙。也正因此，<code>DataX</code> 在 <code>Dal</code> 架构的系统上就不起作用了。需要解决两个问题：<code>DataX</code> 如何配置 <code>TitanKey</code> 或 <code>ClusterName</code>；<code>DataX</code> 如何通过 <code>Dal</code> 获取数据源。</p>
+<h4 id="三、-Datax-配置-TitanKey-或-ClusterName"><a href="#三、-Datax-配置-TitanKey-或-ClusterName" class="headerlink" title="三、 Datax 配置 TitanKey 或 ClusterName"></a>三、 <code>Datax</code> 配置 <code>TitanKey</code> 或 <code>ClusterName</code></h4><p>这是 <code>mysqlwriter</code> 的配置信息模板:</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="attr">"name"</span>: <span class="string">"mysqlwriter"</span>,</span><br><span class="line">    <span class="attr">"parameter"</span>: &#123;</span><br><span class="line">        <span class="attr">"username"</span>: <span class="string">""</span>,</span><br><span class="line">        <span class="attr">"password"</span>: <span class="string">""</span>,</span><br><span class="line">        <span class="attr">"writeMode"</span>: <span class="string">""</span>,</span><br><span class="line">        <span class="attr">"column"</span>: [],</span><br><span class="line">        <span class="attr">"session"</span>: [],</span><br><span class="line">        <span class="attr">"preSql"</span>: [],</span><br><span class="line">        <span class="attr">"connection"</span>: [</span><br><span class="line">            &#123;</span><br><span class="line">                <span class="attr">"jdbcUrl"</span>: <span class="string">""</span>,</span><br><span class="line">                <span class="attr">"table"</span>: []</span><br><span class="line">            &#125;</span><br><span class="line">        ]</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>Dal</code> 不关心 <code>username</code> 和 <code>password</code>，不妨将 <code>TitanKey</code> 或 <code>ClusterName</code>放在 <code>jdbcurl</code>处。</p>
+<h4 id="四、DataX-获取-Dal-数据源"><a href="#四、DataX-获取-Dal-数据源" class="headerlink" title="四、DataX 获取 Dal 数据源"></a>四、<code>DataX</code> 获取 <code>Dal</code> 数据源</h4><p><code>DataX</code> 通过如下方式获取数据连接：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">synchronized</span> Connection <span class="title">connect</span><span class="params">(DataBaseType dataBaseType, String url, Properties prop)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        Class.forName(dataBaseType.getDriverClassName());</span><br><span class="line">        DriverManager.setLoginTimeout(Constant.TIMEOUT_SECONDS);</span><br><span class="line">        <span class="keyword">return</span> DriverManager.getConnection(url, prop);</span><br><span class="line">    &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">        <span class="keyword">throw</span> RdbmsException.asConnException(dataBaseType, e, prop.getProperty(<span class="string">"user"</span>), <span class="keyword">null</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>Dal</code> 通过如下方式获取数据连接：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> javax.annotation.Resource;</span><br><span class="line"><span class="keyword">import</span> javax.sql.DataSource;</span><br><span class="line"><span class="keyword">import</span> java.sql.Connection;</span><br><span class="line"><span class="keyword">import</span> com.ctrip.datasource.configure.DalDataSourceFactory;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">final</span> <span class="class"><span class="keyword">class</span> <span class="title">DBUtil</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="title">DBUtil</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Resource</span></span><br><span class="line">    <span class="keyword">private</span> DalDataSourceFactory dsFactory;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 数据源工厂</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="meta">@Bean</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> DalDataSourceFactory <span class="title">getCtripDalDataSource</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> DalDataSourceFactory();</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 通过 titanKey 获取数据连接</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> Connection <span class="title">getConnectionByTitanKey</span><span class="params">(<span class="keyword">final</span> String titanKey)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            DataSource dataSource = dsFactory.createDataSource(titanKey);</span><br><span class="line">            <span class="keyword">return</span> dataSource.getConnection();</span><br><span class="line">        &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">            <span class="keyword">throw</span> DataXException</span><br><span class="line">                .asDataXException(DBUtilErrorCode.CONN_DB_ERROR,</span><br><span class="line">                                  String.format(<span class="string">"数据库连接失败. 因为根据您配置的连接信息:%s获取数据库连接失败. 请检查您的配置并作出修改."</span>, titanKey), e);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 通过 clusterName 获取数据连接</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> Connection <span class="title">getConnectionByClusterName</span><span class="params">(<span class="keyword">final</span> String clusterName)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            DataSource ds = dsFactory.getOrCreateDataSource(clusterName);</span><br><span class="line">            <span class="keyword">return</span> dataSource.getConnection();</span><br><span class="line">        &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">            <span class="keyword">throw</span> DataXException</span><br><span class="line">                .asDataXException(DBUtilErrorCode.CONN_DB_ERROR,</span><br><span class="line">                                  String.format(<span class="string">"数据库连接失败. 因为根据您配置的连接信息:%s获取数据库连接失败. 请检查您的配置并作出修改."</span>, clusterName), e);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>综上：借助 <code>DataSource</code> 工厂，就可以用 <code>Dal</code> 数据连接替换掉 <code>DataX</code> 的数据连接。</p>
+<h4 id="五、DataX-兼容-Dal-优化"><a href="#五、DataX-兼容-Dal-优化" class="headerlink" title="五、DataX 兼容 Dal 优化"></a>五、<code>DataX</code> 兼容 <code>Dal</code> 优化</h4><p>从以上实现可以看出，获取 <code>Dal</code> 数据连接主要有两步：生成数据源和建立数据连接，并且每次数据同步都要重复一遍。既然 <code>Dal</code> 已经提供了 <code>DataSource</code> 工厂，是否可以考虑将数据源缓存下来呢？</p>
+<p>所以，有一套更好的兼容方案：在工具启动过程中，加载数据源并缓存下来， <code>dbName</code> 作为查找数据源的 <code>key</code>。</p>
+<p><code>DataSourceConfiguration.class</code></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.alibaba.datax.plugin.rdbms.util.DBUtil;</span><br><span class="line"><span class="keyword">import</span> com.ctrip.datasource.configure.DalDataSourceFactory;</span><br><span class="line"><span class="keyword">import</span> com.google.common.base.Throwables;</span><br><span class="line"><span class="keyword">import</span> com.google.common.collect.Maps;</span><br><span class="line"><span class="keyword">import</span> org.apache.commons.lang.StringUtils;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> org.springframework.util.Assert;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> javax.annotation.PostConstruct;</span><br><span class="line"><span class="keyword">import</span> javax.annotation.Resource;</span><br><span class="line"><span class="keyword">import</span> javax.sql.DataSource;</span><br><span class="line"><span class="keyword">import</span> java.util.Map;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@author</span> zourongsheng</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">DataSourceConfiguration</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Resource</span></span><br><span class="line">    <span class="keyword">private</span> DalDataSourceFactory dsFactory;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 数据源工厂</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="meta">@Bean</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> DalDataSourceFactory <span class="title">getCtripDalDataSource</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> DalDataSourceFactory();</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String CLUSTER_CONN_TYPE_FLAG = <span class="string">"cluster"</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * titan key 连接信息</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String TITAN_KEY_TEST_DB = <span class="string">"test_titan_db"</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * cluster name 连接信息</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String CLUSTER_NAME_TEST_DB = <span class="string">"test_cluster_db"</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 根据 titan key 加载数据源</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">fillDataSourceFromTitanKey</span><span class="params">(String titanKey)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            </span><br><span class="line">            Assert.hasText(titanKey,</span><br><span class="line">                           <span class="string">"connect to db failed; titan key cannot be null or empty"</span>);</span><br><span class="line"></span><br><span class="line">            DataSource dataSource = dsFactory.createDataSource(titanKey);</span><br><span class="line">            <span class="comment">// 缓存数据源</span></span><br><span class="line">            DBUtil.setDataSourceIfAbsent(titanKey, dataSource);</span><br><span class="line">        &#125; <span class="keyword">catch</span> (Exception t) &#123;</span><br><span class="line">            <span class="keyword">throw</span> Throwables.propagate(t);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 根据 cluster name 加载单库数据源</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">fillDataSourceFromClusterName</span><span class="params">(String clusterName)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            Assert.hasText(clusterName,</span><br><span class="line">                           <span class="string">"connect to db failed; dal cluster cannot be null or empty"</span>);</span><br><span class="line"></span><br><span class="line">            <span class="comment">// 判断是否为 clusterName 格式</span></span><br><span class="line">            Assert.isTrue(clusterName.contains(CLUSTER_CONN_TYPE_FLAG),</span><br><span class="line">                          String.format(<span class="string">"%s is not in a cluster format"</span>, clusterName));</span><br><span class="line"></span><br><span class="line">            DataSource dataSource = dsFactory.getOrCreateDataSource(clusterName);</span><br><span class="line">            <span class="comment">// 缓存数据源</span></span><br><span class="line">            DBUtil.setDataSourceIfAbsent(clusterName, dataSource);</span><br><span class="line">        &#125; <span class="keyword">catch</span> (Exception t) &#123;</span><br><span class="line">            <span class="keyword">throw</span> Throwables.propagate(t);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@PostConstruct</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">initDataSource</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 通过 titan key 加载数据源</span></span><br><span class="line">        fillDataSourceFromTitanKey(TITAN_KEY_TEST_DB);</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 通过 cluster name 加载数据源</span></span><br><span class="line">        fillDataSourceFromClusterName(CLUSTER_NAME_TEST_DB);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>DBUtil.class</code></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.alibaba.datax.common.exception.DataXException;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.Logger;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.LoggerFactory;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> javax.sql.DataSource;</span><br><span class="line"><span class="keyword">import</span> java.io.File;</span><br><span class="line"><span class="keyword">import</span> java.sql.*;</span><br><span class="line"><span class="keyword">import</span> java.util.*;</span><br><span class="line"><span class="keyword">import</span> java.util.concurrent.*;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">final</span> <span class="class"><span class="keyword">class</span> <span class="title">DBUtil</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="title">DBUtil</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger LOG = LoggerFactory.getLogger(DBUtil<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Map&lt;String, DataSource&gt; DS_MAP = <span class="keyword">new</span> ConcurrentHashMap&lt;&gt;();</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 从外部将数据源放到Engine里</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> dsName 数据源名称(后续根据名称取出数据源)</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> ds     数据源</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">setDataSourceIfAbsent</span><span class="params">(String dsName, DataSource ds)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (DS_MAP.containsKey(dsName)) &#123;</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">synchronized</span> (DS_MAP) &#123;</span><br><span class="line">            <span class="keyword">if</span> (!dsMap.containsKey(dsName)) &#123;</span><br><span class="line">                DS_MAP.put(dsName, ds);</span><br><span class="line">                LOG.info(<span class="string">"setDataSourceIfAbsent将数据源&#123;&#125;放入Engine"</span>, dsName);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 获取数据源</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> dsName 数据源名称</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 数据源</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">static</span> DataSource <span class="title">getDataSource</span><span class="params">(String dsName)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 处理 jdbc 格式的数据源名称</span></span><br><span class="line">        <span class="keyword">if</span> (dsName.contains(<span class="string">"?"</span>)) &#123;</span><br><span class="line">            dsName = dsName.substring(<span class="number">0</span>, dsName.indexOf(<span class="string">"?"</span>));</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">return</span> DS_MAP.get(dsName);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 通过数据源名称获取数据库连接</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> dsName 数据源名称</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 数据库连接</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> Connection <span class="title">getConnection</span><span class="params">(String dsName)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            <span class="comment">// 获取数据源</span></span><br><span class="line">            DataSource dataSource = getDataSource(dsName);</span><br><span class="line">            </span><br><span class="line">            Assert.notNull(dataSource, String.format(<span class="string">"获取数据源%s失败"</span>, dsName));</span><br><span class="line">            </span><br><span class="line">            <span class="keyword">return</span> dataSource.getConnection();</span><br><span class="line">        &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">            <span class="keyword">throw</span> DataXException</span><br><span class="line">                .asDataXException(DBUtilErrorCode.CONN_DB_ERROR,</span><br><span class="line">                                  String.format(<span class="string">"数据库连接失败. 因为根据您配置的连接信息:%s获取数据库连接失败. 请检查您的配置并作出修改."</span>, dsName), e);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5/" rel="tag"><i class="fa fa-tag"></i> 数据同步</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/08/13/unsafe_pointer/" rel="prev" title="unsafe.Pointer-指针转换与运算">
+      <i class="fa fa-chevron-left"></i> unsafe.Pointer-指针转换与运算
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/11/11/spring_bean_util_copy/" rel="next" title="Spring 对象拷贝机制">
+      Spring 对象拷贝机制 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#一、-携程-Dal-开源框架"><span class="nav-number">1.</span> <span class="nav-text">一、 携程 Dal 开源框架</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二、-DataX-与-Dal-的兼容"><span class="nav-number">2.</span> <span class="nav-text">二、 DataX 与 Dal 的兼容</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#三、-Datax-配置-TitanKey-或-ClusterName"><span class="nav-number">3.</span> <span class="nav-text">三、 Datax 配置 TitanKey 或 ClusterName</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#四、DataX-获取-Dal-数据源"><span class="nav-number">4.</span> <span class="nav-text">四、DataX 获取 Dal 数据源</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#五、DataX-兼容-Dal-优化"><span class="nav-number">5.</span> <span class="nav-text">五、DataX 兼容 Dal 优化</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">21</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'naWrDRGa7bbNwXENT37YmHmo-gzGzoHsz',
+      appKey     : 'UkBYXBAr3F8KetKjejwAoDnz',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>
