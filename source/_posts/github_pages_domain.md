@@ -15,7 +15,7 @@ categories: 运维
 
 `GitHub Pages` 是一个很好的博客载体，部署成功之后会分配一个 `username.github.io` 的访问地址。同时，`GitHub Pages` 也预留了域名配置项，“我们可以定制化一个域名，不用再去访问默认的地址”。这使得绑定个人域名成为可能。
 
-[![qrz4k4.png](https://s1.ax1x.com/2022/03/28/qrz4k4.png)](https://imgtu.com/i/qrz4k4)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_21_46_9_github_page_domain.png)
 
 #### 三、绑定个人域名
 
@@ -29,13 +29,13 @@ categories: 运维
 
 **方法一：**在项目目录上手动添加 `CNAME` 文件（没有后缀名），文本内容为 `takeshell.com`。提交之后，可以看到 `Custome domain` 已自动回填新的域名。
 
-![qsPF2j.png](https://s1.ax1x.com/2022/03/28/qsPF2j.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_21_48_22_add_cname_file.png)
 
-![qsPJqx.png](https://s1.ax1x.com/2022/03/28/qsPJqx.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_21_49_32_edit_cname_file.png)
 
 **方法二：**直接操作 `Custom domain` 配置项，填写个人域名，并保存。
 
-![qsC3Hf.png](https://s1.ax1x.com/2022/03/28/qsC3Hf.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_21_52_31_custom_domain.png)
 
 ##### 3.3 `DNS` 配置
 
@@ -46,27 +46,27 @@ categories: 运维
  * A: 全称为`Address`，`DNS` 将个人域名解析到指定 `IP` ；
  * CNAME: 全称为 `Canonical Name`，`DNS` 将域名指向为另外一个域名；
 
-![qrz5tJ.png](https://s1.ax1x.com/2022/03/28/qrz5tJ.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_21_52_59_dns_map.png)
 
 **`Address` 记录类型：**
 
 首先，通过 `ping username.github.io` 获取 `IP`，如 185.199.111.153。然后在阿里云平台，选择域名解析->解析设置->添加记录。
 
-![qsAiT0.png](https://s1.ax1x.com/2022/03/28/qsAiT0.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_18_17_13_add_dns_a.png)
 
 这里的主机记录是 `www`，需要再添加一个 `@` 的配置，这样， `https://www.takeshell.com` 和 `https://takeshell.com` 都可以访问博客。最后启用 `DNS` ，就可以用 `takeshell.com` 访问博客了。这里的 `TTL(Time To Live)`，是 `DNS` 的缓存时间，默认10 `min` 就好了。 
 
-![qsA73F.png](https://s1.ax1x.com/2022/03/28/qsA73F.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_18_17_59_add_dns_a_final.png)
 
 **`CNAME` 记录类型：**
 
 个人域名，除了可以直接映射到指定 `IP`  上，还可以映射到 `username.github.io` 上。相当于开启一个域名分身，虽然来路不同，但目的地是一致的。这样的映射机制也叫域名别名。
 
-![qsVdFP.png](https://s1.ax1x.com/2022/03/28/qsVdFP.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_21_59_27_add_dns_cname.png)
 
 同样地，再申请一个主机记录为 `@` 的配置。开启 `DNS` 后，也可以用 `takeshell.com` 正常访问博客。
 
-![qsZe1S.png](https://s1.ax1x.com/2022/03/28/qsZe1S.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_22_0_0_add_dns_cname_final.png)
 
 #### 四、总结
 
