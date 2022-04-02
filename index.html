@@ -193,7 +193,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
+                <time title="修改时间：2022-04-02 19:30:45" itemprop="dateModified" datetime="2022-04-02T19:30:45+08:00">2022-04-02</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -257,13 +257,13 @@
 <li><code>5</code> 个常开闸机若都有乘客进入，则安排后来者在进站围栏里排队等待；</li>
 <li>若进站围栏已经站满了乘客，则开启另外 <code>5</code> 个应急闸机（一个个开启）；</li>
 </ul>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/thread_pool_change.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_28_38_thread_pool_change.png" alt=""></p>
 <p>为了模拟 <code>Task</code> 任务嵌套的场景，假设所有打工人都有一个同伴，而且都是走到闸机口才发现忘记买票，只能安排同伴去买票。这里：</p>
 <ul>
 <li>外层 <code>Task</code>：打工人进闸机；</li>
 <li>内层 <code>Task</code>：打工人的同伴出去买票；</li>
 </ul>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/thread_pool_dead_lock_2.jpg" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_30_8_thread_pool_dead_lock_2.jpg" alt=""></p>
 <p>假设张三、李四等人走到闸机口时才发现忘了买票，于是便可能发生如下对话：</p>
 <ul>
 <li><p>张三：“怎么出去买个票要这么久？”</p>
@@ -290,7 +290,7 @@
 <p>从日志可以看出，<code>TASK_EXECUTOR</code> 线程池一共经历了三个阶段：开启核心线程处理任务；将多余任务放入阻塞队列；开启非核心线程处理任务。一共有 <code>500</code> 个打工人需要进站，最终只有大概 <code>11</code> 人（<code>ThreadPoolExecutor().getCompletedTaskCount()</code>返回模糊数量）成功进站。线程池死锁，主线程全部处于 <code>WAITING</code> 状态。</p>
 <h4 id="五、-Spring-线程池饥饿死锁解决方案"><a href="#五、-Spring-线程池饥饿死锁解决方案" class="headerlink" title="五、 Spring 线程池饥饿死锁解决方案"></a>五、 <code>Spring</code> 线程池饥饿死锁解决方案</h4><p>线程池死锁，影响比较严重。在编码过程中容易忽略（需要追溯整条业务代码链）；在测试过程中不易发现（需要压测，且是偶发现象）。我们可以采用以下方案：</p>
 <ul>
-<li>嵌套任务禁止共用线程池（推荐）；</li>
+<li>禁止嵌套任务共用线程池（推荐）；</li>
 <li>硬编码 <code>jdk</code> 线程池，执行完任务后手动<code>shutdown</code>（不推荐）；</li>
 <li>回归业务，整合嵌套任务（不推荐）。</li>
 </ul>
