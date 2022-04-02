@@ -21,7 +21,7 @@ type Pointer *ArbitraryType
 
 #### 二、`unsafe.Pointer` 特性
 
-![](https://gitee.com/donehub/imgbed/raw/master/unsafe_convert2.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_44_21_unsafe_convert2.png)
 
 * 任意类型的指针都可以转换为 `unsafe.Pointer`；
 
@@ -47,7 +47,7 @@ type Pointer *ArbitraryType
 
 作为通用的指针类型，`unsafe.Pointer` 最基本的功能就是转换不同类型的指针。从  `*X` 转到 `*Y` 要求 `Y` 不大于 `X` 且两者具有相同的内存布局。
 
-![](https://gitee.com/donehub/imgbed/raw/master/3bae7ae30938f90422720c9ac68ba9b.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_47_43_x-y_pointer.png)
 
 例如 `byte` 与 `string` 互转。由于 `Go` 的类型系统限制，`byte` 指针是不可以直接转为 `string` 指针的，在编译阶段就会报错。我们需要借助 `unsafe.Pointer` 作为中间桥接类型来完成这个转换。
 
@@ -84,7 +84,7 @@ abc
 
 例如 `int64` 与 `*C.char` 互转：
 
-![](https://gitee.com/donehub/imgbed/raw/master/num_to_pointer_convert.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_48_14_num_to_pointer_convert.png)
 
 ```go
 package main
