@@ -344,7 +344,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
+                <time title="修改时间：2022-04-02 19:39:40" itemprop="dateModified" datetime="2022-04-02T19:39:40+08:00">2022-04-02</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -399,10 +399,10 @@
 
 
 <h4 id="二、-BeanUtils-copyProperties实现原理"><a href="#二、-BeanUtils-copyProperties实现原理" class="headerlink" title="二、 BeanUtils.copyProperties实现原理"></a>二、 <code>BeanUtils.copyProperties</code>实现原理</h4><p>根据以上分析，整合出 <code>Spring</code> 对象拷贝的实现原理：</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/introspector.jpg" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_39_5_introspector.jpg" alt=""></p>
 <p>通过内省机制，对 <code>Bean</code> 进行拆分，得到每个属性的描述器，缓存在 <code>Map</code> 中，<code>Key</code>为变量名，<code>Value</code>为属性描述器。属性描述器主要包括：属性名称、读取属性值的方法、设置属性值的方法。拷贝过程中，先获取目标属性的写入方法，再获取对应源属性的读取方法，最后通过反射拷贝属性值。</p>
 <h4 id="三、JavaBean内省机制"><a href="#三、JavaBean内省机制" class="headerlink" title="三、JavaBean内省机制"></a>三、<code>JavaBean</code>内省机制</h4><p><code>JavaBean</code> 内省，是建立在反射基础上的，通过解析 <code>Bean</code>各个属性的描述器，以便通过属性描述器来操作 <code>Bean</code> 的一种机制。反射是将 <code>Java</code> 类中的各种成分映射成相应的 <code>Java</code> 类，可以获取所有属性以及调用任何方法。与反射不同的是，内省是通过属性描述器来暴露一个 <code>Bean</code> 的属性、方法和时间的，而且只有符合 <code>JavaBean</code> 规则的类的成员才可以调用内生 <code>API</code> 进行操作。</p>
-<p><img src="http://assets.processon.com/chart_image/618e0010f346fb6e389afebc.png?_=1636696657277" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_37_1_refect_instropection.png" alt=""></p>
 <p>内省在 <code>java.beans.Introspector</code>中的具体实现：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 获取所有的 public 方法</span></span><br><span class="line">Method methodList[] = getPublicDeclaredMethods(beanClass);</span><br><span class="line"><span class="comment">// 循环遍历处理每一个 public 方法, 为方便讲解, 此处我们以第一个方法为例...</span></span><br><span class="line"></span><br><span class="line">Method method = methodList[<span class="number">0</span>];</span><br><span class="line"><span class="keyword">if</span> (method == <span class="keyword">null</span>) &#123;</span><br><span class="line">    <span class="keyword">continue</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 跳过 static 方法</span></span><br><span class="line"><span class="keyword">int</span> mods = method.getModifiers();</span><br><span class="line"><span class="keyword">if</span> (Modifier.isStatic(mods)) &#123;</span><br><span class="line">    <span class="keyword">continue</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 获取该方法的名称, 如setAge、getAge</span></span><br><span class="line">String name = method.getName();</span><br><span class="line"><span class="comment">// 获取该方法的入参和返参</span></span><br><span class="line">Class&lt;?&gt;[] argTypes = method.getParameterTypes();</span><br><span class="line">Class&lt;?&gt; resultType = method.getReturnType();</span><br><span class="line"><span class="comment">// 获取该方法的入参个数</span></span><br><span class="line"><span class="keyword">int</span> argCount = argTypes.length;</span><br><span class="line">PropertyDescriptor pd = <span class="keyword">null</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (argCount == <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="comment">// 1. 没有入参: 说明是获取属性值的方法</span></span><br><span class="line">    <span class="keyword">if</span> (name.startsWith(GET_PREFIX)) &#123;</span><br><span class="line">        <span class="comment">// 1.1 该方法名称以 get 开头, 如 getAge</span></span><br><span class="line">        pd = <span class="keyword">new</span> PropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">3</span>), method, <span class="keyword">null</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (resultType == <span class="keyword">boolean</span><span class="class">.<span class="keyword">class</span> &amp;&amp; <span class="title">name</span>.<span class="title">startsWith</span>(<span class="title">IS_PREFIX</span>)) </span>&#123;</span><br><span class="line">        <span class="comment">// 1.2 该方法名称以 is 开头, 如 isMale, 只处理基本类型的布尔值</span></span><br><span class="line">        pd = <span class="keyword">new</span> PropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">2</span>), method, <span class="keyword">null</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (argCount == <span class="number">1</span>) &#123;</span><br><span class="line">    <span class="comment">// 2. 有一个入参</span></span><br><span class="line">    if (int.class.equals(argTypes[0]) &amp;&amp; name.startsWith(GET_PREFIX)) &#123;</span><br><span class="line">        <span class="comment">// 2.1 获取属性值的方法, 如 getChild(Integer index), 则封装成索引属性器</span></span><br><span class="line">        pd = <span class="keyword">new</span> IndexedPropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">3</span>), <span class="keyword">null</span>, <span class="keyword">null</span>, method, <span class="keyword">null</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (<span class="keyword">void</span><span class="class">.<span class="keyword">class</span>.<span class="title">equals</span>(<span class="title">resultType</span>) &amp;&amp; <span class="title">name</span>.<span class="title">startsWith</span>(<span class="title">SET_PREFIX</span>)) </span>&#123;</span><br><span class="line">        <span class="comment">// 2.2 设置属性值的方法</span></span><br><span class="line">        pd = <span class="keyword">new</span> PropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">3</span>), <span class="keyword">null</span>, method);</span><br><span class="line">        <span class="keyword">if</span> (throwsException(method, PropertyVetoException<span class="class">.<span class="keyword">class</span>)) </span>&#123;</span><br><span class="line">            pd.setConstrained(<span class="keyword">true</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (argCount == <span class="number">2</span>) &#123;</span><br><span class="line">    <span class="comment">// 3. 有两个入参</span></span><br><span class="line">    if (void.class.equals(resultType) &amp;&amp; int.class.equals(argTypes[0]) &amp;&amp; name.startsWith(SET_PREFIX)) &#123;</span><br><span class="line">        <span class="comment">// 3.1 只处理设置属性值的方法, 如 setChild(Integer index, Child child), 则封装成索引属性器</span></span><br><span class="line">        pd = <span class="keyword">new</span> IndexedPropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">3</span>), <span class="keyword">null</span>, <span class="keyword">null</span>, <span class="keyword">null</span>, method);</span><br><span class="line">        <span class="keyword">if</span> (throwsException(method, PropertyVetoException<span class="class">.<span class="keyword">class</span>)) </span>&#123;</span><br><span class="line">            pd.setConstrained(<span class="keyword">true</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">return</span> PropertyDescriptor;</span><br></pre></td></tr></table></figure>
 
@@ -582,7 +582,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
+                <time title="修改时间：2022-04-02 19:48:47" itemprop="dateModified" datetime="2022-04-02T19:48:47+08:00">2022-04-02</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -630,7 +630,7 @@
 <h4 id="一、unsafe-Pointer-定义及使用背景"><a href="#一、unsafe-Pointer-定义及使用背景" class="headerlink" title="一、unsafe.Pointer 定义及使用背景"></a>一、<code>unsafe.Pointer</code> 定义及使用背景</h4><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ArbitraryType is here for the purposes of documentation only and is not actually</span></span><br><span class="line"><span class="comment">// part of the unsafe package. It represents the type of an arbitrary Go expression.</span></span><br><span class="line"><span class="keyword">type</span> ArbitraryType <span class="keyword">int</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> Pointer *ArbitraryType</span><br></pre></td></tr></table></figure>
 
 <p>本质上，<code>unsafe.Pointer</code>  是 <code>int</code> 类型的指针，用于各种类型指针转换的桥接。<code>Go</code> 语言有着严格的类型系统，弱化了指针的操作，所允许的操作仅仅操作其指向的对象，不能进行类似 <code>C</code> 语言的指针转换和运算。但在日常开发中，可能就需要打破这种强制限制，对内存执行任意的读写。因此，作为通用的指针类型，<code>unsafe.Pointer</code> 开启了一扇指针操作的“后门”。</p>
-<h4 id="二、unsafe-Pointer-特性"><a href="#二、unsafe-Pointer-特性" class="headerlink" title="二、unsafe.Pointer 特性"></a>二、<code>unsafe.Pointer</code> 特性</h4><p><img src="https://gitee.com/donehub/imgbed/raw/master/unsafe_convert2.png" alt=""></p>
+<h4 id="二、unsafe-Pointer-特性"><a href="#二、unsafe-Pointer-特性" class="headerlink" title="二、unsafe.Pointer 特性"></a>二、<code>unsafe.Pointer</code> 特性</h4><p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_44_21_unsafe_convert2.png" alt=""></p>
 <ul>
 <li><p>任意类型的指针都可以转换为 <code>unsafe.Pointer</code>；</p>
 </li>
@@ -646,13 +646,13 @@
 </li>
 </ul>
 <h4 id="三、unsafe-Pointer-应用"><a href="#三、unsafe-Pointer-应用" class="headerlink" title="三、unsafe.Pointer 应用"></a>三、<code>unsafe.Pointer</code> 应用</h4><h5 id="3-1-指针与指针之间的转换"><a href="#3-1-指针与指针之间的转换" class="headerlink" title="3.1 指针与指针之间的转换"></a>3.1 指针与指针之间的转换</h5><p>作为通用的指针类型，<code>unsafe.Pointer</code> 最基本的功能就是转换不同类型的指针。从  <code>*X</code> 转到 <code>*Y</code> 要求 <code>Y</code> 不大于 <code>X</code> 且两者具有相同的内存布局。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/3bae7ae30938f90422720c9ac68ba9b.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_47_43_x-y_pointer.png" alt=""></p>
 <p>例如 <code>byte</code> 与 <code>string</code> 互转。由于 <code>Go</code> 的类型系统限制，<code>byte</code> 指针是不可以直接转为 <code>string</code> 指针的，在编译阶段就会报错。我们需要借助 <code>unsafe.Pointer</code> 作为中间桥接类型来完成这个转换。</p>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">    <span class="string">"fmt"</span></span><br><span class="line">    <span class="string">"unsafe"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    b := []<span class="keyword">byte</span>&#123;<span class="string">'a'</span>, <span class="string">'b'</span>, <span class="string">'c'</span>&#125;</span><br><span class="line">    fmt.Println(b)</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// []byte -&gt; string</span></span><br><span class="line">    s := *(*<span class="keyword">string</span>)(unsafe.Pointer(&amp;b))</span><br><span class="line">    fmt.Println(s)</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// string -&gt; []byte</span></span><br><span class="line">    bb := *(*[]<span class="keyword">byte</span>)(unsafe.Pointer(&amp;s))</span><br><span class="line">    fmt.Println(bb)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">输出：</span><br><span class="line">[<span class="number">97</span> <span class="number">98</span> <span class="number">99</span>]</span><br><span class="line">abc</span><br><span class="line">[<span class="number">97</span> <span class="number">98</span> <span class="number">99</span>]</span><br></pre></td></tr></table></figure>
 
 <h5 id="3-2-数值与指针之间的转换"><a href="#3-2-数值与指针之间的转换" class="headerlink" title="3.2 数值与指针之间的转换"></a>3.2 数值与指针之间的转换</h5><p>在 <code>C</code> 语言中，经常使用普通数值来表示指针，这也就意味着要完成数值与指针之间的互转。 <code>unsafe.Pointer</code> 是通用指针，已无能为力。因此中间人 <code>uintptr</code> 就派上用场了。我们借助 <code>uintptr</code> 先将数值转换为 <code>unsafe.Pointer</code>，然后再转换为任意类型的指针；或者将任意类型的指针，先转换为 <code>unsafe.Pointer</code>，再转换为 <code>uintptr</code>。实际上，数值与指针的互转也是 <code>CGO</code> 编程的要点之一。</p>
 <p>例如 <code>int64</code> 与 <code>*C.char</code> 互转：</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/num_to_pointer_convert.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_48_14_num_to_pointer_convert.png" alt=""></p>
 <figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> <span class="string">"C"</span></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">    <span class="string">"fmt"</span></span><br><span class="line">    <span class="string">"unsafe"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="keyword">var</span> num = <span class="keyword">int64</span>(<span class="number">12</span>)</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// int64 -&gt; C.char</span></span><br><span class="line">    p := (*C.char)(unsafe.Pointer(<span class="keyword">uintptr</span>(num)))</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// C.char -&gt; int64</span></span><br><span class="line">    num2 := <span class="keyword">int64</span>(<span class="keyword">uintptr</span>(unsafe.Pointer(p)))</span><br><span class="line">    </span><br><span class="line">    fmt.Println(num2)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">输出：</span><br><span class="line"><span class="number">12</span></span><br></pre></td></tr></table></figure>
 
 <h5 id="3-3-指针运算"><a href="#3-3-指针运算" class="headerlink" title="3.3 指针运算"></a>3.3 指针运算</h5><p><code>Go</code> 指针不仅不支持不同类型的转换，也不支持指针的运算。借助 <code>uintptr</code> 可以实现指针的移动和运算。</p>
@@ -710,7 +710,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
+                <time title="修改时间：2022-04-02 19:57:49" itemprop="dateModified" datetime="2022-04-02T19:57:49+08:00">2022-04-02</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -756,20 +756,20 @@
       
           <hr>
 <h5 id="一、学习背景"><a href="#一、学习背景" class="headerlink" title="一、学习背景"></a>一、学习背景</h5><p><code>Freemarker</code> 是一款强大的模板引擎，可以用来生成网页、邮件、文档等。对于简单的 <code>Word</code> 文档导出，只需要手动编写 <code>ftl</code> 文件即可。但如果要导出复杂的文档，比如带有复杂样式、页眉页脚、内嵌图片、批注等，手动编写模板就行不通了。现在提出一个从目标文档出发的解决方案：先将目标 <code>Word</code> 模板文档转换为 <code>xml</code> 文档，然后将 <code>xml</code> 文档转换为 <code>ftl</code> 文档，手动替换模板中的变量之后即可导出复杂 <code>Word</code> 。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/export_word_freemarker_flow.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_50_50_export_word_freemarker_flow.png" alt=""></p>
 <h5 id="二、根据目标文档获取-ftl-文档"><a href="#二、根据目标文档获取-ftl-文档" class="headerlink" title="二、根据目标文档获取 ftl 文档"></a>二、根据目标文档获取 <code>ftl</code> 文档</h5><p>我们以导出房屋租赁合同文档为例，模板中有房东、租客信息、房屋信息等。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/contract_template.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_51_57_contract_template.png" alt=""></p>
 <h6 id="1-将目标模板转换为-xml-文档"><a href="#1-将目标模板转换为-xml-文档" class="headerlink" title="1. 将目标模板转换为 xml 文档"></a>1. 将目标模板转换为 <code>xml</code> 文档</h6><p>操作 <code>Word</code> 文档，点击【文件】，另存为 <code>xml</code> 文档。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/convert_to_xml.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_52_36_convert_to_xml.png" alt=""></p>
 <p>用 <code>NotePad++</code> 或 <code>Sublime</code> 打开 <code>xml</code> 文档，内容缺乏层次感，这里需要格式化一下。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/format_xml.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_53_50_format_xml.png" alt=""></p>
 <h6 id="2-将-xml-文档转换为-ftl-文档"><a href="#2-将-xml-文档转换为-ftl-文档" class="headerlink" title="2. 将 xml 文档转换为 ftl 文档"></a>2. 将 <code>xml</code> 文档转换为 <code>ftl</code> 文档</h6><p>格式化之后的 <code>xml</code> 文档，选择【文件】，另存为 <code>ftl</code> 文档。接下来需要手动替换模板参数。</p>
 <p><strong>文本参数：</strong>根据模板中的默认值，找到其所在位置，直接替换。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/replace_txt_2.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_54_36_replace_txt_2.png" alt=""></p>
 <p><strong>图片参数：</strong>图片参数是对图片进行 <code>Base64</code> 加密之后的值，加密操作可以由 <code>Java</code> 来完成。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/replace_img_2.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_55_36_replace_img_2.png" alt=""></p>
 <h5 id="三、使用-Java-根据-ftl-模板导出-Word-文档"><a href="#三、使用-Java-根据-ftl-模板导出-Word-文档" class="headerlink" title="三、使用 Java 根据 ftl 模板导出 Word 文档"></a>三、使用 <code>Java</code> 根据 <code>ftl</code> 模板导出 <code>Word</code> 文档</h5><p>在 <code>Resource</code> 目录下新建文件夹 <code>freemarker_template</code>，将 <code>ftl</code> 文档粘贴进去。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/package_structure.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_56_39_package_structure.png" alt=""></p>
 <p>图片 <code>Base64</code> 位编码：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.company.exception.ServiceException;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.Logger;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.LoggerFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.stereotype.Service;</span><br><span class="line"><span class="keyword">import</span> sun.misc.BASE64Encoder;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.io.File;</span><br><span class="line"><span class="keyword">import</span> java.io.FileInputStream;</span><br><span class="line"><span class="keyword">import</span> java.io.IOException;</span><br><span class="line"><span class="keyword">import</span> java.io.InputStream;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@author</span> zourongsheng</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@version</span> 1.0</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@date</span> 2021/07/11 22:48</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ImageServiceImpl</span> <span class="keyword">implements</span> <span class="title">ImageService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger LOGGER = LoggerFactory.getLogger(ImageServiceImpl<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 【对图片进行 Base64 编码】</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> fileSrc 图片的存储地址: filePath + fileName</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 图片 Base64 编码</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">getImgBase64Data</span><span class="params">(String fileSrc)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        File img = <span class="keyword">new</span> File(fileSrc);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (!img.exists()) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">try</span> (InputStream in = <span class="keyword">new</span> FileInputStream(img)) &#123;</span><br><span class="line">            <span class="keyword">byte</span>[] data = <span class="keyword">new</span> <span class="keyword">byte</span>[in.available()];</span><br><span class="line">            in.read(data);</span><br><span class="line">            BASE64Encoder encoder = <span class="keyword">new</span> BASE64Encoder();</span><br><span class="line">            <span class="keyword">return</span> encoder.encode(data);</span><br><span class="line">        &#125; <span class="keyword">catch</span> (IOException e) &#123;</span><br><span class="line">            LOGGER.error(<span class="string">"invoke ImageService.getImgBase64Data error: &#123;&#125;"</span>, e.getMessage(), e);</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> ServiceException(e.getMessage(), e);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
@@ -781,7 +781,7 @@
 
 <p><strong>注意：</strong> 通过这种方式导出的 <code>Word</code> 文档，本质上还是 <code>xml</code> 文档，因此必须使用 <code>.doc</code> 后缀，具体请查看<a href="https://donehub.github.io/my-blog/2021/07/11/difference_btw_doc_docx/">MsOffice Word docx 研究</a>。</p>
 <p>运行起来，导出<code>租房合同-打工人.doc</code>。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/export_word.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_57_34_export_word.png" alt=""></p>
 <h5 id="四、总结"><a href="#四、总结" class="headerlink" title="四、总结"></a>四、总结</h5><p>通过将目标模板转换为 <code>ftl</code> 文档，再解析得到目标文档的办法，理论上可以应对任何复杂程度的文档导出需求。但这种好办法也有弊端：<code>ftl</code> 文档包含太多的内联样式、复杂标签等，可读性太差。当模板发生变化时，手动替换太多的模板参数将会是一种灾难。</p>
 <blockquote>
 <p>参考：</p>
@@ -841,7 +841,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
+                <time title="修改时间：2022-04-02 20:04:25" itemprop="dateModified" datetime="2022-04-02T20:04:25+08:00">2022-04-02</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -888,10 +888,10 @@
           <hr>
 <h5 id="一、doc-与-docx-简介"><a href="#一、doc-与-docx-简介" class="headerlink" title="一、doc 与 docx 简介"></a>一、<code>doc</code> 与 <code>docx</code> 简介</h5><p><code>doc</code> 全程为 <code>document</code>，是常见的文件扩展名，也是 <code>Word2003</code> 及之前版本的文本文档格式，其基于二进制形式存储；<code>docx</code> 是 <code>Word2007</code> 及之后版本的文本文档格式，其基于 <code>Office Open XML</code> 标准的压缩文件格式。</p>
 <h5 id="二、docx-与-doc-的区别"><a href="#二、docx-与-doc-的区别" class="headerlink" title="二、docx 与 doc 的区别"></a>二、<code>docx</code> 与 <code>doc</code> 的区别</h5><p>既然 <code>docx</code> 基于 <code>ooxml</code> 的格式，那么本质上就是一个 <code>zip</code> 文件。以下是内容相同的文档，分别以 <code>doc</code> 和 <code>docx</code> 格式保存之后所占空间大小，可以看出 <code>docx</code> 文件明显比 <code>doc</code> 要小很多。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/compare_doc_docx_size.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_0_30_compare_doc_docx_size.png" alt=""></p>
 <hr>
 <p>为了进一步了解 <code>ooxml</code> 结构，我们以一个含有页眉页脚、文本、图片的 <code>docx</code> 文件为例。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/export_word.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_4_13_export_word.png" alt=""></p>
 <p>手动修改文件后缀为 <code>.zip</code> 后保存，然后解压得到文件结构：</p>
 <ul>
 <li><code>rels</code><ul>
@@ -996,7 +996,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
+                <time title="修改时间：2022-04-02 20:08:05" itemprop="dateModified" datetime="2022-04-02T20:08:05+08:00">2022-04-02</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -1043,7 +1043,7 @@
           <hr>
 <h3 id="写在前面的话"><a href="#写在前面的话" class="headerlink" title="写在前面的话"></a>写在前面的话</h3><p>最近在做数据迁移工具。经过多方调研，最后选择阿里巴巴开源工具 <code>DataX</code>。为了兼容携程 <code>Dal</code> 组件，对 <code>DataX</code> 连接源库和目标库的部分做了改造，以便通过 <code>TitanKey</code> 实现数据的同步。因此，关于数据同步的内容，计划分为三个章节：<code>DataX</code> 工具研究介绍、携程 <code>Dal</code> 组件研究介绍、<code>DataX</code> 整合 <code>Dal</code>。本篇介绍 <code>DataX</code> 的作用机制与使用。</p>
 <h5 id="一、DataX-介绍"><a href="#一、DataX-介绍" class="headerlink" title="一、DataX 介绍"></a>一、<code>DataX</code> 介绍</h5><p><code>DataX</code> 是阿里巴巴开源出来的数据同步工具，主要解决解决各种异构数据源之间的同步难题。目前已经拥有比较完善的插件体系，包括常用的 <code>RDBMS</code> 数据库、<code>NOSQL</code>、大数据计算系统。良好的架构设计，方便开发者引入新插件，一步步构建起数据同步的生态圈。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/DataX_introduction.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_6_29_DataX_introduction.png" alt=""></p>
 <h5 id="二、目前支持的插件"><a href="#二、目前支持的插件" class="headerlink" title="二、目前支持的插件"></a>二、目前支持的插件</h5><table>
 <thead>
 <tr>
@@ -1199,9 +1199,9 @@
 </tr>
 </tbody></table>
 <h5 id="三、DataX-同步机制"><a href="#三、DataX-同步机制" class="headerlink" title="三、DataX 同步机制"></a>三、<code>DataX</code> 同步机制</h5><p><code>DataX</code> 将数据同步过程中的读取和写入分别抽象为 <code>Reader</code>/<code>Writer</code>插件，并且以框架作为媒介，实现读取数据源和同步数据源的灵活组合。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/datax3.0.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_6_59_datax3.0.png" alt=""></p>
 <p> 简单来说，<code>DataX</code> 的设计愿景，是建立一个万能数据池（图中的 <code>FrameWork</code>）：有无限根管道通往池子，负责导入数据；同时又有无限根管道负责向外导出数据。向池子里导入数据，依赖 <code>Reader</code> 插件；从池子向外导出数据，依赖 <code>Writer</code> 插件。这种设计的精妙之处，在于这个数据池子是万能的，就是说可以从任何一根管道导入数据，也可以将数据导出到任何一根管道。因此，我们只需要关心导入数据和导出数据的管道建设，也就是开发新的 <code>Reader</code>/<code>Writer</code>插件，便可实现多种数据源之间的同步。</p>
-<h5 id="四、DataX数据同步过程"><a href="#四、DataX数据同步过程" class="headerlink" title="四、DataX数据同步过程"></a>四、<code>DataX</code>数据同步过程</h5><p><img src="https://gitee.com/donehub/imgbed/raw/master/datax_sync_flow.png" alt=""></p>
+<h5 id="四、DataX数据同步过程"><a href="#四、DataX数据同步过程" class="headerlink" title="四、DataX数据同步过程"></a>四、<code>DataX</code>数据同步过程</h5><p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_7_23_datax_sync_flow.png" alt=""></p>
 <p>名词解释：</p>
 <p><code>Job</code>：<code>DataX</code> 执行数据同步任务的最小业务单元；</p>
 <p><code>Task</code>：<code>DataX</code> 执行数据同步任务的最小执行单元，由 <code>Job</code> 拆分而来，为实现最大的同步效率；</p>
@@ -1270,7 +1270,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-31 18:18:18" itemprop="dateModified" datetime="2022-03-31T18:18:18+08:00">2022-03-31</time>
+                <time title="修改时间：2022-04-02 20:21:57" itemprop="dateModified" datetime="2022-04-02T20:21:57+08:00">2022-04-02</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -1322,43 +1322,43 @@
 </blockquote>
 <p>简单地说，<code>PicGo</code> 可以主动 <code>Push</code> 图片到远端，并主动获取远端图片的外链，不用我们操心。</p>
 <h5 id="3、搭建基于-Gitee-的图床"><a href="#3、搭建基于-Gitee-的图床" class="headerlink" title="3、搭建基于 Gitee 的图床"></a>3、搭建基于 <code>Gitee</code> 的图床</h5><h6 id="3-1-创建-Gitee-图床仓库"><a href="#3-1-创建-Gitee-图床仓库" class="headerlink" title="3.1 创建 Gitee 图床仓库"></a>3.1 创建 <code>Gitee</code> 图床仓库</h6><p>创建图床仓库，需要注意两点：仓库需要开源，否则别人没有权限查看你的图片；分支只需要初始化 <code>master</code> ，图床操作都在这个分支上。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E6%96%B0%E5%BB%BA%E4%BB%93%E5%BA%93%E5%85%A5%E5%8F%A3.png" alt=""></p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/PicGo%E4%B8%8B%E8%BD%BD%E6%8C%87%E5%AF%BC.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_12_34_%E6%96%B0%E5%BB%BA%E4%BB%93%E5%BA%93%E5%85%A5%E5%8F%A3.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_13_20_PicGo%E4%B8%8B%E8%BD%BD%E6%8C%87%E5%AF%BC.png" alt=""></p>
 <h6 id="3-2-安装配置-PicGo"><a href="#3-2-安装配置-PicGo" class="headerlink" title="3.2 安装配置 PicGo"></a>3.2 安装配置 <code>PicGo</code></h6><p>下载安装包：<a href="https://github.com/Molunerfinn/PicGo/releases/tag/v2.3.0" target="_blank" rel="noopener">version: 2.3.0</a>；</p>
 <p><code>windows</code>平台请选择：</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E6%96%B0%E5%BB%BA%E4%BB%93%E5%BA%93%E9%85%8D%E7%BD%AE.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_13_51_%E6%96%B0%E5%BB%BA%E4%BB%93%E5%BA%93%E9%85%8D%E7%BD%AE.png" alt=""></p>
 <p>运行软件，可以看到【图床设置】一栏是没有 <code>Gitee</code> 的，这需要额外安装插件。操作【插件设置】，输入 <code>gitee</code> 查询相关插件，选择安装 <code>gitee 2.0.5</code>。</p>
 <blockquote>
 <p>插件安装基于 <code>npm</code>，需要先安装 <code>Nodejs</code></p>
 </blockquote>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20211226223238.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_14_29_%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20211226223238.png" alt=""></p>
 <p>插件安装成功后重启软件，打开【图床设置】，选择【<code>Gitee</code>图床】，各项配置如下：</p>
 <p><code>owner</code>:  <code>Gitee</code>用户名 (<code>donehub</code>)；</p>
 <p><code>repo</code>: <code>Gitee</code> 图片仓库名 (<code>img-bed</code>)；</p>
 <p><code>path</code>: 图片存放的目录，可以不填写；</p>
 <p><code>token</code>: <code>Gitee</code> 上生成的私有令牌，用于授权 <code>PicGo</code> 操作 <code>Gitee</code> 图床；</p>
 <p><code>message</code>: 用默认证即可；</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E5%9B%BE%E5%BA%8A%E8%AE%BE%E7%BD%AE.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_14_57_%E5%9B%BE%E5%BA%8A%E8%AE%BE%E7%BD%AE.png" alt=""></p>
 <p>具体配置方法：</p>
 <p><code>owner</code> 、<code>repo</code> 容易写错，建议直接到 <code>Gitee</code> 上 <code>Copy</code>：</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/owner-repo.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_15_41_owner-repo.png" alt=""></p>
 <p><code>Gitee</code> 生成私有令牌：</p>
 <p>步骤：个人主页-》个人设置-》安全设置-》私有令牌-》配置权限-》提交；</p>
 <p>注意：私有令牌只会展示一次，建议复制下来长久保存；</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E4%B8%80%E6%AD%A5.png" alt=""></p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E4%BA%8C%E6%AD%A5.png" alt=""></p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C-%E7%AC%AC%E4%B8%89%E6%AD%A5.png" alt=""></p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E5%9B%9B%E6%AD%A5.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_16_21_%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E4%B8%80%E6%AD%A5.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_17_35_%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E4%BA%8C%E6%AD%A5.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_18_34_%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C-%E7%AC%AC%E4%B8%89%E6%AD%A5.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_19_1_%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E5%9B%9B%E6%AD%A5.png" alt=""></p>
 <h6 id="3-3-上传图片"><a href="#3-3-上传图片" class="headerlink" title="3.3 上传图片"></a>3.3 上传图片</h6><p>打开【上传区】，可以看到 <code>PicGo</code> 支持四种图片上传方式：拖拽上传、选择上传、剪切上传、<code>URL</code> 上传。返回的在线图片链接格式有 <code>Markdown</code>、<code>HTML</code> 等。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E4%B8%8A%E4%BC%A0%E5%9B%BE%E7%89%87.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_19_36_%E4%B8%8A%E4%BC%A0%E5%9B%BE%E7%89%87.png" alt=""></p>
 <p>我们选择一张图片上传，上传成功后，打开【相册】。在相册里，不仅可以看到已上传的所有图片，还可以拷贝、修改在线图片链接。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/%E7%9B%B8%E5%86%8C.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_20_1_%E7%9B%B8%E5%86%8C.png" alt=""></p>
 <h5 id="4-Typora-内嵌-PicGo"><a href="#4-Typora-内嵌-PicGo" class="headerlink" title="4. Typora 内嵌 PicGo"></a>4. <code>Typora</code> 内嵌 <code>PicGo</code></h5><p>虽然 <code>PicGo</code>  + <code>Gitee</code> 已经非常好用了，但我们依然需要手动上传图片并拷贝外链。既然图床是服务于内容，那么是否可以内嵌 <code>PicGo</code> 到编辑器内部呢？</p>
 <p> <code>Typora</code> 是一款主流的 <code>Markdown</code> 编辑器， <code>0.9.98</code> 及以上版本可以内嵌 <code>PicGo</code> 工具。配置完成之后，只需要将图片拖入页面，即可自动上传图床并插入外链。</p>
 <p>配置方法：文件-》偏好设置-》图像-》插入图片时选择上传图片-》上传服务设定</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/typora-picgo.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_20_48_typora-picgo.png" alt=""></p>
 <p>打开 <code>Test.md</code>，将图片拖入页面，可以看到短暂的 <code>loading</code> 提示，然后上传成功并替换图片外链。</p>
-<p><img src="https://gitee.com/donehub/imgbed/raw/master/typora-upload-img.png" alt=""></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_21_27_typora-upload-img.png" alt=""></p>
 
       
     </div>
