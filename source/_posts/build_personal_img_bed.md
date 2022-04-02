@@ -25,9 +25,9 @@ categories: 中间件
 
 创建图床仓库，需要注意两点：仓库需要开源，否则别人没有权限查看你的图片；分支只需要初始化 `master` ，图床操作都在这个分支上。
 
-![](https://gitee.com/donehub/imgbed/raw/master/新建仓库入口.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_12_34_%E6%96%B0%E5%BB%BA%E4%BB%93%E5%BA%93%E5%85%A5%E5%8F%A3.png)
 
-![](https://gitee.com/donehub/imgbed/raw/master/PicGo下载指导.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_13_20_PicGo%E4%B8%8B%E8%BD%BD%E6%8C%87%E5%AF%BC.png)
 
 ###### 3.2 安装配置 `PicGo`
 
@@ -35,13 +35,13 @@ categories: 中间件
 
 `windows`平台请选择：
 
-![](https://gitee.com/donehub/imgbed/raw/master/新建仓库配置.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_13_51_%E6%96%B0%E5%BB%BA%E4%BB%93%E5%BA%93%E9%85%8D%E7%BD%AE.png)
 
 运行软件，可以看到【图床设置】一栏是没有 `Gitee` 的，这需要额外安装插件。操作【插件设置】，输入 `gitee` 查询相关插件，选择安装 `gitee 2.0.5`。
 
 > 插件安装基于 `npm`，需要先安装 `Nodejs`
 
-![](https://gitee.com/donehub/imgbed/raw/master/微信图片_20211226223238.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_14_29_%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20211226223238.png)
 
 插件安装成功后重启软件，打开【图床设置】，选择【`Gitee`图床】，各项配置如下：
 
@@ -55,13 +55,13 @@ categories: 中间件
 
 `message`: 用默认证即可；
 
-![](https://gitee.com/donehub/imgbed/raw/master/图床设置.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_14_57_%E5%9B%BE%E5%BA%8A%E8%AE%BE%E7%BD%AE.png)
 
 具体配置方法：
 
 `owner` 、`repo` 容易写错，建议直接到 `Gitee` 上 `Copy`：
 
-![](https://gitee.com/donehub/imgbed/raw/master/owner-repo.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_15_41_owner-repo.png)
 
 `Gitee` 生成私有令牌：
 
@@ -69,25 +69,23 @@ categories: 中间件
 
 注意：私有令牌只会展示一次，建议复制下来长久保存；
 
-![](https://gitee.com/donehub/imgbed/raw/master/生成私有令牌第一步.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_16_21_%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E4%B8%80%E6%AD%A5.png)
 
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_17_35_%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E4%BA%8C%E6%AD%A5.png)
 
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_18_34_%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C-%E7%AC%AC%E4%B8%89%E6%AD%A5.png)
 
-![](https://gitee.com/donehub/imgbed/raw/master/生成私有令牌第二步.png)
-
-![](https://gitee.com/donehub/imgbed/raw/master/生成私有令牌-第三步.png)
-
-![](https://gitee.com/donehub/imgbed/raw/master/生成私有令牌第四步.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_19_1_%E7%94%9F%E6%88%90%E7%A7%81%E6%9C%89%E4%BB%A4%E7%89%8C%E7%AC%AC%E5%9B%9B%E6%AD%A5.png)
 
 ###### 3.3 上传图片
 
 打开【上传区】，可以看到 `PicGo` 支持四种图片上传方式：拖拽上传、选择上传、剪切上传、`URL` 上传。返回的在线图片链接格式有 `Markdown`、`HTML` 等。
 
-![](https://gitee.com/donehub/imgbed/raw/master/上传图片.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_19_36_%E4%B8%8A%E4%BC%A0%E5%9B%BE%E7%89%87.png)
 
 我们选择一张图片上传，上传成功后，打开【相册】。在相册里，不仅可以看到已上传的所有图片，还可以拷贝、修改在线图片链接。
 
-![](https://gitee.com/donehub/imgbed/raw/master/相册.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_20_1_%E7%9B%B8%E5%86%8C.png)
 
 ##### 4. `Typora` 内嵌 `PicGo`
 
@@ -97,8 +95,8 @@ categories: 中间件
 
 配置方法：文件-》偏好设置-》图像-》插入图片时选择上传图片-》上传服务设定
 
-![](https://gitee.com/donehub/imgbed/raw/master/typora-picgo.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_20_48_typora-picgo.png)
 
 打开 `Test.md`，将图片拖入页面，可以看到短暂的 `loading` 提示，然后上传成功并替换图片外链。
 
-![](https://gitee.com/donehub/imgbed/raw/master/typora-upload-img.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_21_27_typora-upload-img.png)
