@@ -83,7 +83,7 @@ private static void copyProperties(Object source, Object target, Class<?> editab
 
 根据以上分析，整合出 `Spring` 对象拷贝的实现原理：
 
-![](https://gitee.com/donehub/imgbed/raw/master/introspector.jpg)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_39_5_introspector.jpg)
 
 通过内省机制，对 `Bean` 进行拆分，得到每个属性的描述器，缓存在 `Map` 中，`Key`为变量名，`Value`为属性描述器。属性描述器主要包括：属性名称、读取属性值的方法、设置属性值的方法。拷贝过程中，先获取目标属性的写入方法，再获取对应源属性的读取方法，最后通过反射拷贝属性值。
 
@@ -91,7 +91,7 @@ private static void copyProperties(Object source, Object target, Class<?> editab
 
 `JavaBean` 内省，是建立在反射基础上的，通过解析 `Bean`各个属性的描述器，以便通过属性描述器来操作 `Bean` 的一种机制。反射是将 `Java` 类中的各种成分映射成相应的 `Java` 类，可以获取所有属性以及调用任何方法。与反射不同的是，内省是通过属性描述器来暴露一个 `Bean` 的属性、方法和时间的，而且只有符合 `JavaBean` 规则的类的成员才可以调用内生 `API` 进行操作。
 
-![](http://assets.processon.com/chart_image/618e0010f346fb6e389afebc.png?_=1636696657277)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_37_1_refect_instropection.png)
 
 内省在 `java.beans.Introspector`中的具体实现：
 
