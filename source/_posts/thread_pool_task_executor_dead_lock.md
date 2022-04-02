@@ -49,14 +49,14 @@ http-nio-8080-exec-32" daemon prio=5 tid=1676 WAITING
 * `5` 个常开闸机若都有乘客进入，则安排后来者在进站围栏里排队等待；
 * 若进站围栏已经站满了乘客，则开启另外 `5` 个应急闸机（一个个开启）；
 
-![](https://gitee.com/donehub/imgbed/raw/master/thread_pool_change.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_28_38_thread_pool_change.png)
 
 为了模拟 `Task` 任务嵌套的场景，假设所有打工人都有一个同伴，而且都是走到闸机口才发现忘记买票，只能安排同伴去买票。这里：
 
 * 外层 `Task`：打工人进闸机；
 * 内层 `Task`：打工人的同伴出去买票；
 
-![](https://gitee.com/donehub/imgbed/raw/master/thread_pool_dead_lock_2.jpg)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_30_8_thread_pool_dead_lock_2.jpg)
 
 假设张三、李四等人走到闸机口时才发现忘了买票，于是便可能发生如下对话：
 
@@ -441,6 +441,6 @@ public class TaskTest {
 
 线程池死锁，影响比较严重。在编码过程中容易忽略（需要追溯整条业务代码链）；在测试过程中不易发现（需要压测，且是偶发现象）。我们可以采用以下方案：
 
-* 嵌套任务禁止共用线程池（推荐）；
+* 禁止嵌套任务共用线程池（推荐）；
 * 硬编码 `jdk` 线程池，执行完任务后手动`shutdown`（不推荐）；
 * 回归业务，整合嵌套任务（不推荐）。
