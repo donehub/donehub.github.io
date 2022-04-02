@@ -15,13 +15,13 @@ categories: MSOffice
 
 既然 `docx` 基于 `ooxml` 的格式，那么本质上就是一个 `zip` 文件。以下是内容相同的文档，分别以 `doc` 和 `docx` 格式保存之后所占空间大小，可以看出 `docx` 文件明显比 `doc` 要小很多。
 
-![](https://gitee.com/donehub/imgbed/raw/master/compare_doc_docx_size.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_0_30_compare_doc_docx_size.png)
 
 -----------------
 
 为了进一步了解 `ooxml` 结构，我们以一个含有页眉页脚、文本、图片的 `docx` 文件为例。
 
-![](https://gitee.com/donehub/imgbed/raw/master/export_word.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_4_13_export_word.png)
 
 手动修改文件后缀为 `.zip` 后保存，然后解压得到文件结构：
 
