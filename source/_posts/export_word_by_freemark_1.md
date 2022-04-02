@@ -11,23 +11,23 @@ categories: 后端
 
 `Freemarker` 是一款强大的模板引擎，可以用来生成网页、邮件、文档等。对于简单的 `Word` 文档导出，只需要手动编写 `ftl` 文件即可。但如果要导出复杂的文档，比如带有复杂样式、页眉页脚、内嵌图片、批注等，手动编写模板就行不通了。现在提出一个从目标文档出发的解决方案：先将目标 `Word` 模板文档转换为 `xml` 文档，然后将 `xml` 文档转换为 `ftl` 文档，手动替换模板中的变量之后即可导出复杂 `Word` 。
 
-![](https://gitee.com/donehub/imgbed/raw/master/export_word_freemarker_flow.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_50_50_export_word_freemarker_flow.png)
 
 ##### 二、根据目标文档获取 `ftl` 文档
 
 我们以导出房屋租赁合同文档为例，模板中有房东、租客信息、房屋信息等。
 
-![](https://gitee.com/donehub/imgbed/raw/master/contract_template.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_51_57_contract_template.png)
 
 ###### 1. 将目标模板转换为 `xml` 文档
 
 操作 `Word` 文档，点击【文件】，另存为 `xml` 文档。
 
-![](https://gitee.com/donehub/imgbed/raw/master/convert_to_xml.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_52_36_convert_to_xml.png)
 
 用 `NotePad++` 或 `Sublime` 打开 `xml` 文档，内容缺乏层次感，这里需要格式化一下。
 
-![](https://gitee.com/donehub/imgbed/raw/master/format_xml.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_53_50_format_xml.png)
 
 ###### 2. 将 `xml` 文档转换为 `ftl` 文档
 
@@ -35,17 +35,17 @@ categories: 后端
 
 **文本参数：**根据模板中的默认值，找到其所在位置，直接替换。
 
-![](https://gitee.com/donehub/imgbed/raw/master/replace_txt_2.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_54_36_replace_txt_2.png)
 
 **图片参数：**图片参数是对图片进行 `Base64` 加密之后的值，加密操作可以由 `Java` 来完成。
 
-![](https://gitee.com/donehub/imgbed/raw/master/replace_img_2.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_55_36_replace_img_2.png)
 
 ##### 三、使用 `Java` 根据 `ftl` 模板导出 `Word` 文档
 
 在 `Resource` 目录下新建文件夹 `freemarker_template`，将 `ftl` 文档粘贴进去。
 
-![](https://gitee.com/donehub/imgbed/raw/master/package_structure.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_56_39_package_structure.png)
 
 图片 `Base64` 位编码：
 
@@ -261,7 +261,7 @@ public class TemplateTest {
 
 运行起来，导出`租房合同-打工人.doc`。
 
-![](https://gitee.com/donehub/imgbed/raw/master/export_word.png)
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_57_34_export_word.png)
 
 ##### 四、总结
 
