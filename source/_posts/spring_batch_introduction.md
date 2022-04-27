@@ -9,7 +9,7 @@ categories: 后端
 
 #### 一、简介
 
-Spring Batch 是一款轻量级批处理框架，主要用于构建高容量、高性能的批处理应用。作为 Spring 的子项目，Spring Batch 基于 Spring 框架，已进化出一套完备的企业级解决方案。借助良好的 Spring 生态，被广泛应用于批处理领域。
+Spring Batch 是一款轻量级的批处理框架，主要用于构建高容量、高性能的批处理应用。作为 Spring 的子项目，Spring Batch 基于 Spring 框架，已进化出一套完备的企业级解决方案。借助良好的 Spring 生态，被广泛应用于批处理领域。
 
 Spring Batch 拥有强大的组件库，包括任务重启、任务跳过、任务统计、日志追踪、事务管理、资源管理等。此外，对于大批量数据处理任务，通过分区和优化技术，实现高性能作业。总之，Spring Batch 有着良好的可扩展性，既可以处理简单的任务，也可以处理复杂的、高容量的任务。
 
@@ -44,7 +44,7 @@ Spring Batch 拥有强大的组件库，包括任务重启、任务跳过、任�
 
 `StepExecution` 是 `Step` 的一次执行，包含 `Step` 、`JobExecution` 以及事务相关数据的引用，比如提交和回滚次数、开始和结束时间等。
 
-输入器（`ItemReader`）、处理器（`ItemProcessor`）和输出器（`ItemWriter`），是顶级接口。基于此，Spring Batch 已实现常用组件，如文件数据存取器、数据库数据存取器等，功能完备，开箱即用。
+`ItemReader`、`ItemProcessor` 和 `ItemWriter`，是顶级接口。基于此，Spring Batch 已实现常用组件，如文件数据存取器、数据库数据存取器等，功能完备，开箱即用。
 
 ---
 
