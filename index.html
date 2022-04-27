@@ -162,6 +162,173 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2022/01/30/spring_batch_introduction/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/01/30/spring_batch_introduction/" class="post-title-link" itemprop="url">Spring Batch 基础介绍</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-01-30 22:48:01" itemprop="dateCreated datePublished" datetime="2022-01-30T22:48:01+08:00">2022-01-30</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-04-27 23:49:21" itemprop="dateModified" datetime="2022-04-27T23:49:21+08:00">2022-04-27</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2022/01/30/spring_batch_introduction/" class="post-meta-item leancloud_visitors" data-flag-title="Spring Batch 基础介绍" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2022/01/30/spring_batch_introduction/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2022/01/30/spring_batch_introduction/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <hr>
+<h4 id="一、简介"><a href="#一、简介" class="headerlink" title="一、简介"></a>一、简介</h4><p>Spring Batch 是一个轻量级批处理框架，主要被用在高容量、高性能的批处理应用中。作为 Spring 子项目之一，Spring Batch 基于 Spring 框架，发展出一套完备的解决方案，再凭借良好的技术生态，Spring Batch 被广泛应用于批处理领域。</p>
+<p>Spring Batch 有着强大的组件库，包括任务重启、任务跳过、任务统计、日志追踪、事务管理、资源管理等。对于大批量数据处理任务，Spring Batch 通过分区和优化技术，实现高性能的批处理作业。总之，Spring Batch 既可以处理简单的任务，也可以处理复杂的、高容量的任务。</p>
+<h4 id="二、基础架构"><a href="#二、基础架构" class="headerlink" title="二、基础架构"></a>二、基础架构</h4><p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/27_21_7_30_spring-batch-flow.png" alt=""></p>
+<p>看图可知：</p>
+<ul>
+<li>一个  <code>Job</code> 可以有一个或多个 <code>Step</code>；</li>
+<li>每个 <code>Step</code> 都包含一个 <code>ItemReader</code>、一个 <code>ItemProcessor</code> 和一个 <code>ItemWriter</code>；</li>
+<li><code>Job</code> 需要 <code>JobLauncher</code> 发起；</li>
+<li>批处理过程中的元数据存在 <code>JobRepository</code> 中；</li>
+</ul>
+<hr>
+<h5 id="Job"><a href="#Job" class="headerlink" title="Job"></a>Job</h5><p> <code>Job</code> 封装了整个批处理所需要的数据，可以通过 <code>xml</code> 或 <code>Java Bean</code> 注解配置。<code>Job</code> 的继承链：</p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/27_21_38_32_job_detail.png" alt=""></p>
+<p><code>JobInstance</code> 是 <code>Job</code> 的运行实例，就像同一个 <code>Java</code> 类可以实例化出不同的对象， <code>Job</code> 也可以有不同的 <code>JobInstance</code>，这取决于入参（<code>JobParameters</code>）。因此可以说，<code>JobInstance</code> = <code>Job</code> + <code>JobParameters</code>。<code>JobExecution</code>是 <code>JobInstance</code> 的一次执行，包括要做什么、具体怎么做、执行结果等。</p>
+<hr>
+<h5 id="Step"><a href="#Step" class="headerlink" title="Step"></a>Step</h5><p>从 Spring Batch 的基础架构图可知，一个 <code>Step</code> 包含输入、处理、输出这样一种模型，说明在批处理框架中， <code>Step</code> 是最小的执行单元。<code>Step</code> 的继承链：</p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/27_22_7_8_step_detail.png" alt=""></p>
+<p><code>StepExecution</code> 是 <code>Step</code> 的一次执行，包含 <code>Step</code> 、<code>JobExecution</code> 以及事务相关数据的引用，比如提交和回滚次数、开始和结束时间等。输入器（<code>ItemReader</code>）、处理器（<code>ItemProcessor</code>）和输出器（<code>ItemWriter</code>），是 Spring Batch 的顶级接口。作为完备的批处理框架，Spring Batch 自带许多有用的组件，如文件数据存取器、数据库数据存取器等，开箱即用。</p>
+<hr>
+<h5 id="JobLauncher"><a href="#JobLauncher" class="headerlink" title="JobLauncher"></a>JobLauncher</h5><p>对于给定的 <code>JobParameters</code> ，<code>JobLauncher</code> 负责启动 <code>Job</code>。</p>
+<hr>
+<h5 id="JobRepository"><a href="#JobRepository" class="headerlink" title="JobRepository"></a>JobRepository</h5><p><code>JobRepository</code> 专门负责与数据库打交道，记录整个批处理中的增加、检索、更新、删除动作。因此， Spring Batch 是依赖数据库进行管理的。相关表的<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/schema-appendix.html#metaDataSchema" target="_blank" rel="noopener">功能简介</a>如下：</p>
+<ul>
+<li><code>BATCH_JOB_INSTANCE</code>：储存 <code>JobInstance</code> 相关的所有信息；</li>
+<li><code>BATCH_JOB_EXECUTION_PARAMS</code>： 储存 <code>JobParameters</code> 相关的所有信息；</li>
+<li><code>BATCH_JOB_EXECUTION</code>：储存 <code>JobExecution</code> 相关的所有信息；</li>
+<li><code>BATCH_STEP_EXECUTION</code>：存储 <code>StepExecution</code> 相关的所有信息；</li>
+<li><code>BATCH_JOB_EXECUTION_CONTEXT</code>：存储 <code>Job</code> - <code>ExecutionContext</code> 相关的所有信息；</li>
+<li><code>BATCH_STEP_EXECUTION_CONTEXT</code>：存储 <code>Step</code> - <code>ExecutionContext</code> 相关的所有信息；</li>
+</ul>
+<h4 id="三、设计原则"><a href="#三、设计原则" class="headerlink" title="三、设计原则"></a>三、设计原则</h4><p>Spring Batch 只需要简单的配置即可用在基于 Spring 的应用上，实现了与基础架构的完美兼容，小巧却强大。其<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/spring-batch-intro.html#springBatchUsageScenarios" target="_blank" rel="noopener">设计原则</a>总结如下：</p>
+<ul>
+<li><p>继承 Spring 编程模型，开发者只专注于业务逻辑，基础实现交由框架负责；</p>
+</li>
+<li><p>解耦基础架构、执行环境和批处理应用之间的关注点；</p>
+</li>
+<li><p>抽取核心服务，设计顶层接口；</p>
+</li>
+<li><p>实现热门组件，开箱即用；</p>
+</li>
+<li><p>增强核心服务的可拓展性；</p>
+</li>
+<li><p>通过 Maven 构建简单的部署模型，独立于应用程序；</p>
+</li>
+</ul>
+<h4 id="四、使用原则"><a href="#四、使用原则" class="headerlink" title="四、使用原则"></a>四、使用原则</h4><p>Spring Batch 性能强劲，但开发者在构建批处理方案时，也应考虑以下<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/spring-batch-intro.html#springBatchArchitecture" target="_blank" rel="noopener">原则</a>：</p>
+<ul>
+<li><p>搭建架构和环境，尽量使用通用的构建块，批处理架构与在线框架之间会相互影响；</p>
+</li>
+<li><p>避免在单机应用中构建复杂的逻辑结构；</p>
+</li>
+<li><p>尽可能多地在内存中处理任务，尽可能少地使用系统资源，尤其是物理 <code>IO</code>：</p>
+<ul>
+<li>每个事务都去读取数据，完全可以读取一次，缓存下来；</li>
+<li>同一个事务中，重复读取数据；</li>
+<li>全表扫描或索引扫描；</li>
+</ul>
+</li>
+<li><p>不做重复的任务（记录已处理的任务，对于相同的后续任务，直接跳过）；</p>
+</li>
+<li><p>合理分配初始内存，防止在批处理中再次分配，耗费时间；</p>
+</li>
+<li><p>设定足够的校验和记录，保证数据的完整性；</p>
+</li>
+<li><p>模拟生产环境，尽早压测；</p>
+</li>
+<li><p>注重数据备份；</p>
+</li>
+</ul>
+<h4 id="五、总结"><a href="#五、总结" class="headerlink" title="五、总结"></a>五、总结</h4><p>Spring Batch 是一款优秀的批处理框架，其良好的可扩展性和性能天花板，大大简化了日常的批处理工作。</p>
+<p>一方面，Spring Batch 实现了批处理任务的完全解耦。原本复杂且庞大的一条龙任务，可以拆解为若干个 <code>Step</code>，各司其职。同时，每个 <code>Step</code> 都有自己的输入、处理、输出模型，规范且简单。</p>
+<p>另一方面，Spring Batch 使得项目设计科学且合理。开发者不仅可以总览环节要点，还可以专注于单一模块，不至于头晕眼花，bug 爆炸。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/12/23/thread_pool_task_executor_dead_lock/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1498,125 +1665,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/12/14/async_thread_local/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/12/14/async_thread_local/" class="post-title-link" itemprop="url">在异步线程或线程池中传输 ThreadLocal 上下文</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-12-14 01:45:12" itemprop="dateCreated datePublished" datetime="2020-12-14T01:45:12+08:00">2020-12-14</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2020/12/14/async_thread_local/" class="post-meta-item leancloud_visitors" data-flag-title="在异步线程或线程池中传输 ThreadLocal 上下文" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2020/12/14/async_thread_local/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2020/12/14/async_thread_local/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="一、背景介绍"><a href="#一、背景介绍" class="headerlink" title="一、背景介绍"></a>一、背景介绍</h4><p><code>ThreadLocal</code>是线程提供的本地变量，因其线程特殊属性，被经常用于存储与线程相关的信息，如保存登录用户信息、数据库连接配置等。但我们忽略了一个关键点：<code>ThreadLocal</code> 只能用在同步线程中，而在异步线程或线程池中则不起作用。因此，本博文主要探讨如何在异步线程和线程池中传递 <code>ThreadLocal</code> 上下文。</p>
-<h4 id="二、问题描述"><a href="#二、问题描述" class="headerlink" title="二、问题描述"></a>二、问题描述</h4><p>发版之后，爆出线上问题：“用户信息获取失败”。为了更好地解释这个问题，先介绍下公司的系统架构：用户登录时，后台系统通过用户 <code>key</code> 获取个人信息并保存在 <code>ThreadLocal</code> 静态对象中，以供后续使用。简要实现如下：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* 拦截器</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">HandlerAccessInterceptor</span> <span class="keyword">implements</span> <span class="title">HandlerInterceptor</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">preHandle</span><span class="params">(HttpServletRequest httpServletRequest,</span></span></span><br><span class="line"><span class="function"><span class="params">                             HttpServletResponse httpServletResponse, Object o)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">        <span class="comment">// 增加允许跨域的返回信息</span></span><br><span class="line">        httpServletResponse.setHeader(<span class="string">"Access-Control-Allow-Origin"</span>, <span class="string">"*"</span>);</span><br><span class="line">        httpServletResponse.setHeader(<span class="string">"Access-Control-Allow-Headers"</span>, <span class="string">"Content-Type,Content-Length, Authorization, Accept,X-Requested-With"</span>);</span><br><span class="line">        httpServletResponse.setHeader(<span class="string">"Access-Control-Allow-Methods"</span>, <span class="string">"PUT,POST,GET,DELETE,OPTIONS"</span>);</span><br><span class="line">        </span><br><span class="line">        <span class="comment">// 获取并保存用户信息</span></span><br><span class="line">        <span class="keyword">if</span> (httpServletRequest.getCookies() != <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">for</span> (Cookie cookie : httpServletRequest.getCookies()) &#123;</span><br><span class="line">                <span class="keyword">if</span> (<span class="string">"vkey"</span>.equals(cookie.getName())) &#123;</span><br><span class="line">                    UserContextUtil.setUser(cookie.getValue());</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">postHandle</span><span class="params">(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o, ModelAndView modelAndView)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 清除用户信息</span></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">afterCompletion</span><span class="params">(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o, Exception e)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">        UserContextUtil.remove();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* 用户信息工具</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">UserContextUtil</span> </span>&#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> ThreadLocal&lt;SyUser&gt; threadLocal = <span class="keyword">new</span> ThreadLocal&lt;&gt;();</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String TOKEN_BEARER = <span class="string">"Bearer "</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 获取当前线程用户信息</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 前线程用户信息</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">static</span> SyUser <span class="title">getUser</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        SyUser syUser = threadLocal.get();</span><br><span class="line">        <span class="keyword">return</span> syUser;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">    * 直接保存用户信息</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">static</span> <span class="keyword">boolean</span> <span class="title">setSyUser</span><span class="params">(SyUser syUser)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (syUser == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        threadLocal.set(syUser);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 转换登录用户信息为当期系统用户信息</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> cookies</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">static</span> <span class="keyword">boolean</span> <span class="title">setUser</span><span class="params">(Cookie[] cookies)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (cookies == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">for</span> (Cookie cookie : cookies) &#123;</span><br><span class="line">            String name = cookie.getName().toLowerCase();</span><br><span class="line">            <span class="keyword">if</span> (<span class="string">"vkey"</span>.equals(name)) &#123;</span><br><span class="line">                String value = cookie.getValue();</span><br><span class="line">                <span class="keyword">if</span> (StrUtil.isEmpty(value)) &#123;</span><br><span class="line">                    <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                LoginUser loginUser = <span class="keyword">new</span> LoginUser(value);</span><br><span class="line">                <span class="keyword">if</span> (loginUser.getId() == <span class="keyword">null</span>) &#123;</span><br><span class="line">                    <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                SyUser syUser = <span class="keyword">new</span> SyUser();</span><br><span class="line">                syUser.setId(loginUser.getId().intValue());</span><br><span class="line">                syUser.setUserName(loginUser.getMobile());</span><br><span class="line">                syUser.setTrueName(loginUser.getName());</span><br><span class="line">                <span class="keyword">return</span> setSyUser(syUser);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 转换登录用户信息为当期系统用户信息</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> headerValue 头部 vkey 值</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">static</span> <span class="keyword">boolean</span> <span class="title">setUser</span><span class="params">(String headerValue)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (StrUtil.isEmpty(headerValue)) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (headerValue.startsWith(TOKEN_BEARER)) &#123;</span><br><span class="line">            headerValue = headerValue.substring(TOKEN_BEARER.length());</span><br><span class="line">        &#125;</span><br><span class="line">        LoginUser loginUser = <span class="keyword">new</span> LoginUser(headerValue);</span><br><span class="line">        <span class="keyword">if</span> (loginUser.getId() == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        SyUser syUser = <span class="keyword">new</span> SyUser();</span><br><span class="line">        syUser.setId(loginUser.getId().intValue());</span><br><span class="line">        syUser.setUserName(loginUser.getMobile());</span><br><span class="line">        syUser.setTrueName(loginUser.getName());</span><br><span class="line">        syUser.setPhone(loginUser.getMobile());</span><br><span class="line">        <span class="keyword">return</span> setSyUser(syUser);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 获取登录用户姓名</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">static</span> String <span class="title">getUserName</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        SyUser syUser = threadLocal.get();</span><br><span class="line">        <span class="keyword">if</span> (syUser == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> syUser.getTrueName();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 移除线程中用户信息</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">remove</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        threadLocal.remove();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>问题代码定位：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@RestController</span></span><br><span class="line"><span class="meta">@RequestMapping</span>(<span class="string">"/web/file"</span>)</span><br><span class="line"><span class="meta">@Slf</span>4j</span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ManageFileController</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Resource</span></span><br><span class="line">    <span class="keyword">private</span> ManageFileService manageFileService;</span><br><span class="line">    </span><br><span class="line">	<span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 【加载文件】</span></span><br><span class="line"><span class="comment">     * 下载文件的数据准备阶段可能非常长, 前台操作人员无法得知进度, 且无法做其他操作</span></span><br><span class="line"><span class="comment">     * 故将数据准备与文件下载解耦, 解决交互上不舒服的问题</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> loadFileReqDTO 加载文件请求</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 调用是否成功</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="meta">@PostMapping</span>(<span class="string">"/loadFile"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> RespDTO&lt;String&gt; <span class="title">loadFile</span><span class="params">(@Valid @RequestBody LoadFileReqDTO loadFileReqDTO)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 初始化加载文件信息</span></span><br><span class="line">        AsyncLoadFile asyncLoadFile = manageFileService.initLoadFileInfo(loadFileReqDTO);</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 执行文件加载</span></span><br><span class="line">        manageFileService manageFileService.loadFile(loadFileReqDTO, inheritedSyUser);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> RespDTO.success();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@author</span> zourongsheng</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@version</span> 1.0</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@date</span> 2020/10/21 13:55</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="meta">@Slf</span>4j</span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ManageFileService</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Resource</span></span><br><span class="line">    <span class="keyword">private</span> ManageFileHelper manageFileHelper;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Resource</span></span><br><span class="line">    <span class="keyword">private</span> AsyncLoadFileMapper asyncLoadFileMapper;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 【加载文件】</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> loadFileReqDTO 加载文件请求</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> asyncLoadFile  初始化加载文件信息</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> syUser         用户信息</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="meta">@Async</span>(TASK_EXECUTOR)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">loadFile</span><span class="params">(LoadFileReqDTO loadFileReqDTO, AsyncLoadFile asyncLoadFile, SyUser syUser)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line"></span><br><span class="line">            log.info(<span class="string">"异步加载文件开始; userName: &#123;&#125;"</span>, UserContextUtil.getUserName());</span><br><span class="line"></span><br><span class="line">            <span class="comment">// 路由加载服务</span></span><br><span class="line">            LoadFileService loadFileService = manageFileHelper.router(loadFileReqDTO.getLoadFileType());</span><br><span class="line"></span><br><span class="line">            <span class="comment">// 开启文件加载过程</span></span><br><span class="line">            LoadFileReqBO loadFileReqBO = <span class="keyword">new</span> LoadFileReqBO();</span><br><span class="line">            BeanUtils.copyProperties(loadFileReqDTO, loadFileReqBO);</span><br><span class="line"></span><br><span class="line">            LoadFileRespBO loadFileRespBO = loadFileService.executeLoadFile(loadFileReqBO);</span><br><span class="line"></span><br><span class="line">            <span class="comment">// 备份文件至影像件系统</span></span><br><span class="line">            String fileKey = FileUtil.uploadFile(loadFileRespBO.getFilePathUrl(), FileTypeEnum.XLSX, STORE_FILE_KEY);</span><br><span class="line"></span><br><span class="line">            CuiShouAssert.notEmpty(fileKey, <span class="string">"调用影像件系统异常!"</span>);</span><br><span class="line"></span><br><span class="line">            asyncLoadFile.setFileName(loadFileRespBO.getFileName());</span><br><span class="line">            asyncLoadFile.setFileKey(fileKey);</span><br><span class="line">            asyncLoadFile.setLoadStatus(LoadStatusEnum.SUCCESS.name());</span><br><span class="line">        &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">            log.info(<span class="string">"加载文件异常; errMsg: &#123;&#125;"</span>, e.getMessage(), e);</span><br><span class="line">            asyncLoadFile.setLoadStatus(LoadStatusEnum.FAILURE.name());</span><br><span class="line">            asyncLoadFile.setRemark(e.getMessage());</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        asyncLoadFileMapper.update(asyncLoadFile);</span><br><span class="line">        </span><br><span class="line">        log.info(<span class="string">"异步加载文件结束; userName: &#123;&#125;"</span>, UserContextUtil.getUserName());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">运行结果...</span><br><span class="line"><span class="number">2020</span>-<span class="number">12</span>-<span class="number">14</span> <span class="number">17</span>:<span class="number">51</span>:<span class="number">15.235</span>  INFO [-,d11235d6f6eda8d0,<span class="number">8</span>c023b1e45855f97,<span class="keyword">false</span>] <span class="number">19444</span> --- [common-async-executor-<span class="number">1</span>] c.v.c.o.service.file.ManageFileService   : 异步加载文件开始; userName: <span class="keyword">null</span></span><br></pre></td></tr></table></figure>
-
-<p>问题很好定位，<code>@Async</code> 异步线程池开启子线程处理任务后，父线程提供的本地线程变量就销毁了。</p>
-<h4 id="三、解决方法"><a href="#三、解决方法" class="headerlink" title="三、解决方法"></a>三、解决方法</h4><ul>
-<li>将用户信息当作参数传入异步方法，再在异步方法中重新设置本地变量；</li>
-<li>采用 <code>InheritedThreadLocal</code> 实现子线程上下文的传递。</li>
-</ul>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 【加载文件-方法一】</span></span><br><span class="line"><span class="comment"> * 下载文件的数据准备阶段可能非常长, 前台操作人员无法得知进度, 且无法做其他操作</span></span><br><span class="line"><span class="comment"> * 故将数据准备与文件下载解耦, 解决交互上不舒服的问题</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@param</span> loadFileReqDTO 加载文件请求</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@return</span> 调用是否成功</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@PostMapping</span>(<span class="string">"/loadFile"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> RespDTO&lt;String&gt; <span class="title">loadFile</span><span class="params">(@Valid @RequestBody LoadFileReqDTO loadFileReqDTO)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 初始化加载文件信息</span></span><br><span class="line">    AsyncLoadFile asyncLoadFile = manageFileService.initLoadFileInfo(loadFileReqDTO);</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// #loadFile 为异步方法, 这里将操作人信息继承到子线程中</span></span><br><span class="line">    SyUser syUser = UserContextUtil.getUser();</span><br><span class="line"></span><br><span class="line">    SyUser inheritedSyUser = <span class="keyword">new</span> SyUser();</span><br><span class="line"></span><br><span class="line">    BeanUtils.copyProperties(syUser, inheritedSyUser);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 执行文件加载</span></span><br><span class="line">    manageFileService manageFileService.loadFile(loadFileReqDTO, inheritedSyUser);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> RespDTO.success();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* 【加载文件】</span></span><br><span class="line"><span class="comment">* 下载文件的数据准备阶段可能非常长, 前台操作人员无法得知进度, 且无法做其他操作</span></span><br><span class="line"><span class="comment">* 故将数据准备与文件下载解耦, 解决交互上不舒服的问题</span></span><br><span class="line"><span class="comment">*</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> loadFileReqDTO 加载文件请求</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> asyncLoadFile  初始化加载文件信息</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> syUser         用户信息</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="meta">@Async</span>(TASK_EXECUTOR)</span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">loadFile</span><span class="params">(LoadFileReqDTO loadFileReqDTO, AsyncLoadFile asyncLoadFile, SyUser syUser)</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    UserContextUtil.setSyUser(syUser);</span><br><span class="line">    log.info(<span class="string">"异步加载文件开始; UserName: &#123;&#125;"</span>, UserContextUtil.getRealName());</span><br><span class="line">    UserContextUtil.remove();</span><br><span class="line">    log.info(<span class="string">"异步加载文件结束; UserName: &#123;&#125;"</span>, UserContextUtil.getRealName());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">方法一运行结果...</span><br><span class="line"><span class="number">2020</span>-<span class="number">12</span>-<span class="number">14</span> <span class="number">18</span>:<span class="number">03</span>:<span class="number">34.947</span>  INFO [-,<span class="number">480f</span>9c55e785ec6f,c8de532979871193,<span class="keyword">false</span>] <span class="number">19444</span> --- [common-async-executor-<span class="number">2</span>] c.v.c.o.service.file.ManageFileService   : 异步加载文件开始; UserName: 邹荣升</span><br><span class="line"><span class="number">2020</span>-<span class="number">12</span>-<span class="number">14</span> <span class="number">18</span>:<span class="number">03</span>:<span class="number">35.235</span>  INFO [-,<span class="number">480f</span>9c55e785ec6f,c8de532979871193,<span class="keyword">false</span>] <span class="number">19444</span> --- [common-async-executor-<span class="number">2</span>] c.v.c.o.service.file.ManageFileService   : 异步加载文件结束; UserName: <span class="keyword">null</span></span><br></pre></td></tr></table></figure>
-
-<p>方法一可以说是傻瓜操作，治标不治本，后来的同事稍不注意还会掉进坑里。我们来实现方法二：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> ThreadLocal&lt;SyUser&gt; threadLocal = <span class="keyword">new</span> InheritableThreadLocal&lt;&gt;();</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* 【加载文件-异步线程】</span></span><br><span class="line"><span class="comment">* 下载文件的数据准备阶段可能非常长, 前台操作人员无法得知进度, 且无法做其他操作</span></span><br><span class="line"><span class="comment">* 故将数据准备与文件下载解耦, 解决交互上不舒服的问题</span></span><br><span class="line"><span class="comment">*</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> loadFileReqDTO 加载文件请求</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> asyncLoadFile  初始化加载文件信息</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> syUser         用户信息</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="meta">@Async</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">loadFile</span><span class="params">(LoadFileReqDTO loadFileReqDTO, AsyncLoadFile asyncLoadFile, SyUser syUser)</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    UserContextUtil.setSyUser(syUser);</span><br><span class="line">    log.info(<span class="string">"异步加载文件开始; UserName: &#123;&#125;"</span>, UserContextUtil.getRealName());</span><br><span class="line">    UserContextUtil.remove();</span><br><span class="line">    log.info(<span class="string">"异步加载文件结束; UserName: &#123;&#125;"</span>, UserContextUtil.getRealName());</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* 【加载文件-异步线程池】</span></span><br><span class="line"><span class="comment">* 下载文件的数据准备阶段可能非常长, 前台操作人员无法得知进度, 且无法做其他操作</span></span><br><span class="line"><span class="comment">* 故将数据准备与文件下载解耦, 解决交互上不舒服的问题</span></span><br><span class="line"><span class="comment">*</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> loadFileReqDTO 加载文件请求</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> asyncLoadFile  初始化加载文件信息</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> syUser         用户信息</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="meta">@Async</span>(TASK_EXECUTOR)</span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">loadFile</span><span class="params">(LoadFileReqDTO loadFileReqDTO, AsyncLoadFile asyncLoadFile, SyUser syUser)</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    UserContextUtil.setSyUser(syUser);</span><br><span class="line">    log.info(<span class="string">"异步加载文件开始; UserName: &#123;&#125;"</span>, UserContextUtil.getRealName());</span><br><span class="line">    UserContextUtil.remove();</span><br><span class="line">    log.info(<span class="string">"异步加载文件结束; UserName: &#123;&#125;"</span>, UserContextUtil.getRealName());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>异步线程和异步线程池两种情况下的运行结果：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">运行结果...</span><br><span class="line"><span class="number">2020</span>-<span class="number">12</span>-<span class="number">14</span> <span class="number">18</span>:<span class="number">36</span>:<span class="number">41.560</span>  INFO [-,<span class="number">8658</span>c694de3e9b7a,ccc7a782204c91b0,<span class="keyword">false</span>] <span class="number">19876</span> --- [common-async-executor-<span class="number">1</span>] c.v.c.o.service.file.ManageFileService   : 异步加载文件开始; UserName: 邹荣升</span><br><span class="line"></span><br><span class="line"><span class="number">2020</span>-<span class="number">12</span>-<span class="number">14</span> <span class="number">18</span>:<span class="number">41</span>:<span class="number">17.735</span>  INFO [-,<span class="number">67</span>b4725bcaacfc64,<span class="number">36</span>ee2acec232be32,<span class="keyword">false</span>] <span class="number">21600</span> --- [common-async-executor-<span class="number">1</span>] c.v.c.o.service.file.ManageFileService   : 异步加载文件开始; UserName: 邹荣升</span><br></pre></td></tr></table></figure>
-
-<h4 id="三、总结"><a href="#三、总结" class="headerlink" title="三、总结"></a>三、总结</h4><p>虽然 <code>ThreadLocal</code> 的线程相关属性提供了很多便利性，但在高并发系统中，直接使用原生静态对象并不合适。因此，如使用 <code>Redis</code>、<code>MQ</code> 一样，深入了解常用工具的特性，是系统设计的必备要素。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1689,7 +1737,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">22</span>
+          <span class="site-state-item-count">23</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
