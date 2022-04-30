@@ -9,7 +9,7 @@ categories: 后端
 
 #### 一、简介
 
-Spring Batch 是一款轻量级的批处理框架，主要用于构建高容量、高性能的批处理应用。作为 Spring 的子项目，Spring Batch 基于 Spring 框架，已进化出一套完备的企业级解决方案。借助良好的 Spring 生态，被广泛应用于批处理领域。
+Spring Batch 是一款轻量级批处理框架，主要用于构建高容量、高性能的批处理应用。作为 Spring 的子项目，Spring Batch 基于 Spring 框架，已进化出一套完备的企业级解决方案。借助良好的 Spring 生态，被广泛应用于批处理领域。
 
 Spring Batch 拥有强大的组件库，包括任务重启、任务跳过、任务统计、日志追踪、事务管理、资源管理等。此外，对于大批量数据处理任务，通过分区和优化技术，实现高性能作业。总之，Spring Batch 有着良好的可扩展性，既可以处理简单的任务，也可以处理复杂的、高容量的任务。
 
@@ -56,7 +56,7 @@ Spring Batch 拥有强大的组件库，包括任务重启、任务跳过、任�
 
 ##### JobRepository
 
-`JobRepository` 专门负责与数据库打交道，记录整个批处理中的增加、检索、更新、删除动作。因此，Spring Batch 是依赖数据库进行管理的。相关表的[功能简介](https://docs.spring.io/spring-batch/docs/current/reference/html/schema-appendix.html#metaDataSchema)如下：
+`JobRepository` 专门负责与数据库打交道，记录整个批处理中的增加、检索、更新、删除动作。在 Java 应用中，使用注解 `@EnableBatchProcessing` 即可完成配置。此外，Spring Batch 是依赖数据库进行管理的。相关表的[功能简介](https://docs.spring.io/spring-batch/docs/current/reference/html/schema-appendix.html#metaDataSchema)如下：
 
 * `BATCH_JOB_INSTANCE`：储存 `JobInstance` 相关的所有信息；
 * `BATCH_JOB_EXECUTION_PARAMS`： 储存 `JobParameters` 相关的所有信息；
