@@ -162,6 +162,170 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/04/04/spring_container/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/04/04/spring_container/" class="post-title-link" itemprop="url">Spring ApplicationContext 容器的初始化 (上)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-04-04 13:57:01" itemprop="dateCreated datePublished" datetime="2020-04-04T13:57:01+08:00">2020-04-04</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2020/04/04/spring_container/" class="post-meta-item leancloud_visitors" data-flag-title="Spring ApplicationContext 容器的初始化 (上)" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2020/04/04/spring_container/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2020/04/04/spring_container/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <hr>
+<h4 id="一、背景介绍"><a href="#一、背景介绍" class="headerlink" title="一、背景介绍"></a>一、背景介绍</h4><p><code>Spring</code> 容器是 <code>Spring</code> 框架的核心。容器负责配置对象，注入对象，管理对象，并完成整个生命周期。<code>Spring</code> 容器依赖控制反转（<code>Inversion of Control</code>），也即依赖注入（<code>Dependency Injection</code>）来配置并注入对象。这样的对象被成为 <code>Bean</code>。具体过程可抽象为：<code>Spring</code> 读取程序中的 <code>Bean</code> 配置信息，并据此在容器中生成一份 <code>Bean</code> 配置注册表，然后再根据注册表实例化 <code>Bean</code> ，装配好待用。</p>
+<p><img src="http://www.plantuml.com/plantuml/png/SoWkIImgAStDuIf8JCvEJ4zL22ueoinBVxfkvzEPAvvsp7swlFjfppI5QYu5803AvvKel6pjVRvtdK8qK0W2d58Jyo22J_OlVDQu7YvXgAVmTFwk9xlw529yVHIUBTZpT4__yraj4BNMS6L6C6NFDgzuiNmn5XN6S8Ey4iiI5T1Kn28v3k9mDCSf00r-sjRpOk4A3FK1_bx-nGZb43uMK-SzsGSA28HAX1ZO2Wmjp_TCVhfsnhED2z3SWf30j6NNbETJLZnVqVrqLpz861RIkdPGRrafl5Y_-sd_D90arEMwG4cOIy3Yi1105hT2LOBW0LKXt0DKjQGTw02G4eGeK0cAmwmKdkpT3r9Lo-MGcfS2J3e0" alt=""></p>
+<p><code>Spring</code> 提供了两种容器：<code>BeanFactory</code> 与 <code>ApplicationContext</code>。<code>BeanFactory</code> 为  <code>Spring Ioc</code> 功能提供了底层的实现基础，但为了实现框架化，<code>Spring</code> 新增了<code>ApplicationContext</code> 接口。 <code>ApplicationContext</code> 继承于 <code>BeanFactory</code>，并涵盖其所有功能。<a href="https://docs.spring.io/spring/docs/5.2.5.RELEASE/spring-framework-reference/core.html#context-introduction-ctx-vs-beanfactory" target="_blank" rel="noopener">官方</a>对两个容器做出比较：</p>
+<table>
+<thead>
+<tr>
+<th align="left">特征</th>
+<th align="center">BeanFactory</th>
+<th align="center">ApplicationContext</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">Bean 实例化 / 连接</td>
+<td align="center">是</td>
+<td align="center">是</td>
+</tr>
+<tr>
+<td align="left">集成生命周期管理</td>
+<td align="center">否</td>
+<td align="center">是</td>
+</tr>
+<tr>
+<td align="left"><code>BeanPostProcessor</code> 自动注册</td>
+<td align="center">否</td>
+<td align="center">是</td>
+</tr>
+<tr>
+<td align="left"><code>BeanFactoryPostProcessor</code> 自动注册</td>
+<td align="center">否</td>
+<td align="center">是</td>
+</tr>
+<tr>
+<td align="left">利用 <code>MessageSource</code> 进行国际化</td>
+<td align="center">否</td>
+<td align="center">是</td>
+</tr>
+<tr>
+<td align="left">嵌入式 <code>ApplicationEvent</code> 发布机制</td>
+<td align="center">否</td>
+<td align="center">是</td>
+</tr>
+</tbody></table>
+<p>本文分析 <code>ApplicationContext</code> 容器。Spring 源码参考版本 <a href="https://docs.spring.io/spring/docs/5.2.5.RELEASE/spring-framework-reference/index.html" target="_blank" rel="noopener">5.2.5.RELEASE</a>。</p>
+<h4 id="二、ApplicationContext-容器涉及的类关系图"><a href="#二、ApplicationContext-容器涉及的类关系图" class="headerlink" title="二、ApplicationContext 容器涉及的类关系图"></a>二、<code>ApplicationContext</code> 容器涉及的类关系图</h4><p><code>ApplicationContext</code> 有很多实现类，这里我们以 <code>Java EE web</code> （采用 <code>Spring</code> 框架）应用的启动过程为例。为了更直观地描述初始化过程，我们有必要认识  <code>XmlWebApplicationContext</code> 的关联类图:</p>
+<p><img src="http://www.plantuml.com/plantuml/png/hLNHhjCm37tlL_G7jY_WOMCCWJJGD93WrStSDLAQJ8ax6EBZMTHLiZgtIT7DMzjpJe_jsDu40azTQmfb88JoPsj-OBMzNerMGDhPdRE4lwc0Af07HMMFspuVJrXx30rK1cLU1l41hVL5u6fBw6jGMFQGpel_6M6_DzZYDzTvXJb_dzLwZs2_GelRN-2HlVziDMam-e-sbuXXdvYzP2WByZMhEROt2pxe6jLT6UIcZ0iO7HNFU_01Q-WCdJ34HEB1mHbzTXGCkBStxPrjqT8EhX7EhUX0yLLCuKTGvFoTVVsaqODNZLPWPCGN304kGx75-FStj7JiAgD3Wpo28RGZ4A6tyT7Sq7ELZXnBp8WgPOMxB79Rf7oSTtzNg-dUMz0plL9sToRxgXnEzBXUvokpBYmJPw6ob8vq8jBJXlSwfhpcouv7nHl99ghLdpu9wU4vtyrfCRa-2ueYo0Xbu4P6erbopT6YrHGhDUM6IIhOpA4Fi-K_wOKueva6p_NYehCRATDV1_jh109D6Favj8bTaABn1S7yfMYJ-sEUDh5Iad_ZUqOsoHSq2t_uFBagHtSZrbHUxQ8ghvMisEEcLka6xRbhpJy0" alt=""></p>
+<h4 id="三、ApplicationContext-容器初始化"><a href="#三、ApplicationContext-容器初始化" class="headerlink" title="三、ApplicationContext 容器初始化"></a>三、<code>ApplicationContext</code> 容器初始化</h4><p><code>Java EE Web</code> 项目启动，会触发 <code>ContextLoaderListener</code> 监听器，完成 <code>WebApplicationContext</code> -根容器的初始化。具体实现方法如下:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* web.xml 中 &lt;context&gt;contextLoaderListener&lt;/context&gt; 触发根容器初始化</span></span><br><span class="line"><span class="comment">*</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> servletContext 整个应用的上下文; 一个应用只有一个 ServletContext</span></span><br><span class="line"><span class="comment">* <span class="doctag">@return</span> 根容器</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> WebApplicationContext <span class="title">initWebApplicationContext</span><span class="params">(ServletContext servletContext)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 根容器挂载在 ServletContext 下，有且仅有一个根容器</span></span><br><span class="line">    <span class="keyword">if</span> (servletContext</span><br><span class="line">            .getAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE)</span><br><span class="line">        != <span class="keyword">null</span>) &#123;</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> IllegalStateException(<span class="string">"..."</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    servletContext.log(<span class="string">"Initializing Spring root WebApplicationContext"</span>);</span><br><span class="line">    Log logger = LogFactory.getLog(ContextLoader<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">    <span class="keyword">if</span> (logger.isInfoEnabled()) &#123;</span><br><span class="line">        logger.info(<span class="string">"Root WebApplicationContext: initialization started"</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">long</span> startTime = System.currentTimeMillis();</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">this</span>.context == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="comment">// 默认生成的根容器为 XmlWebApplicationContext</span></span><br><span class="line">            <span class="keyword">this</span>.context = createWebApplicationContext(servletContext);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">this</span>.context <span class="keyword">instanceof</span> ConfigurableWebApplicationContext) &#123;</span><br><span class="line">            ConfigurableWebApplicationContext cwac</span><br><span class="line">                = (ConfigurableWebApplicationContext) <span class="keyword">this</span>.context;</span><br><span class="line">            <span class="comment">// 根容器还没有被刷新</span></span><br><span class="line">            <span class="keyword">if</span> (!cwac.isActive()) &#123;</span><br><span class="line">                <span class="comment">// 添加父容器</span></span><br><span class="line">                <span class="keyword">if</span> (cwac.getParent() == <span class="keyword">null</span>) &#123;</span><br><span class="line">                    <span class="comment">// 对于 web 应用， 父容器默认为空</span></span><br><span class="line">                    ApplicationContext parent = loadParentContext(servletContext);</span><br><span class="line">                    cwac.setParent(parent);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="comment">// 配置并刷新容器</span></span><br><span class="line">                configureAndRefreshWebApplicationContext(cwac, servletContext);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 将根容器挂载在 ServletContext 下，指定属性 name 值，方便在应用内部随时使用</span></span><br><span class="line">        servletContext</span><br><span class="line">            .setAttribute(WebApplicationContext</span><br><span class="line">                          .ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, <span class="keyword">this</span>.context);</span><br><span class="line">        <span class="comment">// 获取当前线程的上下文加载器</span></span><br><span class="line">        ClassLoader ccl = Thread.currentThread().getContextClassLoader();</span><br><span class="line">        <span class="keyword">if</span> (ccl == ContextLoader<span class="class">.<span class="keyword">class</span>.<span class="title">getClassLoader</span>()) </span>&#123;</span><br><span class="line">            currentContext = <span class="keyword">this</span>.context;</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (ccl != <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="comment">// 若上下文加载器不是 ContextLoader 加载器，则存至 currentContextPerThread 静态域</span></span><br><span class="line">            currentContextPerThread.put(ccl, <span class="keyword">this</span>.context);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (logger.isInfoEnabled()) &#123;</span><br><span class="line">            <span class="keyword">long</span> elapsedTime = System.currentTimeMillis() - startTime;</span><br><span class="line">            logger.info(<span class="string">"Root WebApplicationContext initialized in "</span></span><br><span class="line">                        + elapsedTime + <span class="string">" ms"</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">this</span>.context;</span><br><span class="line">    &#125; <span class="keyword">catch</span> (RuntimeException | Error ex) &#123;</span><br><span class="line">        logger.error(<span class="string">"Context initialization failed"</span>, ex);</span><br><span class="line">        <span class="comment">// 若发生异常，则将异常挂载到 ServletContext 上下文中，此后不再初始化</span></span><br><span class="line">        servletContext</span><br><span class="line">            .setAttribute(WebApplicationContext</span><br><span class="line">                          .ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, ex);</span><br><span class="line">        <span class="keyword">throw</span> ex;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* 创建根容器 WebApplicationContext</span></span><br><span class="line"><span class="comment">*</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> sc ServletContext 应用上下文; 一个应用只有一个应用上下文</span></span><br><span class="line"><span class="comment">* <span class="doctag">@return</span> WebApplicationContext 根容器</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="function">WebApplicationContext <span class="title">createWebApplicationContext</span><span class="params">(ServletContext sc)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 判断根容器的实现类</span></span><br><span class="line">    Class&lt;?&gt; contextClass = determineContextClass(sc);</span><br><span class="line">    <span class="keyword">if</span> (!ConfigurableWebApplicationContext<span class="class">.<span class="keyword">class</span>.<span class="title">isAssignableFrom</span>(<span class="title">contextClass</span>)) </span>&#123;</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> ApplicationContextException(<span class="string">"..."</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 实例化根容器</span></span><br><span class="line">    <span class="keyword">return</span> (ConfigurableWebApplicationContext) BeanUtils.instantiateClass(contextClass);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* 判断根容器的实现类</span></span><br><span class="line"><span class="comment">*</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> servletContext 应用上下文; 一个应用只有一个应用上下文</span></span><br><span class="line"><span class="comment">* <span class="doctag">@return</span> 根容器的实现类; 默认为 XmlWebApplicationContext</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line">Class&lt;?&gt; determineContextClass(ServletContext servletContext) &#123;</span><br><span class="line">    <span class="comment">// 读取web.xml中的配置 &lt;context-param&gt;contextClass&lt;/context-param&gt;</span></span><br><span class="line">    String contextClassName = servletContext.getInitParameter(CONTEXT_CLASS_PARAM);</span><br><span class="line">    <span class="keyword">if</span> (contextClassName != <span class="keyword">null</span>) &#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            <span class="keyword">return</span> ClassUtils.forName(contextClassName,</span><br><span class="line">                                      ClassUtils.getDefaultClassLoader());</span><br><span class="line">        &#125; <span class="keyword">catch</span> (ClassNotFoundException ex) &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> ApplicationContextException(</span><br><span class="line">                <span class="string">"Failed to load custom context class ["</span> + contextClassName + <span class="string">"]"</span>, ex);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// 若未配置, 则创建默认的根容器 XmlWebApplicationContext</span></span><br><span class="line">        contextClassName =</span><br><span class="line">            defaultStrategies.getProperty(WebApplicationContext<span class="class">.<span class="keyword">class</span>.<span class="title">getName</span>())</span>;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            <span class="keyword">return</span> ClassUtils.forName(contextClassName,</span><br><span class="line">                                      ContextLoader<span class="class">.<span class="keyword">class</span>.<span class="title">getClassLoader</span>())</span>;</span><br><span class="line">        &#125; <span class="keyword">catch</span> (ClassNotFoundException ex) &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> ApplicationContextException(</span><br><span class="line">                <span class="string">"Failed to load default context class ["</span> + contextClassName + <span class="string">"]"</span>, ex);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>从代码实现可以得出：</p>
+<ul>
+<li><p>一个 <code>Web</code> 应用，根容器只能创建一次；</p>
+</li>
+<li><p>根容器的实现类可配置，默认为 <code>XmlWebApplicationContext</code>；</p>
+</li>
+<li><p>需要为根容器指定父容器，旨在实现父容器-子容器的继承架构。目前持保留实现，默认为 <code>null</code>；</p>
+</li>
+<li><p>根容器 <code>WebApplicationContext</code> 是挂载在应用上下文 <code>ServletContext</code> 下的，并指定属性名  <code>WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE</code>。</p>
+</li>
+</ul>
+<p>  下面介绍根容器的配置与刷新:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* WebApplicationContext 根容器的配置与刷新</span></span><br><span class="line"><span class="comment">*</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> wac WebApplicationContext 根容器的可配置继承</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> sc  ServletContext 应用上下文; 一个应用只有一个应用上下文</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">configureAndRefreshWebApplicationContext</span><span class="params">(ConfigurableWebApplicationContext wac,</span></span></span><br><span class="line"><span class="function"><span class="params">                                              ServletContext sc)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 1. 为根容器配置 ID，用于后面加载Spring-MVC的配置文件</span></span><br><span class="line">    <span class="keyword">if</span> (ObjectUtils.identityToString(wac).equals(wac.getId())) &#123;</span><br><span class="line">        String idParam = sc.getInitParameter(CONTEXT_ID_PARAM);</span><br><span class="line">        <span class="keyword">if</span> (idParam != <span class="keyword">null</span>) &#123;</span><br><span class="line">            wac.setId(idParam);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="comment">// 生成默认的 ID</span></span><br><span class="line">            wac.setId(ConfigurableWebApplicationContext.APPLICATION_CONTEXT_ID_PREFIX +</span><br><span class="line">                      ObjectUtils.getDisplayString(sc.getContextPath()));</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 2. 为根容器配置应用上下文</span></span><br><span class="line">    wac.setServletContext(sc);</span><br><span class="line">    <span class="comment">// 3. 为根容器添加配置参数地址</span></span><br><span class="line">    <span class="comment">// 读取web.xml中的配置 &lt;context-param&gt;configLocation&lt;/context-param&gt;</span></span><br><span class="line">    String configLocationParam = sc.getInitParameter(CONFIG_LOCATION_PARAM);</span><br><span class="line">    <span class="keyword">if</span> (configLocationParam != <span class="keyword">null</span>) &#123;</span><br><span class="line">        wac.setConfigLocation(configLocationParam);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 4. 初始化环境属性</span></span><br><span class="line">    ConfigurableEnvironment env = wac.getEnvironment();</span><br><span class="line">    <span class="keyword">if</span> (env <span class="keyword">instanceof</span> ConfigurableWebEnvironment) &#123;</span><br><span class="line">        ((ConfigurableWebEnvironment) env).initPropertySources(sc, <span class="keyword">null</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 5. 自定义上下文</span></span><br><span class="line">    customizeContext(sc, wac);</span><br><span class="line">    <span class="comment">// 6. 刷新根容器</span></span><br><span class="line">    wac.refresh();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* 自定义上下文</span></span><br><span class="line"><span class="comment">*</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> sc  ServletContext 应用上下文; 一个应用只有一个应用上下文</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> wac WebApplicationContext 根容器的可配置继承</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">customizeContext</span><span class="params">(ServletContext sc, ConfigurableWebApplicationContext wac)</span> </span>&#123;</span><br><span class="line">    List&lt;Class&lt;ApplicationContextInitializer&lt;ConfigurableApplicationContext&gt;&gt;&gt;</span><br><span class="line">        initializerClasses =</span><br><span class="line">        determineContextInitializerClasses(sc);</span><br><span class="line">    <span class="keyword">for</span> (Class&lt;ApplicationContextInitializer&lt;ConfigurableApplicationContext&gt;&gt;</span><br><span class="line">         initializerClass : initializerClasses) &#123;</span><br><span class="line">        Class&lt;?&gt; initializerContextClass =</span><br><span class="line">            GenericTypeResolver.resolveTypeArgument(initializerClass,</span><br><span class="line">                                                    ApplicationContextInitializer<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        <span class="keyword">if</span> (initializerContextClass != <span class="keyword">null</span></span><br><span class="line">            &amp;&amp; !initializerContextClass.isInstance(wac)) &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> ApplicationContextException(String.format(<span class="string">"..."</span>));</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 创建 Initializer 实例，并添加到 contextInitializers</span></span><br><span class="line">        <span class="keyword">this</span>.contextInitializers.add(BeanUtils.instantiateClass(initializerClass));</span><br><span class="line">        AnnotationAwareOrderComparator.sort(<span class="keyword">this</span>.contextInitializers);</span><br><span class="line">        <span class="keyword">for</span> (ApplicationContextInitializer&lt;ConfigurableApplicationContext&gt;</span><br><span class="line">             initializer : <span class="keyword">this</span>.contextInitializers) &#123;</span><br><span class="line">            <span class="comment">// 依次执行初始化程序</span></span><br><span class="line">            initializer.initialize(wac);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>从代码实现可以得出：</p>
+<ul>
+<li>通过 <code>&lt;context-parm&gt;configLocation&lt;/context-param&gt;</code> 为根容器添加配置信息；</li>
+<li>因为只要刷新上下文，就要调用环境的 <code>initPropertySources</code> 方法，所以需要提前初始化环境属性，以保证根容器刷新之前的一些操作，如后置处理或初始化过程，都可以直接获取到 <code>Servlet</code> 属性；</li>
+<li>在根容器添加配置后，刷新前，执行自定义操作。根据 <code>ServletContext</code> 的 <code>contextInitializerClasses</code> 和 <code>globalInitializerClasses</code>  配置加载所有的上下文初始化程序，并依次执行；</li>
+<li>自定义根容器后，执行根容器的刷新。放在下一个专栏分解。</li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/03/29/axios_file_download-2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -603,7 +767,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">23</span>
+          <span class="site-state-item-count">24</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

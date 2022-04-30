@@ -162,6 +162,138 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2022/02/02/spring_batch_demo/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/02/02/spring_batch_demo/" class="post-title-link" itemprop="url">Spring Batch 基础应用</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-02-02 23:12:45" itemprop="dateCreated datePublished" datetime="2022-02-02T23:12:45+08:00">2022-02-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-04-30 23:42:58" itemprop="dateModified" datetime="2022-04-30T23:42:58+08:00">2022-04-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2022/02/02/spring_batch_demo/" class="post-meta-item leancloud_visitors" data-flag-title="Spring Batch 基础应用" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2022/02/02/spring_batch_demo/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2022/02/02/spring_batch_demo/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <hr>
+<h4 id="一、项目简介"><a href="#一、项目简介" class="headerlink" title="一、项目简介"></a>一、项目简介</h4><p>上一节介绍了 Spring Batch 的基础架构和设计原理，本节将通过一个简单的批处理任务来学习如何使用 Spring Batch。</p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/30_22_33_0_batch_demo_process_person_2.png" alt=""></p>
+<p>现在需要将逗号分隔值文件 <code>sample-data.cvs</code> 中的数据，按照姓氏、名称拆分，导入数据表 <code>person</code> 中。从图可知，<code>BatchProcessJob</code> 只有一个 <code>Step</code>：<code>BatchProcessPersonStep1</code>。这一步操作分为三个部分：解析 <code>cvs</code> 文件；将文件数据转化为 <code>Person</code> 对象；将 <code>Person</code> 对象信息导入数据表 <code>batch-demo.person</code>。</p>
+<h4 id="二、项目搭建与配置"><a href="#二、项目搭建与配置" class="headerlink" title="二、项目搭建与配置"></a>二、项目搭建与配置</h4><p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/30_22_52_11_build_spring_batch_demo.png" alt=""></p>
+<p>使用<a href="https://start.spring.io/" target="_blank" rel="noopener">Spring 应用构建工具</a>，勾选 <code>batch</code> 选项，即可创建项目。我的应用部署地址：<a href="https://github.com/donehub/spring-batch-demo" target="_blank" rel="noopener">spring-batch-demo</a></p>
+<h4 id="三、创建数据表"><a href="#三、创建数据表" class="headerlink" title="三、创建数据表"></a>三、创建数据表</h4><p>Spring Batch 的组件<code>JobRepository</code>， 专门负责与数据库打交道，记录整个批处理中的增加、检索、更新、删除动作。也就是说，Spring Batch 是依赖数据库进行管理的。数据表<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/schema-appendix.html#exampleDDLScripts" target="_blank" rel="noopener">创建脚本</a>可在<a href="https://github.com/donehub/spring-batch/tree/master/spring-batch-core/src/main/resources/org/springframework/batch/core" target="_blank" rel="noopener">仓库</a>中找到。<code>MySQL</code> 数据库的脚本文件为：<code>schema-mysql.sql</code>。数据表建好后，不要忘了创建表 <code>batch-demo.person</code>。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">USE</span> batch-demo;</span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`person`</span> (</span><br><span class="line">  <span class="string">`person_id`</span> <span class="built_in">bigint</span>(<span class="number">30</span>) <span class="keyword">unsigned</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</span><br><span class="line">  <span class="string">`first_name`</span> <span class="built_in">varchar</span>(<span class="number">10</span>) <span class="keyword">COLLATE</span> utf8mb4_general_ci <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>,</span><br><span class="line">  <span class="string">`last_name`</span> <span class="built_in">varchar</span>(<span class="number">20</span>) <span class="keyword">COLLATE</span> utf8mb4_general_ci <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>,</span><br><span class="line">  PRIMARY <span class="keyword">KEY</span> (<span class="string">`person_id`</span>)</span><br><span class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span> AUTO_INCREMENT=<span class="number">142</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span>=utf8mb4 <span class="keyword">COLLATE</span>=utf8mb4_general_ci <span class="keyword">COMMENT</span>=<span class="string">'人员信息表'</span>;</span><br></pre></td></tr></table></figure>
+
+<h4 id="四、批处理任务配置"><a href="#四、批处理任务配置" class="headerlink" title="四、批处理任务配置"></a>四、批处理任务配置</h4><p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/27_21_7_30_spring-batch-flow.png" alt=""></p>
+<p>根据批处理框架的运作流程，我们做出如下配置：</p>
+<p><strong>4.1 <code>cvs</code>文件内容读取器：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Person;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.file.FlatFileItemReader;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> org.springframework.core.io.ClassPathResource;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">CustomItemReader</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"personItemReader"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Person&gt; <span class="title">reader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Person&gt;()</span><br><span class="line">                .name(<span class="string">"personItemReader"</span>)</span><br><span class="line">                .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"sample-data.csv"</span>))</span><br><span class="line">                .delimited()</span><br><span class="line">                .names(<span class="keyword">new</span> String[]&#123;<span class="string">"firstName"</span>, <span class="string">"lastName"</span>&#125;)</span><br><span class="line">                .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Person&gt;() &#123;&#123;</span><br><span class="line">                    setTargetType(Person<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">                &#125;&#125;)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>4.2 解析数据处理器：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Person;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.Logger;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.LoggerFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.ItemProcessor;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> java.util.Optional;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">PersonItemProcessor</span> <span class="keyword">implements</span> <span class="title">ItemProcessor</span>&lt;<span class="title">Person</span>, <span class="title">Person</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(PersonItemProcessor<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Person <span class="title">process</span><span class="params">(<span class="keyword">final</span> Person person)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> String firstName = Optional.ofNullable(person.getFirstName()).orElse(<span class="keyword">null</span>);</span><br><span class="line">        <span class="keyword">final</span> String lastName = Optional.ofNullable(person.getLastName()).orElse(<span class="keyword">null</span>);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Person transformedPerson = <span class="keyword">new</span> Person();</span><br><span class="line">        transformedPerson.setFirstName(firstName);</span><br><span class="line">        transformedPerson.setLastName(lastName);</span><br><span class="line"></span><br><span class="line">        log.info(<span class="string">"Converting (&#123;&#125;) into (&#123;&#125;)"</span>, person, transformedPerson);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> transformedPerson;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>4.3 <code>Person</code> 对象写入器：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Person;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcBatchItemWriter;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> javax.sql.DataSource;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">CustomItemWriter</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchDemoDB"</span>)</span><br><span class="line">    <span class="keyword">private</span> DataSource batchDemoDB;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"personItemWriter"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> JdbcBatchItemWriter&lt;Person&gt; <span class="title">writer</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> JdbcBatchItemWriterBuilder&lt;Person&gt;()</span><br><span class="line">                .itemSqlParameterSourceProvider(<span class="keyword">new</span> BeanPropertyItemSqlParameterSourceProvider&lt;&gt;())</span><br><span class="line">                .sql(<span class="string">"INSERT INTO person (first_name, last_name) VALUES (:firstName, :lastName)"</span>)</span><br><span class="line">                .dataSource(batchDemoDB)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>4.4 <code>MySQL</code> 数据源配置：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.zaxxer.hikari.HikariDataSource;</span><br><span class="line"><span class="keyword">import</span> org.springframework.boot.context.properties.ConfigurationProperties;</span><br><span class="line"><span class="keyword">import</span> org.springframework.boot.jdbc.DataSourceBuilder;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Primary;</span><br><span class="line"><span class="keyword">import</span> javax.sql.DataSource;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">DataSourceConfig</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Primary</span></span><br><span class="line">    <span class="meta">@Bean</span>(name = <span class="string">"batchDemoDB"</span>)</span><br><span class="line">    <span class="comment">// 数据源配置参数识别前缀, 根据应用的具体配置来设定</span></span><br><span class="line">    <span class="meta">@ConfigurationProperties</span>(prefix = <span class="string">"spring.datasource.batch-demo"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> DataSource <span class="title">druidDataSource</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 使用 SpringBoot 默认的数据源 HikariDataSource</span></span><br><span class="line">        <span class="keyword">return</span> DataSourceBuilder.create().type(HikariDataSource<span class="class">.<span class="keyword">class</span>).<span class="title">build</span>()</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>4.5 Step 配置</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.component.processor.PersonItemProcessor;</span><br><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Person;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Step;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.StepBuilderFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcBatchItemWriter;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.file.FlatFileItemReader;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BatchProcessPersonStep</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">public</span> StepBuilderFactory stepBuilderFactory;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"personItemReader"</span>)</span><br><span class="line">    <span class="keyword">private</span> FlatFileItemReader&lt;Person&gt; personItemReader;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"personItemWriter"</span>)</span><br><span class="line">    <span class="keyword">private</span> JdbcBatchItemWriter&lt;Person&gt; personItemWriter;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> PersonItemProcessor personItemProcessor;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"batchProcessPersonStep1"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Step <span class="title">step1</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"step1"</span>)</span><br><span class="line">                .&lt;Person, Person&gt;chunk(<span class="number">10</span>)</span><br><span class="line">                .reader(personItemReader)</span><br><span class="line">                .processor(personItemProcessor)</span><br><span class="line">                .writer(personItemWriter)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>4.6 <code>Job</code> 配置</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.component.listener.BatchProcessPersonCompletionListener;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Job;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Step;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.JobBuilderFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.launch.support.RunIdIncrementer;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="meta">@EnableBatchProcessing</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BatchProcessPersonJob</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">public</span> JobBuilderFactory jobBuilderFactory;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchProcessPersonStep1"</span>)</span><br><span class="line">    <span class="keyword">private</span> Step batchProcessPersonStep1;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> BatchProcessPersonCompletionListener batchProcessPersonCompletionListener;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Job <span class="title">importUserJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"importUserJob"</span>)</span><br><span class="line">                .preventRestart()</span><br><span class="line">                .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">                .listener(batchProcessPersonCompletionListener)</span><br><span class="line">                .flow(batchProcessPersonStep1)</span><br><span class="line">                .end()</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>4.7 任务状态监听器</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Person;</span><br><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.mapper.PersonMapper;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.Logger;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.LoggerFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.BatchStatus;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.JobExecution;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.listener.JobExecutionListenerSupport;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.stereotype.Component;</span><br><span class="line"><span class="keyword">import</span> java.util.List;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BatchProcessPersonCompletionListener</span> <span class="keyword">extends</span> <span class="title">JobExecutionListenerSupport</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(BatchProcessPersonCompletionListener<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> PersonMapper personMapper;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">afterJob</span><span class="params">(JobExecution jobExecution)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (jobExecution.getStatus() == BatchStatus.COMPLETED) &#123;</span><br><span class="line">            log.info(<span class="string">"Job finished! Time to verify the results"</span>);</span><br><span class="line"></span><br><span class="line">            <span class="comment">// spring-mybatis 查询所有的人员信息</span></span><br><span class="line">            List&lt;Person&gt; personList = personMapper.queryAll();</span><br><span class="line">            personList.forEach(person -&gt; log.info(<span class="string">"Found &lt;&#123;&#125;&gt; in the database."</span>, person));</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>4.8 <code>cvs</code> 测试数据文件配置</strong></p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/30_23_30_14_sample-data.png" alt=""></p>
+<h4 id="五、执行批处理任务"><a href="#五、执行批处理任务" class="headerlink" title="五、执行批处理任务"></a>五、执行批处理任务</h4><p>运行 <code>SpringBoot</code> 项目，<code>JobLauncher</code> 会自动发起注册进来的任务 <code>importUserJob</code>，执行结果如下：</p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/30_23_40_7_batch_demo_log.png" alt=""></p>
+<p>查看表 <code>batch-demo.person</code>：</p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/30_23_41_47_batch_task_db.png" alt=""></p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2022/01/30/spring_batch_introduction/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -193,7 +325,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-04-28 00:36:16" itemprop="dateModified" datetime="2022-04-28T00:36:16+08:00">2022-04-28</time>
+                <time title="修改时间：2022-04-30 23:43:43" itemprop="dateModified" datetime="2022-04-30T23:43:43+08:00">2022-04-30</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -238,7 +370,7 @@
 
       
           <hr>
-<h4 id="一、简介"><a href="#一、简介" class="headerlink" title="一、简介"></a>一、简介</h4><p>Spring Batch 是一款轻量级的批处理框架，主要用于构建高容量、高性能的批处理应用。作为 Spring 的子项目，Spring Batch 基于 Spring 框架，已进化出一套完备的企业级解决方案。借助良好的 Spring 生态，被广泛应用于批处理领域。</p>
+<h4 id="一、简介"><a href="#一、简介" class="headerlink" title="一、简介"></a>一、简介</h4><p>Spring Batch 是一款轻量级批处理框架，主要用于构建高容量、高性能的批处理应用。作为 Spring 的子项目，Spring Batch 基于 Spring 框架，已进化出一套完备的企业级解决方案。借助良好的 Spring 生态，被广泛应用于批处理领域。</p>
 <p>Spring Batch 拥有强大的组件库，包括任务重启、任务跳过、任务统计、日志追踪、事务管理、资源管理等。此外，对于大批量数据处理任务，通过分区和优化技术，实现高性能作业。总之，Spring Batch 有着良好的可扩展性，既可以处理简单的任务，也可以处理复杂的、高容量的任务。</p>
 <h4 id="二、基础架构"><a href="#二、基础架构" class="headerlink" title="二、基础架构"></a>二、基础架构</h4><p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/27_21_7_30_spring-batch-flow.png" alt=""></p>
 <p>看图可知：</p>
@@ -260,7 +392,7 @@
 <hr>
 <h5 id="JobLauncher"><a href="#JobLauncher" class="headerlink" title="JobLauncher"></a>JobLauncher</h5><p><code>JobLauncher</code> 负责在指定的 <code>JobParameters</code> 下，启动 <code>Job</code>。</p>
 <hr>
-<h5 id="JobRepository"><a href="#JobRepository" class="headerlink" title="JobRepository"></a>JobRepository</h5><p><code>JobRepository</code> 专门负责与数据库打交道，记录整个批处理中的增加、检索、更新、删除动作。因此，Spring Batch 是依赖数据库进行管理的。相关表的<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/schema-appendix.html#metaDataSchema" target="_blank" rel="noopener">功能简介</a>如下：</p>
+<h5 id="JobRepository"><a href="#JobRepository" class="headerlink" title="JobRepository"></a>JobRepository</h5><p><code>JobRepository</code> 专门负责与数据库打交道，记录整个批处理中的增加、检索、更新、删除动作。在 Java 应用中，使用注解 <code>@EnableBatchProcessing</code> 即可完成配置。此外，Spring Batch 是依赖数据库进行管理的。相关表的<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/schema-appendix.html#metaDataSchema" target="_blank" rel="noopener">功能简介</a>如下：</p>
 <ul>
 <li><code>BATCH_JOB_INSTANCE</code>：储存 <code>JobInstance</code> 相关的所有信息；</li>
 <li><code>BATCH_JOB_EXECUTION_PARAMS</code>： 储存 <code>JobParameters</code> 相关的所有信息；</li>
@@ -1541,130 +1673,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/01/13/github_pages_domain/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/01/13/github_pages_domain/" class="post-title-link" itemprop="url">GitHub Pages 绑定个人域名</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-01-13 22:27:58" itemprop="dateCreated datePublished" datetime="2021-01-13T22:27:58+08:00">2021-01-13</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-31 22:00:47" itemprop="dateModified" datetime="2022-03-31T22:00:47+08:00">2022-03-31</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%BF%90%E7%BB%B4/" itemprop="url" rel="index"><span itemprop="name">运维</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2021/01/13/github_pages_domain/" class="post-meta-item leancloud_visitors" data-flag-title="GitHub Pages 绑定个人域名" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2021/01/13/github_pages_domain/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2021/01/13/github_pages_domain/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <hr>
-<h4 id="一、为什么要使用域名"><a href="#一、为什么要使用域名" class="headerlink" title="一、为什么要使用域名"></a>一、为什么要使用域名</h4><p>曾经很多次想给别人介绍我熬着夜写出的技术博客，但网址是什么，我经常拼不出来。虽然 <code>donehub.github.io</code> 的结构比较简单，但摆到台面上，总差那么点意思。因此，为了让自己更容易被记住，我需要一个域名。</p>
-<h4 id="二、GitHub-Pages-支持域名配置"><a href="#二、GitHub-Pages-支持域名配置" class="headerlink" title="二、GitHub Pages 支持域名配置"></a>二、<code>GitHub Pages</code> 支持域名配置</h4><p><code>GitHub Pages</code> 是一个很好的博客载体，部署成功之后会分配一个 <code>username.github.io</code> 的访问地址。同时，<code>GitHub Pages</code> 也预留了域名配置项，“我们可以定制化一个域名，不用再去访问默认的地址”。这使得绑定个人域名成为可能。</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_21_46_9_github_page_domain.png" alt=""></p>
-<h4 id="三、绑定个人域名"><a href="#三、绑定个人域名" class="headerlink" title="三、绑定个人域名"></a>三、绑定个人域名</h4><h5 id="3-1-申请个人域名"><a href="#3-1-申请个人域名" class="headerlink" title="3.1 申请个人域名"></a>3.1 申请个人域名</h5><p>域名注册平台有<a href="https://wanwang.aliyun.com/?spm=5176.19720258.J_8058803260.31.69832c4a5H4h10" target="_blank" rel="noopener">阿里云</a>、<a href="https://www.godaddy.com/zh-sg/domains/domain-name-search" target="_blank" rel="noopener">GoDaddy</a> 等。我在阿里云平台注册的，叫 <a href="https://www.takeshell.com" target="_blank" rel="noopener">takeshell.com</a>。每年只需要几十块钱，还能玩得起。</p>
-<h5 id="3-2-GitHub-Pages-域名替换"><a href="#3-2-GitHub-Pages-域名替换" class="headerlink" title="3.2 GitHub Pages 域名替换"></a>3.2 <code>GitHub Pages</code> 域名替换</h5><p><code>GitHub Pages</code> 默认是部署在 <code>https://username.github.io/</code> 上的，我们有两种方法将域名替换为 <code>takeshell.com</code>。</p>
-<p><strong>方法一：</strong>在项目目录上手动添加 <code>CNAME</code> 文件（没有后缀名），文本内容为 <code>takeshell.com</code>。提交之后，可以看到 <code>Custome domain</code> 已自动回填新的域名。</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_21_48_22_add_cname_file.png" alt=""></p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_21_49_32_edit_cname_file.png" alt=""></p>
-<p><strong>方法二：</strong>直接操作 <code>Custom domain</code> 配置项，填写个人域名，并保存。</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_21_52_31_custom_domain.png" alt=""></p>
-<h5 id="3-3-DNS-配置"><a href="#3-3-DNS-配置" class="headerlink" title="3.3 DNS 配置"></a>3.3 <code>DNS</code> 配置</h5><p>替换为个人域名后， <code>GitHub</code> 的域名健康检测是不通过的，这是因为我们没有为个人域名配置 <code>DNS</code>。</p>
-<p>主要有两种域名绑定方案：</p>
-<ul>
-<li>A: 全称为<code>Address</code>，<code>DNS</code> 将个人域名解析到指定 <code>IP</code> ；</li>
-<li>CNAME: 全称为 <code>Canonical Name</code>，<code>DNS</code> 将域名指向为另外一个域名；</li>
-</ul>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_21_52_59_dns_map.png" alt=""></p>
-<p><strong><code>Address</code> 记录类型：</strong></p>
-<p>首先，通过 <code>ping username.github.io</code> 获取 <code>IP</code>，如 185.199.111.153。然后在阿里云平台，选择域名解析-&gt;解析设置-&gt;添加记录。</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_18_17_13_add_dns_a.png" alt=""></p>
-<p>这里的主机记录是 <code>www</code>，需要再添加一个 <code>@</code> 的配置，这样， <code>https://www.takeshell.com</code> 和 <code>https://takeshell.com</code> 都可以访问博客。最后启用 <code>DNS</code> ，就可以用 <code>takeshell.com</code> 访问博客了。这里的 <code>TTL(Time To Live)</code>，是 <code>DNS</code> 的缓存时间，默认10 <code>min</code> 就好了。 </p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_18_17_59_add_dns_a_final.png" alt=""></p>
-<p><strong><code>CNAME</code> 记录类型：</strong></p>
-<p>个人域名，除了可以直接映射到指定 <code>IP</code>  上，还可以映射到 <code>username.github.io</code> 上。相当于开启一个域名分身，虽然来路不同，但目的地是一致的。这样的映射机制也叫域名别名。</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_21_59_27_add_dns_cname.png" alt=""></p>
-<p>同样地，再申请一个主机记录为 <code>@</code> 的配置。开启 <code>DNS</code> 后，也可以用 <code>takeshell.com</code> 正常访问博客。</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/03/31_22_0_0_add_dns_cname_final.png" alt=""></p>
-<h4 id="四、总结"><a href="#四、总结" class="headerlink" title="四、总结"></a>四、总结</h4><p>拥有个人域名是件令人兴奋的事情。首先，个人域名要足够简单，能让别人一眼记住。其次，个人域名要突出个人风格，<code>geek</code> 精神还是日常生活，通过域名必须能看出来。最后，也是最重要的，就是我们看中的域名，不能名花有主了。</p>
-<p>个人博客是一个展示自己的舞台，但这个舞台不能深藏于巷，否则就是自导自演。如今，终于绑上了个人域名，希望这个广告牌可以吸引更多的目光。当然，前提是要有好的表演。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1737,7 +1745,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">23</span>
+          <span class="site-state-item-count">24</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
