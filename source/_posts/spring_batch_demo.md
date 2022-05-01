@@ -56,7 +56,7 @@ import org.springframework.core.io.ClassPathResource;
 public class CustomItemReader {
 
     @Bean("personItemReader")
-    public FlatFileItemReader<Person> reader() {
+    public FlatFileItemReader<Person> personItemReader() {
         return new FlatFileItemReaderBuilder<Person>()
                 .name("personItemReader")
                 .resource(new ClassPathResource("sample-data.csv"))
@@ -78,7 +78,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.context.annotation.Configuration;
-import java.util.Optional;
 
 @Configuration
 public class PersonItemProcessor implements ItemProcessor<Person, Person> {
@@ -88,8 +87,8 @@ public class PersonItemProcessor implements ItemProcessor<Person, Person> {
     @Override
     public Person process(final Person person) throws Exception {
 
-        final String firstName = Optional.ofNullable(person.getFirstName()).orElse(null);
-        final String lastName = Optional.ofNullable(person.getLastName()).orElse(null);
+        final String firstName = person.getFirstName();
+        final String lastName = person.getLastName();
 
         final Person transformedPerson = new Person();
         transformedPerson.setFirstName(firstName);
@@ -123,7 +122,7 @@ public class CustomItemWriter {
     private DataSource batchDemoDB;
 
     @Bean("personItemWriter")
-    public JdbcBatchItemWriter<Person> writer() {
+    public JdbcBatchItemWriter<Person> personItemWriter() {
 
         return new JdbcBatchItemWriterBuilder<Person>()
                 .itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
@@ -268,7 +267,7 @@ public class BatchProcessPersonCompletionListener extends JobExecutionListenerSu
 
     @Override
     public void afterJob(JobExecution jobExecution) {
-        if (jobExecution.getStatus() == BatchStatus.COMPLETED) {
+        if (BatchStatus.COMPLETED.equals(jobExecution.getStatus())) {
             log.info("Job finished! Time to verify the results");
 
             // spring-mybatis 查询所有的人员信息
