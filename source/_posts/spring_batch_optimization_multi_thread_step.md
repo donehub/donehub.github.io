@@ -9,18 +9,18 @@ categories: 后端
 
 #### 一、Spring Batch 性能优化指标
 
-Spring Batch 是一款伸缩性非常强的批处理工具，既可以处理简单的任务，也可以处理复杂的、高容量的任务。在性能调优方面，Spring Batch 提供了丰富的接口支持，各项优化指标可归纳如下：
+Spring Batch 是一款伸缩性非常好的批处理工具，既可以处理简单的任务，也可以处理复杂的、高容量的任务。在性能调优方面，Spring Batch 提供了丰富的接口支持，各项优化指标可归纳如下：
 
-* 多线程 `Step`：不同项目组块（a chunk of items），由单独的线程执行输入、处理、输出的过程；
+* 多线程 `Step`：不同项目组块（a chunk of items），由独立线程执行输入、处理、输出的过程；
 * 并行化 `Step`：对于可并行处理的 `Step`，交由不同的线程去处理；
 * 分片化 `Step`：通过 `SPI(Serial Peripheral Interface)`，对 `Step` 分片执行；
-* 远程组块：对于输入无性能瓶颈，但处理和输出有性能瓶颈的任务，交由远程组块执行，并借助中间件通信；
+* 远程组块：对于输入无性能瓶颈，但处理和输出有性能瓶颈的任务，交由远程组块执行；
 
 详见[Spring文档](https://docs.spring.io/spring-batch/docs/current/reference/html/scalability.html#scalability)。
 
 #### 二、多线程 `Step` 配置
 
-Spring Batch 执行一个 `Step`，通常会按照 `chunk` 配置的数量，分批次提交。对于多线程 `Step`，每个提交的批次任务，都交由线程池去处理。因此，每个 `chunk` 都不用串行等待，这大大地提高了批处理性能。
+Spring Batch 执行一个 `Step`，会按照 `chunk` 配置的数量分批次提交。对于多线程 `Step`，由线程池去处理任务批次。因此，每个 `chunk` 都不用串行等待，这大大地提高了批处理性能。
 
 配置多线程 `Step` 非常简单，可以通过 `xml` 或接口来配置。以接口配置为例：
 
@@ -42,7 +42,7 @@ public Step sampleStep(TaskExecutor taskExecutor) {
 
 * 线程池：推荐使用 `Spring` 线程池 `ThreadPoolTaskExecutor`，兼容性好；
 * 线程安全：输入器和输出器必须是线程安全的，否则可能会导致重复任务、脏数据等问题；
-* 框架节流：Spring Batch 自带节流器，默认最多可处理 4 个小任务，在多线程场景下，需要重新配置；
+* 框架节流：Spring Batch 自带节流器，默认最多可处理 4 个小任务，因此需要重新配置；
 
 #### 三、批处理配置
 
@@ -104,10 +104,8 @@ import java.sql.SQLException;
 
 public class StudentRowMapper implements RowMapper<Student> {
 
-
     @Override
     public Student mapRow(ResultSet rs, int rowNum) throws SQLException {
-
         Student student = new Student();
         student.setStudentId(rs.getLong("student_id"));
         student.setName(rs.getString("name"));
@@ -344,13 +342,11 @@ public class DataSourceConfig {
 ##### 3.9 线程池配置
 
 ```java
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 
-@Slf4j
 @Configuration
 public class ExecutorConfig {
 
@@ -394,7 +390,7 @@ public class ExecutorConfig {
 
 ---
 
-性能提升近**300%**
+性能提升超**300%**
 
 #### 五、总结
 
