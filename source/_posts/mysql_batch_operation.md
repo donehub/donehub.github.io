@@ -471,7 +471,7 @@ public void batchInsert() {
   插入100000条数据, 耗时: 2404 ms
   ```
 
-##### 3.2 批量更新 10000 条学生信息
+##### 3.2 批量更新 100000 条学生信息
 
 ```java
 public void batchUpdate() {

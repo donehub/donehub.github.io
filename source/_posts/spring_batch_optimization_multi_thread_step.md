@@ -11,8 +11,8 @@ categories: 后端
 
 Spring Batch 是一款伸缩性非常好的批处理工具，既可以处理简单的任务，也可以处理复杂的、高容量的任务。在性能调优方面，Spring Batch 提供了丰富的接口支持，各项优化指标可归纳如下：
 
-* 多线程 `Step`：不同项目组块（a chunk of items），由独立线程执行输入、处理、输出的过程；
-* 并行化 `Step`：对于可并行处理的 `Step`，交由不同的线程去处理；
+* 多线程 `Step`：由独立线程执行提交块（a chunk of items）的输入、处理和输出过程；
+* [并行化 `Step`](https://takeshell.com/2022/02/08/spring_batch_optimization_parallel_step/)：对于可并行处理的 `Step`，交由不同的线程去处理；
 * 分片化 `Step`：通过 `SPI(Serial Peripheral Interface)`，对 `Step` 分片执行；
 * 远程组块：对于输入无性能瓶颈，但处理和输出有性能瓶颈的任务，交由远程组块执行；
 
