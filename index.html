@@ -193,7 +193,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-05-19 22:20:04" itemprop="dateModified" datetime="2022-05-19T22:20:04+08:00">2022-05-19</time>
+                <time title="修改时间：2022-05-19 22:26:50" itemprop="dateModified" datetime="2022-05-19T22:26:50+08:00">2022-05-19</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -241,12 +241,12 @@
 <h4 id="一、Spring-Batch-性能优化指标"><a href="#一、Spring-Batch-性能优化指标" class="headerlink" title="一、Spring Batch 性能优化指标"></a>一、Spring Batch 性能优化指标</h4><p>Spring Batch 是一款伸缩性非常好的批处理工具，既可以处理简单的任务，也可以处理复杂的、高容量的任务。在性能调优方面，Spring Batch 提供了丰富的接口支持，各项优化指标可归纳如下：</p>
 <ul>
 <li><a href="https://takeshell.com/2022/02/04/spring_batch_optimization_multi_thread_step/" target="_blank" rel="noopener">多线程 <code>Step</code></a>：由独立线程执行提交块（a chunk of items）的输入、处理和输出过程；</li>
-<li>并行化 <code>Step</code>：对于可并行处理的 <code>Step</code>，交由不同的线程去处理；</li>
+<li><a href="https://takeshell.com/2022/02/08/spring_batch_optimization_parallel_step/" target="_blank" rel="noopener">并行化 <code>Step</code></a>：对于可并行处理的 <code>Step</code>，交由不同的线程去处理；</li>
 <li>分片化 <code>Step</code>：通过 <code>SPI(Serial Peripheral Interface)</code>，对 <code>Step</code> 分片执行；</li>
 <li>远程组块：对于输入无性能瓶颈，但处理和输出有性能瓶颈的任务，交由远程组块执行；</li>
 </ul>
 <p>详见<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/scalability.html#scalability" target="_blank" rel="noopener">Spring文档</a>。</p>
-<h4 id="二、分片化-Step"><a href="#二、分片化-Step" class="headerlink" title="二、分片化 Step"></a>二、分片化 <code>Step</code></h4><p>如果一个 <code>Step</code> 的任务量比较大，可以尝试将其拆分成多个子任务。子任务之间可并行处理且互不干扰，这将大大提升批处理效率。例如：Master 这个 <code>Step</code> 迁移 100000 条数据需要 100 s，如果将其拆分为 100 个子任务，那么时间可缩短至 1 s。</p>
+<h4 id="二、分片化-Step"><a href="#二、分片化-Step" class="headerlink" title="二、分片化 Step"></a>二、分片化 <code>Step</code></h4><p>如果一个 <code>Step</code> 的任务量比较大，可以尝试将其拆分成多个子任务。子任务之间可并行处理且互不干扰，这将大大提升批处理效率。例如：Master 这个 <code>Step</code> 迁移 100000 条数据需要 100 s，如果将其拆分为 100 个 Slave 任务，那么时间可缩短至 1 s。</p>
 <p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/19_20_41_39_partition_step_2.png" alt=""></p>
 <p><code>Step</code> 分片原理，是一个 Master 处理器对应多个 Salve 处理器。Slave 处理器可以是远程服务，也可以是本地执行线程。主从服务间的消息不需要持久化，也不需要严格保证传递，因为 <code>JobRepository</code> 的元数据管理，是将每个 Salve 独立保存在 <code>batch_step_execution</code> 中的，这样便可以保证每个 Slave 任务只执行一次。</p>
 <p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/19_21_53_13_partition_step_structure.png" alt=""></p>
