@@ -13,7 +13,7 @@ Spring Batch 是一款伸缩性非常好的批处理工具，既可以处理简�
 
 * [多线程 `Step`](https://takeshell.com/2022/02/04/spring_batch_optimization_multi_thread_step/)：由独立线程执行提交块（a chunk of items）的输入、处理和输出过程；
 * 并行化 `Step`：对于可并行处理的 `Step`，交由不同的线程去处理；
-* 分片化 `Step`：通过 `SPI(Serial Peripheral Interface)`，对 `Step` 分片执行；
+* [分片化 `Step`](https://takeshell.com/2022/02/15/spring_batch_optimization_partition_step/)：通过 `SPI(Serial Peripheral Interface)`，对 `Step` 分片执行；
 * 远程组块：对于输入无性能瓶颈，但处理和输出有性能瓶颈的任务，交由远程组块执行；
 
 详见[Spring文档](https://docs.spring.io/spring-batch/docs/current/reference/html/scalability.html#scalability)。
