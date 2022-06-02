@@ -162,6 +162,129 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/07/19/bitwise_and_in_sql/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/07/19/bitwise_and_in_sql/" class="post-title-link" itemprop="url">位与运算在SQL中的使用</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-07-19 01:50:12" itemprop="dateCreated datePublished" datetime="2020-07-19T01:50:12+08:00">2020-07-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/" itemprop="url" rel="index"><span itemprop="name">数据库</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2020/07/19/bitwise_and_in_sql/" class="post-meta-item leancloud_visitors" data-flag-title="位与运算在SQL中的使用" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2020/07/19/bitwise_and_in_sql/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2020/07/19/bitwise_and_in_sql/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h4 id="一、需求背景"><a href="#一、需求背景" class="headerlink" title="一、需求背景"></a>一、需求背景</h4><p>本周负责做调账线上化，其中一个业务需求比较棘手：提交调账申请后，需在数据表记录对应的调账类型；而在调账复核页面，列表筛选项-调账类型，需支持多选。简单枚举如下:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">enum</span> AdjustTypeEnum &#123;</span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 调账类型枚举; 一次调账申请可能对应多种调账类型，在数据表中枚举值之间以英文 , 分隔</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    FINE(<span class="number">0</span>, <span class="string">"应还罚息"</span>),</span><br><span class="line">    TOTAL_REPAYMENT(<span class="number">1</span>, <span class="string">"应还总额"</span>),</span><br><span class="line">    FACT_REPAYMENT(<span class="number">2</span>, <span class="string">"实还总额"</span>),</span><br><span class="line">    FACT_PAYMENT_DATE(<span class="number">3</span>, <span class="string">"实还日期"</span>),</span><br><span class="line">    OVERDUE_DAYS(<span class="number">4</span>, <span class="string">"逾期天数"</span>),</span><br><span class="line">    PAYMENT_STATUS(<span class="number">5</span>, <span class="string">"还款状态"</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>假如调账申请A的调账类型包括应还罚息和应还总额，则数据表相应字段值为<code>0,1</code>。在复核页面，若调账类型复选项中包含应还罚息或应还总额，则需查询到该申请。此时，我们发现<code>SQL</code>内置函数<code>FIND_IN_SET</code>只支持单选项查询，而无法灵活拆分筛选条件和存储数据。因此，有必要调整一下数据的存储规则和查询规则。</p>
+<h4 id="二、位与运算的妙用"><a href="#二、位与运算的妙用" class="headerlink" title="二、位与运算的妙用"></a>二、位与运算的妙用</h4><p>首先，我们需要进一步抽象：一方面，为了不浪费存储空间，科学地设计数据表，我们需要将目标数据列表整合存储在一个字段中；另一方面，数据库引擎需要灵活使用整合后的字段，以执行相应的查询语句。说白了，就是看起来像做了整合，实际上还是原始的目标数据列表。</p>
+<p>事实证明，上面提出的方案根本满足不了业务需求，是一个非常差的设计。除了以逗号分隔枚举值的存储方式，还有一种更为科学的存储方式——二进制。简单做几个位与运算：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 存储值: 3; 查询条件: 1</span></span><br><span class="line"><span class="comment">// 3 == 2 + 1</span></span><br><span class="line"><span class="comment">// 1 &amp; 3 == 1</span></span><br><span class="line"><span class="number">0001</span></span><br><span class="line">&amp;</span><br><span class="line"><span class="number">0011</span></span><br><span class="line">=</span><br><span class="line"><span class="number">0001</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 存储值: 7; 查询条件: 1</span></span><br><span class="line"><span class="comment">// 7 == 1 + 2 + 4</span></span><br><span class="line"><span class="comment">// 1 &amp; 7 == 1</span></span><br><span class="line"><span class="number">0111</span></span><br><span class="line">&amp;</span><br><span class="line"><span class="number">0001</span></span><br><span class="line">=</span><br><span class="line"><span class="number">0001</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 存储值: 7; 查询条件: 3</span></span><br><span class="line"><span class="comment">// 7 == 1 + 2 + 4</span></span><br><span class="line"><span class="comment">// 3 == 1 + 2</span></span><br><span class="line"><span class="comment">// 3 &amp; 7 == 3</span></span><br><span class="line"><span class="number">0111</span></span><br><span class="line">&amp;</span><br><span class="line"><span class="number">0011</span></span><br><span class="line">=</span><br><span class="line"><span class="number">0011</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 存储值: 7; 查询条件: 15</span></span><br><span class="line"><span class="comment">// 7 == 1 + 2 + 4</span></span><br><span class="line"><span class="comment">// 15 == 1 + 2 + 4 + 8</span></span><br><span class="line"><span class="comment">// 15 &amp; 7 == 7</span></span><br><span class="line"><span class="number">0111</span></span><br><span class="line">&amp;</span><br><span class="line"><span class="number">1111</span></span><br><span class="line">=</span><br><span class="line"><span class="number">0111</span></span><br></pre></td></tr></table></figure>
+
+<p>从以上位与运算实例，可以发现一个有趣的现象：若将枚举值设置为<code>2</code>的<code>n</code>次幂，则只需将目标数据列表加合，即可保证每一个目标数据对应到二进制中的一位。</p>
+<p><img src="http://www.plantuml.com/plantuml/png/TP9TIyCm58Rl-oj2hsTf-j7fjfGL5q6OcwoPC8QCQjArMBkHLhrG_xinSP14xSKBvpbFtuj3fbrVyFxbkN4SMkzvSQn0n_Whu-3T0UBZHVj4QmuGcA_6ZaJjWR9jLnL79YXdZmTE1-2jfdqbPWyEGCNgVTNBuLxxnzysnGDh17SdfPzwdlSnAM4AHGOoGvcHp5Xcaa9Nwxxujnl-wdR5-hGDpEtLzG8Zg0kXAP0boUQx5RxDDZTuGL2Wkv5LbbqIJOrqDVv3_H5tiunWTAxRYMalx_1gjiP2tEG89hevDCrJPKuoiivH6BZ6sKTbSfRACunAVwppMF7Gvf7YaSr3nMER1uedDeUA3stkAmub_tIchANVB_0B" alt=""></p>
+<p>此时，对于任何一个查询条件，只需要将其与整合值进行位与运算，即可得到匹配的值。</p>
+<p>由此，我们调整枚举为：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">enum</span> AdjustTypeEnum &#123;</span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 调账类型枚举; 一次调账申请可能对应多种调账类型，在数据表中存储各值之和</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    FINE(<span class="number">1</span>, <span class="string">"应还罚息"</span>),</span><br><span class="line">    TOTAL_REPAYMENT(<span class="number">2</span>, <span class="string">"应还总额"</span>),</span><br><span class="line">    FACT_REPAYMENT(<span class="number">4</span>, <span class="string">"实还总额"</span>),</span><br><span class="line">    FACT_PAYMENT_DATE(<span class="number">8</span>, <span class="string">"实还日期"</span>),</span><br><span class="line">    OVERDUE_DAYS(<span class="number">16</span>, <span class="string">"逾期天数"</span>),</span><br><span class="line">    PAYMENT_STATUS(<span class="number">32</span>, <span class="string">"还款状态"</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>调整<code>SQL</code>为：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span></span><br><span class="line">*</span><br><span class="line"><span class="keyword">FROM</span> <span class="string">`boss-account`</span>.acct_adjust_account_record</span><br><span class="line"><span class="keyword">WHERE</span></span><br><span class="line">adjust_type_sum &amp; <span class="comment">#&#123;调账类型筛选条件值之和&#125; &gt; 0</span></span><br></pre></td></tr></table></figure>
+
+
+
+
+
+
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/07/06/redis_pubsub/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1232,7 +1355,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">28</span>
+          <span class="site-state-item-count">29</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
