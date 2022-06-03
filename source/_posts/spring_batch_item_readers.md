@@ -9,7 +9,7 @@ categories: 后端
 
 #### 一、Spring Batch 数据读取器
 
-Spring Batch 的数据读取器，是通过接口 `ItemReader` 来实现的。针对常用的数据读取场景，Spring Batch 提供了丰富的组件支持（[查看所有组件](https://docs.spring.io/spring-batch/docs/current/reference/html/appendix.html#listOfReadersAndWriters)），本文介绍最常用的五个组件：
+Spring Batch 的数据读取器，是通过接口 `ItemReader` 来实现的。针对常用的数据读取场景，Spring Batch 提供了丰富的组件支持（[查看所有组件](https://docs.spring.io/spring-batch/docs/current/reference/html/appendix.html#itemReadersAppendix)），本文介绍最常用的五个组件：
 
 * `FlatFileItemReader`：读取文本数据；
 * `JdbcPagingItemReader`：分页读取数据库的数据；
@@ -19,11 +19,9 @@ Spring Batch 的数据读取器，是通过接口 `ItemReader` 来实现的。�
 
 #### 二、简单使用
 
-以下用例涉及到实体类 `Ticket.class`：
+实体类 `Ticket.class`：
 
 ```java
-package com.example.springbatchdemo.entity;
-
 import lombok.Data;
 import java.math.BigDecimal;
 
@@ -64,7 +62,7 @@ public class Ticket {
 上海,昆山,19.00
 ```
 
-可以看到，文本数据的每一行代表一个 `Ticket` 实体，对象属性之间以英文逗号分隔。通过 `FlatFileItemReader`，可以按照行将文本数据转换为 `POJO` 存储。demo 示例：
+可以看到，文本数据的每一行代表一个 `Ticket` 实体，对象属性之间以英文逗号分隔。通过 `FlatFileItemReader`，可以按照行将文本数据转换为 `POJO` 存储。
 
 ```java
 /**
@@ -109,7 +107,7 @@ public FlatFileItemReader<Ticket> ticketFileItemReader() {
 }
 ```
 
-运行应用，控制台打印日志：
+启动应用，控制台打印日志：
 
 ```java
 2022-06-02 13:50:23.538  INFO 77808 --- [restartedMain] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=testFlatItemFileReaderJob]] launched with the following parameters: [{run.id=2}]
@@ -124,7 +122,7 @@ public FlatFileItemReader<Ticket> ticketFileItemReader() {
 
 ##### 2.2 JdbcPagingItemReader-数据库数据读取
 
-从 `MySQL` 数据库，分页读取表 `student` 的数据，并打印数据内容。demo 示例：
+从 `MySQL` 数据库，分页读取表 `student` 的数据，并打印数据内容。
 
 ```java
 /**
@@ -190,9 +188,19 @@ public class StudentRowMapper implements RowMapper<Student> {
         return student;
     }
 }
+
+/**
+ * MySQL 数据源配置
+ */
+@Primary
+@Bean(name = "batchDemoDB")
+@ConfigurationProperties(prefix = "spring.datasource.batch-demo")
+public DataSource druidDataSource() {
+    return DataSourceBuilder.create().type(HikariDataSource.class).build();
+}
 ```
 
-运行应用，控制台打印日志：
+启动应用，控制台打印日志：
 
 ```java
 2022-06-02 14:00:19.010  INFO 67748 --- [restartedMain] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=testDatabaseItemReaderJob]] launched with the following parameters: [{run.id=2}]
@@ -261,8 +269,6 @@ name: 张三10, address: 上海市10
 </dependency>
 ```
 
-demo 示例：
-
 ```java
 /**
  * Job
@@ -303,7 +309,7 @@ public StaxEventItemReader<Ticket> itemReader() {
 }
 
 /**
- * 字段映射
+ * 映射器
  */
 @Bean("ticketMarshaller")
 public XStreamMarshaller ticketMarshaller() {
@@ -318,7 +324,7 @@ public XStreamMarshaller ticketMarshaller() {
 }
 ```
 
-运行应用，控制台打印日志：
+启动应用，控制台打印日志：
 
 ```java
 2022-06-02 14:15:48.444  INFO 87024 --- [restartedMain] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=testXmlItemReaderJob]] launched with the following parameters: [{run.id=3}]
@@ -365,8 +371,6 @@ public XStreamMarshaller ticketMarshaller() {
 ]
 ```
 
-demo 示例：
-
 ```java
 /**
  * Job
@@ -406,7 +410,7 @@ public JsonItemReader<Ticket> ticketJsonItemReader() {
 }
 ```
 
-运行应用，控制台打印日志：
+启动应用，控制台打印日志：
 
 ```java
 2022-06-02 14:25:38.142  INFO 76544 --- [restartedMain] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=testJsonItemReaderJob]] launched with the following parameters: [{run.id=2}]
@@ -433,8 +437,6 @@ public JsonItemReader<Ticket> ticketJsonItemReader() {
 上海,杭州,75.20
 上海,昆山,19.00
 ```
-
-demo 示例：
 
 ```java
 /**
@@ -496,7 +498,7 @@ public FlatFileItemReader<Ticket> commonTicketFileItemReader() {
 }
 ```
 
-运行程序，控制台打印日志：
+启动程序，控制台打印日志：
 
 ```java
 2022-06-02 14:37:49.693  INFO 86124 --- [restartedMain] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=testMultiFileItemReaderJob]] launched with the following parameters: [{run.id=2}]
@@ -512,10 +514,3 @@ public FlatFileItemReader<Ticket> commonTicketFileItemReader() {
 
 
 示例代码：[spring-batch-demo](https://github.com/donehub/spring-batch-demo)
-
-
-
-
-
-
-
