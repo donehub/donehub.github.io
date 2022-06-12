@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="一、Spring Batch 监听器在批处理过程中，需要对一些关键节点，如启动、结束、抛异常等，添加额外的处理，那么，就要借助 Spring Batch 监听器。Spring Batch 提供了两个维度的监听器：  Job 层面：  JobExecutionListener: 在 Job 执行之前（beforeJob）、之后（afterJob）触发；  Step 层面:  ChunkListen">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spring Batch 监听器">
+<meta property="og:url" content="https://donehub.github.io/2022/02/02/spring_batch_listeners/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="一、Spring Batch 监听器在批处理过程中，需要对一些关键节点，如启动、结束、抛异常等，添加额外的处理，那么，就要借助 Spring Batch 监听器。Spring Batch 提供了两个维度的监听器：  Job 层面：  JobExecutionListener: 在 Job 执行之前（beforeJob）、之后（afterJob）触发；  Step 层面:  ChunkListen">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/06/12_20_43_8_objects.png">
+<meta property="article:published_time" content="2022-02-02T15:59:25.000Z">
+<meta property="article:modified_time" content="2022-06-12T13:09:20.558Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Spring">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/06/12_20_43_8_objects.png">
+
+<link rel="canonical" href="https://donehub.github.io/2022/02/02/spring_batch_listeners/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Spring Batch 监听器 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2022/02/02/spring_batch_listeners/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Spring Batch 监听器
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-02-02 23:59:25" itemprop="dateCreated datePublished" datetime="2022-02-02T23:59:25+08:00">2022-02-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-06-12 21:09:20" itemprop="dateModified" datetime="2022-06-12T21:09:20+08:00">2022-06-12</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2022/02/02/spring_batch_listeners/" class="post-meta-item leancloud_visitors" data-flag-title="Spring Batch 监听器" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2022/02/02/spring_batch_listeners/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2022/02/02/spring_batch_listeners/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <hr>
+<h4 id="一、Spring-Batch-监听器"><a href="#一、Spring-Batch-监听器" class="headerlink" title="一、Spring Batch 监听器"></a>一、Spring Batch 监听器</h4><p>在批处理过程中，需要对一些关键节点，如启动、结束、抛异常等，添加额外的处理，那么，就要借助 Spring Batch 监听器。Spring Batch 提供了两个维度的监听器：</p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/06/12_20_43_8_objects.png" alt=""></p>
+<p><strong>Job 层面：</strong></p>
+<ul>
+<li><code>JobExecutionListener</code>: 在 Job 执行之前（beforeJob）、之后（afterJob）触发；</li>
+</ul>
+<p><strong>Step 层面:</strong></p>
+<ul>
+<li><code>ChunkListener</code>: 在 Chunk 执行之前（beforeChunk）、之后（afterChunk）和异常后（afterChunkError）触发；</li>
+<li><code>StepExecutionListener</code>: 在 Step 执行之前（beforeStep）、之后（afterStep）触发；</li>
+<li><code>ItemReadListener</code>: 在 Read 执行之前（beforeRead）、之后（afterRead）和异常时（onReadError）触发；</li>
+<li><code>ItemProcessListener</code>: 在 Process 执行之前（beforeProcess）、之后（afterProcess）和异常时（onProcessError）触发；</li>
+<li><code>ItemWriteListener</code>: 在 Write 执行之前（beforeWrite）、之后（afterWrite）和异常时（onWriteError）触发；</li>
+</ul>
+<h4 id="二、简单使用"><a href="#二、简单使用" class="headerlink" title="二、简单使用"></a>二、简单使用</h4><p>将文件 <code>ticket.cvs</code> 中的内容，打印出来：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">合肥,蚌埠,60.00</span><br><span class="line">南京,蚌埠,70.00</span><br><span class="line">上海,蚌埠,220.00</span><br><span class="line">上海,杭州,75.20</span><br><span class="line">上海,昆山,19.00</span><br></pre></td></tr></table></figure>
+
+<p>实体类：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> lombok.Data;</span><br><span class="line"><span class="keyword">import</span> java.math.BigDecimal;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Data</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Ticket</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 始发站</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> String departureStation;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 到达站</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> String arrivalStation;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 票价</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> BigDecimal price;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">toString</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> String.format(<span class="string">"始发站: %s; 到达站: %s; 票价: %s"</span>, departureStation, arrivalStation, price);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testListenerJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testListenerJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        <span class="comment">// job 监听器</span></span><br><span class="line">        .listener(testJobListener)</span><br><span class="line">        .flow(testListenerStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testListenerStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testListenerStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testListenerStep"</span>)</span><br><span class="line">        <span class="comment">// step 监听器</span></span><br><span class="line">        .listener(testStepListener)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Ticket, Ticket&gt;chunk(<span class="number">2</span>)</span><br><span class="line">        .faultTolerant()</span><br><span class="line">        <span class="comment">// chunk 监听器</span></span><br><span class="line">        .listener(testChunkListener)</span><br><span class="line">        .reader(ticketFileItemReader)</span><br><span class="line">        <span class="comment">// read 监听器</span></span><br><span class="line">        .listener(testReadListener)</span><br><span class="line">        .processor(ticketItemProcessor)</span><br><span class="line">        <span class="comment">// process 监听器</span></span><br><span class="line">        .listener(testProcessListener)</span><br><span class="line">        .writer(list -&gt; list.forEach(System.out::println))</span><br><span class="line">        <span class="comment">// write 监听器</span></span><br><span class="line">        .listener(testWriteListener)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Ticket&gt; <span class="title">ticketFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"ticket.csv"</span>))</span><br><span class="line">        .delimited()</span><br><span class="line">        .names(<span class="keyword">new</span> String[]&#123;<span class="string">"departureStation"</span>, <span class="string">"arrivalStation"</span>, <span class="string">"price"</span>&#125;)</span><br><span class="line">        .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Ticket&gt;() &#123;&#123;</span><br><span class="line">            setTargetType(Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        &#125;&#125;)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Processor</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">TicketItemProcessor</span> <span class="keyword">implements</span> <span class="title">ItemProcessor</span>&lt;<span class="title">Ticket</span>, <span class="title">Ticket</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(TicketItemProcessor<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Ticket <span class="title">process</span><span class="params">(<span class="keyword">final</span> Ticket ticketSource)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> String departureStation = ticketSource.getDepartureStation();</span><br><span class="line">        <span class="keyword">final</span> String arrivalStation = ticketSource.getArrivalStation();</span><br><span class="line">        <span class="keyword">final</span> BigDecimal price = ticketSource.getPrice();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Ticket ticketTarget = <span class="keyword">new</span> Ticket();</span><br><span class="line">        ticketTarget.setDepartureStation(departureStation);</span><br><span class="line">        ticketTarget.setArrivalStation(arrivalStation);</span><br><span class="line">        ticketTarget.setPrice(price);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> ticketTarget;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job Listener</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">TestJobListener</span> <span class="keyword">extends</span> <span class="title">JobExecutionListenerSupport</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(TestJobListener<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">beforeJob</span><span class="params">(JobExecution jobExecution)</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"before job: &#123;&#125;"</span>, jobExecution.getJobInstance().getJobName());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">afterJob</span><span class="params">(JobExecution jobExecution)</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"after job: &#123;&#125;"</span>, jobExecution.getJobInstance().getJobName());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Chunk Listener</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">TestChunkListener</span> <span class="keyword">extends</span> <span class="title">ChunkListenerSupport</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(TestChunkListener<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">beforeChunk</span><span class="params">(ChunkContext context)</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"before chunk: &#123;&#125;"</span>, context.getStepContext().getStepName());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">afterChunk</span><span class="params">(ChunkContext context)</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"after chunk: &#123;&#125;"</span>, context.getStepContext().getStepName());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">afterChunkError</span><span class="params">(ChunkContext context)</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"after chunk error: &#123;&#125;"</span>, context.getStepContext().getStepName());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Read Listener</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">TestReadListener</span> <span class="keyword">implements</span> <span class="title">ItemReadListener</span>&lt;<span class="title">Ticket</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(TestReadListener<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">beforeRead</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"before read"</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">afterRead</span><span class="params">(Ticket item)</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"after read: &#123;&#125;"</span>, item);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onReadError</span><span class="params">(Exception ex)</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"read item error: &#123;&#125;"</span>, ex.getMessage(), ex);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Process Listener</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">TestProcessListener</span> <span class="keyword">implements</span> <span class="title">ItemProcessListener</span>&lt;<span class="title">Ticket</span>, <span class="title">Ticket</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(TestProcessListener<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">beforeProcess</span><span class="params">(Ticket item)</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"before process: &#123;&#125;"</span>, item);</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">afterProcess</span><span class="params">(Ticket item, Ticket result)</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"after process: &#123;&#125;"</span>, item);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onProcessError</span><span class="params">(Ticket item, Exception e)</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"process: &#123;&#125; error: &#123;&#125;"</span>, item, e.getMessage(), e);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Write Listener</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">TestWriteListener</span> <span class="keyword">implements</span> <span class="title">ItemWriteListener</span>&lt;<span class="title">Ticket</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(TestWriteListener<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">beforeWrite</span><span class="params">(List&lt;? extends Ticket&gt; items)</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"before write: &#123;&#125;"</span>, items);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">afterWrite</span><span class="params">(List&lt;? extends Ticket&gt; items)</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"after write: &#123;&#125;"</span>, items);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onWriteError</span><span class="params">(Exception exception, List&lt;? extends Ticket&gt; items)</span> </span>&#123;</span><br><span class="line">        log.info(<span class="string">"write item error: &#123;&#125;"</span>, exception.getMessage(), exception);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>启动应用，打印日志：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.774</span>  INFO <span class="number">33680</span> --- [restartedMain] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=testListenerJob]] launched with the following parameters: [&#123;run.id=<span class="number">4</span>&#125;]</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.820</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.listener.job.TestJobListener     : before job: testListenerJob</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.858</span>  INFO <span class="number">33680</span> --- [restartedMain] o.s.batch.core.job.SimpleStepHandler     : Executing step: [testListenerStep]</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.867</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.listener.step.TestStepListener   : before step: testListenerStep</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.889</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.chunk.TestChunkListener        : before chunk: testListenerStep</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.891</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.reader.TestReadListener        : before read</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.905</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.reader.TestReadListener        : after read: 始发站: 合肥; 到达站: 蚌埠; 票价: <span class="number">60.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.906</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.reader.TestReadListener        : before read</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.907</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.reader.TestReadListener        : after read: 始发站: 南京; 到达站: 蚌埠; 票价: <span class="number">70.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.911</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.processor.TestProcessListener  : before process: 始发站: 合肥; 到达站: 蚌埠; 票价: <span class="number">60.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.912</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.processor.TestProcessListener  : after process: 始发站: 合肥; 到达站: 蚌埠; 票价: <span class="number">60.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.912</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.processor.TestProcessListener  : before process: 始发站: 南京; 到达站: 蚌埠; 票价: <span class="number">70.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.912</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.processor.TestProcessListener  : after process: 始发站: 南京; 到达站: 蚌埠; 票价: <span class="number">70.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.913</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.writer.TestWriteListener       : before write: [始发站: 合肥; 到达站: 蚌埠; 票价: <span class="number">60.00</span>, 始发站: 南京; 到达站: 蚌埠; 票价: <span class="number">70.00</span>]</span><br><span class="line">始发站: 合肥; 到达站: 蚌埠; 票价: <span class="number">60.00</span></span><br><span class="line">始发站: 南京; 到达站: 蚌埠; 票价: <span class="number">70.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.914</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.writer.TestWriteListener       : after write: [始发站: 合肥; 到达站: 蚌埠; 票价: <span class="number">60.00</span>, 始发站: 南京; 到达站: 蚌埠; 票价: <span class="number">70.00</span>]</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.928</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.chunk.TestChunkListener        : after chunk: testListenerStep</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.929</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.chunk.TestChunkListener        : before chunk: testListenerStep</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.929</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.reader.TestReadListener        : before read</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.930</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.reader.TestReadListener        : after read: 始发站: 上海; 到达站: 蚌埠; 票价: <span class="number">220.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.930</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.reader.TestReadListener        : before read</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.931</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.reader.TestReadListener        : after read: 始发站: 上海; 到达站: 杭州; 票价: <span class="number">75.20</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.931</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.processor.TestProcessListener  : before process: 始发站: 上海; 到达站: 蚌埠; 票价: <span class="number">220.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.931</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.processor.TestProcessListener  : after process: 始发站: 上海; 到达站: 蚌埠; 票价: <span class="number">220.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.931</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.processor.TestProcessListener  : before process: 始发站: 上海; 到达站: 杭州; 票价: <span class="number">75.20</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.932</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.processor.TestProcessListener  : after process: 始发站: 上海; 到达站: 杭州; 票价: <span class="number">75.20</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.932</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.writer.TestWriteListener       : before write: [始发站: 上海; 到达站: 蚌埠; 票价: <span class="number">220.00</span>, 始发站: 上海; 到达站: 杭州; 票价: <span class="number">75.20</span>]</span><br><span class="line">始发站: 上海; 到达站: 蚌埠; 票价: <span class="number">220.00</span></span><br><span class="line">始发站: 上海; 到达站: 杭州; 票价: <span class="number">75.20</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.932</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.writer.TestWriteListener       : after write: [始发站: 上海; 到达站: 蚌埠; 票价: <span class="number">220.00</span>, 始发站: 上海; 到达站: 杭州; 票价: <span class="number">75.20</span>]</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.943</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.chunk.TestChunkListener        : after chunk: testListenerStep</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.944</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.chunk.TestChunkListener        : before chunk: testListenerStep</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.944</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.reader.TestReadListener        : before read</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.945</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.reader.TestReadListener        : after read: 始发站: 上海; 到达站: 昆山; 票价: <span class="number">19.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.945</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.reader.TestReadListener        : before read</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.945</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.processor.TestProcessListener  : before process: 始发站: 上海; 到达站: 昆山; 票价: <span class="number">19.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.945</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.processor.TestProcessListener  : after process: 始发站: 上海; 到达站: 昆山; 票价: <span class="number">19.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.946</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.writer.TestWriteListener       : before write: [始发站: 上海; 到达站: 昆山; 票价: <span class="number">19.00</span>]</span><br><span class="line">始发站: 上海; 到达站: 昆山; 票价: <span class="number">19.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.946</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.writer.TestWriteListener       : after write: [始发站: 上海; 到达站: 昆山; 票价: <span class="number">19.00</span>]</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.959</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.l.chunk.TestChunkListener        : after chunk: testListenerStep</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.959</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.listener.step.TestStepListener   : after step: testListenerStep</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.962</span>  INFO <span class="number">33680</span> --- [restartedMain] o.s.batch.core.step.AbstractStep         : Step: [testListenerStep] executed in <span class="number">104</span>ms</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.978</span>  INFO <span class="number">33680</span> --- [restartedMain] c.e.s.c.listener.job.TestJobListener     : after job: testListenerJob</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">12</span> <span class="number">19</span>:<span class="number">31</span>:<span class="number">13.997</span>  INFO <span class="number">33680</span> --- [restartedMain] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=testListenerJob]] completed with the following parameters: [&#123;run.id=<span class="number">4</span>&#125;] and the following status: [COMPLETED] in <span class="number">178</span>ms</span><br></pre></td></tr></table></figure>
+
+<p>从日志可以看出：</p>
+<ul>
+<li><p>Job 、Step 监听器贯穿任务的始终；</p>
+</li>
+<li><p>每一个 chunk 中，执行 2 次读、2 次处理、1 次写；</p>
+</li>
+<li><p>每一次 read 过程，触发 beforeRead()、afterRead()；</p>
+</li>
+<li><p>每一次 process 过程，触发  beforeProcess()、afterProcess()；</p>
+</li>
+<li><p>每一次 write 过程，触发 beforeWrite()、afterWrite()；</p>
+</li>
+</ul>
+<p>示例代码：<a href="https://github.com/donehub/spring-batch-demo" target="_blank" rel="noopener">spring-batch-demo</a></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Spring/" rel="tag"><i class="fa fa-tag"></i> Spring</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/02/02/spring_batch_demo/" rel="prev" title="Spring Batch 基础应用">
+      <i class="fa fa-chevron-left"></i> Spring Batch 基础应用
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/02/03/spring_batch_item_readers/" rel="next" title="Spring Batch 数据读取器">
+      Spring Batch 数据读取器 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#一、Spring-Batch-监听器"><span class="nav-number">1.</span> <span class="nav-text">一、Spring Batch 监听器</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二、简单使用"><span class="nav-number">2.</span> <span class="nav-text">二、简单使用</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">31</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>

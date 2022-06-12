@@ -162,6 +162,128 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/11/11/spring_bean_util_copy/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/11/11/spring_bean_util_copy/" class="post-title-link" itemprop="url">Spring 对象拷贝机制</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-11-11 13:57:01" itemprop="dateCreated datePublished" datetime="2021-11-11T13:57:01+08:00">2021-11-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-04-02 19:39:40" itemprop="dateModified" datetime="2022-04-02T19:39:40+08:00">2022-04-02</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2021/11/11/spring_bean_util_copy/" class="post-meta-item leancloud_visitors" data-flag-title="Spring 对象拷贝机制" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2021/11/11/spring_bean_util_copy/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2021/11/11/spring_bean_util_copy/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <hr>
+<h4 id="一、-Spring-对象拷贝的具体实现"><a href="#一、-Spring-对象拷贝的具体实现" class="headerlink" title="一、 Spring 对象拷贝的具体实现"></a>一、 <code>Spring</code> 对象拷贝的具体实现</h4><p><code>Spring</code> 对象拷贝，基于反射和内省，将源对象字段值装填到目标对象字段上。主要分以下两步：</p>
+<ul>
+<li>通过内省，获取源对象和目标对象的属性描述器；</li>
+<li>通过反射，解析源属性值，赋值到目标属性中；</li>
+</ul>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Spring 对象拷贝基础方法</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@param</span> source           源对象</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@param</span> target           目标对象</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@param</span> editable         限制目标 Class</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@param</span> ignoreProperties 需要忽略的拷贝字段</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">copyProperties</span><span class="params">(Object source, Object target, Class&lt;?&gt; editable,</span></span></span><br><span class="line"><span class="function"><span class="params">                                   String... ignoreProperties)</span> <span class="keyword">throws</span> BeansException </span>&#123;</span><br><span class="line">    </span><br><span class="line">    Assert.notNull(source, <span class="string">"Source must not be null"</span>);</span><br><span class="line">    Assert.notNull(target, <span class="string">"Target must not be null"</span>);</span><br><span class="line">    </span><br><span class="line">    Class&lt;?&gt; actualEditable = target.getClass();</span><br><span class="line">    <span class="keyword">if</span> (editable != <span class="keyword">null</span>) &#123;</span><br><span class="line">        <span class="comment">// 如果 target 不是 editable 的实例, 则中断拷贝</span></span><br><span class="line">        <span class="keyword">if</span> (!editable.isInstance(target)) &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> IllegalArgumentException(<span class="string">"Target class ["</span> + target.getClass().getName() +<span class="string">"] not assignable to Editable class ["</span> + editable.getName() + <span class="string">"]"</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        actualEditable = editable;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 内省目标对象, 获取其属性描述器列表</span></span><br><span class="line">    PropertyDescriptor[] targetPds = getPropertyDescriptors(actualEditable);</span><br><span class="line">    <span class="comment">// 解析需要忽略拷贝的字段</span></span><br><span class="line">    List&lt;String&gt; ignoreList = (ignoreProperties != <span class="keyword">null</span> ? Arrays.asList(ignoreProperties) : <span class="keyword">null</span>);</span><br><span class="line">    <span class="comment">// 遍历目标对象的属性描述器, 依次进行属性值的拷贝</span></span><br><span class="line">    <span class="keyword">for</span> (PropertyDescriptor targetPd : targetPds) &#123;</span><br><span class="line">        <span class="comment">// 解析目标属性描述器的写入方法</span></span><br><span class="line">        Method writeMethod = targetPd.getWriteMethod();</span><br><span class="line">        <span class="comment">// 如果目标属性可以写入且需要拷贝, 则内省源对象, 获取对应的属性描述器, 读取属性值并拷贝到目标属性中</span></span><br><span class="line">        <span class="keyword">if</span> (writeMethod != <span class="keyword">null</span> &amp;&amp; (ignoreList == <span class="keyword">null</span> || !ignoreList.contains(targetPd.getName()))) &#123;</span><br><span class="line">            <span class="comment">// 内省源对象, 缓存属性描述器, 并根据目标属性名称取出对应的源属性的描述器</span></span><br><span class="line">            PropertyDescriptor sourcePd = getPropertyDescriptor(source.getClass(), targetPd.getName());</span><br><span class="line">            <span class="keyword">if</span> (sourcePd != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="comment">// 解析源属性值的读取方法</span></span><br><span class="line">                Method readMethod = sourcePd.getReadMethod();</span><br><span class="line">                <span class="keyword">if</span> (readMethod != <span class="keyword">null</span></span><br><span class="line">                    &amp;&amp; ClassUtils.isAssignable(writeMethod.getParameterTypes()[<span class="number">0</span>],</span><br><span class="line">                                              readMethod.getReturnType())) &#123;</span><br><span class="line">                    </span><br><span class="line">                    <span class="keyword">try</span> &#123;</span><br><span class="line">                        <span class="keyword">if</span> (!Modifier.isPublic(readMethod.getDeclaringClass().getModifiers())) &#123;</span><br><span class="line">                            readMethod.setAccessible(<span class="keyword">true</span>);</span><br><span class="line">                        &#125;</span><br><span class="line">                        <span class="comment">// 读取源属性值</span></span><br><span class="line">                        Object value = readMethod.invoke(source);</span><br><span class="line">                        <span class="keyword">if</span> (!Modifier.isPublic(writeMethod.getDeclaringClass().getModifiers())) &#123;</span><br><span class="line">                            writeMethod.setAccessible(<span class="keyword">true</span>);</span><br><span class="line">                        &#125;</span><br><span class="line">                        <span class="comment">// 写入目标属性</span></span><br><span class="line">                        writeMethod.invoke(target, value);</span><br><span class="line">                    &#125; <span class="keyword">catch</span> (Throwable ex) &#123;</span><br><span class="line">                        <span class="keyword">throw</span> <span class="keyword">new</span> FatalBeanException(<span class="string">"Could not copy property '"</span> + targetPd.getName() + <span class="string">"' from source to target"</span>, ex);</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="二、-BeanUtils-copyProperties实现原理"><a href="#二、-BeanUtils-copyProperties实现原理" class="headerlink" title="二、 BeanUtils.copyProperties实现原理"></a>二、 <code>BeanUtils.copyProperties</code>实现原理</h4><p>根据以上分析，整合出 <code>Spring</code> 对象拷贝的实现原理：</p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_39_5_introspector.jpg" alt=""></p>
+<p>通过内省机制，对 <code>Bean</code> 进行拆分，得到每个属性的描述器，缓存在 <code>Map</code> 中，<code>Key</code>为变量名，<code>Value</code>为属性描述器。属性描述器主要包括：属性名称、读取属性值的方法、设置属性值的方法。拷贝过程中，先获取目标属性的写入方法，再获取对应源属性的读取方法，最后通过反射拷贝属性值。</p>
+<h4 id="三、JavaBean内省机制"><a href="#三、JavaBean内省机制" class="headerlink" title="三、JavaBean内省机制"></a>三、<code>JavaBean</code>内省机制</h4><p><code>JavaBean</code> 内省，是建立在反射基础上的，通过解析 <code>Bean</code>各个属性的描述器，以便通过属性描述器来操作 <code>Bean</code> 的一种机制。反射是将 <code>Java</code> 类中的各种成分映射成相应的 <code>Java</code> 类，可以获取所有属性以及调用任何方法。与反射不同的是，内省是通过属性描述器来暴露一个 <code>Bean</code> 的属性、方法和时间的，而且只有符合 <code>JavaBean</code> 规则的类的成员才可以调用内生 <code>API</code> 进行操作。</p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_37_1_refect_instropection.png" alt=""></p>
+<p>内省在 <code>java.beans.Introspector</code>中的具体实现：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 获取所有的 public 方法</span></span><br><span class="line">Method methodList[] = getPublicDeclaredMethods(beanClass);</span><br><span class="line"><span class="comment">// 循环遍历处理每一个 public 方法, 为方便讲解, 此处我们以第一个方法为例...</span></span><br><span class="line"></span><br><span class="line">Method method = methodList[<span class="number">0</span>];</span><br><span class="line"><span class="keyword">if</span> (method == <span class="keyword">null</span>) &#123;</span><br><span class="line">    <span class="keyword">continue</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 跳过 static 方法</span></span><br><span class="line"><span class="keyword">int</span> mods = method.getModifiers();</span><br><span class="line"><span class="keyword">if</span> (Modifier.isStatic(mods)) &#123;</span><br><span class="line">    <span class="keyword">continue</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 获取该方法的名称, 如setAge、getAge</span></span><br><span class="line">String name = method.getName();</span><br><span class="line"><span class="comment">// 获取该方法的入参和返参</span></span><br><span class="line">Class&lt;?&gt;[] argTypes = method.getParameterTypes();</span><br><span class="line">Class&lt;?&gt; resultType = method.getReturnType();</span><br><span class="line"><span class="comment">// 获取该方法的入参个数</span></span><br><span class="line"><span class="keyword">int</span> argCount = argTypes.length;</span><br><span class="line">PropertyDescriptor pd = <span class="keyword">null</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (argCount == <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="comment">// 1. 没有入参: 说明是获取属性值的方法</span></span><br><span class="line">    <span class="keyword">if</span> (name.startsWith(GET_PREFIX)) &#123;</span><br><span class="line">        <span class="comment">// 1.1 该方法名称以 get 开头, 如 getAge</span></span><br><span class="line">        pd = <span class="keyword">new</span> PropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">3</span>), method, <span class="keyword">null</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (resultType == <span class="keyword">boolean</span><span class="class">.<span class="keyword">class</span> &amp;&amp; <span class="title">name</span>.<span class="title">startsWith</span>(<span class="title">IS_PREFIX</span>)) </span>&#123;</span><br><span class="line">        <span class="comment">// 1.2 该方法名称以 is 开头, 如 isMale, 只处理基本类型的布尔值</span></span><br><span class="line">        pd = <span class="keyword">new</span> PropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">2</span>), method, <span class="keyword">null</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (argCount == <span class="number">1</span>) &#123;</span><br><span class="line">    <span class="comment">// 2. 有一个入参</span></span><br><span class="line">    if (int.class.equals(argTypes[0]) &amp;&amp; name.startsWith(GET_PREFIX)) &#123;</span><br><span class="line">        <span class="comment">// 2.1 获取属性值的方法, 如 getChild(Integer index), 则封装成索引属性器</span></span><br><span class="line">        pd = <span class="keyword">new</span> IndexedPropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">3</span>), <span class="keyword">null</span>, <span class="keyword">null</span>, method, <span class="keyword">null</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (<span class="keyword">void</span><span class="class">.<span class="keyword">class</span>.<span class="title">equals</span>(<span class="title">resultType</span>) &amp;&amp; <span class="title">name</span>.<span class="title">startsWith</span>(<span class="title">SET_PREFIX</span>)) </span>&#123;</span><br><span class="line">        <span class="comment">// 2.2 设置属性值的方法</span></span><br><span class="line">        pd = <span class="keyword">new</span> PropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">3</span>), <span class="keyword">null</span>, method);</span><br><span class="line">        <span class="keyword">if</span> (throwsException(method, PropertyVetoException<span class="class">.<span class="keyword">class</span>)) </span>&#123;</span><br><span class="line">            pd.setConstrained(<span class="keyword">true</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (argCount == <span class="number">2</span>) &#123;</span><br><span class="line">    <span class="comment">// 3. 有两个入参</span></span><br><span class="line">    if (void.class.equals(resultType) &amp;&amp; int.class.equals(argTypes[0]) &amp;&amp; name.startsWith(SET_PREFIX)) &#123;</span><br><span class="line">        <span class="comment">// 3.1 只处理设置属性值的方法, 如 setChild(Integer index, Child child), 则封装成索引属性器</span></span><br><span class="line">        pd = <span class="keyword">new</span> IndexedPropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">3</span>), <span class="keyword">null</span>, <span class="keyword">null</span>, <span class="keyword">null</span>, method);</span><br><span class="line">        <span class="keyword">if</span> (throwsException(method, PropertyVetoException<span class="class">.<span class="keyword">class</span>)) </span>&#123;</span><br><span class="line">            pd.setConstrained(<span class="keyword">true</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">return</span> PropertyDescriptor;</span><br></pre></td></tr></table></figure>
+
+<p>由此可以看出，一个类的方法名称、入参个数、反参类型是<code>JavaBean</code> 内省的主要要素，可以总结为：</p>
+<ul>
+<li>只能内省一个类暴露的 <code>public</code> 非静态方法；</li>
+<li>可以内省标准化的 <code>set</code> 方法，如  <code>void setAge(Integer age)</code>；</li>
+<li>可以内省标准化的 <code>get</code> 方法，如  <code>ResultType getAge()</code>；</li>
+<li>可以内省设置索引属性的方法，如 <code>setChild(Integer index, Child child)</code>；</li>
+<li>可以内省获取索引属性的方法，如 <code>getChild(Integer index)</code>；</li>
+<li>可以内省获取基本类型布尔值的且以 <code>is</code> 开头的方法，如 <code>boolean isMale()</code>；</li>
+</ul>
+<h4 id="五、总结"><a href="#五、总结" class="headerlink" title="五、总结"></a>五、总结</h4><p><code>Spring</code> 对象拷贝，基于反射和内省机制，通过属性描述器，将源属性值写入目标属性。如今 <code>Spring</code> 架构已被广泛使用，旗下各种好用的工具也是顺手拈来，但无端的滥用也潜藏着一些问题。比如 <code>Spring</code> 对象拷贝，要求操作的对象必须符合 <code>JavaBean</code> 规范，否则将无法拷贝。如拷贝包装类型的布尔值，其读取方法为 <code>Boolean isMale</code> ，不符合 <code>JavaBean</code> 规范，对应的目标属性值一定是 <code>null</code>。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/11/09/datax_fixed_with_ctrip_dal/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1457,132 +1579,11 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/09/13/tiger-head/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/09/13/tiger-head/" class="post-title-link" itemprop="url">狮子头</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-09-13 14:57:01" itemprop="dateCreated datePublished" datetime="2020-09-13T14:57:01+08:00">2020-09-13</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%90%83%E8%B4%A7/" itemprop="url" rel="index"><span itemprop="name">吃货</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2020/09/13/tiger-head/" class="post-meta-item leancloud_visitors" data-flag-title="狮子头" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2020/09/13/tiger-head/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2020/09/13/tiger-head/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <hr>
-<p>自从国内猪肉紧俏以来，市面上就经常买到进口猪肉。外国人养猪比较人性化，不给小猪做阉割，所以猪肉又腥又骚。今天抱着踩雷的心态，买了一份肉，并在叮咚上特意备注道：“只要中国猪肉！”。</p>
-<p>今天来做个狮子头。</p>
-<h5 id="一、食材准备"><a href="#一、食材准备" class="headerlink" title="一、食材准备"></a>一、食材准备</h5><p>五花肉（肥瘦比: 6:4），山药（马蹄/萝卜）、老豆腐、红薯淀粉、辣椒、葱姜蒜、生抽、老抽、蚝油、料酒、八角、鸡蛋。</p>
-<p><img src="https://s1.ax1x.com/2020/09/15/wyDNmd.jpg" alt="wyDNmd.jpg"></p>
-<p>辅料我用的是山药，大家可以根据自己的口味调整。辅料添加要适量，否则可能团不成肉丸子。</p>
-<h5 id="二、制作流程"><a href="#二、制作流程" class="headerlink" title="二、制作流程"></a>二、制作流程</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">graph LR</span><br><span class="line">A[拌料] --&gt; B(成型)</span><br><span class="line">B --&gt; C(煎炸)</span><br><span class="line">C --&gt; D(红烧)</span><br><span class="line">D --&gt; E(勾芡)</span><br></pre></td></tr></table></figure>
-
-<h5 id="三、操作步骤"><a href="#三、操作步骤" class="headerlink" title="三、操作步骤"></a>三、操作步骤</h5><ol>
-<li><p>将五花肉，山药、老豆腐、葱姜蒜、生抽、老抽、蚝油、料酒、鸡蛋依次放入碗中，用手沿着一个方向搅拌上劲，待拌料可以黏在手上，加入少量淀粉后继续搅拌摔打；</p>
-<p><img src="https://s1.ax1x.com/2020/09/15/wyD8SO.jpg" alt="wyD8SO.jpg"></p>
-</li>
-<li><p>将拌料团成你喜欢的大小；</p>
-<p><img src="https://s1.ax1x.com/2020/09/15/wyDJ6e.jpg" alt="wyDJ6e.jpg"></p>
-</li>
-<li><p>热锅冷油，煎炸二十分钟；油热6分可入锅，全程小火；这一步的主要目的是定型，口味清淡的朋友也可以用沸水来操作；</p>
-<p><img src="https://s1.ax1x.com/2020/09/15/wyDGlD.jpg" alt="wyDGlD.jpg"></p>
-</li>
-<li><p>将辣椒、葱姜蒜、八角炒香，再加入生抽、老抽、蚝油、料酒，添2/3锅水，加入肉丸子小火慢煮30分钟；</p>
-<p><img src="https://s1.ax1x.com/2020/09/15/wyDYOH.jpg" alt="wyDYOH.jpg"></p>
-</li>
-<li><p>勾芡 ；待锅内汤汁不多时，盛出肉丸子，然后加入水淀粉熬制挂锅，然后将红烧汁浇在狮子头上；</p>
-<p><img src="https://s1.ax1x.com/2020/09/15/wygNnS.jpg" alt="wygNnS.jpg"></p>
-<p><img src="https://s1.ax1x.com/2020/09/15/wygwkj.jpg" alt="wygwkj.jpg"></p>
-</li>
-</ol>
-<h5 id="四、多说一句"><a href="#四、多说一句" class="headerlink" title="四、多说一句"></a>四、多说一句</h5><p>做狮子头比较耗时耗力，只能在周末享用。相比来说，我更喜欢老家的肉丸子。材料比较简单，猪肉、馒头渣、黑胡椒。团成丸子，再兑上半锅水，炖煮一个小时。味浓又不油腻！</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><a class="extend next" rel="next" href="/page/3/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><a class="page-number" href="/page/4/">4</a><a class="extend next" rel="next" href="/page/3/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1650,7 +1651,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">30</span>
+          <span class="site-state-item-count">31</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
