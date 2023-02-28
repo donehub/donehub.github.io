@@ -45,15 +45,6 @@
   
 
 
-  <script>
-    var _hmt = _hmt || [];
-    (function() {
-      var hm = document.createElement("script");
-      hm.src = "https://hm.baidu.com/hm.js?44f89ab9ce69c43629d7406e7b3d2ac1";
-      var s = document.getElementsByTagName("script")[0];
-      s.parentNode.insertBefore(hm, s);
-    })();
-  </script>
 
 
 
@@ -243,6 +234,13 @@
             </span>
 
           
+            <span id="/2021/11/11/spring_bean_util_copy/" class="post-meta-item leancloud_visitors" data-flag-title="Spring 对象拷贝机制" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
   
   <span class="post-meta-item">
     
@@ -358,6 +356,13 @@
             </span>
 
           
+            <span id="/2021/11/09/datax_fixed_with_ctrip_dal/" class="post-meta-item leancloud_visitors" data-flag-title="DataX 兼容携程 Dal 数据库访问框架" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
   
   <span class="post-meta-item">
     
@@ -423,6 +428,145 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/10/01/java_switch/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/10/01/java_switch/" class="post-title-link" itemprop="url">Java 关键字 Switch 的实现原理</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-10-01 21:57:18" itemprop="dateCreated datePublished" datetime="2021-10-01T21:57:18+08:00">2021-10-01</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-02-28 19:14:20" itemprop="dateModified" datetime="2023-02-28T19:14:20+08:00">2023-02-28</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2021/10/01/java_switch/" class="post-meta-item leancloud_visitors" data-flag-title="Java 关键字 Switch 的实现原理" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2021/10/01/java_switch/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2021/10/01/java_switch/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <hr>
+<h4 id="一、Swicth-关键字"><a href="#一、Swicth-关键字" class="headerlink" title="一、Swicth 关键字"></a>一、Swicth 关键字</h4><p><code>switch</code> 是 <code>Java</code> 中的选择语句，与 <code>if/else</code> 不同的是，<code>switch</code> 只支持常量表达式，包括 byte、short、int、char、枚举常量和字符串常量(From jdk1.7)。</p>
+<p>通常说，引入 <code>switch</code> ，一是为了优化代码结构，让代码更简洁；二是为了优化性能，提升效率。为了进一步学习 <code>switch</code> 作用机制，本文将从字节码的角度来探索其底层实现。</p>
+<h4 id="二、Switch-的典型应用"><a href="#二、Switch-的典型应用" class="headerlink" title="二、Switch 的典型应用"></a>二、Switch 的典型应用</h4><h5 id="2-1-对整型-int的支持"><a href="#2-1-对整型-int的支持" class="headerlink" title="2.1 对整型-int的支持"></a>2.1 对整型-int的支持</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">switchInt</span><span class="params">(<span class="keyword">int</span> flag)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">switch</span> (flag) &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">1</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是1"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">8</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是8"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">3</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是3"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">default</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是未知数"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>使用 Jclasslib 查看字节码：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"> <span class="number">0</span> iload_0</span><br><span class="line"> <span class="number">1</span> lookupswitch <span class="number">3</span></span><br><span class="line">	<span class="number">1</span>:  <span class="number">36</span> (+<span class="number">35</span>)</span><br><span class="line">	<span class="number">3</span>:  <span class="number">58</span> (+<span class="number">57</span>)</span><br><span class="line">	<span class="number">8</span>:  <span class="number">47</span> (+<span class="number">46</span>)</span><br><span class="line">	<span class="keyword">default</span>:  <span class="number">69</span> (+<span class="number">68</span>)</span><br><span class="line">36 getstatic #3 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">39 ldc #4 &lt;这是1&gt;</span><br><span class="line">41 invokevirtual #5 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">44</span> goto <span class="number">77</span> (+<span class="number">33</span>)</span><br><span class="line">47 getstatic #3 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">50 ldc #6 &lt;这是8&gt;</span><br><span class="line">52 invokevirtual #5 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">55</span> goto <span class="number">77</span> (+<span class="number">22</span>)</span><br><span class="line">58 getstatic #3 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">61 ldc #7 &lt;这是3&gt;</span><br><span class="line">63 invokevirtual #5 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">66</span> goto <span class="number">77</span> (+<span class="number">11</span>)</span><br><span class="line">69 getstatic #3 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">72 ldc #8 &lt;这是未知数&gt;</span><br><span class="line">74 invokevirtual #5 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">77</span> <span class="keyword">return</span></span><br></pre></td></tr></table></figure>
+
+<p>可以看出，<code>switch</code> 对整形-int类型的选择，是直接比较 int 值的。</p>
+<h5 id="2-2-对整型-byte的支持"><a href="#2-2-对整型-byte的支持" class="headerlink" title="2.2 对整型-byte的支持"></a>2.2 对整型-byte的支持</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">switchByte</span><span class="params">(<span class="keyword">byte</span> flag)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">switch</span> (flag) &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">1</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是1"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">8</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是8"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">3</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是3"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">default</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是未知数"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>使用 Jclasslib 查看字节码：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"> <span class="number">0</span> iload_0</span><br><span class="line"> <span class="number">1</span> lookupswitch <span class="number">3</span></span><br><span class="line">	<span class="number">1</span>:  <span class="number">36</span> (+<span class="number">35</span>)</span><br><span class="line">	<span class="number">3</span>:  <span class="number">58</span> (+<span class="number">57</span>)</span><br><span class="line">	<span class="number">8</span>:  <span class="number">47</span> (+<span class="number">46</span>)</span><br><span class="line">	<span class="keyword">default</span>:  <span class="number">69</span> (+<span class="number">68</span>)</span><br><span class="line">36 getstatic #3 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">39 ldc #4 &lt;这是1&gt;</span><br><span class="line">41 invokevirtual #5 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">44</span> goto <span class="number">77</span> (+<span class="number">33</span>)</span><br><span class="line">47 getstatic #3 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">50 ldc #6 &lt;这是8&gt;</span><br><span class="line">52 invokevirtual #5 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">55</span> goto <span class="number">77</span> (+<span class="number">22</span>)</span><br><span class="line">58 getstatic #3 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">61 ldc #7 &lt;这是3&gt;</span><br><span class="line">63 invokevirtual #5 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">66</span> goto <span class="number">77</span> (+<span class="number">11</span>)</span><br><span class="line">69 getstatic #3 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">72 ldc #8 &lt;这是未知数&gt;</span><br><span class="line">74 invokevirtual #5 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">77</span> <span class="keyword">return</span></span><br></pre></td></tr></table></figure>
+
+<p>可以看出，<code>switch</code> 对整形-byte类型的选择，是先将其转化为 int 类型，再比较 int 值的。</p>
+<h5 id="2-3-对整型-char的支持"><a href="#2-3-对整型-char的支持" class="headerlink" title="2.3 对整型-char的支持"></a>2.3 对整型-char的支持</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">switchChar</span><span class="params">(<span class="keyword">char</span> flag)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">switch</span> (flag) &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">'a'</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是a"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">'c'</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是c"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">'b'</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是b"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">default</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是未知数"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>使用 Jclasslib 查看字节码：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"> <span class="number">0</span> iload_0</span><br><span class="line"> <span class="number">1</span> tableswitch <span class="number">97</span> to <span class="number">99</span></span><br><span class="line">	<span class="number">97</span>:  <span class="number">28</span> (+<span class="number">27</span>)</span><br><span class="line">	<span class="number">98</span>:  <span class="number">50</span> (+<span class="number">49</span>)</span><br><span class="line">	<span class="number">99</span>:  <span class="number">39</span> (+<span class="number">38</span>)</span><br><span class="line">	<span class="keyword">default</span>:  <span class="number">61</span> (+<span class="number">60</span>)</span><br><span class="line">28 getstatic #3 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">31 ldc #4 &lt;这是a&gt;</span><br><span class="line">33 invokevirtual #5 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">36</span> goto <span class="number">69</span> (+<span class="number">33</span>)</span><br><span class="line">39 getstatic #3 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">42 ldc #6 &lt;这是c&gt;</span><br><span class="line">44 invokevirtual #5 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">47</span> goto <span class="number">69</span> (+<span class="number">22</span>)</span><br><span class="line">50 getstatic #3 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">53 ldc #7 &lt;这是b&gt;</span><br><span class="line">55 invokevirtual #5 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">58</span> goto <span class="number">69</span> (+<span class="number">11</span>)</span><br><span class="line">61 getstatic #3 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">64 ldc #8 &lt;这是未知数&gt;</span><br><span class="line">66 invokevirtual #5 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">69</span> <span class="keyword">return</span></span><br></pre></td></tr></table></figure>
+
+<p>可以看出，<code>switch</code> 对整形-char类型的选择，是先将其转化为 int 类型，再比较 int 值的。此外，short 类型的选择也是先转化为 int 类型再做比较的，就不一一展开了。</p>
+<h5 id="2-4-对枚举类型的支持"><a href="#2-4-对枚举类型的支持" class="headerlink" title="2.4 对枚举类型的支持"></a>2.4 对枚举类型的支持</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">switchEnum</span><span class="params">(PayStatusEnum flag)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">switch</span> (flag) &#123;</span><br><span class="line">        <span class="keyword">case</span> INIT:</span><br><span class="line">            System.out.println(<span class="string">"INIT"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> PAYING:</span><br><span class="line">            System.out.println(<span class="string">"PAYING"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> PAID:</span><br><span class="line">            System.out.println(<span class="string">"PAID"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">default</span>:</span><br><span class="line">            System.out.println(<span class="string">"非法状态"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>使用 Jclasslib 查看字节码：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">0 getstatic #4 &lt;com/example/springbatchdemo/job/Test$1.$SwitchMap$com$example$springbatchdemo$job$PayStatusEnum : [I&gt;</span><br><span class="line"> <span class="number">3</span> aload_0</span><br><span class="line"> 4 invokevirtual #5 &lt;com/example/springbatchdemo/job/PayStatusEnum.ordinal : ()I&gt;</span><br><span class="line"> <span class="number">7</span> iaload</span><br><span class="line"> <span class="number">8</span> tableswitch <span class="number">1</span> to <span class="number">3</span></span><br><span class="line">	<span class="number">1</span>:  <span class="number">36</span> (+<span class="number">28</span>)</span><br><span class="line">	<span class="number">2</span>:  <span class="number">47</span> (+<span class="number">39</span>)</span><br><span class="line">	<span class="number">3</span>:  <span class="number">58</span> (+<span class="number">50</span>)</span><br><span class="line">	<span class="keyword">default</span>:  <span class="number">69</span> (+<span class="number">61</span>)</span><br><span class="line">36 getstatic #6 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">39 ldc #7 &lt;INIT&gt;</span><br><span class="line">41 invokevirtual #8 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">44</span> goto <span class="number">77</span> (+<span class="number">33</span>)</span><br><span class="line">47 getstatic #6 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">50 ldc #9 &lt;PAYING&gt;</span><br><span class="line">52 invokevirtual #8 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">55</span> goto <span class="number">77</span> (+<span class="number">22</span>)</span><br><span class="line">58 getstatic #6 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">61 ldc #10 &lt;PAID&gt;</span><br><span class="line">63 invokevirtual #8 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">66</span> goto <span class="number">77</span> (+<span class="number">11</span>)</span><br><span class="line">69 getstatic #6 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">72 ldc #11 &lt;非法状态&gt;</span><br><span class="line">74 invokevirtual #8 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">77</span> <span class="keyword">return</span></span><br></pre></td></tr></table></figure>
+
+<p>可以看出，<code>switch</code> 对枚举类型的选择，是先将枚举项的<code>ordinal()</code>的返回值+1，再做比较的。</p>
+<h5 id="2-5-对字符串的支持"><a href="#2-5-对字符串的支持" class="headerlink" title="2.5 对字符串的支持"></a>2.5 对字符串的支持</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">switchString</span><span class="params">(String flag)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">switch</span> (flag) &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">"ONE"</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是ONE"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">"TWO"</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是TWO"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">"THREE"</span>:</span><br><span class="line">            System.out.println(<span class="string">"这是THREE"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">default</span>:</span><br><span class="line">            System.out.println(<span class="string">"未知数"</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>使用 Jclasslib 查看字节码：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br></pre></td><td class="code"><pre><span class="line">  <span class="number">0</span> aload_0</span><br><span class="line">  <span class="number">1</span> astore_1</span><br><span class="line">  <span class="number">2</span> iconst_m1</span><br><span class="line">  <span class="number">3</span> istore_2</span><br><span class="line">  <span class="number">4</span> aload_1</span><br><span class="line">  5 invokevirtual #4 &lt;java/lang/String.hashCode : ()I&gt;</span><br><span class="line">  <span class="number">8</span> lookupswitch <span class="number">3</span></span><br><span class="line">	<span class="number">78406</span>:  <span class="number">44</span> (+<span class="number">36</span>)</span><br><span class="line">	<span class="number">83500</span>:  <span class="number">58</span> (+<span class="number">50</span>)</span><br><span class="line">	<span class="number">79801726</span>:  <span class="number">72</span> (+<span class="number">64</span>)</span><br><span class="line">	<span class="keyword">default</span>:  <span class="number">83</span> (+<span class="number">75</span>)</span><br><span class="line"> <span class="number">44</span> aload_1</span><br><span class="line"> 45 ldc #2 &lt;ONE&gt;</span><br><span class="line"> 47 invokevirtual #5 &lt;java/lang/String.equals : (Ljava/lang/Object;)Z&gt;</span><br><span class="line"> <span class="number">50</span> ifeq <span class="number">83</span> (+<span class="number">33</span>)</span><br><span class="line"> <span class="number">53</span> iconst_0</span><br><span class="line"> <span class="number">54</span> istore_2</span><br><span class="line"> <span class="number">55</span> goto <span class="number">83</span> (+<span class="number">28</span>)</span><br><span class="line"> <span class="number">58</span> aload_1</span><br><span class="line"> 59 ldc #6 &lt;TWO&gt;</span><br><span class="line"> 61 invokevirtual #5 &lt;java/lang/String.equals : (Ljava/lang/Object;)Z&gt;</span><br><span class="line"> <span class="number">64</span> ifeq <span class="number">83</span> (+<span class="number">19</span>)</span><br><span class="line"> <span class="number">67</span> iconst_1</span><br><span class="line"> <span class="number">68</span> istore_2</span><br><span class="line"> <span class="number">69</span> goto <span class="number">83</span> (+<span class="number">14</span>)</span><br><span class="line"> <span class="number">72</span> aload_1</span><br><span class="line"> 73 ldc #7 &lt;THREE&gt;</span><br><span class="line"> 75 invokevirtual #5 &lt;java/lang/String.equals : (Ljava/lang/Object;)Z&gt;</span><br><span class="line"> <span class="number">78</span> ifeq <span class="number">83</span> (+<span class="number">5</span>)</span><br><span class="line"> <span class="number">81</span> iconst_2</span><br><span class="line"> <span class="number">82</span> istore_2</span><br><span class="line"> <span class="number">83</span> iload_2</span><br><span class="line"> <span class="number">84</span> tableswitch <span class="number">0</span> to <span class="number">2</span></span><br><span class="line">	<span class="number">0</span>:  <span class="number">112</span> (+<span class="number">28</span>)</span><br><span class="line">	<span class="number">1</span>:  <span class="number">123</span> (+<span class="number">39</span>)</span><br><span class="line">	<span class="number">2</span>:  <span class="number">134</span> (+<span class="number">50</span>)</span><br><span class="line">	<span class="keyword">default</span>:  <span class="number">145</span> (+<span class="number">61</span>)</span><br><span class="line">112 getstatic #8 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">115 ldc #9 &lt;这是ONE&gt;</span><br><span class="line">117 invokevirtual #10 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">120</span> goto <span class="number">153</span> (+<span class="number">33</span>)</span><br><span class="line">123 getstatic #8 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">126 ldc #11 &lt;这是TWO&gt;</span><br><span class="line">128 invokevirtual #10 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">131</span> goto <span class="number">153</span> (+<span class="number">22</span>)</span><br><span class="line">134 getstatic #8 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">137 ldc #12 &lt;这是THREE&gt;</span><br><span class="line">139 invokevirtual #10 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">142</span> goto <span class="number">153</span> (+<span class="number">11</span>)</span><br><span class="line">145 getstatic #8 &lt;java/lang/System.out : Ljava/io/PrintStream;&gt;</span><br><span class="line">148 ldc #13 &lt;未知数&gt;</span><br><span class="line">150 invokevirtual #10 &lt;java/io/PrintStream.println : (Ljava/lang/String;)V&gt;</span><br><span class="line"><span class="number">153</span> <span class="keyword">return</span></span><br></pre></td></tr></table></figure>
+
+<p>可以看出，<code>switch</code> 对字符串类型的选择，是先比较其 <code>hashCode</code>，若出现哈希碰撞，再通过 <code>String.equals</code>做校验的。</p>
+<h4 id="三、Switch-的特点"><a href="#三、Switch-的特点" class="headerlink" title="三、Switch 的特点"></a>三、Switch 的特点</h4><h5 id="3-1-本质上是int值的比较"><a href="#3-1-本质上是int值的比较" class="headerlink" title="3.1 本质上是int值的比较"></a>3.1 本质上是int值的比较</h5><p>从以上使用场景和对应的字节码可知，不管 <code>switch</code> 筛选何种类型的数据，最终都都是将其转化为int类型，再做值的比较的。</p>
+<h5 id="3-2-对筛选值排序"><a href="#3-2-对筛选值排序" class="headerlink" title="3.2 对筛选值排序"></a>3.2 对筛选值排序</h5><p>以上案例出现一个很有意思的现象，如 <code>switch</code> 筛选1，8，3这个三个值，但字节码中的筛选顺序却是1，3，8，如果筛选值更多更乱，就更能验证这个机制——对筛选值排序。</p>
+<p>说到排序查找，很容易想到二分查找。实际上，<code>switch</code> 确实引入了二分查找算法（时间复杂度：O(log2n)）。在分支较多的情况下，使用二分查找，可以大大降低查找时间，提升筛选效率。</p>
+<h5 id="3-3-lookupswitch-和-tableswitch"><a href="#3-3-lookupswitch-和-tableswitch" class="headerlink" title="3.3 lookupswitch 和 tableswitch"></a>3.3 lookupswitch 和 tableswitch</h5><p>从字节码可以看出，<code>switch</code> 的作用机制，是先比较int值，再映射到执行地址的。这种类似 <code>map</code> 的映射结构，专业名叫跳转表。那么 <code>switch</code> 的跳转表为什么会有两种呢？</p>
+<p>从以上案例可以发现：</p>
+<ul>
+<li>筛选值是1，3，8时，使用的是 <code>lookupswitch</code>；</li>
+<li>筛选值是字符串的哈希值时，使用的是 <code>lookupswitch</code>；</li>
+<li>筛选值是a，b，c时，对应的 int 值分别是97，98，99，使用的是 <code>tableswitch</code>；</li>
+<li>筛选值是枚举项的下标+1时，对应的 int 值分别是1，2，3，使用的是 <code>tableswitch</code>；</li>
+</ul>
+<p>阅相关文档可知：<code>lookpswitch</code> 应用于筛选值离散度比较高的场景，<code>tableswitch</code> 应用于筛选值离散度比较低的场景。这是由编译器在编辑阶段，根据分支的离散度决定的，本质上都是为了提升查找速度。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/08/13/unsafe_pointer/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -467,6 +611,13 @@
             </span>
 
           
+            <span id="/2021/08/13/unsafe_pointer/" class="post-meta-item leancloud_visitors" data-flag-title="unsafe.Pointer-指针转换与运算" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
   
   <span class="post-meta-item">
     
@@ -588,6 +739,13 @@
             </span>
 
           
+            <span id="/2021/07/12/export_word_by_freemark_1/" class="post-meta-item leancloud_visitors" data-flag-title="用 freemarker 导出复杂的 word 文档" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
   
   <span class="post-meta-item">
     
@@ -712,6 +870,13 @@
             </span>
 
           
+            <span id="/2021/07/11/difference_btw_doc_docx/" class="post-meta-item leancloud_visitors" data-flag-title="MsOffice Word 文档格式-docx 研究" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
   
   <span class="post-meta-item">
     
@@ -860,6 +1025,13 @@
             </span>
 
           
+            <span id="/2021/05/03/dataX_introduction/" class="post-meta-item leancloud_visitors" data-flag-title="DataX 的设计与简单使用" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
   
   <span class="post-meta-item">
     
@@ -1127,6 +1299,13 @@
             </span>
 
           
+            <span id="/2021/04/23/build_personal_img_bed/" class="post-meta-item leancloud_visitors" data-flag-title="用 PicGo + Gitee 搭建个人图床" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
   
   <span class="post-meta-item">
     
@@ -1259,6 +1438,13 @@
             </span>
 
           
+            <span id="/2021/01/13/github_pages_domain/" class="post-meta-item leancloud_visitors" data-flag-title="GitHub Pages 绑定个人域名" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
   
   <span class="post-meta-item">
     
@@ -1376,6 +1562,13 @@
             </span>
 
           
+            <span id="/2020/12/14/async_thread_local/" class="post-meta-item leancloud_visitors" data-flag-title="在异步线程或线程池中传输 ThreadLocal 上下文" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
   
   <span class="post-meta-item">
     
@@ -1425,112 +1618,6 @@
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">运行结果...</span><br><span class="line"><span class="number">2020</span>-<span class="number">12</span>-<span class="number">14</span> <span class="number">18</span>:<span class="number">36</span>:<span class="number">41.560</span>  INFO [-,<span class="number">8658</span>c694de3e9b7a,ccc7a782204c91b0,<span class="keyword">false</span>] <span class="number">19876</span> --- [common-async-executor-<span class="number">1</span>] c.v.c.o.service.file.ManageFileService   : 异步加载文件开始; UserName: 邹荣升</span><br><span class="line"></span><br><span class="line"><span class="number">2020</span>-<span class="number">12</span>-<span class="number">14</span> <span class="number">18</span>:<span class="number">41</span>:<span class="number">17.735</span>  INFO [-,<span class="number">67</span>b4725bcaacfc64,<span class="number">36</span>ee2acec232be32,<span class="keyword">false</span>] <span class="number">21600</span> --- [common-async-executor-<span class="number">1</span>] c.v.c.o.service.file.ManageFileService   : 异步加载文件开始; UserName: 邹荣升</span><br></pre></td></tr></table></figure>
 
 <h4 id="三、总结"><a href="#三、总结" class="headerlink" title="三、总结"></a>三、总结</h4><p>虽然 <code>ThreadLocal</code> 的线程相关属性提供了很多便利性，但在高并发系统中，直接使用原生静态对象并不合适。因此，如使用 <code>Redis</code>、<code>MQ</code> 一样，深入了解常用工具的特性，是系统设计的必备要素。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/12/05/ball/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/12/05/ball/" class="post-title-link" itemprop="url">萝卜丸子</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-12-05 14:57:01" itemprop="dateCreated datePublished" datetime="2020-12-05T14:57:01+08:00">2020-12-05</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%90%83%E8%B4%A7/" itemprop="url" rel="index"><span itemprop="name">吃货</span></a>
-                </span>
-            </span>
-
-          
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2020/12/05/ball/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2020/12/05/ball/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <hr>
-<p>最近在忙很多事，工作和生活都乱糟糟的，博客也停更了。写技术还是美食呢，当然是美食啦。</p>
-<p>今天做萝卜丸子。边做边吃，忽然想起读初二的一天，同学们凑钱买了五斤萝卜丸子，然后在英语课上偷吃的故事。十五年过去了，但历历在目。</p>
-<h5 id="一、食材准备"><a href="#一、食材准备" class="headerlink" title="一、食材准备"></a>一、食材准备</h5><p>青萝卜、胡萝卜、红薯淀粉、面粉、鸡蛋、辣椒、胡椒、葱姜蒜、生抽、老抽、蚝油、冰糖。</p>
-<p><a href="https://imgchr.com/i/DOPsrd" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOPsrd.jpg" alt="DOPsrd.jpg"></a></p>
-<h5 id="二、调料子"><a href="#二、调料子" class="headerlink" title="二、调料子"></a>二、调料子</h5><p>首先将萝卜刨丝。</p>
-<p><a href="https://imgchr.com/i/DOPjRU" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOPjRU.jpg" alt="DOPjRU.jpg"></a></p>
-<p>然后要杀掉萝卜的水气和臭味。比较喜欢看老饭骨，大伯给的方子是在沸水中放入冰糖，再倒入萝卜丝。今天试了下，效果确实很棒，建议民间推广。</p>
-<p><a href="https://imgchr.com/i/DOPgat" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOPgat.jpg" alt="DOPgat.jpg"></a></p>
-<p>接下来调糊糊。用筷子顺着一个方向搅拌，直到可以用筷子提起来。这步也叫上劲，是关键一环。</p>
-<p><a href="https://imgchr.com/i/DOiNLj" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOiNLj.jpg" alt="DOiNLj.jpg"></a></p>
-<p>调糊糊前，可以先把油热上。</p>
-<p><a href="https://imgchr.com/i/DOiXTI" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOiXTI.jpg" alt="DOiXTI.jpg"></a></p>
-<p>待油七分热，将糊糊团成丸子，依次放入。油温太高会让丸子糊掉，太低又会导致丸子吸油太多。七分热怎么看呢？可以先放一小块糊糊进去，剧烈翻滚但短时间内又不会泛黄就可以了。</p>
-<p><a href="https://imgchr.com/i/DOFTNq" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOFTNq.jpg" alt="DOFTNq.jpg"></a></p>
-<p>文火慢炸20分钟，表面金黄时捞出。</p>
-<p><a href="https://imgchr.com/i/DOFxb9" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOFxb9.jpg" alt="DOFxb9.jpg"></a></p>
-<p>丸子放入次序不一样，可能炸出来的颜色也不一样。强迫症患者可以将丸子下入油中复炸一次，让颜色均匀。</p>
-<p>萝卜丸子可以当零食吃，也可以做汤。</p>
 
       
     </div>
@@ -1618,7 +1705,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">32</span>
+          <span class="site-state-item-count">33</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1631,7 +1718,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-count">18</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -1669,7 +1756,7 @@
 <div class="copyright">
   
   &copy; 
-  <span itemprop="copyrightYear">2022</span>
+  <span itemprop="copyrightYear">2023</span>
   <span class="with-love">
     <i class="fa fa-user"></i>
   </span>
@@ -1683,6 +1770,97 @@
 
 
 
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
 
 
       </div>

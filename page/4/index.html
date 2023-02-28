@@ -45,15 +45,6 @@
   
 
 
-  <script>
-    var _hmt = _hmt || [];
-    (function() {
-      var hm = document.createElement("script");
-      hm.src = "https://hm.baidu.com/hm.js?44f89ab9ce69c43629d7406e7b3d2ac1";
-      var s = document.getElementsByTagName("script")[0];
-      s.parentNode.insertBefore(hm, s);
-    })();
-  </script>
 
 
 
@@ -199,6 +190,146 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/03/29/axios_file_download-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/03/29/axios_file_download-2/" class="post-title-link" itemprop="url">Axios 跨域下载文件解决方案</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-03-29 22:37:01" itemprop="dateCreated datePublished" datetime="2020-03-29T22:37:01+08:00">2020-03-29</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%89%8D%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">前端</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2020/03/29/axios_file_download-2/" class="post-meta-item leancloud_visitors" data-flag-title="Axios 跨域下载文件解决方案" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2020/03/29/axios_file_download-2/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2020/03/29/axios_file_download-2/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h3 id="1-问题描述"><a href="#1-问题描述" class="headerlink" title="1. 问题描述"></a>1. 问题描述</h3><p>上篇介绍了通过<code>Blob</code> 类文件对象实现文件下载，但具体操作下去，会发现我留下了一个坑—浏览器跨域请求问题<a href="https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Access_control_CORS" target="_blank" rel="noopener"><code>CORS</code></a>。如下图提示:</p>
+<p><img src="https://s1.ax1x.com/2020/06/10/toVMsf.png" alt="toVMsf.png"></p>
+<p>为实现应用解耦，前后端分离已然成为主流设计。生产环境中，前端请求需要经过代理和负载(如: <code>Nigix</code>、<code>LVS</code>)处理，才能传递到后端。此种模式下，前后端的交互实现都需要跨域。</p>
+<p>同源安全策略是浏览器的一种安全限制，默认阻止跨域获取资源，防止跨站攻击。但 <code>CORS</code> 为跨域请求提供了可能。<code>CORS</code> 将跨域权限交给 <code>Web</code> 服务端，即通过配置就可以实现跨域地资源访问。</p>
+<h3 id="2-跨域请求"><a href="#2-跨域请求" class="headerlink" title="2. 跨域请求"></a>2. 跨域请求</h3><table>
+<thead>
+<tr>
+<th>跨域场景</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>域名不同</td>
+<td>spring.io     zhihu.com</td>
+</tr>
+<tr>
+<td>域名相同，端口不通</td>
+<td><a href="http://127.0.0.1:8080" target="_blank" rel="noopener">http://127.0.0.1:8080</a>; <a href="http://127.0.0.1:8081" target="_blank" rel="noopener">http://127.0.0.1:8081</a></td>
+</tr>
+<tr>
+<td>二级目录不同</td>
+<td>document.spring.io; reference.spring.io</td>
+</tr>
+</tbody></table>
+<p>综上:  当一个资源从与该资源本身所在的服务器不同的域、协议或端口请求一个资源时，资源会发起一个跨域 HTTP 请求。</p>
+<h3 id="3-解决方案"><a href="#3-解决方案" class="headerlink" title="3. 解决方案"></a>3. 解决方案</h3><p><code>Access-Control-Allow-Origin</code> 是响应头中一个重要的属性，它规定浏览器可以获取哪些域的资源。既然 <code>CORS</code> 将跨域访问权限交给了服务器，那么只需要服务器设置 <code>Access-Control-Allow-Origin</code>属性即可。以 <code>Java</code> 为后端语言的服务中，可以做如下设置:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 为实现服务的可扩展，采用通配符域名，即允许访问所有域的资源</span></span><br><span class="line">response.setHeader(<span class="string">"Access-Control-Allow-Origin"</span>, <span class="string">"*"</span>);</span><br></pre></td></tr></table></figure>
+
+<p>继续实现下去，我们可能又会遇到如下问题:</p>
+<p><img src="https://s1.ax1x.com/2020/06/10/tol4mR.png" alt="tol4mR.png"></p>
+<p>查阅资料发现，对于跨域请求，请求头的可获取性配置在属性 <code>Access-Control-Expose-Headers</code> 中，<code>W3C</code> 规定客户端获取的响应头字段仅限于<code>simple response header</code> ，包括:</p>
+<ul>
+<li><code>Cache-Control</code></li>
+<li><code>Content-Language</code></li>
+<li><code>Content-Type</code></li>
+<li><code>Expires</code></li>
+<li><code>Last-Modified</code></li>
+<li><code>Pragma</code></li>
+</ul>
+<p>而文件名在后端的设置方式如下:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">response.setHeader(<span class="string">"fileName"</span>, encodeFileName);</span><br></pre></td></tr></table></figure>
+
+<p>因此还后端将请求头 <code>fileName</code> 暴露给前端，配置如下:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">response.setHeader(<span class="string">"fileName"</span>, encodeFileName);</span><br><span class="line">response.setHeader(<span class="string">"Access-Control-Expose-Headers"</span>, <span class="string">"fileName"</span>);</span><br></pre></td></tr></table></figure>
+
+<p>以上。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/03/28/axios_file_download/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -243,6 +374,13 @@
             </span>
 
           
+            <span id="/2020/03/28/axios_file_download/" class="post-meta-item leancloud_visitors" data-flag-title="通过 Axios 实现文件下载" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
   
   <span class="post-meta-item">
     
@@ -363,6 +501,13 @@
             </span>
 
           
+            <span id="/2020/03/22/reponse_setHeader/" class="post-meta-item leancloud_visitors" data-flag-title="response.setHeader 与 response.addHeader 分析" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
   
   <span class="post-meta-item">
     
@@ -486,7 +631,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">32</span>
+          <span class="site-state-item-count">33</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -499,7 +644,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-count">18</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -537,7 +682,7 @@
 <div class="copyright">
   
   &copy; 
-  <span itemprop="copyrightYear">2022</span>
+  <span itemprop="copyrightYear">2023</span>
   <span class="with-love">
     <i class="fa fa-user"></i>
   </span>
@@ -551,6 +696,97 @@
 
 
 
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
 
 
       </div>
