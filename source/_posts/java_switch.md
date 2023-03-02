@@ -329,3 +329,7 @@ public static void switchEnum(PayStatusEnum flag) {
 * 筛选值是枚举项的下标+1时，对应的 int 值分别是1，2，3，使用的是 `tableswitch`；
 
 阅相关文档可知：`lookpswitch` 应用于筛选值离散度比较高的场景，`tableswitch` 应用于筛选值离散度比较低的场景。这是由编译器在编辑阶段，根据分支的离散度决定的，本质上都是为了提升查找速度。
+
+
+
+>参考：[stackoverflow: 为什么 switch 不支持 long 类型？](https://stackoverflow.com/questions/2676210/why-cant-your-switch-statement-data-type-be-long-java?r=SearchResults)
