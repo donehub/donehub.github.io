@@ -20,22 +20,20 @@
     var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="一、需求背景本周负责做调账线上化，其中一个业务需求比较棘手：提交调账申请后，需在数据表记录对应的调账类型；而在调账复核页面，列表筛选项-调账类型，需支持多选。简单枚举如下: 1234567891011public enum AdjustTypeEnum &amp;#123;    &#x2F;**     * 调账类型枚举; 一次调账申请可能对应多种调账类型，在数据表中枚举值之间以英文 , 分隔     *&#x2F;">
+  <meta name="description" content="一、Spring Retry 使用场景之调用第三方服务在很多应用中，都需要对接第三方平台，如调用支付平台、调用外部企业平台等。出于对接口通信的安全性考虑，第三方服务往往都会下发一个 token 给调用方，调用方只有通过这个 token 才能完成业务处理。但这个 token 是存在有效期的，因此调用方也会把 token 缓存一定的时间，在有效期内直接读取缓存，缓存过期便再次请求第三方平台下发一个新">
 <meta property="og:type" content="article">
-<meta property="og:title" content="位与运算在SQL中的使用">
-<meta property="og:url" content="https://donehub.github.io/2020/07/19/bitwise_and_in_sql/index.html">
+<meta property="og:title" content="Spring Retry 在对接第三方API中的使用">
+<meta property="og:url" content="https://donehub.github.io/2021/10/07/spring_retry_app/index.html">
 <meta property="og:site_name" content="DoneHub">
-<meta property="og:description" content="一、需求背景本周负责做调账线上化，其中一个业务需求比较棘手：提交调账申请后，需在数据表记录对应的调账类型；而在调账复核页面，列表筛选项-调账类型，需支持多选。简单枚举如下: 1234567891011public enum AdjustTypeEnum &amp;#123;    &#x2F;**     * 调账类型枚举; 一次调账申请可能对应多种调账类型，在数据表中枚举值之间以英文 , 分隔     *&#x2F;">
+<meta property="og:description" content="一、Spring Retry 使用场景之调用第三方服务在很多应用中，都需要对接第三方平台，如调用支付平台、调用外部企业平台等。出于对接口通信的安全性考虑，第三方服务往往都会下发一个 token 给调用方，调用方只有通过这个 token 才能完成业务处理。但这个 token 是存在有效期的，因此调用方也会把 token 缓存一定的时间，在有效期内直接读取缓存，缓存过期便再次请求第三方平台下发一个新">
 <meta property="og:locale" content="zh_CN">
-<meta property="og:image" content="http://www.plantuml.com/plantuml/png/TP9TIyCm58Rl-oj2hsTf-j7fjfGL5q6OcwoPC8QCQjArMBkHLhrG_xinSP14xSKBvpbFtuj3fbrVyFxbkN4SMkzvSQn0n_Whu-3T0UBZHVj4QmuGcA_6ZaJjWR9jLnL79YXdZmTE1-2jfdqbPWyEGCNgVTNBuLxxnzysnGDh17SdfPzwdlSnAM4AHGOoGvcHp5Xcaa9Nwxxujnl-wdR5-hGDpEtLzG8Zg0kXAP0boUQx5RxDDZTuGL2Wkv5LbbqIJOrqDVv3_H5tiunWTAxRYMalx_1gjiP2tEG89hevDCrJPKuoiivH6BZ6sKTbSfRACunAVwppMF7Gvf7YaSr3nMER1uedDeUA3stkAmub_tIchANVB_0B">
-<meta property="article:published_time" content="2020-07-18T17:50:12.000Z">
-<meta property="article:modified_time" content="2022-03-22T12:58:36.154Z">
+<meta property="article:published_time" content="2021-10-07T07:57:01.000Z">
+<meta property="article:modified_time" content="2023-03-08T12:51:07.247Z">
 <meta property="article:author" content="Zou Rongsheng">
-<meta property="article:tag" content="位运算">
+<meta property="article:tag" content="Spring">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://www.plantuml.com/plantuml/png/TP9TIyCm58Rl-oj2hsTf-j7fjfGL5q6OcwoPC8QCQjArMBkHLhrG_xinSP14xSKBvpbFtuj3fbrVyFxbkN4SMkzvSQn0n_Whu-3T0UBZHVj4QmuGcA_6ZaJjWR9jLnL79YXdZmTE1-2jfdqbPWyEGCNgVTNBuLxxnzysnGDh17SdfPzwdlSnAM4AHGOoGvcHp5Xcaa9Nwxxujnl-wdR5-hGDpEtLzG8Zg0kXAP0boUQx5RxDDZTuGL2Wkv5LbbqIJOrqDVv3_H5tiunWTAxRYMalx_1gjiP2tEG89hevDCrJPKuoiivH6BZ6sKTbSfRACunAVwppMF7Gvf7YaSr3nMER1uedDeUA3stkAmub_tIchANVB_0B">
 
-<link rel="canonical" href="https://donehub.github.io/2020/07/19/bitwise_and_in_sql/">
+<link rel="canonical" href="https://donehub.github.io/2021/10/07/spring_retry_app/">
 
 
 <script id="page-configurations">
@@ -48,7 +46,7 @@
   };
 </script>
 
-  <title>位与运算在SQL中的使用 | DoneHub</title>
+  <title>Spring Retry 在对接第三方API中的使用 | DoneHub</title>
   
 
 
@@ -197,7 +195,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/07/19/bitwise_and_in_sql/">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/10/07/spring_retry_app/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -210,7 +208,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          位与运算在SQL中的使用
+          Spring Retry 在对接第三方API中的使用
         </h1>
 
         <div class="post-meta">
@@ -220,14 +218,14 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-07-19 01:50:12" itemprop="dateCreated datePublished" datetime="2020-07-19T01:50:12+08:00">2020-07-19</time>
+              <time title="创建时间：2021-10-07 15:57:01" itemprop="dateCreated datePublished" datetime="2021-10-07T15:57:01+08:00">2021-10-07</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
+                <time title="修改时间：2023-03-08 20:51:07" itemprop="dateModified" datetime="2023-03-08T20:51:07+08:00">2023-03-08</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -235,12 +233,12 @@
               </span>
               <span class="post-meta-item-text">分类于</span>
                 <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/" itemprop="url" rel="index"><span itemprop="name">数据库</span></a>
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
                 </span>
             </span>
 
           
-            <span id="/2020/07/19/bitwise_and_in_sql/" class="post-meta-item leancloud_visitors" data-flag-title="位与运算在SQL中的使用" title="阅读次数">
+            <span id="/2021/10/07/spring_retry_app/" class="post-meta-item leancloud_visitors" data-flag-title="Spring Retry 在对接第三方API中的使用" title="阅读次数">
               <span class="post-meta-item-icon">
                 <i class="fa fa-eye"></i>
               </span>
@@ -255,8 +253,8 @@
       </span>
       <span class="post-meta-item-text">Valine：</span>
     
-    <a title="valine" href="/2020/07/19/bitwise_and_in_sql/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2020/07/19/bitwise_and_in_sql/" itemprop="commentCount"></span>
+    <a title="valine" href="/2021/10/07/spring_retry_app/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2021/10/07/spring_retry_app/" itemprop="commentCount"></span>
     </a>
   </span>
   
@@ -271,35 +269,26 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <h4 id="一、需求背景"><a href="#一、需求背景" class="headerlink" title="一、需求背景"></a>一、需求背景</h4><p>本周负责做调账线上化，其中一个业务需求比较棘手：提交调账申请后，需在数据表记录对应的调账类型；而在调账复核页面，列表筛选项-调账类型，需支持多选。简单枚举如下:</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">enum</span> AdjustTypeEnum &#123;</span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 调账类型枚举; 一次调账申请可能对应多种调账类型，在数据表中枚举值之间以英文 , 分隔</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    FINE(<span class="number">0</span>, <span class="string">"应还罚息"</span>),</span><br><span class="line">    TOTAL_REPAYMENT(<span class="number">1</span>, <span class="string">"应还总额"</span>),</span><br><span class="line">    FACT_REPAYMENT(<span class="number">2</span>, <span class="string">"实还总额"</span>),</span><br><span class="line">    FACT_PAYMENT_DATE(<span class="number">3</span>, <span class="string">"实还日期"</span>),</span><br><span class="line">    OVERDUE_DAYS(<span class="number">4</span>, <span class="string">"逾期天数"</span>),</span><br><span class="line">    PAYMENT_STATUS(<span class="number">5</span>, <span class="string">"还款状态"</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+        <hr>
+<h4 id="一、Spring-Retry-使用场景之调用第三方服务"><a href="#一、Spring-Retry-使用场景之调用第三方服务" class="headerlink" title="一、Spring Retry 使用场景之调用第三方服务"></a>一、Spring Retry 使用场景之调用第三方服务</h4><p>在很多应用中，都需要对接第三方平台，如调用支付平台、调用外部企业平台等。出于对接口通信的安全性考虑，第三方服务往往都会下发一个 token 给调用方，调用方只有通过这个 token 才能完成业务处理。但这个 token 是存在有效期的，因此调用方也会把 token 缓存一定的时间，在有效期内直接读取缓存，缓存过期便再次请求第三方平台下发一个新的 token，缓存起来。这样既可以减少对第三方服务的调用次数，也可以缩短接口的处理时间。</p>
+<p>这样就存在一个问题：如果这个 token 因为种种原因在第三方是已过期的状态，而调用方的缓存未过期，那么调用方的所有业务操作都会出错。从接口逻辑上来说，报错是正确的，也是有必要的，但在系统设计层面上来看，因为 token 过期导致的所有接口报错，是不合理的。好的设计应该是在接口层重新获取 token，继续完成业务逻辑，对顶层调用无感。</p>
+<p>因此，spring retry 在对接第三方服务的场景中，可以有效提升接口的容错性。</p>
+<h4 id="二、Spring-Retry-在实际应用中的关注点"><a href="#二、Spring-Retry-在实际应用中的关注点" class="headerlink" title="二、Spring Retry 在实际应用中的关注点"></a>二、Spring Retry 在实际应用中的关注点</h4><p>spring retry 本质上是代理逻辑的重复处理，每次处理的代码逻辑都是一样的，那么重复处理的意义何在？</p>
+<p>我们以调用支付服务为例，当服务端告诉我们：“token 已过期，查询支付结果失败”，我们首先要做的事，就是把token已过期这个异常抛出去，让 spring retry 监听到这个异常，进行重试。重试的结果，必然还是“token 已过期，查询支付结果失败”，因为重试过程中使用的 token 还是已过期的 token。因此，不仅需要重试，还需要在重试之前清除 token 缓存。也就是说，spring retry 至少需要关注两点：</p>
+<ul>
+<li>监听异常：对于指定的异常，按照配置的策略，开启重试；</li>
+<li>清除缓存：对于指定的异常，清除缓存；</li>
+</ul>
+<h4 id="三、代码实现"><a href="#三、代码实现" class="headerlink" title="三、代码实现"></a>三、代码实现</h4><p>在底层方法上，使用 @Retryable 和 @TokenExpiredExceptionCatch 两个注解。前者的作用是发起业务重试，后者的作用是清除 token 缓存。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Retryable</span>(value = &#123;TokenExpiredException<span class="class">.<span class="keyword">class</span>&#125;, <span class="title">maxAttempts</span> </span>= <span class="number">3</span>, backoff = <span class="meta">@Backoff</span>(delay = <span class="number">100L</span>, multiplier = <span class="number">1</span>))</span><br><span class="line"><span class="meta">@TokenExpiredExceptionCatch</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Response <span class="title">invoke</span><span class="params">(Request request)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 从缓存中获取 token </span></span><br><span class="line">    String token = cache.getToken();</span><br><span class="line">    <span class="comment">// 缓存不存在，则调用接口请求再次下发 token</span></span><br><span class="line">    <span class="keyword">if</span> (StringUtils.isEmpty(token)) &#123;</span><br><span class="line">        <span class="comment">// 调用第三方平台，获取新的token，并缓存</span></span><br><span class="line">        token = newToken;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 调用第三方服务</span></span><br><span class="line">    ResponseInfo responseInfo= Server.queryPayResult(token, request);</span><br><span class="line">    <span class="keyword">if</span> (responseInfo.getCode == <span class="number">1002</span>) &#123;</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> TokenExpiredException(responseInfo.getMessage());</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> responseInfo.getData();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>假如调账申请A的调账类型包括应还罚息和应还总额，则数据表相应字段值为<code>0,1</code>。在复核页面，若调账类型复选项中包含应还罚息或应还总额，则需查询到该申请。此时，我们发现<code>SQL</code>内置函数<code>FIND_IN_SET</code>只支持单选项查询，而无法灵活拆分筛选条件和存储数据。因此，有必要调整一下数据的存储规则和查询规则。</p>
-<h4 id="二、位与运算的妙用"><a href="#二、位与运算的妙用" class="headerlink" title="二、位与运算的妙用"></a>二、位与运算的妙用</h4><p>首先，我们需要进一步抽象：一方面，为了不浪费存储空间，科学地设计数据表，我们需要将目标数据列表整合存储在一个字段中；另一方面，数据库引擎需要灵活使用整合后的字段，以执行相应的查询语句。说白了，就是看起来像做了整合，实际上还是原始的目标数据列表。</p>
-<p>事实证明，上面提出的方案根本满足不了业务需求，是一个非常差的设计。除了以逗号分隔枚举值的存储方式，还有一种更为科学的存储方式——二进制。简单做几个位与运算：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 存储值: 3; 查询条件: 1</span></span><br><span class="line"><span class="comment">// 3 == 2 + 1</span></span><br><span class="line"><span class="comment">// 1 &amp; 3 == 1</span></span><br><span class="line"><span class="number">0001</span></span><br><span class="line">&amp;</span><br><span class="line"><span class="number">0011</span></span><br><span class="line">=</span><br><span class="line"><span class="number">0001</span></span><br></pre></td></tr></table></figure>
+<p>自定义注解 @TokenExpiredExceptionCatch</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Target</span>(ElementType.METHOD)</span><br><span class="line"><span class="meta">@Retention</span>(RetentionPolicy.RUNTIME)</span><br><span class="line"><span class="keyword">public</span> <span class="meta">@interface</span> TokenExpiredExceptionCatch &#123;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 存储值: 7; 查询条件: 1</span></span><br><span class="line"><span class="comment">// 7 == 1 + 2 + 4</span></span><br><span class="line"><span class="comment">// 1 &amp; 7 == 1</span></span><br><span class="line"><span class="number">0111</span></span><br><span class="line">&amp;</span><br><span class="line"><span class="number">0001</span></span><br><span class="line">=</span><br><span class="line"><span class="number">0001</span></span><br></pre></td></tr></table></figure>
+<p>切面监听注解 @TokenExpiredExceptionCatch</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Around</span>(<span class="string">"@annotation(com.aspects.TokenExpiredExceptionCatch)"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Object <span class="title">handler</span><span class="params">(ProceedingJoinPoint joinPoint)</span> <span class="keyword">throws</span> Throwable </span>&#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> joinPoint.proceed();</span><br><span class="line">    &#125; <span class="keyword">catch</span> (AbstractCustomException e) &#123;</span><br><span class="line">        <span class="comment">// 解析异常码值</span></span><br><span class="line">        ErrorCodeEnum ErrorCodeEnum = ErrorCodeEnum.getByCode(String.valueOf(e.getCode()));</span><br><span class="line">        <span class="comment">// --------------处理 token 已过期异常--------------</span></span><br><span class="line">        <span class="keyword">if</span> (ErrorCodeEnum.TOKEN_EXPIRED.equals(ErrorCodeEnum)) &#123;</span><br><span class="line">            <span class="comment">// 清除缓存 token</span></span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">throw</span> e;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 存储值: 7; 查询条件: 3</span></span><br><span class="line"><span class="comment">// 7 == 1 + 2 + 4</span></span><br><span class="line"><span class="comment">// 3 == 1 + 2</span></span><br><span class="line"><span class="comment">// 3 &amp; 7 == 3</span></span><br><span class="line"><span class="number">0111</span></span><br><span class="line">&amp;</span><br><span class="line"><span class="number">0011</span></span><br><span class="line">=</span><br><span class="line"><span class="number">0011</span></span><br></pre></td></tr></table></figure>
-
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 存储值: 7; 查询条件: 15</span></span><br><span class="line"><span class="comment">// 7 == 1 + 2 + 4</span></span><br><span class="line"><span class="comment">// 15 == 1 + 2 + 4 + 8</span></span><br><span class="line"><span class="comment">// 15 &amp; 7 == 7</span></span><br><span class="line"><span class="number">0111</span></span><br><span class="line">&amp;</span><br><span class="line"><span class="number">1111</span></span><br><span class="line">=</span><br><span class="line"><span class="number">0111</span></span><br></pre></td></tr></table></figure>
-
-<p>从以上位与运算实例，可以发现一个有趣的现象：若将枚举值设置为<code>2</code>的<code>n</code>次幂，则只需将目标数据列表加合，即可保证每一个目标数据对应到二进制中的一位。</p>
-<p><img src="http://www.plantuml.com/plantuml/png/TP9TIyCm58Rl-oj2hsTf-j7fjfGL5q6OcwoPC8QCQjArMBkHLhrG_xinSP14xSKBvpbFtuj3fbrVyFxbkN4SMkzvSQn0n_Whu-3T0UBZHVj4QmuGcA_6ZaJjWR9jLnL79YXdZmTE1-2jfdqbPWyEGCNgVTNBuLxxnzysnGDh17SdfPzwdlSnAM4AHGOoGvcHp5Xcaa9Nwxxujnl-wdR5-hGDpEtLzG8Zg0kXAP0boUQx5RxDDZTuGL2Wkv5LbbqIJOrqDVv3_H5tiunWTAxRYMalx_1gjiP2tEG89hevDCrJPKuoiivH6BZ6sKTbSfRACunAVwppMF7Gvf7YaSr3nMER1uedDeUA3stkAmub_tIchANVB_0B" alt=""></p>
-<p>此时，对于任何一个查询条件，只需要将其与整合值进行位与运算，即可得到匹配的值。</p>
-<p>由此，我们调整枚举为：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">enum</span> AdjustTypeEnum &#123;</span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 调账类型枚举; 一次调账申请可能对应多种调账类型，在数据表中存储各值之和</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    FINE(<span class="number">1</span>, <span class="string">"应还罚息"</span>),</span><br><span class="line">    TOTAL_REPAYMENT(<span class="number">2</span>, <span class="string">"应还总额"</span>),</span><br><span class="line">    FACT_REPAYMENT(<span class="number">4</span>, <span class="string">"实还总额"</span>),</span><br><span class="line">    FACT_PAYMENT_DATE(<span class="number">8</span>, <span class="string">"实还日期"</span>),</span><br><span class="line">    OVERDUE_DAYS(<span class="number">16</span>, <span class="string">"逾期天数"</span>),</span><br><span class="line">    PAYMENT_STATUS(<span class="number">32</span>, <span class="string">"还款状态"</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>调整<code>SQL</code>为：</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span></span><br><span class="line">*</span><br><span class="line"><span class="keyword">FROM</span> <span class="string">`boss-account`</span>.acct_adjust_account_record</span><br><span class="line"><span class="keyword">WHERE</span></span><br><span class="line">adjust_type_sum &amp; <span class="comment">#&#123;调账类型筛选条件值之和&#125; &gt; 0</span></span><br></pre></td></tr></table></figure>
-
-
-
-
-
-
-
+<h4 id="四、Spring-Retry-注意事项"><a href="#四、Spring-Retry-注意事项" class="headerlink" title="四、Spring Retry 注意事项"></a>四、Spring Retry 注意事项</h4><p>spring retry 是一个很好用的重试工具，配置简单，对 Spring 项目兼容良好，但也不可无脑使用，让所有接口都在底层无感重试。如果支付/退款业务发生重试，极有可能引来客诉或发生资损。因此，在引入重试机制的接口上，一定要判断接口的幂等性。</p>
 
     </div>
 
@@ -310,7 +299,7 @@
       <footer class="post-footer">
           
           <div class="post-tags">
-              <a href="/tags/%E4%BD%8D%E8%BF%90%E7%AE%97/" rel="tag"><i class="fa fa-tag"></i> 位运算</a>
+              <a href="/tags/Spring/" rel="tag"><i class="fa fa-tag"></i> Spring</a>
           </div>
 
         
@@ -319,12 +308,12 @@
         
     <div class="post-nav">
       <div class="post-nav-item">
-    <a href="/2020/07/06/redis_pubsub/" rel="prev" title="redis 发布订阅模式">
-      <i class="fa fa-chevron-left"></i> redis 发布订阅模式
+    <a href="/2021/09/30/java_switch/" rel="prev" title="Java 关键字 Switch 的实现原理">
+      <i class="fa fa-chevron-left"></i> Java 关键字 Switch 的实现原理
     </a></div>
       <div class="post-nav-item">
-    <a href="/2020/08/17/metrics_in_thread_pool/" rel="next" title="用 Prometheus 监控线程池">
-      用 Prometheus 监控线程池 <i class="fa fa-chevron-right"></i>
+    <a href="/2021/11/09/datax_fixed_with_ctrip_dal/" rel="next" title="DataX 兼容携程 Dal 数据库访问框架">
+      DataX 兼容携程 Dal 数据库访问框架 <i class="fa fa-chevron-right"></i>
     </a></div>
     </div>
       </footer>
@@ -386,7 +375,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#一、需求背景"><span class="nav-number">1.</span> <span class="nav-text">一、需求背景</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二、位与运算的妙用"><span class="nav-number">2.</span> <span class="nav-text">二、位与运算的妙用</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#一、Spring-Retry-使用场景之调用第三方服务"><span class="nav-number">1.</span> <span class="nav-text">一、Spring Retry 使用场景之调用第三方服务</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二、Spring-Retry-在实际应用中的关注点"><span class="nav-number">2.</span> <span class="nav-text">二、Spring Retry 在实际应用中的关注点</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#三、代码实现"><span class="nav-number">3.</span> <span class="nav-text">三、代码实现</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#四、Spring-Retry-注意事项"><span class="nav-number">4.</span> <span class="nav-text">四、Spring Retry 注意事项</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
