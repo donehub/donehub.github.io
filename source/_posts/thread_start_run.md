@@ -1,5 +1,5 @@
 ---
-qtitle: Thread 之 start()、run() 详解
+title: Thread 之 start()、run() 详解
 date: 2020-06-07 19:57:01
 tags: Java
 categories: 后端
