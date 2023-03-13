@@ -1,6 +1,6 @@
 ---
 title: JUC线程池-ForkJoinPool
-date: 2021-08-13 14:57:01
+date: 2021-02-20 10:57:01
 tags: Java
 categories: 后端
 ---
@@ -11,7 +11,7 @@ categories: 后端
 
 ForkJoinPool 是 jdk 1.7 引入的一个线程池，其底层设计基于分治算法(Divide-and-Conquer)的并行实现，是一款可以获得良好并行性能的简单且高效的设计技术。通过任务分治，可以更好地利用多处理器，提升预算效能。
 
-// 图片
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/13_20_27_1_fork_join.png)
 
 Fork/Join 框架主要包含三个模块：
 
@@ -23,9 +23,9 @@ ForkJoinPool 通过 ForkJoinWorkerThread 来处理提交的 ForkJoinTask。通�
 
 #### 二、ForkJoinPool 使用
 
-我们以 RecursiveTask 学习使用 ForkJoinPool，可递归分治任务实现：
+我们以 RecursiveTask 学习使用 ForkJoinPool，可递归分治任务实现类图：
 
-// 类继承关系图
+![](https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/13_20_49_59_recursive_task.png)
 
 计算1+2+3+...+10000的值：
 
