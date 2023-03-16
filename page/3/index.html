@@ -190,6 +190,135 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/02/20/fork_join_thred_pool/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/02/20/fork_join_thred_pool/" class="post-title-link" itemprop="url">JUC线程池-ForkJoinPool</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-02-20 10:57:01" itemprop="dateCreated datePublished" datetime="2021-02-20T10:57:01+08:00">2021-02-20</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-03-14 21:38:48" itemprop="dateModified" datetime="2023-03-14T21:38:48+08:00">2023-03-14</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2021/02/20/fork_join_thred_pool/" class="post-meta-item leancloud_visitors" data-flag-title="JUC线程池-ForkJoinPool" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2021/02/20/fork_join_thred_pool/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2021/02/20/fork_join_thred_pool/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <hr>
+<h4 id="一、ForkJoinPool-介绍"><a href="#一、ForkJoinPool-介绍" class="headerlink" title="一、ForkJoinPool 介绍"></a>一、ForkJoinPool 介绍</h4><p>ForkJoinPool 是 jdk 1.7 引入的一个线程池，其底层设计基于分治算法(Divide-and-Conquer)的并行实现，是一款可以获得良好并行性能的简单且高效的设计技术。通过任务分治，可以更好地利用多处理器，并行处理任务，提升计算效能。</p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/13_20_27_1_fork_join.png" alt=""></p>
+<p>Fork/Join 框架主要包含三个模块：</p>
+<ul>
+<li>线程池：ForkJoinPool</li>
+<li>执行 Fork/Join 任务的线程：ForkJoinWorkerThread</li>
+<li>任务对象：ForkJoinTask，继承者有 RecursiveTask、RecursiveAction、CountedCompleter</li>
+</ul>
+<p>ForkJoinPool 通过 ForkJoinWorkerThread 来处理提交的 ForkJoinTask。通常不会直接创建 ForkJoinTask，而是借助其继承类，根据实际需要创建对应的分治任务。RecursiveTask 是一个可以递归执行的 ForkJoinTask；RecursiveAction 是一个没有返回值的 RecursiveTask；CountedCompleter 在完成任务执行后，回自动触发执行一个自定义的钩子函数。</p>
+<h4 id="二、工作窃取（Work-Stealing）算法"><a href="#二、工作窃取（Work-Stealing）算法" class="headerlink" title="二、工作窃取（Work-Stealing）算法"></a>二、工作窃取（Work-Stealing）算法</h4><p>工作窃取 (work-stealing) 算法，是 Fork/Join 的设计原理，指线程池内的所有工作线程都尝试找到并执行已经提交的任务，或者是被其他活动任务创建的子任务。因此，在运行多个可以产生子任务的任务，或提交的许多小任务，ForkJoinPool 的效率非常高。</p>
+<p>在 ForkJoinPool 中，每个工作线程 (ForkJoinWorkerThread) 都对应一个任务队列 (WorkQueue)，工作线程优先处理自身队列的任务，然后以 FIFO 的顺序随机窃取其他队列中的任务。处理自身队列的任务的方式有两种：先进先出 (FIFO)、先进后出 (LIFO)。这由 ForkJoinPool 的构造参数 asyncMode 决定，默认先进先出 (FIFO)。</p>
+<ul>
+<li>每个工作线程 (ForkJoinWorkerThread) 都有自己的一个 WorkQueue，该工作队列是一个双端队列；</li>
+<li>WorkQueue 支持三种操作 push、pop、poll；</li>
+<li>push/pop 只能被队列的所有者线程调用，而 poll 可以被其他线程调用；</li>
+<li>划分的子任务调用 fork 方法时，都会被 push 到自己的 WorkQueue 中；</li>
+<li>一般情况下，工作线程 (ForkJoinWorkerThread) 从自己的双端队列获出任务并执行；</li>
+<li>当自己的队列为空时，工作线程 (ForkJoinWorkerThread) 便随机从其他 WorkQueue 末尾调用 poll 方法窃取任务并执行；</li>
+</ul>
+<h4 id="三、ForkJoinPool-使用"><a href="#三、ForkJoinPool-使用" class="headerlink" title="三、ForkJoinPool 使用"></a>三、ForkJoinPool 使用</h4><p>我们以 RecursiveTask 学习使用 ForkJoinPool，可递归分治任务实现类图：</p>
+<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/13_20_49_59_recursive_task.png" alt=""></p>
+<p>计算1+2+3+…+10000的值：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SumTest</span> <span class="keyword">extends</span> <span class="title">RecursiveTask</span>&lt;<span class="title">Integer</span>&gt; </span>&#123;</span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">int</span> start;</span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">int</span> end;</span><br><span class="line"></span><br><span class="line">    SumTest(<span class="keyword">int</span> start, <span class="keyword">int</span> end) &#123;</span><br><span class="line">        <span class="keyword">this</span>.start = start;</span><br><span class="line">        <span class="keyword">this</span>.end = end;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> Integer <span class="title">compute</span><span class="params">()</span> </span>&#123;</span><br><span class="line">		</span><br><span class="line">        <span class="keyword">if</span> (end - start &lt; <span class="number">100</span>) &#123;</span><br><span class="line">            System.out.println(Thread.currentThread().getName() + <span class="string">" 开始执行: "</span> + start + <span class="string">"-"</span> + end);</span><br><span class="line">            <span class="keyword">int</span> sum = <span class="number">0</span>;</span><br><span class="line">            <span class="keyword">for</span> (<span class="keyword">int</span> i = start; i &lt;= end; i++) &#123;</span><br><span class="line">                sum += i;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> sum;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        SumTest sumTest1 = <span class="keyword">new</span> SumTest(start, (end + start) / <span class="number">2</span>);</span><br><span class="line">        SumTest sumTest2 = <span class="keyword">new</span> SumTest((start + end) / <span class="number">2</span> + <span class="number">1</span>, end);</span><br><span class="line"></span><br><span class="line">        sumTest1.fork();</span><br><span class="line">        sumTest2.fork();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> sumTest1.join() + sumTest2.join();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> ExecutionException, InterruptedException </span>&#123;</span><br><span class="line">        ForkJoinPool pool = <span class="keyword">new</span> ForkJoinPool();</span><br><span class="line">        ForkJoinTask&lt;Integer&gt; task = <span class="keyword">new</span> SumTest(<span class="number">1</span>, <span class="number">1000</span>);</span><br><span class="line">        pool.submit(task);</span><br><span class="line">        System.out.println(task.get());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>运行结果：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">13</span> 开始执行: <span class="number">1</span>-<span class="number">63</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">11</span> 开始执行: <span class="number">501</span>-<span class="number">563</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">13</span> 开始执行: <span class="number">126</span>-<span class="number">188</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">11</span> 开始执行: <span class="number">564</span>-<span class="number">625</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">13</span> 开始执行: <span class="number">189</span>-<span class="number">250</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">10</span> 开始执行: <span class="number">251</span>-<span class="number">313</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">4</span> 开始执行: <span class="number">64</span>-<span class="number">125</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">10</span> 开始执行: <span class="number">314</span>-<span class="number">375</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">13</span> 开始执行: <span class="number">376</span>-<span class="number">438</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">10</span> 开始执行: <span class="number">439</span>-<span class="number">500</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">4</span> 开始执行: <span class="number">626</span>-<span class="number">688</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">0</span> 开始执行: <span class="number">814</span>-<span class="number">875</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">7</span> 开始执行: <span class="number">751</span>-<span class="number">813</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">11</span> 开始执行: <span class="number">689</span>-<span class="number">750</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">3</span> 开始执行: <span class="number">939</span>-<span class="number">1000</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">15</span> 开始执行: <span class="number">876</span>-<span class="number">938</span></span><br><span class="line"><span class="number">500500</span></span><br></pre></td></tr></table></figure>
+
+<p>从执行结果来看，ForkJoinPool 通过分治算法，一级级拆分表达式，直到拆分的数据单元的差值小于100，接着分别计算各个小数据单元的和，提交汇总。</p>
+<h4 id="四、Fork-Join-任务提交方式"><a href="#四、Fork-Join-任务提交方式" class="headerlink" title="四、Fork/Join 任务提交方式"></a>四、Fork/Join 任务提交方式</h4><p>ForkJoinPool 支持三种任务提交方式：</p>
+<ul>
+<li>submit: 异步执行，有返回值，通过 task.get() 获取执行结果；</li>
+<li>invoke: 同步执行，等待任务执行完毕后，返回计算结果；</li>
+<li>execute: 直接提交任务，同步执行，无返回结果。</li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/01/13/github_pages_domain/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1302,123 +1431,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/06/20/scallionPancake/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/06/20/scallionPancake/" class="post-title-link" itemprop="url">葱油饼</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-06-20 21:00:12" itemprop="dateCreated datePublished" datetime="2020-06-20T21:00:12+08:00">2020-06-20</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%90%83%E8%B4%A7/" itemprop="url" rel="index"><span itemprop="name">吃货</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2020/06/20/scallionPancake/" class="post-meta-item leancloud_visitors" data-flag-title="葱油饼" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2020/06/20/scallionPancake/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2020/06/20/scallionPancake/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <hr>
-<hr>
-<p>今天特别想吃我妈做的油馍，也就是大家常说的葱油饼。虽然出租屋的条件有限，但我打算尝试一次。</p>
-<hr>
-<h4 id="一、原料"><a href="#一、原料" class="headerlink" title="一、原料"></a>一、原料</h4><p>小麦粉，小香葱，香油，花生油，食盐，佐料（看个人喜好选择添加）。</p>
-<h4 id="二、步骤"><a href="#二、步骤" class="headerlink" title="二、步骤"></a>二、步骤</h4><h6 id="1-和面"><a href="#1-和面" class="headerlink" title="1. 和面"></a>1. 和面</h6><p>加入适量面粉（尽量选高筋粉），边用筷子搅拌边兑温水，待面结成絮状，手动和成面团。建议面团和软一点，保证很好的延展性。和好后，套上保鲜膜，醒面20分钟。</p>
-<p><img src="https://s1.ax1x.com/2020/06/20/N1pDh9.jpg" alt="N1pDh9.jpg"></p>
-<h6 id="2-擀面"><a href="#2-擀面" class="headerlink" title="2. 擀面"></a>2. 擀面</h6><p>面醒好后，揉捏成条状。</p>
-<p><img src="https://s1.ax1x.com/2020/06/20/N19cCj.jpg" alt="N19cCj.jpg"></p>
-<p>葱油饼是多层叠加起来的，所以需要尽可能地将面擀薄。</p>
-<p><img src="https://s1.ax1x.com/2020/06/20/N1C3Mq.jpg" alt="N1C3Mq.jpg"></p>
-<h5 id="3-加料"><a href="#3-加料" class="headerlink" title="3. 加料"></a>3. 加料</h5><p>将适量香油滴在面皮上，然后不断对折面皮，直至香油全部铺开。</p>
-<p><img src="https://s1.ax1x.com/2020/06/20/N1PkY4.jpg" alt="N1PkY4.jpg"></p>
-<p>然后，均匀撒上葱花，食盐少量。</p>
-<p><img src="https://s1.ax1x.com/2020/06/20/N1P4NF.jpg" alt="N1P4NF.jpg"></p>
-<h5 id="4-成型"><a href="#4-成型" class="headerlink" title="4. 成型"></a>4. 成型</h5><p>将铺满葱花的面从一边角叠起。</p>
-<p><img src="https://s1.ax1x.com/2020/06/20/N1ZtPK.jpg" alt="N1ZtPK.jpg"></p>
-<p>将面擀平实。</p>
-<p><img src="https://s1.ax1x.com/2020/06/20/N1VM7t.jpg" alt="N1VM7t.jpg"></p>
-<h5 id="5-煎饼"><a href="#5-煎饼" class="headerlink" title="5. 煎饼"></a>5. 煎饼</h5><p>注意控制油温。家用燃气灶，小火慢热即可。</p>
-<p><img src="https://s1.ax1x.com/2020/06/20/N1VaBn.jpg" alt="N1VaBn.jpg"></p>
-<p><img src="https://s1.ax1x.com/2020/06/20/N1VUns.jpg" alt="N1VUns.jpg"></p>
-<p><img src="https://s1.ax1x.com/2020/06/20/N1VtXj.jpg" alt="N1VtXj.jpg"></p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1491,7 +1503,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">38</span>
+          <span class="site-state-item-count">39</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

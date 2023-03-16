@@ -686,6 +686,178 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/08/13/zero_copy/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/08/13/zero_copy/" class="post-title-link" itemprop="url">零拷贝</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-08-13 14:57:01" itemprop="dateCreated datePublished" datetime="2021-08-13T14:57:01+08:00">2021-08-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-03-16 19:17:27" itemprop="dateModified" datetime="2023-03-16T19:17:27+08:00">2023-03-16</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2021/08/13/zero_copy/" class="post-meta-item leancloud_visitors" data-flag-title="零拷贝" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2021/08/13/zero_copy/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2021/08/13/zero_copy/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <hr>
+<h4 id="一、零拷贝技术"><a href="#一、零拷贝技术" class="headerlink" title="一、零拷贝技术"></a>一、零拷贝技术</h4><p>零拷贝技术，是相对于传统 IO 的一种技术思想。传统 IO 的工作方式：读取/写入数据是在用户空间和内核空间来回复制，而内核空间的数据是通过操作系统层面的 IO 接口从磁盘读取或写入的，中间需要多次拷贝，因此效率比较低。但是零拷贝技术的应用，让 CPU 从数据拷贝的繁杂工作中解脱了出来，大大提高了工作效率。</p>
+<h4 id="二、传统-IO-实现原理"><a href="#二、传统-IO-实现原理" class="headerlink" title="二、传统 IO 实现原理"></a>二、传统 IO 实现原理</h4><p>当应用服务接收客户端的请求时，通常需要两种系统调用：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 读取</span></span><br><span class="line">read(file, tmp_buf, len);</span><br><span class="line"><span class="comment">// 写入</span></span><br><span class="line">write(socket, tmp_buf, len);</span><br></pre></td></tr></table></figure>
+
+<p>虽然只有两个方法，但具体的实现还是比较复杂的：</p>
+<p>// 传统 IO 调用图；还在画；待补充</p>
+<p>从细分图中可知，在传统 IO 操作中，<strong>一次读写将发生 4 次上下文切换：</strong></p>
+<ul>
+<li>读取数据：从用户态切换到内核态；</li>
+<li>读取完毕：内核完成数据准备，从内核态切换到用户态；</li>
+<li>写入数据：从用户态切换到内核态；</li>
+<li>写入完毕：内核完成数据写入，从内核态切换到用户态；</li>
+</ul>
+<p><strong>一次读写将发生 4 次数据拷贝 (2 次 DMA 拷贝 + 2 次 CPU 拷贝)：</strong></p>
+<ul>
+<li>第一次拷贝 (DMA)：把磁盘上的数据拷贝到内核缓冲区内；</li>
+<li>第二次拷贝 (CPU)：把内核缓冲区内的数据拷贝到用户缓冲区内，供应用程序使用；</li>
+<li>第三次拷贝 (CPU)：把用户缓冲区的数据拷贝到内核 socket 缓冲区内；</li>
+<li>第四次拷贝 (DMA)：把内核 socket 缓冲区内的数据拷贝到网卡缓冲区内；</li>
+</ul>
+<p>一次上下文切换需耗时约几微秒，虽然很短，但在高并发场景中，这种延迟容易被积累和放大，从而影响整体性能。此外，磁盘和网卡操作速度远远小于内存，而内存操作速度又远远小于 CPU，4 次拷贝将严重拖慢系统性能。因此，提高 IO 性能，需要从减少上下文切换次数和拷贝次数两个方面入手。</p>
+<h4 id="三、零拷贝实现"><a href="#三、零拷贝实现" class="headerlink" title="三、零拷贝实现"></a>三、零拷贝实现</h4><p>基于以上对传统 IO 的讨论，可知零拷贝的技术特性和要解决的痛点：尽可能减少上下文切换次数和拷贝次数。零拷贝的具体实现方式有：</p>
+<ul>
+<li>mmap</li>
+<li>sendfile</li>
+<li>direct IO</li>
+</ul>
+<h5 id="mmap-write-实现零拷贝"><a href="#mmap-write-实现零拷贝" class="headerlink" title="mmap() + write 实现零拷贝"></a>mmap() + write 实现零拷贝</h5><p>在介绍 mmap() 的作用机制之前，先介绍一个新概念-虚拟内存。虚拟内存是现代操作系统中普遍使用的内存结构，使用虚拟地址取代物理地址，有两点好处：一是多个虚拟地址可以指向同一个物理地址；二是虚拟内存空间远远大于物理内存空间。</p>
+<p>在传统 IO 中，read() 调用会把内核缓存区的数据拷贝到用户缓存区内，耗时又耗力。如果把内核空间和用户空间的虚拟地址映射到同一个物理地址，那么就不需要 CPU 来回复制了。</p>
+<p>mmap() 正是利用了虚拟内存的这一特性，取代传统 IO 的 read() 操作，将内核缓存区和用户缓存区地址映射到同一物理内存地址，省去一次 CPU 拷贝的过程，提升 IO 性能。具体过程如下：</p>
+<ul>
+<li><p>应用进程调用 mmap() 后，DMA 会把磁盘的数据拷贝到内核缓冲区内；</p>
+</li>
+<li><p>应用进程跟操作系统内核共享这个缓冲区；</p>
+</li>
+<li><p>应用进程再调用 write()，直接将内核缓冲区的数据拷贝到 socket 缓冲区中；</p>
+</li>
+<li><p>DMA 把内核的 socket 缓冲区内的数据，拷贝到网卡缓冲区内；</p>
+</li>
+</ul>
+<p>// 调用图；还在画，待补充</p>
+<p>从调用过程可知，与传统 IO 相比，mmap() + write 只是减少了 1 次 CPU 拷贝，仍然要发生 4 次上下文切换和 3 次数据拷贝。</p>
+<h5 id="sendfile-实现零拷贝"><a href="#sendfile-实现零拷贝" class="headerlink" title="sendfile() 实现零拷贝"></a>sendfile() 实现零拷贝</h5><p>senfile() 是 Linux 提供的，专门用于发送文件的系统调用函数。sendfile() 可以替代传统 IO 的 read()、write()，这意味着将省去 2 次上下文切换。此外，数据拷贝路径也有所优化，具体的优化方案与 Linux 内核版本有关，因为在 2.4 版本之后，Linux 提供了 SG-DMA 技术，它将提供比 DMA 技术更进一步的优化策略。</p>
+<p>在 2.4 版本之前，CPU 可以直接把内核缓存区的数据拷贝到 socket 缓冲区，省去拷贝到用户缓冲区这一步，因此还存在 2 次上下文切换和 3 次数据拷贝。</p>
+<p>// 图片</p>
+<p>具体执行步骤：</p>
+<ul>
+<li>DMA 把磁盘文件数据拷贝到内核缓存区内；</li>
+<li>CPU 把内核缓存区内的数据拷贝到 socket 缓冲区内；</li>
+<li>DMA 把 socket 缓冲区内的数据拷贝到网卡缓冲区；</li>
+</ul>
+<p>在 2.4 版本之后，如果网卡支持 SG_DMA 技术，则可以把内核缓冲区的数据直接拷贝到网卡缓冲区内，也就是说还存在 2 次上下文切换和 2 次数据拷贝。</p>
+<p>// 图片</p>
+<p>具体执行步骤：</p>
+<ul>
+<li>DMA 把磁盘文件数据拷贝到内核缓冲区内；</li>
+<li>把内核缓冲区描述符和数据长度传到 socket 缓冲区；</li>
+<li>SG-DMA 直接把内核缓冲区内的数据拷贝到网卡缓冲区内；</li>
+</ul>
+<h5 id="direct-IO"><a href="#direct-IO" class="headerlink" title="direct IO"></a>direct IO</h5><p>direct IO 是在用户缓冲区和磁盘、网卡之间建立直接通道的技术设计。直接 IO 在读写数据时，就可以绕开内核，减少上下文切换和数据拷贝的次数，从而提高效率。</p>
+<p>// 图片</p>
+<p>具体执行步骤：</p>
+<ul>
+<li>DMA 把磁盘文件数据直接拷贝到用户缓冲区；</li>
+<li>DMA 把用户缓冲区内的数据直接拷贝到网卡缓冲区；</li>
+</ul>
+<p>因此，direct IO 的优缺点也是很明显的。</p>
+<p>优点：</p>
+<ul>
+<li>应用层与磁盘、网卡建立直接通道，减少了上下文切换和数据拷贝的次数，速度更快；</li>
+<li>数据直接缓存在应用层，应用可以更加灵活得操作数据；</li>
+</ul>
+<p>缺点：</p>
+<ul>
+<li>在应用层引入直接 IO，需要应用层自主管理，给系统带来了额外的复杂度；</li>
+<li>若数据不在应用层缓冲区，那么将直接操作磁盘文件读写，性能将大大降低；</li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/08/13/unsafe_pointer/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1509,125 +1681,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/02/20/fork_join_thred_pool/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/02/20/fork_join_thred_pool/" class="post-title-link" itemprop="url">JUC线程池-ForkJoinPool</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-02-20 10:57:01" itemprop="dateCreated datePublished" datetime="2021-02-20T10:57:01+08:00">2021-02-20</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-03-14 21:17:15" itemprop="dateModified" datetime="2023-03-14T21:17:15+08:00">2023-03-14</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2021/02/20/fork_join_thred_pool/" class="post-meta-item leancloud_visitors" data-flag-title="JUC线程池-ForkJoinPool" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2021/02/20/fork_join_thred_pool/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2021/02/20/fork_join_thred_pool/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <hr>
-<h4 id="一、ForkJoinPool-介绍"><a href="#一、ForkJoinPool-介绍" class="headerlink" title="一、ForkJoinPool 介绍"></a>一、ForkJoinPool 介绍</h4><p>ForkJoinPool 是 jdk 1.7 引入的一个线程池，其底层设计基于分治算法(Divide-and-Conquer)的并行实现，是一款可以获得良好并行性能的简单且高效的设计技术。通过任务分治，可以更好地利用多处理器，并行处理任务，提升计算效能。</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/13_20_27_1_fork_join.png" alt=""></p>
-<p>Fork/Join 框架主要包含三个模块：</p>
-<ul>
-<li>线程池：ForkJoinPool</li>
-<li>执行 Fork/Join 任务的线程：ForkJoinWorkerThread</li>
-<li>任务对象：ForkJoinTask，继承者有 RecursiveTask、RecursiveAction、CountedCompleter</li>
-</ul>
-<p>ForkJoinPool 通过 ForkJoinWorkerThread 来处理提交的 ForkJoinTask。通常不会直接创建 ForkJoinTask，而是借助其继承类，根据实际需要创建对应的分治任务。RecursiveTask 是一个可以递归执行的 ForkJoinTask；RecursiveAction 是一个没有返回值的 RecursiveTask；CountedCompleter 在完成任务执行后，回自动触发执行一个自定义的钩子函数。</p>
-<h4 id="二、ForkJoinPool-使用"><a href="#二、ForkJoinPool-使用" class="headerlink" title="二、ForkJoinPool 使用"></a>二、ForkJoinPool 使用</h4><p>我们以 RecursiveTask 学习使用 ForkJoinPool，可递归分治任务实现类图：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/13_20_49_59_recursive_task.png" alt=""></p>
-<p>计算1+2+3+…+10000的值：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SumTest</span> <span class="keyword">extends</span> <span class="title">RecursiveTask</span>&lt;<span class="title">Integer</span>&gt; </span>&#123;</span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">int</span> start;</span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">int</span> end;</span><br><span class="line"></span><br><span class="line">    SumTest(<span class="keyword">int</span> start, <span class="keyword">int</span> end) &#123;</span><br><span class="line">        <span class="keyword">this</span>.start = start;</span><br><span class="line">        <span class="keyword">this</span>.end = end;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> Integer <span class="title">compute</span><span class="params">()</span> </span>&#123;</span><br><span class="line">		</span><br><span class="line">        <span class="keyword">if</span> (end - start &lt; <span class="number">100</span>) &#123;</span><br><span class="line">            System.out.println(Thread.currentThread().getName() + <span class="string">" 开始执行: "</span> + start + <span class="string">"-"</span> + end);</span><br><span class="line">            <span class="keyword">int</span> sum = <span class="number">0</span>;</span><br><span class="line">            <span class="keyword">for</span> (<span class="keyword">int</span> i = start; i &lt;= end; i++) &#123;</span><br><span class="line">                sum += i;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> sum;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        SumTest sumTest1 = <span class="keyword">new</span> SumTest(start, (end + start) / <span class="number">2</span>);</span><br><span class="line">        SumTest sumTest2 = <span class="keyword">new</span> SumTest((start + end) / <span class="number">2</span> + <span class="number">1</span>, end);</span><br><span class="line"></span><br><span class="line">        sumTest1.fork();</span><br><span class="line">        sumTest2.fork();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> sumTest1.join() + sumTest2.join();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> ExecutionException, InterruptedException </span>&#123;</span><br><span class="line">        ForkJoinPool pool = <span class="keyword">new</span> ForkJoinPool();</span><br><span class="line">        ForkJoinTask&lt;Integer&gt; task = <span class="keyword">new</span> SumTest(<span class="number">1</span>, <span class="number">1000</span>);</span><br><span class="line">        pool.submit(task);</span><br><span class="line">        System.out.println(task.get());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>运行结果：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">13</span> 开始执行: <span class="number">1</span>-<span class="number">63</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">11</span> 开始执行: <span class="number">501</span>-<span class="number">563</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">13</span> 开始执行: <span class="number">126</span>-<span class="number">188</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">11</span> 开始执行: <span class="number">564</span>-<span class="number">625</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">13</span> 开始执行: <span class="number">189</span>-<span class="number">250</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">10</span> 开始执行: <span class="number">251</span>-<span class="number">313</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">4</span> 开始执行: <span class="number">64</span>-<span class="number">125</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">10</span> 开始执行: <span class="number">314</span>-<span class="number">375</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">13</span> 开始执行: <span class="number">376</span>-<span class="number">438</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">10</span> 开始执行: <span class="number">439</span>-<span class="number">500</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">4</span> 开始执行: <span class="number">626</span>-<span class="number">688</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">0</span> 开始执行: <span class="number">814</span>-<span class="number">875</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">7</span> 开始执行: <span class="number">751</span>-<span class="number">813</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">11</span> 开始执行: <span class="number">689</span>-<span class="number">750</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">3</span> 开始执行: <span class="number">939</span>-<span class="number">1000</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">15</span> 开始执行: <span class="number">876</span>-<span class="number">938</span></span><br><span class="line"><span class="number">500500</span></span><br></pre></td></tr></table></figure>
-
-<p>从执行结果来看，ForkJoinPool 通过分治算法，一级级拆分表达式，直到拆分的数据单元的差值小于100，接着分别计算各个小数据单元的和，提交汇总。</p>
-<h4 id="三、Fork-Join-任务提交方式"><a href="#三、Fork-Join-任务提交方式" class="headerlink" title="三、Fork/Join 任务提交方式"></a>三、Fork/Join 任务提交方式</h4><p>ForkJoinPool 支持三种任务提交方式：</p>
-<ul>
-<li>submit: 异步执行，有返回值，通过 task.get() 获取执行结果；</li>
-<li>invoke: 同步执行，等待任务执行完毕后，返回计算结果；</li>
-<li>execute: 直接提交任务，同步执行，无返回结果。</li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1700,7 +1753,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">38</span>
+          <span class="site-state-item-count">39</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
