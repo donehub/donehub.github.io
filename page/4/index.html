@@ -190,6 +190,136 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/07/06/redis_pubsub/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/07/06/redis_pubsub/" class="post-title-link" itemprop="url">redis 发布订阅模式</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-07-06 09:00:12" itemprop="dateCreated datePublished" datetime="2020-07-06T09:00:12+08:00">2020-07-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-03-22 20:58:36" itemprop="dateModified" datetime="2022-03-22T20:58:36+08:00">2022-03-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E4%B8%AD%E9%97%B4%E4%BB%B6/" itemprop="url" rel="index"><span itemprop="name">中间件</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2020/07/06/redis_pubsub/" class="post-meta-item leancloud_visitors" data-flag-title="redis 发布订阅模式" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2020/07/06/redis_pubsub/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2020/07/06/redis_pubsub/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h4 id="一、技术背景"><a href="#一、技术背景" class="headerlink" title="一、技术背景"></a>一、技术背景</h4><p>实现发布订阅的中间件有许多，包括时下最热的<code>Kafka</code>、<code>RabbitMQ</code>、<code>ActiveMQ</code>，不太常见的<code>Guava</code>下的<code>EventBus</code>，以及<code>Redis</code>等。关于<code>MQ</code>之流的分析已经够多了，今天详细介绍下<code>Redis</code>的发布订阅机制及其实现。事实上，<code>Redis</code>的发布订阅机制在具体项目中的应用非常少，主要有两方面原因：其一，<code>Redis</code>的可靠性比较差，一旦出现断网等情况，则发布的消息便全部丢失；其二，<code>Redis</code>的消息处理方式是通过单线程循环遍历实现的，若存在大量的消息发布，则可能导致输出缓冲区膨胀，甚至服务崩溃。但对数据安全性和稳定性要求不高的场景来说，<code>Redis</code>不失为最佳的选择。</p>
+<h4 id="二、基本操作"><a href="#二、基本操作" class="headerlink" title="二、基本操作"></a>二、基本操作</h4><p><code>Redis</code> 的发布订阅模式包括普通订阅，普通订阅取消，模式订阅，模式订阅取消这四个场景。用命令实现如下：</p>
+<ul>
+<li><p>启动 <code>Redis</code> 服务（以 <code>Windows</code> 平台为例）</p>
+<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">C:\<span class="title">Tools</span>\<span class="title">Redis</span>&gt;<span class="title">redis</span>-<span class="title">server.exe</span> <span class="title">redis.windows.conf</span></span></span><br><span class="line"><span class="function">...</span></span><br><span class="line"><span class="function"><span class="title">The</span> <span class="title">server</span> <span class="title">is</span> <span class="title">now</span> <span class="title">ready</span> <span class="title">to</span> <span class="title">accept</span> <span class="title">connections</span> <span class="title">on</span> <span class="title">port</span> 6379</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>创建客户端<code>client1</code>，并以普通订阅渠道<code>channel1</code></p>
+<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">redis-cli.exe -h <span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span> -p <span class="number">6379</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt; SUBSCRIBE channel1</span><br><span class="line">Reading messages... (press Ctrl-C to quit)</span><br><span class="line"><span class="number">1</span>) "subscribe"</span><br><span class="line"><span class="number">2</span>) "channel1"</span><br><span class="line"><span class="number">3</span>) (integer) <span class="number">1</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>创建客户端<code>client2</code>，并普通订阅渠道<code>channel2</code></p>
+<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">redis-cli.exe -h <span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span> -p <span class="number">6379</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt; SUBSCRIBE channel2</span><br><span class="line">Reading messages... (press Ctrl-C to quit)</span><br><span class="line"><span class="number">1</span>) "subscribe"</span><br><span class="line"><span class="number">2</span>) "channel2"</span><br><span class="line"><span class="number">3</span>) (integer) <span class="number">1</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>创建客户端<code>client3</code>，并模式订阅渠道<code>channel*</code></p>
+<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">redis-cli.exe -h <span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span> -p <span class="number">6379</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt; PSUBSCRIBE channel*</span><br><span class="line">Reading messages... (press Ctrl-C to quit)</span><br><span class="line"><span class="number">1</span>) "psubscribe"</span><br><span class="line"><span class="number">2</span>) "channel*"</span><br><span class="line"><span class="number">3</span>) (integer) <span class="number">1</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>向渠道<code>channel2</code>发布一条消息</p>
+<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">redis-cli.exe -h <span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span> -p <span class="number">6379</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt; PUBLISH channel2 "msg from channel2"</span><br><span class="line">(integer) <span class="number">2</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><code>client2</code> 、<code>client3</code> 接收到消息</p>
+<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"># ----------client2---------</span><br><span class="line"><span class="number">1</span>) "message"</span><br><span class="line"><span class="number">2</span>) "channel2"</span><br><span class="line"><span class="number">3</span>) "msg from channel2"</span><br><span class="line"></span><br><span class="line"># ----------client3---------</span><br><span class="line"><span class="number">1</span>) "pmessage"</span><br><span class="line"><span class="number">2</span>) "channel*"</span><br><span class="line"><span class="number">3</span>) "channel2"</span><br><span class="line"><span class="number">4</span>) "msg from channel2"</span><br></pre></td></tr></table></figure>
+
+</li>
+</ul>
+<p>因此，我们可以猜测，消息发布者与消息订阅者之间是通过渠道连接的，包括精准匹配（普通订阅）和模糊匹配（模式订阅）。经过分析其结构设计，可表示为用例：</p>
+<p><img src="http://www.plantuml.com/plantuml/png/SoWkIImgAStDuU8gIaqkISnBpqbLA4fDoIoEBoXDYYykJLAevk9I08ASrBGIXP9yXQBCz8mIXPHCaFBC_3omN69oINwHmjF-YKztDBzeQ4KIUx5kqSiPhK0nGso2HjW4ZI7sbHQd9YSMfog4EXig91OhA3tRiU1bu-IOlEICnBoyr9oOl8B4afBKeZmbi7A4vGgwkdOWJLPG8R0qI00iWN2F5PIDNTe8lxGnNBgMoo4rBmKOW000" alt=""></p>
+<h4 id="三、原理分析"><a href="#三、原理分析" class="headerlink" title="三、原理分析"></a>三、原理分析</h4><p><code>Redis</code>发布订阅的核心实现在<code>pubsub.c</code>文件。从头文件<code>server.h</code>中可以读取相关函数声明：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">void subscribeCommand(client *c);      &#x2F;* 普通订阅 *&#x2F;</span><br><span class="line">void unsubscribeCommand(client *c);    &#x2F;* 普通订阅取消 *&#x2F;</span><br><span class="line">void psubscribeCommand(client *c);     &#x2F;* 模式订阅 *&#x2F;</span><br><span class="line">void punsubscribeCommand(client *c);   &#x2F;* 模式订阅取消 *&#x2F;</span><br><span class="line">void publishCommand(client *c);</span><br><span class="line">void pubsubCommand(client *c);</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>普通订阅模式：</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> CLIENT_PUBSUB (1&lt;&lt;18)      <span class="comment">/* Client is in Pub/Sub mode. */</span></span></span><br><span class="line"><span class="comment">/*-----------------------------------------------------------------------------</span></span><br><span class="line"><span class="comment"> * Pubsub commands implementation</span></span><br><span class="line"><span class="comment"> *----------------------------------------------------------------------------*/</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">subscribeCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> j;</span><br><span class="line">	<span class="comment">/* 分析client结构，c-&gt;argv[0]为命令本身，第2位开始为渠道参数 */</span></span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">1</span>; j &lt; c-&gt;argc; j++)</span><br><span class="line">        <span class="comment">/* 订阅一个渠道 */</span></span><br><span class="line">        pubsubSubscribeChannel(c,c-&gt;argv[j]);</span><br><span class="line">    <span class="comment">/* 设置客户端为发布订阅模式，此模式在processCommand中为校验值 */</span></span><br><span class="line">    c-&gt;flags |= CLIENT_PUBSUB;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* 一个客户端订阅一个渠道。若返回 1，则订阅成功；若返回 0，则该客户端已订阅该渠道 */</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pubsubSubscribeChannel</span><span class="params">(client *c, robj *channel)</span> </span>&#123;</span><br><span class="line">    dictEntry *de;</span><br><span class="line">    <span class="built_in">list</span> *clients = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="keyword">int</span> retval = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 将该渠道添加到该客户端的pubsub_channels哈希表中； key: channel，value: NULL*/</span></span><br><span class="line">    <span class="keyword">if</span> (dictAdd(c-&gt;pubsub_channels,channel,<span class="literal">NULL</span>) == DICT_OK) &#123;</span><br><span class="line">        retval = <span class="number">1</span>;</span><br><span class="line">        <span class="comment">/* 引用自增 1 */</span></span><br><span class="line">        incrRefCount(channel);</span><br><span class="line">        <span class="comment">/* 在服务端pubsub_channels中查找该channel */</span></span><br><span class="line">        de = dictFind(server.pubsub_channels,channel);</span><br><span class="line">        <span class="comment">/* 若该channel不存在，则新建 */</span></span><br><span class="line">        <span class="keyword">if</span> (de == <span class="literal">NULL</span>) &#123;</span><br><span class="line">            clients = listCreate();</span><br><span class="line">            <span class="comment">/* 将该客户端添加到该服务端的pubsub_channels哈希表中; key: channel，value: client*/</span></span><br><span class="line">            dictAdd(server.pubsub_channels,channel,clients);</span><br><span class="line">             <span class="comment">/* 引用自增 1 */</span></span><br><span class="line">            incrRefCount(channel);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            clients = dictGetVal(de);</span><br><span class="line">        &#125;</span><br><span class="line">         <span class="comment">/* 将客户端c记录在订阅客户端列表 */</span></span><br><span class="line">        listAddNodeTail(clients,c);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">/* 通知客户端订阅结果 */</span></span><br><span class="line">    addReplyPubsubSubscribed(c,channel);</span><br><span class="line">    <span class="keyword">return</span> retval;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>普通订阅模式主要做了两件事：将订阅渠道添加至客户端<code>pubsub_channels</code>哈希表中；将订阅客户端添加至服务端的<code>pubsub_channels</code>哈希表中。可如下表示：</p>
+<p><img src="http://www.plantuml.com/plantuml/png/VP5FJyCW6CRFurEGdcjJ_kpYjcRHws8yw6anXXOwYCWMIgE9-jrz1Tk5Is_yVW_mFeJz48GFuxj524bpykAYSMUDSW5_ePKNxaqQZtVuwMw3qCgTfJeEMbmKAA-wivSb_Z0oQE2Ab5WhSz8Xmijqe3vQqIeBijZsTTDfuPoov7lRamae09s00R09E01lggegIlmPxzaLzwdVuzWEO_lwlt4eve4a7_ZmV3X0c3AwaB65Z2zawooBPQ-Fl-thcoQsWjLcbYH9cacQ9CiaIv9daYUvZl87eRroykyJVm40" alt=""></p>
+<p><img src="http://www.plantuml.com/plantuml/png/RL9TJuCm57tlhsXuHa8_W4mtikZhOapKfyMOifQLYDrIG4tK_-uT26ipUBhduvnxcx1kMc7Rxhr6I5PxAuuQDyf-A8k_4ORF2lCcAujN-Eds1lMKEKYrRRGuAc2jsXsi3F5d9LiDE28XrghQwxO7BquctjQYK3NmmRACyvqMngYQ_2nBCW8AW8w00M0Zu01u7aLHuEpYtguGV_KBLi7Zy8A7hcYwulM_eGdSOuX_p5rTATCIi4mEwZlkdpSRLsPp1THry3a7Tns9xu3NUJUcSmNCBSZc78bNifYpf9ublYxZg_mq4PZExMJYKvZy01a4UY7GGM1U4vkQiei06mG-1aQU3tpY1xAfQT4BlmYjbP6d7_WF" alt=""></p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/06/20/scallionPancake/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1374,7 +1504,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">39</span>
+          <span class="site-state-item-count">40</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
