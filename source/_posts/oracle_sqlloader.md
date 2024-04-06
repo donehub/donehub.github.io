@@ -42,7 +42,7 @@ FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"'   -- 指定字段分隔符�
   email,
   hire_date DATE 'YYYY-MM-DD'  -- 数据格式化，确保日期格式正确
 )
-WHEN (hire_date >= '2022-01-01')
+WHEN (hire_date >= '2022-02-01')
 ```
 
 - `LOAD DATA` 表示开始加载数据的声明；
@@ -78,15 +78,15 @@ FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"'
   email,
   hire_date DATE 'YYYY-MM-DD'
 )
-WHEN (hire_date >= '2022-01-01')
+WHEN (hire_date >= '2022-02-01')
 ```
 
 * 准备外部数据文件 `data.csv`，包含待加载的数据。
 
 | employee_id | first_name | last_name | email              | hire_date  |
 | ----------- | ---------- | --------- | ------------------ | ---------- |
-| 001         | 张         | 三        | zhangsan@gmail.com | 2023-01-01 |
-| 002         | 李         | 四        | lisi@gmail.com     | 2023-01-02 |
+| 001         | 张         | 三        | zhangsan@gmail.com | 2023-02-01 |
+| 002         | 李         | 四        | lisi@gmail.com     | 2023-02-02 |
 
 * 在命令行中运行 `SQL*Loader`：
 
