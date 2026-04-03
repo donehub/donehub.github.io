@@ -1,7 +1,7 @@
 ---
 title: Chrome DevTools MCP 入门实战：让 AI 助手操控浏览器
-date: 2026-04-03
-tags: AI 工具, MCP, Claude Code
+date: 2026-04-01
+tags: MCP
 categories: AI
 ---
 
