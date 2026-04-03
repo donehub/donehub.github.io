@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="一、写在前面：为什么需要 Superpowers？你有没有遇到过这样的场景：  让 AI 帮你写代码，它一上来就开始”输出”，完全不考虑你的真实需求 AI 写的代码看似没问题，但测试一跑就崩，因为它根本没写测试 AI “自主工作”了半小时，结果偏离了原需求十万八千里 多个功能并行开发，AI 把代码混在一起，最后连回滚都困难  Superpowers 就是解决这些问题的”流程管家”。它不是让 AI">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Superpowers 介绍与使用">
+<meta property="og:url" content="https://donehub.github.io/2026/02/15/superpowers-vs-speckit-guide/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="一、写在前面：为什么需要 Superpowers？你有没有遇到过这样的场景：  让 AI 帮你写代码，它一上来就开始”输出”，完全不考虑你的真实需求 AI 写的代码看似没问题，但测试一跑就崩，因为它根本没写测试 AI “自主工作”了半小时，结果偏离了原需求十万八千里 多个功能并行开发，AI 把代码混在一起，最后连回滚都困难  Superpowers 就是解决这些问题的”流程管家”。它不是让 AI">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-02-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-03T23:52:47.719Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="AI 工具">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/02/15/superpowers-vs-speckit-guide/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Superpowers 介绍与使用 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/02/15/superpowers-vs-speckit-guide/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Superpowers 介绍与使用
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-02-15 00:00:00" itemprop="dateCreated datePublished" datetime="2026-02-15T00:00:00+08:00">2026-02-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-04 07:52:47" itemprop="dateModified" datetime="2026-04-04T07:52:47+08:00">2026-04-04</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/02/15/superpowers-vs-speckit-guide/" class="post-meta-item leancloud_visitors" data-flag-title="Superpowers 介绍与使用" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/02/15/superpowers-vs-speckit-guide/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/02/15/superpowers-vs-speckit-guide/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="一、写在前面：为什么需要-Superpowers？"><a href="#一、写在前面：为什么需要-Superpowers？" class="headerlink" title="一、写在前面：为什么需要 Superpowers？"></a>一、写在前面：为什么需要 Superpowers？</h2><p>你有没有遇到过这样的场景：</p>
+<ul>
+<li>让 AI 帮你写代码，它一上来就开始”输出”，完全不考虑你的真实需求</li>
+<li>AI 写的代码看似没问题，但测试一跑就崩，因为它根本没写测试</li>
+<li>AI “自主工作”了半小时，结果偏离了原需求十万八千里</li>
+<li>多个功能并行开发，AI 把代码混在一起，最后连回滚都困难</li>
+</ul>
+<p><strong>Superpowers</strong> 就是解决这些问题的”流程管家”。它不是让 AI 更聪明，而是让 AI <strong>更靠谱</strong>——先规划、再测试、再实现、再审查，像真正工程师一样工作。</p>
+<hr>
+<h2 id="二、Superpowers-是什么？"><a href="#二、Superpowers-是什么？" class="headerlink" title="二、Superpowers 是什么？"></a>二、Superpowers 是什么？</h2><h3 id="2-1-一句话定义"><a href="#2-1-一句话定义" class="headerlink" title="2.1 一句话定义"></a>2.1 一句话定义</h3><p><strong>Superpowers</strong> 是由 Jesse Vincent（Perl 专家、Markdown 发明者之一）开发的软件开发工作流系统，通过一系列”技能(Skills)”让 AI 编码助手遵循严格的工程流程。</p>
+<h3 id="2-2-核心理念"><a href="#2-2-核心理念" class="headerlink" title="2.2 核心理念"></a>2.2 核心理念</h3><p>打个比方：</p>
+<table>
+<thead>
+<tr>
+<th>没有 Superpowers</th>
+<th>有 Superpowers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>AI 像是个”热情但冲动的新手”——拿到任务就写代码，写完就交</td>
+<td>AI 像是个”老练的资深工程师”——先问清楚需求，写测试，再实现，最后审查</td>
+</tr>
+<tr>
+<td>容易偏离需求</td>
+<td>强制按计划执行</td>
+</tr>
+<tr>
+<td>测试是”事后补的”</td>
+<td>测试是”先写的”（TDD）</td>
+</tr>
+<tr>
+<td>一个分支干所有事</td>
+<td>Git Worktree 隔离开发</td>
+</tr>
+</tbody></table>
+<h3 id="2-3-支持的-AI-工具"><a href="#2-3-支持的-AI-工具" class="headerlink" title="2.3 支持的 AI 工具"></a>2.3 支持的 AI 工具</h3><table>
+<thead>
+<tr>
+<th>工具</th>
+<th>安装方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Claude Code</strong></td>
+<td><code>/plugin install superpowers@claude-plugins-official</code></td>
+</tr>
+<tr>
+<td><strong>Cursor</strong></td>
+<td><code>/add-plugin superpowers</code></td>
+</tr>
+<tr>
+<td><strong>GitHub Copilot CLI</strong></td>
+<td><code>copilot plugin install superpowers</code></td>
+</tr>
+<tr>
+<td><strong>Gemini CLI</strong></td>
+<td><code>gemini extensions install</code></td>
+</tr>
+<tr>
+<td><strong>Codex CLI</strong></td>
+<td>手动配置（见后文）</td>
+</tr>
+<tr>
+<td><strong>OpenCode</strong></td>
+<td>手动配置</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="三、核心工作流程详解"><a href="#三、核心工作流程详解" class="headerlink" title="三、核心工作流程详解"></a>三、核心工作流程详解</h2><h3 id="3-1-七步流程"><a href="#3-1-七步流程" class="headerlink" title="3.1 七步流程"></a>3.1 七步流程</h3><p>Superpowers 强制 AI 遵循以下流程：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line">┌──────────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                     Superpowers 工作流程                              │</span><br><span class="line">├──────────────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                                      │</span><br><span class="line">│  1. brainstorming (头脑风暴)                                         │</span><br><span class="line">│     └─► AI 不直接写代码，先问你&quot;到底想做什么&quot;                          │</span><br><span class="line">│     └─► 通过苏格拉底式提问，提炼出清晰的设计文档                       │</span><br><span class="line">│                                                                      │</span><br><span class="line">│  2. using-git-worktrees (创建隔离工作空间)                           │</span><br><span class="line">│     └─► 自动创建新分支 + Git Worktree                                │</span><br><span class="line">│     └─► 确保开发环境干净、可回滚                                      │</span><br><span class="line">│                                                                      │</span><br><span class="line">│  3. writing-plans (编写计划)                                         │</span><br><span class="line">│     └─► 将设计拆成 2-5 分钟的小任务                                   │</span><br><span class="line">│     └─► 每个任务包含：文件路径、代码、验证步骤                        │</span><br><span class="line">│                                                                      │</span><br><span class="line">│  4. subagent-driven-development (子代理执行)                         │</span><br><span class="line">│     └─► 每个任务派发一个新的子代理                                    │</span><br><span class="line">│     └─► 主代理审查子代理的工作                                        │</span><br><span class="line">│     └─► 可连续自主工作数小时                                          │</span><br><span class="line">│                                                                      │</span><br><span class="line">│  5. test-driven-development (强制 TDD)                               │</span><br><span class="line">│     └─► RED: 先写失败的测试                                           │</span><br><span class="line">│     └─► GREEN: 写最少代码让测试通过                                   │</span><br><span class="line">│     └─► REFACTOR: 优化代码                                           │</span><br><span class="line">│     └─► 如果代码先于测试写了，会被删除！                              │</span><br><span class="line">│                                                                      │</span><br><span class="line">│  6. requesting-code-review (代码审查)                                │</span><br><span class="line">│     └─► 每个任务完成后自动审查                                        │</span><br><span class="line">│     └─► 两阶段审查：规格合规 + 代码质量                               │</span><br><span class="line">│     └─► 关键问题会阻塞进度                                            │</span><br><span class="line">│                                                                      │</span><br><span class="line">│  7. finishing-a-development-branch (完成分支)                        │</span><br><span class="line">│     └─► 验证所有测试通过                                              │</span><br><span class="line">│     └─► 提供：合并 &#x2F; PR &#x2F; 保留 &#x2F; 丢弃选项                            │</span><br><span class="line">│     └─► 清理 Worktree                                                │</span><br><span class="line">│                                                                      │</span><br><span class="line">└──────────────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-2-为什么这套流程有效？"><a href="#3-2-为什么这套流程有效？" class="headerlink" title="3.2 为什么这套流程有效？"></a>3.2 为什么这套流程有效？</h3><p><strong>问题 1：AI 容易”跑偏”</strong></p>
+<p>传统 AI 编码：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">用户：帮我加个登录功能</span><br><span class="line">AI：好的，开始写代码...</span><br><span class="line">（30分钟后）</span><br><span class="line">AI：登录功能写好了，还顺便加了注册、找回密码、OAuth...</span><br><span class="line">用户：？？我只想要个简单的登录啊</span><br></pre></td></tr></table></figure>
+
+<p>有 Superpowers：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">用户：帮我加个登录功能</span><br><span class="line">AI (brainstorming)：让我先理解一下：</span><br><span class="line">  - 登录方式是什么？账号密码？OAuth？</span><br><span class="line">  - 需要记住登录状态吗？多久？</span><br><span class="line">  - 安全要求是什么？</span><br><span class="line">用户：账号密码登录，记住 7 天，简单安全就行</span><br><span class="line">AI：好的，我来写设计文档，你确认后再动手</span><br><span class="line">（用户确认后）</span><br><span class="line">AI：现在开始实现，每个任务都会按计划执行</span><br></pre></td></tr></table></figure>
+
+<p><strong>问题 2：AI 不写测试</strong></p>
+<p>传统 AI 编码：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">AI：功能写完了！</span><br><span class="line">用户：测试呢？</span><br><span class="line">AI：呃...我补一下</span><br><span class="line">（补的测试可能根本测不到关键逻辑）</span><br></pre></td></tr></table></figure>
+
+<p>有 Superpowers（强制 TDD）：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">AI：现在要实现登录验证</span><br><span class="line">AI：先写测试（RED）→ 测试失败 ✓</span><br><span class="line">AI：再写代码（GREEN）→ 测试通过 ✓</span><br><span class="line">AI：重构优化（REFACTOR）→ 测试仍通过 ✓</span><br><span class="line">AI：继续下一个任务</span><br></pre></td></tr></table></figure>
+
+<p><strong>问题 3：多功能开发混乱</strong></p>
+<p>传统方式：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">main 分支上同时开发 3 个功能</span><br><span class="line">功能 A 改了文件 X</span><br><span class="line">功能 B 也改了文件 X</span><br><span class="line">功能 C 又改了文件 X</span><br><span class="line">→ 冲突灾难</span><br></pre></td></tr></table></figure>
+
+<p>有 Superpowers（Git Worktree）：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">功能 A → worktree&#x2F;feature-a&#x2F; (独立目录)</span><br><span class="line">功能 B → worktree&#x2F;feature-b&#x2F; (独立目录)</span><br><span class="line">功能 C → worktree&#x2F;feature-c&#x2F; (独立目录)</span><br><span class="line">→ 完全隔离，互不影响</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="四、安装配置实战"><a href="#四、安装配置实战" class="headerlink" title="四、安装配置实战"></a>四、安装配置实战</h2><h3 id="4-1-Claude-Code-安装（推荐）"><a href="#4-1-Claude-Code-安装（推荐）" class="headerlink" title="4.1 Claude Code 安装（推荐）"></a>4.1 Claude Code 安装（推荐）</h3><p><strong>方式一：官方插件市场（最简单）</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在 Claude Code 中执行</span></span><br><span class="line">/plugin install superpowers@claude-plugins-official</span><br></pre></td></tr></table></figure>
+
+<p><strong>方式二：第三方市场</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 先注册市场</span></span><br><span class="line">/plugin marketplace add obra/superpowers-marketplace</span><br><span class="line"></span><br><span class="line"><span class="comment"># 再安装插件</span></span><br><span class="line">/plugin install superpowers@superpowers-marketplace</span><br></pre></td></tr></table></figure>
+
+<p><strong>验证安装：</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 查看已安装插件</span></span><br><span class="line">/plugin list</span><br><span class="line"></span><br><span class="line"><span class="comment"># 应该看到 superpowers</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="4-2-Cursor-安装"><a href="#4-2-Cursor-安装" class="headerlink" title="4.2 Cursor 安装"></a>4.2 Cursor 安装</h3><p>在 Cursor Agent 聊天中：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;add-plugin superpowers</span><br></pre></td></tr></table></figure>
+
+<p>或者在插件市场搜索 “superpowers”。</p>
+<h3 id="4-3-GitHub-Copilot-CLI-安装"><a href="#4-3-GitHub-Copilot-CLI-安装" class="headerlink" title="4.3 GitHub Copilot CLI 安装"></a>4.3 GitHub Copilot CLI 安装</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 注册市场</span></span><br><span class="line">copilot plugin marketplace add obra/superpowers-marketplace</span><br><span class="line"></span><br><span class="line"><span class="comment"># 安装插件</span></span><br><span class="line">copilot plugin install superpowers@superpowers-marketplace</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-4-Codex-CLI-手动安装"><a href="#4-4-Codex-CLI-手动安装" class="headerlink" title="4.4 Codex CLI 手动安装"></a>4.4 Codex CLI 手动安装</h3><p>Codex 目前没有插件市场，需要手动配置：</p>
+<p><strong>步骤 1：获取技能文件</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 克隆仓库</span></span><br><span class="line">git <span class="built_in">clone</span> https://github.com/obra/superpowers.git</span><br><span class="line"></span><br><span class="line"><span class="comment"># 复制技能到 Codex 目录</span></span><br><span class="line">mkdir -p ~/.codex/skills</span><br><span class="line">cp -r superpowers/skills/* ~/.codex/skills/</span><br></pre></td></tr></table></figure>
+
+<p><strong>步骤 2：配置 Codex</strong></p>
+<p>创建或编辑 <code>~/.codex/config.json</code>：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"skillsDirectory"</span>: <span class="string">"~/.codex/skills"</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>步骤 3：验证</strong></p>
+<p>启动 Codex 后，技能会自动加载。</p>
+<h3 id="4-5-Gemini-CLI-安装"><a href="#4-5-Gemini-CLI-安装" class="headerlink" title="4.5 Gemini CLI 安装"></a>4.5 Gemini CLI 安装</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 安装扩展</span></span><br><span class="line">gemini extensions install https://github.com/obra/superpowers</span><br><span class="line"></span><br><span class="line"><span class="comment"># 更新</span></span><br><span class="line">gemini extensions update superpowers</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-6-更新插件"><a href="#4-6-更新插件" class="headerlink" title="4.6 更新插件"></a>4.6 更新插件</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Claude Code</span></span><br><span class="line">/plugin update superpowers</span><br><span class="line"></span><br><span class="line"><span class="comment"># Copilot CLI</span></span><br><span class="line">copilot plugin update superpowers</span><br><span class="line"></span><br><span class="line"><span class="comment"># Gemini CLI</span></span><br><span class="line">gemini extensions update superpowers</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="五、使用实战：从零开始"><a href="#五、使用实战：从零开始" class="headerlink" title="五、使用实战：从零开始"></a>五、使用实战：从零开始</h2><h3 id="5-1-触发技能"><a href="#5-1-触发技能" class="headerlink" title="5.1 触发技能"></a>5.1 触发技能</h3><p>Superpowers 的技能会<strong>自动触发</strong>。你不需要特殊命令，只需要用自然语言描述需求。</p>
+<p><strong>示例：启动一个新功能</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">我想给博客系统加一个评论功能，支持用户登录后评论</span><br></pre></td></tr></table></figure>
+
+<p>AI 会自动调用 <code>brainstorming</code> 技能：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">AI：让我先理解你的需求...</span><br><span class="line"></span><br><span class="line">问题 1：评论需要审核吗？还是直接发布？</span><br><span class="line">问题 2：评论可以回复吗？支持嵌套？</span><br><span class="line">问题 3：评论内容有什么限制？字数、格式？</span><br><span class="line">问题 4：需要通知博主吗？邮件？站内？</span><br><span class="line"></span><br><span class="line">请逐一回答，我会根据你的回答设计功能。</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-2-头脑风暴阶段"><a href="#5-2-头脑风暴阶段" class="headerlink" title="5.2 头脑风暴阶段"></a>5.2 头脑风暴阶段</h3><p><strong>你的回答：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">评论不需要审核，直接发布</span><br><span class="line">支持回复，但不嵌套（最多一层）</span><br><span class="line">评论最多 500 字，不能发链接</span><br><span class="line">不需要通知</span><br></pre></td></tr></table></figure>
+
+<p><strong>AI 会生成设计文档：</strong></p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">## 评论功能设计文档</span></span><br><span class="line"></span><br><span class="line"><span class="section">### 核心需求</span></span><br><span class="line"><span class="bullet">- </span>用户登录后可评论</span><br><span class="line"><span class="bullet">- </span>评论直接发布，无需审核</span><br><span class="line"><span class="bullet">- </span>支持回复评论（一层）</span><br><span class="line"></span><br><span class="line"><span class="section">### 技术方案</span></span><br><span class="line"><span class="bullet">- </span>数据表：comments (id, user<span class="emphasis">_id, post_</span>id, content, parent<span class="emphasis">_id, created_</span>at)</span><br><span class="line"><span class="bullet">- </span>API：POST /comments, GET /comments/:post_id</span><br><span class="line"><span class="bullet">- </span>前端：评论框 + 评论列表 + 回复按钮</span><br><span class="line"></span><br><span class="line"><span class="section">### 验收标准</span></span><br><span class="line"><span class="bullet">- </span>登录用户可发表评论</span><br><span class="line"><span class="bullet">- </span>可回复他人评论</span><br><span class="line"><span class="bullet">- </span>评论字数限制 500 字</span><br><span class="line"><span class="bullet">- </span>不允许发送链接</span><br></pre></td></tr></table></figure>
+
+<p><strong>你确认后，AI 进入下一阶段。</strong></p>
+<h3 id="5-3-Git-Worktree-阶段"><a href="#5-3-Git-Worktree-阶段" class="headerlink" title="5.3 Git Worktree 阶段"></a>5.3 Git Worktree 阶段</h3><p>AI 会自动：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 创建新分支</span></span><br><span class="line">git checkout -b feature/comments</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建 Worktree（独立工作目录）</span></span><br><span class="line">git worktree add .claude/worktrees/feature-comments feature/comments</span><br><span class="line"></span><br><span class="line"><span class="comment"># 在 Worktree 中初始化环境</span></span><br><span class="line"><span class="built_in">cd</span> .claude/worktrees/feature-comments</span><br><span class="line">npm install  <span class="comment"># 或其他项目初始化命令</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 验证测试基线</span></span><br><span class="line">npm <span class="built_in">test</span>     <span class="comment"># 确保当前测试都通过</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>Worktree 的好处：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">你的主项目目录:     &#x2F;projects&#x2F;my-blog&#x2F;</span><br><span class="line">评论功能 Worktree:  &#x2F;projects&#x2F;my-blog&#x2F;.claude&#x2F;worktrees&#x2F;feature-comments&#x2F;</span><br><span class="line"></span><br><span class="line">两个目录完全独立！</span><br><span class="line">你可以在主目录继续其他工作</span><br><span class="line">AI 在 Worktree 专心开发评论功能</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-4-编写计划阶段"><a href="#5-4-编写计划阶段" class="headerlink" title="5.4 编写计划阶段"></a>5.4 编写计划阶段</h3><p>AI 会把设计拆成小任务：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">## 实现计划</span></span><br><span class="line"></span><br><span class="line"><span class="section">### 任务 1：创建评论数据模型 (预计 3 分钟)</span></span><br><span class="line"><span class="bullet">- </span>文件：<span class="code">`src/models/comment.js`</span></span><br><span class="line"><span class="bullet">- </span>代码：定义 Comment schema</span><br><span class="line"><span class="bullet">- </span>验证：模型可正确创建实例</span><br><span class="line"></span><br><span class="line"><span class="section">### 任务 2：添加评论 API (预计 5 分钟)</span></span><br><span class="line"><span class="bullet">- </span>文件：<span class="code">`src/routes/comments.js`</span></span><br><span class="line"><span class="bullet">- </span>代码：POST /comments, GET /comments/:post_id</span><br><span class="line"><span class="bullet">- </span>验证：API 测试通过</span><br><span class="line"></span><br><span class="line"><span class="section">### 任务 3：评论前端组件 (预计 10 分钟)</span></span><br><span class="line"><span class="bullet">- </span>文件：<span class="code">`src/components/CommentBox.jsx`</span>, <span class="code">`src/components/CommentList.jsx`</span></span><br><span class="line"><span class="bullet">- </span>代码：评论输入框、评论列表、回复按钮</span><br><span class="line"><span class="bullet">- </span>验证：组件渲染正确，可交互</span><br><span class="line"></span><br><span class="line"><span class="section">### 任务 4：字数限制和链接过滤 (预计 3 分钟)</span></span><br><span class="line"><span class="bullet">- </span>文件：<span class="code">`src/utils/commentValidator.js`</span></span><br><span class="line"><span class="bullet">- </span>代码：验证函数</span><br><span class="line"><span class="bullet">- </span>验证：超过 500 字拒绝，包含链接拒绝</span><br><span class="line"></span><br><span class="line"><span class="section">### 任务 5：集成测试 (预计 5 分钟)</span></span><br><span class="line"><span class="bullet">- </span>文件：<span class="code">`tests/comment.test.js`</span></span><br><span class="line"><span class="bullet">- </span>代码：完整流程测试</span><br><span class="line"><span class="bullet">- </span>验证：测试通过</span><br></pre></td></tr></table></figure>
+
+<p><strong>任务粒度原则：</strong></p>
+<ul>
+<li>每个任务 <strong>2-5 分钟</strong></li>
+<li>有<strong>明确的文件路径</strong></li>
+<li>有<strong>验证步骤</strong></li>
+</ul>
+<h3 id="5-5-子代理执行阶段"><a href="#5-5-子代理执行阶段" class="headerlink" title="5.5 子代理执行阶段"></a>5.5 子代理执行阶段</h3><p>这是 Superpowers 的核心亮点：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    子代理驱动开发                             │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  主代理 (你对话的 AI)                                        │</span><br><span class="line">│      │                                                      │</span><br><span class="line">│      ├──► 派发子代理 1 → 执行任务 1 (创建模型)               │</span><br><span class="line">│      │        │                                             │</span><br><span class="line">│      │        └──► 完成后返回结果                            │</span><br><span class="line">│      │                                                      │</span><br><span class="line">│      ├──► 主代理审查：符合设计？代码质量？                    │</span><br><span class="line">│      │                                                      │</span><br><span class="line">│      ├──► 派发子代理 2 → 执行任务 2 (添加 API)               │</span><br><span class="line">│      │        │                                             │</span><br><span class="line">│      │        └──► 完成后返回结果                            │</span><br><span class="line">│      │                                                      │</span><br><span class="line">│      ├──► 主代理审查...                                     │</span><br><span class="line">│      │                                                      │</span><br><span class="line">│      └──► 继续执行...                                       │</span><br><span class="line">│                                                             │</span><br><span class="line">│  优势：                                                      │</span><br><span class="line">│  - 每个任务用&quot;新鲜&quot;的子代理，无上下文污染                    │</span><br><span class="line">│  - 主代理审查，确保质量                                      │</span><br><span class="line">│  - 可连续自主工作数小时                                      │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p><strong>你的体验：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">AI：开始执行任务 1...</span><br><span class="line">AI：任务 1 完成，审查中...</span><br><span class="line">AI：审查通过 ✓，继续任务 2...</span><br><span class="line">AI：任务 2 完成，审查中...</span><br><span class="line">AI：发现一个小问题，已修复 ✓</span><br><span class="line">AI：继续任务 3...</span><br><span class="line">（你可以去喝咖啡了）</span><br><span class="line">AI：所有任务完成！</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-6-TDD-阶段（强制）"><a href="#5-6-TDD-阶段（强制）" class="headerlink" title="5.6 TDD 阶段（强制）"></a>5.6 TDD 阶段（强制）</h3><p><strong>Superpowers 的 TDD 是真正的 RED-GREEN-REFACTOR：</strong></p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 步骤 1：RED - 先写失败的测试</span></span><br><span class="line">describe(<span class="string">'CommentValidator'</span>, () =&gt; &#123;</span><br><span class="line">  it(<span class="string">'should reject comment longer than 500 chars'</span>, () =&gt; &#123;</span><br><span class="line">    <span class="keyword">const</span> longComment = <span class="string">'a'</span>.repeat(<span class="number">501</span>);</span><br><span class="line">    expect(validateComment(longComment)).toBe(<span class="literal">false</span>);</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 运行测试 → 失败 ✓ (因为 validateComment 还不存在)</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 步骤 2：GREEN - 写最少代码让测试通过</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">validateComment</span>(<span class="params">content</span>) </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (content.length &gt; <span class="number">500</span>) <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 运行测试 → 通过 ✓</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 步骤 3：REFACTOR - 优化代码</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">validateComment</span>(<span class="params">content</span>) </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> MAX_LENGTH = <span class="number">500</span>;</span><br><span class="line">  <span class="keyword">const</span> LINK_PATTERN = <span class="regexp">/https?:\/\/\S+/</span>;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (content.length &gt; MAX_LENGTH) <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">  <span class="keyword">if</span> (LINK_PATTERN.test(content)) <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 运行测试 → 仍通过 ✓</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>如果 AI 先写了代码再写测试？</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">AI 会删除代码，重新从测试开始写！</span><br><span class="line">这是强制的，不是建议。</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-7-代码审查阶段"><a href="#5-7-代码审查阶段" class="headerlink" title="5.7 代码审查阶段"></a>5.7 代码审查阶段</h3><p>每个任务完成后，主代理会审查：</p>
+<p><strong>审查维度：</strong></p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>检查内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>规格合规</strong></td>
+<td>是否符合设计文档？</td>
+</tr>
+<tr>
+<td><strong>代码质量</strong></td>
+<td>可读性、命名、结构</td>
+</tr>
+<tr>
+<td><strong>测试覆盖</strong></td>
+<td>测试是否充分？</td>
+</tr>
+<tr>
+<td><strong>安全性</strong></td>
+<td>有无安全漏洞？</td>
+</tr>
+</tbody></table>
+<p><strong>审查结果：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">审查报告：</span><br><span class="line"></span><br><span class="line">✓ 规格合规：符合设计文档</span><br><span class="line">⚠ 代码质量：变量命名可优化（comment → userComment）</span><br><span class="line">✓ 测试覆盖：覆盖了主要场景</span><br><span class="line">✓ 安全性：无明显问题</span><br><span class="line"></span><br><span class="line">建议：优化变量命名后继续</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键问题会阻塞进度：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">❌ 发现关键问题：API 缺少权限验证</span><br><span class="line">   → 必须修复后才能继续</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-8-完成分支阶段"><a href="#5-8-完成分支阶段" class="headerlink" title="5.8 完成分支阶段"></a>5.8 完成分支阶段</h3><p>所有任务完成后：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">AI：所有任务完成！验证测试...</span><br><span class="line">AI：所有测试通过 ✓</span><br><span class="line"></span><br><span class="line">请选择下一步：</span><br><span class="line">[1] 合并到主分支</span><br><span class="line">[2] 创建 Pull Request</span><br><span class="line">[3] 保留分支（暂不合并）</span><br><span class="line">[4] 丢弃所有更改</span><br><span class="line"></span><br><span class="line">你的选择？</span><br></pre></td></tr></table></figure>
+
+<p><strong>选择后，AI 会：</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 如果选择合并</span></span><br><span class="line">git checkout main</span><br><span class="line">git merge feature/comments</span><br><span class="line">git worktree remove .claude/worktrees/feature-comments</span><br><span class="line"></span><br><span class="line"><span class="comment"># 如果选择创建 PR</span></span><br><span class="line">gh pr create --title <span class="string">"Add comment feature"</span> --body <span class="string">"..."</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="六、与-GitHub-SpecKit-的对比"><a href="#六、与-GitHub-SpecKit-的对比" class="headerlink" title="六、与 GitHub SpecKit 的对比"></a>六、与 GitHub SpecKit 的对比</h2><h3 id="6-1-两者是什么关系？"><a href="#6-1-两者是什么关系？" class="headerlink" title="6.1 两者是什么关系？"></a>6.1 两者是什么关系？</h3><p><strong>Superpowers</strong> 和 <strong>GitHub SpecKit</strong> 都是”规范驱动开发”的工具，但理念和实现方式不同。</p>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>Superpowers</th>
+<th>GitHub SpecKit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>开发者</strong></td>
+<td>Jesse Vincent（独立开发者）</td>
+<td><strong>GitHub 官方</strong></td>
+</tr>
+<tr>
+<td><strong>形态</strong></td>
+<td>Skills 插件系统</td>
+<td>CLI + Skills + Extensions 生态</td>
+</tr>
+<tr>
+<td><strong>核心理念</strong></td>
+<td><strong>流程至上</strong> - 强制 TDD、强制审查</td>
+<td><strong>规范至上</strong> - spec 成为可执行文档</td>
+</tr>
+<tr>
+<td><strong>安装方式</strong></td>
+<td><code>/plugin install</code></td>
+<td><code>uv tool install specify-cli</code></td>
+</tr>
+<tr>
+<td><strong>项目宪法</strong></td>
+<td>无</td>
+<td><code>/speckit.constitution</code> 创建</td>
+</tr>
+<tr>
+<td><strong>产出文件</strong></td>
+<td>动态生成</td>
+<td>固定：spec.md, plan.md, tasks.md</td>
+</tr>
+<tr>
+<td><strong>TDD</strong></td>
+<td><strong>强制</strong> RED-GREEN-REFACTOR</td>
+<td>推荐但不强制</td>
+</tr>
+<tr>
+<td><strong>Git Worktree</strong></td>
+<td>自动创建</td>
+<td>无内置</td>
+</tr>
+<tr>
+<td><strong>子代理执行</strong></td>
+<td><strong>内置</strong> subagent-driven</td>
+<td>通过扩展实现</td>
+</tr>
+<tr>
+<td><strong>可视化 UI</strong></td>
+<td>无</td>
+<td>VS Code 扩展支持</td>
+</tr>
+<tr>
+<td><strong>外部集成</strong></td>
+<td>有限</td>
+<td>Jira、Azure DevOps、Linear 等 40+ 扩展</td>
+</tr>
+</tbody></table>
+<h3 id="6-2-核心哲学差异"><a href="#6-2-核心哲学差异" class="headerlink" title="6.2 核心哲学差异"></a>6.2 核心哲学差异</h3><p><strong>Superpowers：流程至上</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">核心理念：&quot;让 AI 不犯错误&quot;</span><br><span class="line"></span><br><span class="line">方式：强制工程流程</span><br><span class="line">- 不写测试就不能写代码</span><br><span class="line">- 不审查就不能继续</span><br><span class="line">- 不隔离就不能开发</span><br><span class="line"></span><br><span class="line">适合：个人开发者、追求代码质量</span><br></pre></td></tr></table></figure>
+
+<p><strong>SpecKit：规范至上</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">核心理念：&quot;让规范成为第一性原理&quot;</span><br><span class="line"></span><br><span class="line">方式：规范可执行</span><br><span class="line">- spec.md 直接生成代码</span><br><span class="line">- 规范是&quot;活的&quot;，不是文档</span><br><span class="line">- 专注于&quot;做什么&quot;，而非&quot;怎么做&quot;</span><br><span class="line"></span><br><span class="line">适合：团队协作、需要外部集成</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-3-工作流对比"><a href="#6-3-工作流对比" class="headerlink" title="6.3 工作流对比"></a>6.3 工作流对比</h3><p><strong>Superpowers 流程：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">需求 → 头脑风暴 → Worktree → 计划 → 子代理执行 → TDD → 审查 → 完成分支</span><br><span class="line">       ↑          ↑          ↑           ↑         ↑      ↑</span><br><span class="line">     问清楚     隔离环境   拆任务      自动执行    强制   质量保证</span><br></pre></td></tr></table></figure>
+
+<p><strong>SpecKit 流程：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">宪法 → Specify → Plan → Tasks → Implement</span><br><span class="line"> ↑      ↑        ↑       ↑        ↑</span><br><span class="line">原则   需求     技术    任务     执行</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-4-SpecKit-的独特优势"><a href="#6-4-SpecKit-的独特优势" class="headerlink" title="6.4 SpecKit 的独特优势"></a>6.4 SpecKit 的独特优势</h3><p><strong>1. 项目宪法</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 定义项目原则</span></span><br><span class="line">/speckit.constitution Create principles focused on:</span><br><span class="line">- Code quality: clean code, no duplication</span><br><span class="line">- Testing: unit tests required <span class="keyword">for</span> all logic</span><br><span class="line">- Performance: response time &lt; 200ms</span><br></pre></td></tr></table></figure>
+
+<p>这会生成一个”宪法文件”，指导所有后续开发。</p>
+<p><strong>2. 丰富的扩展生态</strong></p>
+<table>
+<thead>
+<tr>
+<th>扩展</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>spec-kit-jira</code></td>
+<td>同步到 Jira</td>
+</tr>
+<tr>
+<td><code>spec-kit-review</code></td>
+<td>代码审查</td>
+</tr>
+<tr>
+<td><code>spec-kit-qa</code></td>
+<td>QA 测试</td>
+</tr>
+<tr>
+<td><code>spec-kit-ship</code></td>
+<td>自动发布</td>
+</tr>
+<tr>
+<td><code>superpowers-bridge</code></td>
+<td><strong>将 Superpowers 集成到 SpecKit！</strong></td>
+</tr>
+</tbody></table>
+<p><strong>3. 预设系统</strong></p>
+<p>可以自定义术语和模板：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"name"</span>: <span class="string">"pirate-speak"</span>,</span><br><span class="line">  <span class="attr">"templates"</span>: &#123;</span><br><span class="line">    <span class="attr">"spec.md"</span>: <span class="string">"Voyage Manifest"</span>,</span><br><span class="line">    <span class="attr">"plan.md"</span>: <span class="string">"Battle Plan"</span>,</span><br><span class="line">    <span class="attr">"tasks.md"</span>: <span class="string">"Crew Assignments"</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-5-Superpowers-的独特优势"><a href="#6-5-Superpowers-的独特优势" class="headerlink" title="6.5 Superpowers 的独特优势"></a>6.5 Superpowers 的独特优势</h3><p><strong>1. 强制 TDD</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">这是最大的区别。</span><br><span class="line">SpecKit 推荐 TDD，但 Superpowers 强制 TDD。</span><br><span class="line">如果你先写代码再写测试，代码会被删除。</span><br></pre></td></tr></table></figure>
+
+<p><strong>2. Git Worktree 隔离</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">每个功能在独立目录开发：</span><br><span class="line">- 不影响主项目</span><br><span class="line">- 可以并行开发多个功能</span><br><span class="line">- 回滚简单（删除 worktree 即可）</span><br></pre></td></tr></table></figure>
+
+<p><strong>3. 子代理驱动</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">每个任务派发新的子代理：</span><br><span class="line">- 无上下文污染</span><br><span class="line">- 主代理审查质量</span><br><span class="line">- 可连续自主工作数小时</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-6-可以一起用吗？"><a href="#6-6-可以一起用吗？" class="headerlink" title="6.6 可以一起用吗？"></a>6.6 可以一起用吗？</h3><p><strong>可以！</strong> 社区已经创建了 <code>superpowers-bridge</code> 扩展：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在 SpecKit 项目中安装</span></span><br><span class="line">uv tool install specify-cli --from git+https://github.com/github/spec-kit.git</span><br><span class="line"></span><br><span class="line"><span class="comment"># 安装 superpowers-bridge 扩展</span></span><br><span class="line"><span class="comment"># (详见扩展文档)</span></span><br></pre></td></tr></table></figure>
+
+<p>这样你可以：</p>
+<ul>
+<li>用 SpecKit 管理规范和外部集成</li>
+<li>用 Superpowers 的 TDD、Worktree、子代理执行</li>
+</ul>
+<hr>
+<h2 id="七、最佳实践与适用场景"><a href="#七、最佳实践与适用场景" class="headerlink" title="七、最佳实践与适用场景"></a>七、最佳实践与适用场景</h2><h3 id="7-1-适用场景建议"><a href="#7-1-适用场景建议" class="headerlink" title="7.1 适用场景建议"></a>7.1 适用场景建议</h3><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>推荐</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>个人开发者，追求代码质量</strong></td>
+<td>Superpowers</td>
+</tr>
+<tr>
+<td><strong>企业团队，需要外部集成</strong></td>
+<td>SpecKit</td>
+</tr>
+<tr>
+<td><strong>已有完善规范流程</strong></td>
+<td>SpecKit（可定制扩展）</td>
+</tr>
+<tr>
+<td><strong>需要长时间自主运行</strong></td>
+<td>Superpowers（子代理可工作数小时）</td>
+</tr>
+<tr>
+<td><strong>多功能并行开发</strong></td>
+<td>Superpowers（Git Worktree）</td>
+</tr>
+<tr>
+<td><strong>两者都需要</strong></td>
+<td>SpecKit + superpowers-bridge</td>
+</tr>
+</tbody></table>
+<h3 id="7-2-使用-Superpowers-的建议"><a href="#7-2-使用-Superpowers-的建议" class="headerlink" title="7.2 使用 Superpowers 的建议"></a>7.2 使用 Superpowers 的建议</h3><p><strong>建议 1：让 AI 问清楚再开始</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">不要急着说&quot;开始写代码&quot;</span><br><span class="line">等 AI 完成头脑风暴</span><br><span class="line">仔细阅读设计文档</span><br><span class="line">确认后再说&quot;开始实现&quot;</span><br></pre></td></tr></table></figure>
+
+<p><strong>建议 2：任务粒度要小</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">好的任务：2-5 分钟，一个文件</span><br><span class="line">不好的任务：&quot;实现整个评论功能&quot;</span><br><span class="line"></span><br><span class="line">小任务的好处：</span><br><span class="line">- 更容易审查</span><br><span class="line">- 更容易回滚</span><br><span class="line">- 更容易并行</span><br></pre></td></tr></table></figure>
+
+<p><strong>建议 3：关注审查报告</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">不要忽略审查报告中的警告</span><br><span class="line">即使是&quot;建议优化&quot;</span><br><span class="line">让 AI 修复后再继续</span><br></pre></td></tr></table></figure>
+
+<p><strong>建议 4：并行开发时用 Worktree</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">如果你要同时开发 3 个功能：</span><br><span class="line">功能 A → 让 AI 创建 worktree&#x2F;feature-a</span><br><span class="line">功能 B → 让 AI 创建 worktree&#x2F;feature-b</span><br><span class="line">功能 C → 让 AI 创建 worktree&#x2F;feature-c</span><br><span class="line"></span><br><span class="line">完全隔离，不会冲突</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-3-使用-SpecKit-的建议"><a href="#7-3-使用-SpecKit-的建议" class="headerlink" title="7.3 使用 SpecKit 的建议"></a>7.3 使用 SpecKit 的建议</h3><p><strong>建议 1：先写宪法</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/speckit.constitution Define project principles first</span><br></pre></td></tr></table></figure>
+
+<p>宪法会指导所有后续开发，相当于”项目宪法”。</p>
+<p><strong>建议 2：选择合适的扩展</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">需要 Jira 集成？→ spec-kit-jira</span><br><span class="line">需要代码审查？→ spec-kit-review</span><br><span class="line">需要自动发布？→ spec-kit-ship</span><br></pre></td></tr></table></figure>
+
+<p><strong>建议 3：利用社区预设</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">不想自己配置？</span><br><span class="line">用社区预设：</span><br><span class="line">- Agent Teams Lite（多代理）</span><br><span class="line">- Pirate Speak（有趣模板）</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="八、常见问题"><a href="#八、常见问题" class="headerlink" title="八、常见问题"></a>八、常见问题</h2><h3 id="Q1-Superpowers-和-SpecKit-可以同时用吗？"><a href="#Q1-Superpowers-和-SpecKit-可以同时用吗？" class="headerlink" title="Q1: Superpowers 和 SpecKit 可以同时用吗？"></a>Q1: Superpowers 和 SpecKit 可以同时用吗？</h3><p><strong>可以。</strong> 安装 <code>superpowers-bridge</code> 扩展即可。</p>
+<h3 id="Q2-Superpowers-会让我写代码变慢吗？"><a href="#Q2-Superpowers-会让我写代码变慢吗？" class="headerlink" title="Q2: Superpowers 会让我写代码变慢吗？"></a>Q2: Superpowers 会让我写代码变慢吗？</h3><p><strong>短期内可能变慢（因为要先规划、先写测试），但长期会更快（因为减少返工）。</strong></p>
+<h3 id="Q3-子代理执行安全吗？"><a href="#Q3-子代理执行安全吗？" class="headerlink" title="Q3: 子代理执行安全吗？"></a>Q3: 子代理执行安全吗？</h3><p><strong>安全。</strong> 子代理在隔离环境中执行，主代理审查结果。</p>
+<h3 id="Q4-Git-Worktree-会占用很多磁盘空间吗？"><a href="#Q4-Git-Worktree-会占用很多磁盘空间吗？" class="headerlink" title="Q4: Git Worktree 会占用很多磁盘空间吗？"></a>Q4: Git Worktree 会占用很多磁盘空间吗？</h3><p><strong>会占用一些，但完成后会自动清理。</strong> 你也可以手动清理：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git worktree list</span><br><span class="line">git worktree remove &lt;path&gt;</span><br></pre></td></tr></table></figure>
+
+<h3 id="Q5-SpecKit-的扩展稳定吗？"><a href="#Q5-SpecKit-的扩展稳定吗？" class="headerlink" title="Q5: SpecKit 的扩展稳定吗？"></a>Q5: SpecKit 的扩展稳定吗？</h3><p><strong>社区扩展由独立开发者维护，GitHub 官方不审核。</strong> 使用前建议查看源代码。</p>
+<hr>
+<h2 id="九、总结"><a href="#九、总结" class="headerlink" title="九、总结"></a>九、总结</h2><h3 id="核心要点"><a href="#核心要点" class="headerlink" title="核心要点"></a>核心要点</h3><ol>
+<li><strong>Superpowers 是流程管家</strong>：让 AI 遵循严格的工程流程</li>
+<li><strong>核心流程</strong>：头脑风暴 → Worktree → 计划 → 子代理 → TDD → 审查 → 完成</li>
+<li><strong>强制 TDD</strong>：不写测试就不能写代码</li>
+<li><strong>Git Worktree</strong>：每个功能在独立目录开发</li>
+<li><strong>子代理执行</strong>：每个任务派发新的子代理，主代理审查</li>
+</ol>
+<h3 id="与-SpecKit-的核心区别"><a href="#与-SpecKit-的核心区别" class="headerlink" title="与 SpecKit 的核心区别"></a>与 SpecKit 的核心区别</h3><table>
+<thead>
+<tr>
+<th>方面</th>
+<th>Superpowers</th>
+<th>SpecKit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>理念</strong></td>
+<td>流程至上</td>
+<td>规范至上</td>
+</tr>
+<tr>
+<td><strong>TDD</strong></td>
+<td>强制</td>
+<td>推荐</td>
+</tr>
+<tr>
+<td><strong>Worktree</strong></td>
+<td>自动</td>
+<td>无内置</td>
+</tr>
+<tr>
+<td><strong>子代理</strong></td>
+<td>内置</td>
+<td>通过扩展</td>
+</tr>
+<tr>
+<td><strong>生态</strong></td>
+<td>单一技能库</td>
+<td>40+ 扩展</td>
+</tr>
+</tbody></table>
+<h3 id="选择建议"><a href="#选择建议" class="headerlink" title="选择建议"></a>选择建议</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">追求代码质量、个人开发 → Superpowers</span><br><span class="line">团队协作、外部集成     → SpecKit</span><br><span class="line">两者都需要             → SpecKit + superpowers-bridge</span><br></pre></td></tr></table></figure>
+
+<h3 id="学习路径"><a href="#学习路径" class="headerlink" title="学习路径"></a>学习路径</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">第 1 天：安装 Superpowers，体验头脑风暴</span><br><span class="line">第 2 天：完整走一遍流程，感受 TDD</span><br><span class="line">第 3 天：尝试并行开发（Worktree）</span><br><span class="line">第 4 天：对比 SpecKit，选择适合你的</span><br><span class="line">第 5 天：深入使用，定制你的工作流</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://github.com/obra/superpowers" target="_blank" rel="noopener">GitHub - obra/superpowers</a></li>
+<li><a href="https://github.com/github/spec-kit" target="_blank" rel="noopener">GitHub - github/spec-kit</a></li>
+<li><a href="https://blog.fsck.com/2025/10/09/superpowers/" target="_blank" rel="noopener">Superpowers 博客介绍</a></li>
+<li><a href="https://github.github.io/spec-kit/" target="_blank" rel="noopener">Spec Kit 文档</a></li>
+<li><a href="https://github.com/RbBtSn0w/spec-kit-extensions/tree/main/superpowers-bridge" target="_blank" rel="noopener">superpowers-bridge 扩展</a></li>
+<li><a href="https://discord.gg/Jd8Vphy9jq" target="_blank" rel="noopener">Discord 社区</a></li>
+</ul>
+<hr>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/AI-%E5%B7%A5%E5%85%B7/" rel="tag"><i class="fa fa-tag"></i> AI 工具</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/02/10/crewai-guide/" rel="prev" title="CrewAI 入门实战：从零构建多 Agent 协作系统">
+      <i class="fa fa-chevron-left"></i> CrewAI 入门实战：从零构建多 Agent 协作系统
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/04/01/chrome-devtools-mcp-guide/" rel="next" title="Chrome DevTools MCP 入门实战：让 AI 助手操控浏览器">
+      Chrome DevTools MCP 入门实战：让 AI 助手操控浏览器 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#一、写在前面：为什么需要-Superpowers？"><span class="nav-number">1.</span> <span class="nav-text">一、写在前面：为什么需要 Superpowers？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、Superpowers-是什么？"><span class="nav-number">2.</span> <span class="nav-text">二、Superpowers 是什么？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-一句话定义"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 一句话定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-核心理念"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 核心理念</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-支持的-AI-工具"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 支持的 AI 工具</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、核心工作流程详解"><span class="nav-number">3.</span> <span class="nav-text">三、核心工作流程详解</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-七步流程"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 七步流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-为什么这套流程有效？"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 为什么这套流程有效？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、安装配置实战"><span class="nav-number">4.</span> <span class="nav-text">四、安装配置实战</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-Claude-Code-安装（推荐）"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 Claude Code 安装（推荐）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-Cursor-安装"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 Cursor 安装</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-GitHub-Copilot-CLI-安装"><span class="nav-number">4.3.</span> <span class="nav-text">4.3 GitHub Copilot CLI 安装</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-Codex-CLI-手动安装"><span class="nav-number">4.4.</span> <span class="nav-text">4.4 Codex CLI 手动安装</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-Gemini-CLI-安装"><span class="nav-number">4.5.</span> <span class="nav-text">4.5 Gemini CLI 安装</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-6-更新插件"><span class="nav-number">4.6.</span> <span class="nav-text">4.6 更新插件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、使用实战：从零开始"><span class="nav-number">5.</span> <span class="nav-text">五、使用实战：从零开始</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-触发技能"><span class="nav-number">5.1.</span> <span class="nav-text">5.1 触发技能</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-头脑风暴阶段"><span class="nav-number">5.2.</span> <span class="nav-text">5.2 头脑风暴阶段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-Git-Worktree-阶段"><span class="nav-number">5.3.</span> <span class="nav-text">5.3 Git Worktree 阶段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-4-编写计划阶段"><span class="nav-number">5.4.</span> <span class="nav-text">5.4 编写计划阶段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-5-子代理执行阶段"><span class="nav-number">5.5.</span> <span class="nav-text">5.5 子代理执行阶段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-6-TDD-阶段（强制）"><span class="nav-number">5.6.</span> <span class="nav-text">5.6 TDD 阶段（强制）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-7-代码审查阶段"><span class="nav-number">5.7.</span> <span class="nav-text">5.7 代码审查阶段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-8-完成分支阶段"><span class="nav-number">5.8.</span> <span class="nav-text">5.8 完成分支阶段</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、与-GitHub-SpecKit-的对比"><span class="nav-number">6.</span> <span class="nav-text">六、与 GitHub SpecKit 的对比</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-两者是什么关系？"><span class="nav-number">6.1.</span> <span class="nav-text">6.1 两者是什么关系？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-核心哲学差异"><span class="nav-number">6.2.</span> <span class="nav-text">6.2 核心哲学差异</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-工作流对比"><span class="nav-number">6.3.</span> <span class="nav-text">6.3 工作流对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-4-SpecKit-的独特优势"><span class="nav-number">6.4.</span> <span class="nav-text">6.4 SpecKit 的独特优势</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-5-Superpowers-的独特优势"><span class="nav-number">6.5.</span> <span class="nav-text">6.5 Superpowers 的独特优势</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-6-可以一起用吗？"><span class="nav-number">6.6.</span> <span class="nav-text">6.6 可以一起用吗？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、最佳实践与适用场景"><span class="nav-number">7.</span> <span class="nav-text">七、最佳实践与适用场景</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-适用场景建议"><span class="nav-number">7.1.</span> <span class="nav-text">7.1 适用场景建议</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-2-使用-Superpowers-的建议"><span class="nav-number">7.2.</span> <span class="nav-text">7.2 使用 Superpowers 的建议</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-3-使用-SpecKit-的建议"><span class="nav-number">7.3.</span> <span class="nav-text">7.3 使用 SpecKit 的建议</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、常见问题"><span class="nav-number">8.</span> <span class="nav-text">八、常见问题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Q1-Superpowers-和-SpecKit-可以同时用吗？"><span class="nav-number">8.1.</span> <span class="nav-text">Q1: Superpowers 和 SpecKit 可以同时用吗？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Q2-Superpowers-会让我写代码变慢吗？"><span class="nav-number">8.2.</span> <span class="nav-text">Q2: Superpowers 会让我写代码变慢吗？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Q3-子代理执行安全吗？"><span class="nav-number">8.3.</span> <span class="nav-text">Q3: 子代理执行安全吗？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Q4-Git-Worktree-会占用很多磁盘空间吗？"><span class="nav-number">8.4.</span> <span class="nav-text">Q4: Git Worktree 会占用很多磁盘空间吗？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Q5-SpecKit-的扩展稳定吗？"><span class="nav-number">8.5.</span> <span class="nav-text">Q5: SpecKit 的扩展稳定吗？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#九、总结"><span class="nav-number">9.</span> <span class="nav-text">九、总结</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#核心要点"><span class="nav-number">9.1.</span> <span class="nav-text">核心要点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#与-SpecKit-的核心区别"><span class="nav-number">9.2.</span> <span class="nav-text">与 SpecKit 的核心区别</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#选择建议"><span class="nav-number">9.3.</span> <span class="nav-text">选择建议</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#学习路径"><span class="nav-number">9.4.</span> <span class="nav-text">学习路径</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考资料"><span class="nav-number">10.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">46</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">8</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">21</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>
