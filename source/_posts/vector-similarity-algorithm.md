@@ -3,6 +3,7 @@ title: 向量相似度计算：从数学原理到算法实现
 date: 2025-06-30
 tags: 向量检索
 categories: AI
+mathjax: true
 ---
 
 ## 写在前面
