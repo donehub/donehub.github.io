@@ -2747,6 +2747,1004 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2025/06/30/vector-similarity-algorithm/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/06/30/vector-similarity-algorithm/" class="post-title-link" itemprop="url">向量相似度计算：从数学原理到算法实现</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-06-30 00:00:00" itemprop="dateCreated datePublished" datetime="2025-06-30T00:00:00+08:00">2025-06-30</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-04 18:04:17" itemprop="dateModified" datetime="2026-04-04T18:04:17+08:00">2026-04-04</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2025/06/30/vector-similarity-algorithm/" class="post-meta-item leancloud_visitors" data-flag-title="向量相似度计算：从数学原理到算法实现" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2025/06/30/vector-similarity-algorithm/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2025/06/30/vector-similarity-algorithm/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h2><p>向量数据库的核心问题只有一个：<strong>给定一个查询向量，如何快速找出数据库中最相似的 K 个向量？</strong></p>
+<p>这个问题看似简单，实则涉及数学、算法、工程三个层面。数学层面是相似度度量，算法层面是近似最近邻搜索（ANN），工程层面是索引结构与存储优化。</p>
+<p>这篇文章从研究角度切入，深入剖析相似度计算的数学原理和核心算法，不谈产品选型，只谈技术本质。</p>
+<hr>
+<h2 id="一、相似度度量：三种主流方法"><a href="#一、相似度度量：三种主流方法" class="headerlink" title="一、相似度度量：三种主流方法"></a>一、相似度度量：三种主流方法</h2><h3 id="1-余弦相似度（Cosine-Similarity）"><a href="#1-余弦相似度（Cosine-Similarity）" class="headerlink" title="1. 余弦相似度（Cosine Similarity）"></a>1. 余弦相似度（Cosine Similarity）</h3><p><strong>定义</strong>：两个向量夹角的余弦值。</p>
+<p>$$<br>\cos(\theta) = \frac{\vec{A} \cdot \vec{B}}{|\vec{A}| \times |\vec{B}|} = \frac{\sum_{i=1}^{n} A_i B_i}{\sqrt{\sum_{i=1}^{n} A_i^2} \times \sqrt{\sum_{i=1}^{n} B_i^2}}<br>$$</p>
+<p><strong>特点</strong>：</p>
+<ul>
+<li>值域 [-1, 1]，1 表示方向完全相同，-1 表示方向相反</li>
+<li>只关注方向，忽略向量长度（magnitude）</li>
+<li>对向量长度不敏感，适合文本语义相似度</li>
+</ul>
+<p><strong>为什么文本向量用余弦</strong>：Embedding 模型输出的向量长度（norm）本身就蕴含信息，但语义相似度主要看方向。两篇文章讨论同一话题，即使篇幅不同（向量长度不同），方向应该相近。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">cosine_similarity</span><span class="params">(a, b)</span>:</span></span><br><span class="line">    <span class="string">"""余弦相似度计算"""</span></span><br><span class="line">    dot_product = np.dot(a, b)</span><br><span class="line">    norm_a = np.linalg.norm(a)</span><br><span class="line">    norm_b = np.linalg.norm(b)</span><br><span class="line">    <span class="keyword">return</span> dot_product / (norm_a * norm_b)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 示例</span></span><br><span class="line">a = np.array([<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>])</span><br><span class="line">b = np.array([<span class="number">2</span>, <span class="number">4</span>, <span class="number">6</span>])  <span class="comment"># b = 2a，方向完全相同</span></span><br><span class="line"></span><br><span class="line">print(cosine_similarity(a, b))  <span class="comment"># 输出 1.0</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>计算复杂度</strong>：O(d)，d 为向量维度。</p>
+<h3 id="2-欧氏距离（Euclidean-Distance）"><a href="#2-欧氏距离（Euclidean-Distance）" class="headerlink" title="2. 欧氏距离（Euclidean Distance）"></a>2. 欧氏距离（Euclidean Distance）</h3><p><strong>定义</strong>：两个向量在欧氏空间中的直线距离。</p>
+<p>$$<br>d_{L2}(\vec{A}, \vec{B}) = \sqrt{\sum_{i=1}^{n} (A_i - B_i)^2}<br>$$</p>
+<p><strong>特点</strong>：</p>
+<ul>
+<li>值域 [0, ∞)，越小越相似</li>
+<li>同时考虑方向和长度</li>
+<li>适合图像特征、物理坐标等绝对距离有意义的场景</li>
+</ul>
+<p><strong>与余弦的关系</strong>：对归一化向量，欧氏距离和余弦相似度有单调关系：</p>
+<p>$$<br>d_{L2} = \sqrt{2(1 - \cos(\theta))}<br>$$</p>
+<p>证明：设 $\vec{A}$ 和 $\vec{B}$ 均归一化（$|\vec{A}| = |\vec{B}| = 1$），则：</p>
+<p>$$<br>|\vec{A} - \vec{B}|^2 = |\vec{A}|^2 + |\vec{B}|^2 - 2\vec{A}\cdot\vec{B} = 2 - 2\cos(\theta)<br>$$</p>
+<p><strong>结论</strong>：如果向量已归一化，用 L2 或余弦结果一致。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">euclidean_distance</span><span class="params">(a, b)</span>:</span></span><br><span class="line">    <span class="string">"""欧氏距离计算"""</span></span><br><span class="line">    <span class="keyword">return</span> np.sqrt(np.sum((a - b) ** <span class="number">2</span>))</span><br><span class="line"></span><br><span class="line"><span class="comment"># 归一化后与余弦的关系</span></span><br><span class="line">a_norm = a / np.linalg.norm(a)</span><br><span class="line">b_norm = b / np.linalg.norm(b)</span><br><span class="line"></span><br><span class="line">d = euclidean_distance(a_norm, b_norm)</span><br><span class="line">cos = cosine_similarity(a_norm, b_norm)</span><br><span class="line"></span><br><span class="line">print(np.sqrt(<span class="number">2</span> * (<span class="number">1</span> - cos)))  <span class="comment"># 与 d 相等</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="3-内积（Inner-Product-Dot-Product）"><a href="#3-内积（Inner-Product-Dot-Product）" class="headerlink" title="3. 内积（Inner Product / Dot Product）"></a>3. 内积（Inner Product / Dot Product）</h3><p><strong>定义</strong>：两个向量对应分量乘积之和。</p>
+<p>$$<br>\vec{A} \cdot \vec{B} = \sum_{i=1}^{n} A_i B_i<br>$$</p>
+<p><strong>特点</strong>：</p>
+<ul>
+<li>值域取决于向量，无固定范围</li>
+<li>计算最快，无需计算 norm</li>
+<li>要求向量归一化，否则结果不可比</li>
+</ul>
+<p><strong>为什么内积最快</strong>：省去了 norm 计算（两遍向量遍历），只需一遍遍历。在大规模检索中，这个差异很显著。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">dot_product</span><span class="params">(a, b)</span>:</span></span><br><span class="line">    <span class="string">"""内积计算"""</span></span><br><span class="line">    <span class="keyword">return</span> np.dot(a, b)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 归一化向量：内积 = 余弦相似度</span></span><br><span class="line">a_norm = a / np.linalg.norm(a)</span><br><span class="line">b_norm = b / np.linalg.norm(b)</span><br><span class="line"></span><br><span class="line">print(dot_product(a_norm, b_norm))  <span class="comment"># 与 cosine_similarity 相等</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="4-三种度量对比"><a href="#4-三种度量对比" class="headerlink" title="4. 三种度量对比"></a>4. 三种度量对比</h3><table>
+<thead>
+<tr>
+<th>度量方法</th>
+<th>公式复杂度</th>
+<th>值域</th>
+<th>计算速度</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>余弦相似度</td>
+<td>O(d) + norm</td>
+<td>[-1, 1]</td>
+<td>中等</td>
+<td>文本语义、方向敏感</td>
+</tr>
+<tr>
+<td>欧氏距离</td>
+<td>O(d)</td>
+<td>[0, ∞)</td>
+<td>中等</td>
+<td>图像特征、物理位置</td>
+</tr>
+<tr>
+<td>内积</td>
+<td>O(d)</td>
+<td>不固定</td>
+<td>最快</td>
+<td>归一化向量、追求速度</td>
+</tr>
+</tbody></table>
+<p><strong>工程选择</strong>：</p>
+<ul>
+<li>文本向量默认归一化 → 内积或余弦，推荐内积（快）</li>
+<li>未归一化向量 → 余弦或 L2</li>
+<li>物理坐标、图像特征 → L2</li>
+</ul>
+<hr>
+<h2 id="二、精确搜索-vs-近似搜索"><a href="#二、精确搜索-vs-近似搜索" class="headerlink" title="二、精确搜索 vs 近似搜索"></a>二、精确搜索 vs 近似搜索</h2><h3 id="1-暴力搜索（FLAT）"><a href="#1-暴力搜索（FLAT）" class="headerlink" title="1. 暴力搜索（FLAT）"></a>1. 暴力搜索（FLAT）</h3><p>遍历所有向量，逐一计算相似度，排序取 Top-K。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">brute_force_search</span><span class="params">(query, database, k=<span class="number">10</span>)</span>:</span></span><br><span class="line">    <span class="string">"""暴力搜索"""</span></span><br><span class="line">    <span class="comment"># 计算所有相似度</span></span><br><span class="line">    similarities = [cosine_similarity(query, vec) <span class="keyword">for</span> vec <span class="keyword">in</span> database]</span><br><span class="line">    <span class="comment"># 排序取 Top-K</span></span><br><span class="line">    indices = np.argsort(similarities)[-k:]</span><br><span class="line">    <span class="keyword">return</span> indices, [similarities[i] <span class="keyword">for</span> i <span class="keyword">in</span> indices]</span><br></pre></td></tr></table></figure>
+
+<p><strong>复杂度分析</strong>：</p>
+<ul>
+<li>时间：O(N × d)，N 为向量数，d 为维度</li>
+<li>空间：O(1)，无需额外索引</li>
+</ul>
+<p><strong>问题</strong>：N 达到百万级时，单次查询耗时秒级，无法满足实时需求。</p>
+<h3 id="2-维度灾难（Curse-of-Dimensionality）"><a href="#2-维度灾难（Curse-of-Dimensionality）" class="headerlink" title="2. 维度灾难（Curse of Dimensionality）"></a>2. 维度灾难（Curse of Dimensionality）</h3><p>高维空间的几何特性与低维截然不同：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>特性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2D/3D</td>
+<td>距离有意义，近邻真的”近”</td>
+</tr>
+<tr>
+<td>高维（&gt;100）</td>
+<td>所有向量距离趋于均匀，近邻与远邻差距缩小</td>
+</tr>
+</tbody></table>
+<p><strong>定量分析</strong>：在 d 维超立方体中，随机两点距离的方差：</p>
+<p>$$<br>\text{Var}(d) \approx \frac{d}{12}<br>$$</p>
+<p>随着 d 增加，距离分布趋于集中，”最近”和”最远”的区分度下降。</p>
+<p><strong>结论</strong>：高维空间中，精确找到最近邻代价极高，但”足够近”的近似最近邻（ANN）足够好——这是 ANN 算法的理论基础。</p>
+<hr>
+<h2 id="三、ANN-算法：核心思想与分类"><a href="#三、ANN-算法：核心思想与分类" class="headerlink" title="三、ANN 算法：核心思想与分类"></a>三、ANN 算法：核心思想与分类</h2><p>ANN（Approximate Nearest Neighbor）牺牲少量精度换取大幅提升的速度。核心思想：<strong>构建索引结构，搜索时只考察部分候选，而非全量遍历</strong>。</p>
+<h3 id="算法分类"><a href="#算法分类" class="headerlink" title="算法分类"></a>算法分类</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">ANN 算法家族</span><br><span class="line">├── 基于树（Tree-based）</span><br><span class="line">│   ├── KD-Tree：低维有效，高维失效</span><br><span class="line">│   ├── Ball Tree：球形划分，中等维度</span><br><span class="line">│   └── Annoy（Spotify）：多棵随机投影树</span><br><span class="line">│</span><br><span class="line">├── 基于图（Graph-based）</span><br><span class="line">│   ├── NSW：可导航小世界图</span><br><span class="line">│   ├── HNSW：分层 NSW，当前最优</span><br><span class="line">│   └── NGT&#x2F;ONNG：日本 Yahoo 开源</span><br><span class="line">│</span><br><span class="line">├── 基于量化（Quantization-based）</span><br><span class="line">│   ├── PQ：乘积量化，压缩向量</span><br><span class="line">│   ├── OPQ：优化乘积量化</span><br><span class="line">│   └── ScaNN：Google 开源，量化+重排</span><br><span class="line">│</span><br><span class="line">├── 基于哈希（Hash-based）</span><br><span class="line">│   ├── LSH：局部敏感哈希</span><br><span class="line">│   └── Multi-probe LSH：改进版</span><br><span class="line">│</span><br><span class="line">└── 基于聚类（Clustering-based）</span><br><span class="line">    ├── IVF：倒排文件索引</span><br><span class="line">    └── IVF-PQ：倒排+量化组合</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="四、HNSW：当前最优的图索引算法"><a href="#四、HNSW：当前最优的图索引算法" class="headerlink" title="四、HNSW：当前最优的图索引算法"></a>四、HNSW：当前最优的图索引算法</h2><h3 id="1-核心思想"><a href="#1-核心思想" class="headerlink" title="1. 核心思想"></a>1. 核心思想</h3><p>HNSW（Hierarchical Navigable Small World）由 Malkov 等人在 2016 年提出，是当前最主流的 ANN 算法。</p>
+<p><strong>灵感来源</strong>：跳表（Skip List）。跳表通过多层索引实现 O(log N) 查找，HNSW 将这个思想移植到图结构。</p>
+<p><strong>结构设计</strong>：</p>
+<ul>
+<li>多层图，上层稀疏，下层密集</li>
+<li>搜索从顶层开始，逐层向下逼近</li>
+<li>每层内节点通过边连接，边代表”邻居关系”</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">层级结构示意：</span><br><span class="line"></span><br><span class="line">Layer 2 (最高层，概率 p²)：    ●───────●</span><br><span class="line">                                 │       │</span><br><span class="line">Layer 1 (概率 p¹)：        ●───●───●───●</span><br><span class="line">                           │   │   │   │</span><br><span class="line">Layer 0 (全量节点)：    ●─●─●─●─●─●─●─●─●─●─●</span><br><span class="line">                      (每个节点都在 Layer 0)</span><br><span class="line"></span><br><span class="line">节点进入高层概率：p^l &#x3D; 1 &#x2F; (ln(M) × M^(level))</span><br><span class="line">高层节点数 ≈ N &#x2F; (ln M × M^level)</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-构建算法"><a href="#2-构建算法" class="headerlink" title="2. 构建算法"></a>2. 构建算法</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">算法：INSERT(element, hnsw)</span><br><span class="line">输入：新元素 q，HNSW 图</span><br><span class="line">输出：更新后的 HNSW 图</span><br><span class="line"></span><br><span class="line">1. 确定插入层数 l &#x3D; floor(-ln(uniform(0,1)) × mL)</span><br><span class="line">2. 从顶层 entry point 开始，贪心搜索到 l 层的入口</span><br><span class="line">3. 从 l 层向下到 0 层，每层：</span><br><span class="line">   a. 在当前层搜索 efConstruction 个最近邻候选</span><br><span class="line">   b. 从候选中选择 M 个最近邻连接</span><br><span class="line">   c. 处理连接边：保持每节点最大 M 条边</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键参数</strong>：</p>
+<ul>
+<li><strong>M</strong>：每节点最大连接数（默认 16）</li>
+<li><strong>efConstruction</strong>：构建时搜索宽度（默认 200）</li>
+<li><strong>mL</strong>：层数乘数，通常取 $1/\ln M$</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># HNSW 构建伪代码</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">insert</span><span class="params">(q, hnsw, M=<span class="number">16</span>, ef_construction=<span class="number">200</span>, mL=<span class="number">1</span>/np.log<span class="params">(<span class="number">16</span>)</span>)</span>:</span></span><br><span class="line">    <span class="comment"># 1. 确定插入层数</span></span><br><span class="line">    level = int(-np.log(np.random.random()) * mL)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 2. 从顶层搜索到 level 层的入口</span></span><br><span class="line">    entry = hnsw.entry_point</span><br><span class="line">    <span class="keyword">for</span> l <span class="keyword">in</span> range(hnsw.max_level, level + <span class="number">1</span>):</span><br><span class="line">        entry = greedy_search(q, entry, ef=<span class="number">1</span>, layer=l)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 3. 从 level 层向下插入</span></span><br><span class="line">    <span class="keyword">for</span> l <span class="keyword">in</span> range(level, <span class="number">-1</span>, <span class="number">-1</span>):</span><br><span class="line">        candidates = search_layer(q, entry, ef_construction, l)</span><br><span class="line">        neighbors = select_neighbors(q, candidates, M)</span><br><span class="line">        connect(q, neighbors, l)</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-搜索算法"><a href="#3-搜索算法" class="headerlink" title="3. 搜索算法"></a>3. 搜索算法</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">算法：SEARCH(query, hnsw, ef, K)</span><br><span class="line">输入：查询向量 q，HNSW 图，搜索宽度 ef，返回数量 K</span><br><span class="line">输出：K 个最近邻</span><br><span class="line"></span><br><span class="line">1. 从顶层 entry point 开始</span><br><span class="line">2. 逐层向下贪心搜索：</span><br><span class="line">   - 在当前层找最近的节点作为下一层入口</span><br><span class="line">3. 到达 Layer 0 后，搜索 ef 个候选</span><br><span class="line">4. 从候选中取 Top-K 返回</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">search</span><span class="params">(q, hnsw, ef=<span class="number">50</span>, k=<span class="number">10</span>)</span>:</span></span><br><span class="line">    entry = hnsw.entry_point</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 从顶层贪心向下</span></span><br><span class="line">    <span class="keyword">for</span> l <span class="keyword">in</span> range(hnsw.max_level, <span class="number">0</span>):</span><br><span class="line">        entry = greedy_search_layer(q, entry, ef=<span class="number">1</span>, layer=l)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Layer 0：扩展搜索</span></span><br><span class="line">    candidates = search_layer(q, entry, ef, layer=<span class="number">0</span>)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 返回 Top-K</span></span><br><span class="line">    <span class="keyword">return</span> sorted(candidates, key=<span class="keyword">lambda</span> x: x.distance)[:k]</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-参数调优指南"><a href="#4-参数调优指南" class="headerlink" title="4. 参数调优指南"></a>4. 参数调优指南</h3><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>影响</th>
+<th>调优建议</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>M ↑</td>
+<td>精度↑，内存↑，构建时间↑</td>
+<td>16-32 是平衡点</td>
+</tr>
+<tr>
+<td>efConstruction ↑</td>
+<td>构建质量↑，构建时间↑</td>
+<td>200-400 足够</td>
+</tr>
+<tr>
+<td>ef ↑</td>
+<td>召回率↑，查询延迟↑</td>
+<td>动态调整：在线查询用 50-100</td>
+</tr>
+</tbody></table>
+<p><strong>召回率与延迟权衡</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">ef 值      召回率      延迟</span><br><span class="line">─────────────────────────────</span><br><span class="line">10         70%         1ms</span><br><span class="line">50         95%         5ms</span><br><span class="line">100        98%         10ms</span><br><span class="line">200        99.5%       20ms</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="五、IVF：倒排文件索引"><a href="#五、IVF：倒排文件索引" class="headerlink" title="五、IVF：倒排文件索引"></a>五、IVF：倒排文件索引</h2><h3 id="1-核心思想-1"><a href="#1-核心思想-1" class="headerlink" title="1. 核心思想"></a>1. 核心思想</h3><p>聚类 + 倒排：将向量空间划分为多个区域（cluster），每个区域维护一个倒排列表。</p>
+<p><strong>搜索流程</strong>：</p>
+<ol>
+<li>找出查询向量最近的几个聚类中心</li>
+<li>只在这些聚类内搜索，而非全量遍历</li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">IVF 结构示意：</span><br><span class="line"></span><br><span class="line">向量空间划分：</span><br><span class="line">┌──────────────────────────────┐</span><br><span class="line">│  ┌─────┐    ┌─────┐          │</span><br><span class="line">│  │ C1  │    │ C2  │   ┌───┐  │</span><br><span class="line">│  │ ●●● │    │ ●●  │   │C3 │  │</span><br><span class="line">│  │ ●●  │    │  ●  │   │ ● │  │</span><br><span class="line">│  └─────┘    └─────┘   └───┘  │</span><br><span class="line">└──────────────────────────────┘</span><br><span class="line"></span><br><span class="line">倒排列表：</span><br><span class="line">C1 → [vec1, vec5, vec8, vec12, ...]</span><br><span class="line">C2 → [vec3, vec7, vec11, ...]</span><br><span class="line">C3 → [vec2, vec4, vec6, ...]</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-算法流程"><a href="#2-算法流程" class="headerlink" title="2. 算法流程"></a>2. 算法流程</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">构建阶段：</span><br><span class="line">1. 对全量向量做 K-means 聚类，得到 nlist 个聚类中心</span><br><span class="line">2. 每个向量分配到最近的聚类中心</span><br><span class="line">3. 每个聚类维护一个倒排列表</span><br><span class="line"></span><br><span class="line">搜索阶段：</span><br><span class="line">1. 找出查询向量最近的 nprobe 个聚类中心</span><br><span class="line">2. 只在这些聚类内做 FLAT 搜索</span><br><span class="line">3. 合并结果，返回 Top-K</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键参数</strong>：</p>
+<ul>
+<li><strong>nlist</strong>：聚类数量（通常取 $\sqrt{N}$）</li>
+<li><strong>nprobe</strong>：搜索时探查的聚类数</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># IVF 构建伪代码</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">build_ivf</span><span class="params">(vectors, nlist=<span class="number">1024</span>)</span>:</span></span><br><span class="line">    <span class="comment"># K-means 聚类</span></span><br><span class="line">    centroids = kmeans(vectors, nlist)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 分配向量到聚类</span></span><br><span class="line">    clusters = &#123;i: [] <span class="keyword">for</span> i <span class="keyword">in</span> range(nlist)&#125;</span><br><span class="line">    <span class="keyword">for</span> vec <span class="keyword">in</span> vectors:</span><br><span class="line">        nearest = argmin(distance(vec, centroids))</span><br><span class="line">        clusters[nearest].append(vec)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> centroids, clusters</span><br><span class="line"></span><br><span class="line"><span class="comment"># IVF 搜索伪代码</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">search_ivf</span><span class="params">(query, centroids, clusters, nprobe=<span class="number">10</span>, k=<span class="number">10</span>)</span>:</span></span><br><span class="line">    <span class="comment"># 找最近的 nprobe 个聚类</span></span><br><span class="line">    nearest_clusters = argsort(distance(query, centroids))[:nprobe]</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 在这些聚类内搜索</span></span><br><span class="line">    candidates = []</span><br><span class="line">    <span class="keyword">for</span> c <span class="keyword">in</span> nearest_clusters:</span><br><span class="line">        <span class="keyword">for</span> vec <span class="keyword">in</span> clusters[c]:</span><br><span class="line">            candidates.append((vec, distance(query, vec)))</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 返回 Top-K</span></span><br><span class="line">    <span class="keyword">return</span> sorted(candidates, key=<span class="keyword">lambda</span> x: x[<span class="number">1</span>])[:k]</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-性能分析"><a href="#3-性能分析" class="headerlink" title="3. 性能分析"></a>3. 性能分析</h3><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>nlist ↑</td>
+<td>聚类更精细，单聚类内向量更少，搜索更快</td>
+</tr>
+<tr>
+<td>nprobe ↑</td>
+<td>搜索更多聚类，召回率↑，延迟↑</td>
+</tr>
+</tbody></table>
+<p><strong>召回率与 nprobe 关系</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">nprobe&#x2F;nlist    召回率</span><br><span class="line">────────────────────────</span><br><span class="line">1%              60-70%</span><br><span class="line">5%              85-90%</span><br><span class="line">10%             92-96%</span><br><span class="line">20%             95-98%</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="六、PQ：乘积量化压缩"><a href="#六、PQ：乘积量化压缩" class="headerlink" title="六、PQ：乘积量化压缩"></a>六、PQ：乘积量化压缩</h2><h3 id="1-问题背景"><a href="#1-问题背景" class="headerlink" title="1. 问题背景"></a>1. 问题背景</h3><p>高维向量存储和计算成本高。1536 维向量，100万个需要 6GB 内存。如何压缩？</p>
+<h3 id="2-核心思想"><a href="#2-核心思想" class="headerlink" title="2. 核心思想"></a>2. 核心思想</h3><p>将高维向量切分成多个低维子向量，每个子空间独立量化。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">PQ 量化过程：</span><br><span class="line"></span><br><span class="line">原始向量：[v1, v2, v3, v4, v5, v6, v7, v8]  (8维)</span><br><span class="line">         ↓ 切分为 4 个子向量（每个2维）</span><br><span class="line">子向量：  [v1,v2]  [v3,v4]  [v5,v6]  [v7,v8]</span><br><span class="line">         ↓ 每个子空间独立聚类量化</span><br><span class="line">量化码：  [P1&#x3D;3]   [P2&#x3D;7]   [P3&#x3D;1]   [P4&#x3D;5]</span><br><span class="line">         ↓ 存储为码本索引</span><br><span class="line">存储：    [3, 7, 1, 5]  (4字节，压缩率 50%)</span><br><span class="line"></span><br><span class="line">码本：每个子空间 256 个中心点（8bit索引）</span><br></pre></td></tr></table></figure>
+
+<p><strong>数学表示</strong>：</p>
+<p>设向量 $\vec{x} \in \mathbb{R}^d$，切分为 $m$ 个子向量：</p>
+<p>$$<br>\vec{x} = [\vec{x}^1, \vec{x}^2, …, \vec{x}^m], \quad \vec{x}^i \in \mathbb{R}^{d/m}<br>$$</p>
+<p>每个子空间有 $K^<em>$ 个中心点（通常 $K^</em> = 256$），量化函数：</p>
+<p>$$<br>q^i(\vec{x}^i) = \arg\min_k ||\vec{x}^i - \vec{c}_k^i||^2<br>$$</p>
+<p>压缩后向量表示为 $[q^1, q^2, …, q^m]$，共 $m$ 字节。</p>
+<h3 id="3-距离计算：ADC（Asymmetric-Distance-Computation）"><a href="#3-距离计算：ADC（Asymmetric-Distance-Computation）" class="headerlink" title="3. 距离计算：ADC（Asymmetric Distance Computation）"></a>3. 距离计算：ADC（Asymmetric Distance Computation）</h3><p><strong>关键洞察</strong>：查询向量不压缩，只压缩数据库向量。预先计算查询向量与码本中心的距离表。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">pq_distance</span><span class="params">(query, pq_code, codebooks, m=<span class="number">8</span>)</span>:</span></span><br><span class="line">    <span class="string">"""PQ 距离计算"""</span></span><br><span class="line">    <span class="comment"># 1. 预计算距离表</span></span><br><span class="line">    <span class="comment"># distance_table[i][k] = distance(query的第i段, 第i个码本的第k个中心)</span></span><br><span class="line">    distance_table = precompute_distance_table(query, codebooks, m)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 2. 查表累加</span></span><br><span class="line">    d = <span class="number">0</span></span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> range(m):</span><br><span class="line">        d += distance_table[i][pq_code[i]]</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> d</span><br></pre></td></tr></table></figure>
+
+<p><strong>复杂度分析</strong>：</p>
+<ul>
+<li>距离表构建：$O(m \times K^* \times d/m) = O(d \times K^*)$</li>
+<li>单向量距离查表：$O(m)$</li>
+</ul>
+<p>相比原始距离计算 $O(d)$，PQ 距离查表 $O(m)$ 快得多（$m \ll d$）。</p>
+<h3 id="4-压缩率计算"><a href="#4-压缩率计算" class="headerlink" title="4. 压缩率计算"></a>4. 压缩率计算</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">原始存储：d × 4 字节（float32）</span><br><span class="line">PQ 存储：m 字节（m 个 uint8 码）</span><br><span class="line"></span><br><span class="line">压缩率：d × 4 &#x2F; m &#x3D; 4d&#x2F;m</span><br><span class="line"></span><br><span class="line">示例：d&#x3D;1536, m&#x3D;48</span><br><span class="line">压缩率 &#x3D; 1536 × 4 &#x2F; 48 &#x3D; 128 倍</span><br><span class="line">100万向量：6GB → 48MB</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="七、IVF-PQ：组合优化"><a href="#七、IVF-PQ：组合优化" class="headerlink" title="七、IVF-PQ：组合优化"></a>七、IVF-PQ：组合优化</h2><p>将 IVF 和 PQ 组合，兼顾速度和内存：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">IVF-PQ 结构：</span><br><span class="line"></span><br><span class="line">┌────────────────────────────────────────────┐</span><br><span class="line">│              IVF 聚类层                     │</span><br><span class="line">│   C1    C2    C3    C4    ...    Cnlist   │</span><br><span class="line">├────────────────────────────────────────────┤</span><br><span class="line">│              PQ 量化层                      │</span><br><span class="line">│   每个聚类内向量用 PQ 压缩存储              │</span><br><span class="line">│   C1 → [pq_code1, pq_code2, ...]           │</span><br><span class="line">└────────────────────────────────────────────┘</span><br><span class="line"></span><br><span class="line">搜索流程：</span><br><span class="line">1. 找最近的 nprobe 个聚类中心（FLAT）</span><br><span class="line">2. 在这些聚类内用 PQ 查表计算距离</span><br><span class="line">3. 可选：重排（rerank）Top-K 用原始向量精确计算</span><br></pre></td></tr></table></figure>
+
+<p><strong>重排策略</strong>：PQ 计算的是近似距离，对 Top-K 候选用原始向量重新计算精确距离。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">search_ivf_pq</span><span class="params">(query, nprobe=<span class="number">10</span>, k=<span class="number">10</span>, rerank=True)</span>:</span></span><br><span class="line">    <span class="comment"># 1. 找聚类</span></span><br><span class="line">    nearest_clusters = find_nearest_clusters(query, nprobe)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 2. PQ 查表搜索</span></span><br><span class="line">    candidates = pq_search(query, nearest_clusters, k * rerank_factor)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 3. 重排（可选）</span></span><br><span class="line">    <span class="keyword">if</span> rerank:</span><br><span class="line">        candidates = rerank_with_original_vectors(query, candidates, k)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> candidates[:k]</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="八、算法性能对比"><a href="#八、算法性能对比" class="headerlink" title="八、算法性能对比"></a>八、算法性能对比</h2><h3 id="1-理论复杂度"><a href="#1-理论复杂度" class="headerlink" title="1. 理论复杂度"></a>1. 理论复杂度</h3><table>
+<thead>
+<tr>
+<th>算法</th>
+<th>构建复杂度</th>
+<th>搜索复杂度</th>
+<th>空间复杂度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FLAT</td>
+<td>O(1)</td>
+<td>O(Nd)</td>
+<td>O(Nd)</td>
+</tr>
+<tr>
+<td>IVF</td>
+<td>O(Ndnlist)</td>
+<td>O(nprobe × Nd/nlist)</td>
+<td>O(Nd)</td>
+</tr>
+<tr>
+<td>HNSW</td>
+<td>O(Nd × efConstruction × logN)</td>
+<td>O(d × ef × logN)</td>
+<td>O(Nd × M)</td>
+</tr>
+<tr>
+<td>PQ</td>
+<td>O(Nd × K^*)</td>
+<td>O(dK^* + Nm)</td>
+<td>O(Nm)</td>
+</tr>
+<tr>
+<td>IVF-PQ</td>
+<td>O(Nd × nlist × K^*)</td>
+<td>O(nprobe × (dK^* + N/nlist × m))</td>
+<td>O(Nm)</td>
+</tr>
+</tbody></table>
+<h3 id="2-实测性能（SIFT-1M-数据集）"><a href="#2-实测性能（SIFT-1M-数据集）" class="headerlink" title="2. 实测性能（SIFT-1M 数据集）"></a>2. 实测性能（SIFT-1M 数据集）</h3><table>
+<thead>
+<tr>
+<th>算法</th>
+<th>召回率@10</th>
+<th>QPS</th>
+<th>内存</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FLAT</td>
+<td>100%</td>
+<td>200</td>
+<td>512MB</td>
+</tr>
+<tr>
+<td>IVF (nlist=1024, nprobe=64)</td>
+<td>95%</td>
+<td>8000</td>
+<td>512MB</td>
+</tr>
+<tr>
+<td>HNSW (M=16, ef=64)</td>
+<td>96%</td>
+<td>15000</td>
+<td>700MB</td>
+</tr>
+<tr>
+<td>PQ (m=8)</td>
+<td>85%</td>
+<td>30000</td>
+<td>16MB</td>
+</tr>
+<tr>
+<td>IVF-PQ (nlist=1024, m=8)</td>
+<td>90%</td>
+<td>20000</td>
+<td>16MB</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="九、研究前沿与新算法"><a href="#九、研究前沿与新算法" class="headerlink" title="九、研究前沿与新算法"></a>九、研究前沿与新算法</h2><h3 id="1-ScaNN（Google，2020）"><a href="#1-ScaNN（Google，2020）" class="headerlink" title="1. ScaNN（Google，2020）"></a>1. ScaNN（Google，2020）</h3><p>创新点：<strong>量化 + 内积优化 + 重排</strong>。</p>
+<ul>
+<li>量化时考虑内积最大化的方向</li>
+<li>用 SIMD 加速距离表计算</li>
+<li>比 HNSW 在内积度量上更快</li>
+</ul>
+<h3 id="2-DiskANN（Microsoft，2019）"><a href="#2-DiskANN（Microsoft，2019）" class="headerlink" title="2. DiskANN（Microsoft，2019）"></a>2. DiskANN（Microsoft，2019）</h3><p>创新点：<strong>磁盘索引 + SSD 优化</strong>。</p>
+<ul>
+<li>向量和索引存储在 SSD，内存只放聚类中心</li>
+<li>利用 SSD 高并发读取特性</li>
+<li>支持 10 亿级向量，内存需求 &lt; 16GB</li>
+</ul>
+<h3 id="3-Faiss（Facebook，2017）"><a href="#3-Faiss（Facebook，2017）" class="headerlink" title="3. Faiss（Facebook，2017）"></a>3. Faiss（Facebook，2017）</h3><p>工业界最成熟的开源库：</p>
+<ul>
+<li>GPU 加速（10倍提速）</li>
+<li>支持 IVF、PQ、HNSW 等多种索引</li>
+<li>灵活的组合索引（IVF-PQ, IVF-HNSW）</li>
+</ul>
+<hr>
+<h2 id="十、工程实践要点"><a href="#十、工程实践要点" class="headerlink" title="十、工程实践要点"></a>十、工程实践要点</h2><h3 id="1-索引选择决策"><a href="#1-索引选择决策" class="headerlink" title="1. 索引选择决策"></a>1. 索引选择决策</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">数据规模 &lt; 10万：FLAT（精确搜索）</span><br><span class="line">数据规模 10万-100万：</span><br><span class="line">    - 内存充足 → HNSW（最快）</span><br><span class="line">    - 内存紧张 → IVF-PQ（压缩）</span><br><span class="line">数据规模 &gt; 100万：</span><br><span class="line">    - 内存充足 → HNSW</span><br><span class="line">    - 内存紧张 → IVF-PQ</span><br><span class="line">    - 超大规模 → DiskANN</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-参数调优经验"><a href="#2-参数调优经验" class="headerlink" title="2. 参数调优经验"></a>2. 参数调优经验</h3><table>
+<thead>
+<tr>
+<th>目标</th>
+<th>参数调整</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>提高召回率</td>
+<td>HNSW: ef↑ / IVF: nprobe↑</td>
+</tr>
+<tr>
+<td>降低延迟</td>
+<td>HNSW: M↓, ef↓ / IVF: nlist↑, nprobe↓</td>
+</tr>
+<tr>
+<td>降低内存</td>
+<td>使用 PQ 压缩</td>
+</tr>
+<tr>
+<td>加速构建</td>
+<td>HNSW: efConstruction↓</td>
+</tr>
+</tbody></table>
+<h3 id="3-常见陷阱"><a href="#3-常见陷阱" class="headerlink" title="3. 常见陷阱"></a>3. 常见陷阱</h3><table>
+<thead>
+<tr>
+<th>问题</th>
+<th>解决方案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>召回率不够</td>
+<td>ef/nprobe 调高；检查向量质量</td>
+</tr>
+<tr>
+<td>延迟太高</td>
+<td>减少候选数量；检查是否做了不必要的重排</td>
+</tr>
+<tr>
+<td>内存爆炸</td>
+<td>使用 PQ 压缩；检查索引参数 M</td>
+</tr>
+<tr>
+<td>构建太慢</td>
+<td>efConstruction 适度降低；分批构建</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>向量相似度计算的核心要点：</p>
+<ol>
+<li><strong>度量选择</strong>：归一化向量用内积（最快），文本用余弦，物理坐标用 L2</li>
+<li><strong>算法选择</strong>：小数据 FLAT，大数据 HNSW 或 IVF-PQ</li>
+<li><strong>参数调优</strong>：ef/nprobe 控制召回率，M/nlist 控制内存</li>
+<li><strong>压缩策略</strong>：PQ 压缩率可达 100 倍，代价是精度下降 5-10%</li>
+</ol>
+<p>数学是本质，算法是手段，工程是落地。理解原理，才能在选型和调优时做出正确决策。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2025/05/19/vector-database-deep-analysis/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/05/19/vector-database-deep-analysis/" class="post-title-link" itemprop="url">向量数据库深度解析</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-05-19 00:00:00" itemprop="dateCreated datePublished" datetime="2025-05-19T00:00:00+08:00">2025-05-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-04 18:02:49" itemprop="dateModified" datetime="2026-04-04T18:02:49+08:00">2026-04-04</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2025/05/19/vector-database-deep-analysis/" class="post-meta-item leancloud_visitors" data-flag-title="向量数据库深度解析" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2025/05/19/vector-database-deep-analysis/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2025/05/19/vector-database-deep-analysis/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h2><p>做 RAG（检索增强生成）应用，向量数据库是绕不开的核心组件。市面上产品不少——Milvus、Qdrant、Weaviate、Chroma、Pinecone……每个都说自己最强。到底怎么选？</p>
+<p>这篇文章不讲虚的，从<strong>底层原理</strong>到<strong>实际选型</strong>，重点分析 Chroma 和 Milvus 两款代表产品，让你看完就能做决策。</p>
+<hr>
+<h2 id="一、向量数据库解决什么问题"><a href="#一、向量数据库解决什么问题" class="headerlink" title="一、向量数据库解决什么问题"></a>一、向量数据库解决什么问题</h2><p>传统数据库擅长精确匹配：<code>WHERE name = &#39;张三&#39;</code>。但语义搜索不一样——用户问”如何提高团队协作效率”，你得找出意思相近的文档，哪怕文档里压根没有这几个词。</p>
+<p><strong>向量数据库的核心价值</strong>：把文本、图像、音频等非结构化数据转换成向量（一串数字），然后用数学方法计算”相似度”，找出语义最接近的内容。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">文本 → Embedding模型 → 向量 [0.12, -0.34, 0.56, ...] → 向量数据库</span><br><span class="line">查询 → Embedding模型 → 向量 [0.15, -0.30, 0.52, ...] → 相似度计算 → Top-K结果</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="二、核心技术指标：怎么评判一个向量数据库"><a href="#二、核心技术指标：怎么评判一个向量数据库" class="headerlink" title="二、核心技术指标：怎么评判一个向量数据库"></a>二、核心技术指标：怎么评判一个向量数据库</h2><h3 id="1-索引算法决定性能上限"><a href="#1-索引算法决定性能上限" class="headerlink" title="1. 索引算法决定性能上限"></a>1. 索引算法决定性能上限</h3><p>向量数据库的索引算法直接决定查询速度和召回率。主流索引类型：</p>
+<table>
+<thead>
+<tr>
+<th>索引类型</th>
+<th>原理</th>
+<th>查询速度</th>
+<th>内存占用</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>FLAT</strong></td>
+<td>暴力遍历，精确计算</td>
+<td>最慢</td>
+<td>最高</td>
+<td>小数据量，要求100%召回</td>
+</tr>
+<tr>
+<td><strong>IVF-FLAT</strong></td>
+<td>clustering + 倒排</td>
+<td>中等</td>
+<td>中等</td>
+<td>百万级，平衡方案</td>
+</tr>
+<tr>
+<td><strong>IVF-PQ</strong></td>
+<td>聚类 + 乘积量化压缩</td>
+<td>快</td>
+<td>低</td>
+<td>内存受限，牺牲精度</td>
+</tr>
+<tr>
+<td><strong>HNSW</strong></td>
+<td>分层可导航小世界图</td>
+<td>最快</td>
+<td>较高</td>
+<td>高性能实时查询</td>
+</tr>
+<tr>
+<td><strong>DISKANN</strong></td>
+<td>磁盘索引 + SSD优化</td>
+<td>较慢</td>
+<td>极低</td>
+<td>超大规模，成本敏感</td>
+</tr>
+</tbody></table>
+<p><strong>HNSW 是当前主流选择</strong>，它的核心思想是构建一个多层图结构，搜索时从顶层快速跳转，逐层缩小范围，像”跳表”一样高效。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">HNSW 结构示意：</span><br><span class="line"></span><br><span class="line">Layer 2:    ●────────────●           (稀疏，快速跳转)</span><br><span class="line">            │            │</span><br><span class="line">Layer 1:    ●────●───────●           (中等密度)</span><br><span class="line">            │    │       │</span><br><span class="line">Layer 0:  ●─●─●─●─●─●─●─●─●         (全量节点，精确搜索)</span><br><span class="line"></span><br><span class="line">关键参数：</span><br><span class="line">- M: 每节点最大连接数（默认16），越大越精确但内存越高</span><br><span class="line">- efConstruction: 构建时搜索宽度（默认200）</span><br><span class="line">- efSearch: 查询时搜索宽度，动态调整召回率</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-分布式架构决定扩展能力"><a href="#2-分布式架构决定扩展能力" class="headerlink" title="2. 分布式架构决定扩展能力"></a>2. 分布式架构决定扩展能力</h3><table>
+<thead>
+<tr>
+<th>架构类型</th>
+<th>代表产品</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>单机嵌入式</td>
+<td>Chroma、Faiss</td>
+<td>无部署成本，数据量受限</td>
+</tr>
+<tr>
+<td>单机服务化</td>
+<td>Qdrant 单机版</td>
+<td>独立进程，支持持久化</td>
+</tr>
+<tr>
+<td>分布式集群</td>
+<td>Milvus、Qdrant 集群</td>
+<td>水平扩展，高可用</td>
+</tr>
+</tbody></table>
+<h3 id="3-元数据过滤能力"><a href="#3-元数据过滤能力" class="headerlink" title="3. 元数据过滤能力"></a>3. 元数据过滤能力</h3><p>实际业务中，向量搜索往往要结合条件过滤：找出”价格在100-500元之间且类别是电子产品”的相似商品。</p>
+<table>
+<thead>
+<tr>
+<th>数据库</th>
+<th>过滤能力</th>
+<th>实现方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Qdrant</strong></td>
+<td>最强</td>
+<td>原生支持复杂过滤，性能最优</td>
+</tr>
+<tr>
+<td><strong>Milvus</strong></td>
+<td>强</td>
+<td>支持标量字段过滤</td>
+</tr>
+<tr>
+<td><strong>Chroma</strong></td>
+<td>基础</td>
+<td>简单 where 条件</td>
+</tr>
+<tr>
+<td><strong>Pinecone</strong></td>
+<td>强</td>
+<td>元数据命名空间</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="三、主流向量数据库横向对比"><a href="#三、主流向量数据库横向对比" class="headerlink" title="三、主流向量数据库横向对比"></a>三、主流向量数据库横向对比</h2><h3 id="1-开源产品对比"><a href="#1-开源产品对比" class="headerlink" title="1. 开源产品对比"></a>1. 开源产品对比</h3><table>
+<thead>
+<tr>
+<th>数据库</th>
+<th>语言</th>
+<th>架构</th>
+<th>索引支持</th>
+<th>过滤能力</th>
+<th>社区活跃度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Milvus</strong></td>
+<td>Go</td>
+<td>分布式</td>
+<td>HNSW/IVF/DISKANN</td>
+<td>强</td>
+<td>活跃（CNCF项目）</td>
+</tr>
+<tr>
+<td><strong>Qdrant</strong></td>
+<td>Rust</td>
+<td>单机/分布式</td>
+<td>HNSW</td>
+<td>最强</td>
+<td>活跃</td>
+</tr>
+<tr>
+<td><strong>Weaviate</strong></td>
+<td>Go</td>
+<td>单机/分布式</td>
+<td>HNSW</td>
+<td>强</td>
+<td>活跃</td>
+</tr>
+<tr>
+<td><strong>Chroma</strong></td>
+<td>Python</td>
+<td>嵌入式</td>
+<td>HNSW</td>
+<td>基础</td>
+<td>活跃</td>
+</tr>
+</tbody></table>
+<h3 id="2-云服务对比"><a href="#2-云服务对比" class="headerlink" title="2. 云服务对比"></a>2. 云服务对比</h3><table>
+<thead>
+<tr>
+<th>产品</th>
+<th>定位</th>
+<th>优势</th>
+<th>劣势</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Pinecone</strong></td>
+<td>全托管 Serverless</td>
+<td>零运维，自动扩展</td>
+<td>供应商锁定，成本不可控</td>
+</tr>
+<tr>
+<td><strong>Zilliz Cloud</strong></td>
+<td>Milvus 托管版</td>
+<td>企业级支持，兼容 Milvus API</td>
+<td>价格较高</td>
+</tr>
+<tr>
+<td><strong>MongoDB Atlas Vector</strong></td>
+<td>MongoDB 生态</td>
+<td>复用现有基础设施</td>
+<td>向量能力有限</td>
+</tr>
+</tbody></table>
+<h3 id="3-性能基准（百万级向量，HNSW索引）"><a href="#3-性能基准（百万级向量，HNSW索引）" class="headerlink" title="3. 性能基准（百万级向量，HNSW索引）"></a>3. 性能基准（百万级向量，HNSW索引）</h3><table>
+<thead>
+<tr>
+<th>数据库</th>
+<th>QPS</th>
+<th>P99延迟</th>
+<th>内存占用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Milvus</td>
+<td>~15000</td>
+<td>~10ms</td>
+<td>高</td>
+</tr>
+<tr>
+<td>Qdrant</td>
+<td>~12000</td>
+<td>~8ms</td>
+<td>中</td>
+</tr>
+<tr>
+<td>Weaviate</td>
+<td>~8000</td>
+<td>~15ms</td>
+<td>中</td>
+</tr>
+<tr>
+<td>Chroma</td>
+<td>~3000</td>
+<td>~30ms</td>
+<td>低</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="四、Chroma：轻量级入门首选"><a href="#四、Chroma：轻量级入门首选" class="headerlink" title="四、Chroma：轻量级入门首选"></a>四、Chroma：轻量级入门首选</h2><h3 id="1-为什么选-Chroma"><a href="#1-为什么选-Chroma" class="headerlink" title="1. 为什么选 Chroma"></a>1. 为什么选 Chroma</h3><p>Chroma 的设计哲学是<strong>极简</strong>：Python 原生、嵌入式运行、API 设计友好。适合以下场景：</p>
+<ul>
+<li><strong>原型验证</strong>：快速搭建 RAG Demo，几行代码就能跑</li>
+<li><strong>小规模应用</strong>：文档量 &lt; 10万，单机部署</li>
+<li><strong>本地开发</strong>：数据不想出本机，隐私可控</li>
+<li><strong>学习研究</strong>：理解向量数据库基本概念</li>
+</ul>
+<h3 id="2-Chroma-核心特性"><a href="#2-Chroma-核心特性" class="headerlink" title="2. Chroma 核心特性"></a>2. Chroma 核心特性</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Chroma 的极简 API 设计</span></span><br><span class="line"><span class="keyword">import</span> chromadb</span><br><span class="line"></span><br><span class="line"><span class="comment"># 初始化：嵌入式，无需启动服务</span></span><br><span class="line">client = chromadb.PersistentClient(path=<span class="string">"./chroma_db"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建集合</span></span><br><span class="line">collection = client.create_collection(</span><br><span class="line">    name=<span class="string">"documents"</span>,</span><br><span class="line">    metadata=&#123;<span class="string">"hnsw:space"</span>: <span class="string">"cosine"</span>&#125;  <span class="comment"># 支持 l2、ip、cosine</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 添加文档：自动调用 Embedding（内置默认模型）</span></span><br><span class="line">collection.add(</span><br><span class="line">    documents=[<span class="string">"文档内容1"</span>, <span class="string">"文档内容2"</span>],</span><br><span class="line">    ids=[<span class="string">"doc1"</span>, <span class="string">"doc2"</span>]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 查询：一步到位</span></span><br><span class="line">results = collection.query(</span><br><span class="line">    query_texts=[<span class="string">"查询内容"</span>],</span><br><span class="line">    n_results=<span class="number">5</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p><strong>Chroma 内置 Embedding</strong>：默认使用 <code>all-MiniLM-L6-v2</code> 模型，也可以替换为 OpenAI、Cohere 等：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> chromadb.utils <span class="keyword">import</span> embedding_functions</span><br><span class="line"></span><br><span class="line"><span class="comment"># 使用 OpenAI Embedding</span></span><br><span class="line">openai_ef = embedding_functions.OpenAIEmbeddingFunction(</span><br><span class="line">    api_key=<span class="string">"your-key"</span>,</span><br><span class="line">    model_name=<span class="string">"text-embedding-3-small"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">collection = client.create_collection(</span><br><span class="line">    name=<span class="string">"docs"</span>,</span><br><span class="line">    embedding_function=openai_ef</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-Chroma-的元数据过滤"><a href="#3-Chroma-的元数据过滤" class="headerlink" title="3. Chroma 的元数据过滤"></a>3. Chroma 的元数据过滤</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 添加带元数据的文档</span></span><br><span class="line">collection.add(</span><br><span class="line">    documents=[<span class="string">"技术文档"</span>, <span class="string">"产品文档"</span>],</span><br><span class="line">    ids=[<span class="string">"d1"</span>, <span class="string">"d2"</span>],</span><br><span class="line">    metadatas=[</span><br><span class="line">        &#123;<span class="string">"category"</span>: <span class="string">"tech"</span>, <span class="string">"author"</span>: <span class="string">"张三"</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"category"</span>: <span class="string">"product"</span>, <span class="string">"author"</span>: <span class="string">"李四"</span>&#125;</span><br><span class="line">    ]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 查询时过滤</span></span><br><span class="line">results = collection.query(</span><br><span class="line">    query_texts=[<span class="string">"如何部署"</span>],</span><br><span class="line">    n_results=<span class="number">5</span>,</span><br><span class="line">    where=&#123;<span class="string">"category"</span>: <span class="string">"tech"</span>&#125;  <span class="comment"># 只在技术文档中搜索</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-Chroma-的局限性"><a href="#4-Chroma-的局限性" class="headerlink" title="4. Chroma 的局限性"></a>4. Chroma 的局限性</h3><table>
+<thead>
+<tr>
+<th>限制</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>单机架构</td>
+<td>无法水平扩展，数据量上限约百万级</td>
+</tr>
+<tr>
+<td>索引单一</td>
+<td>仅支持 HNSW，无法根据场景切换</td>
+</tr>
+<tr>
+<td>过滤简单</td>
+<td>不支持复杂布尔组合，性能一般</td>
+</tr>
+<tr>
+<td>无分布式</td>
+<td>没有副本、分片机制，单点故障风险</td>
+</tr>
+</tbody></table>
+<p><strong>一句话总结</strong>：Chroma 是向量数据库界的 SQLite——简单好用，但别指望它扛生产级大流量。</p>
+<hr>
+<h2 id="五、Milvus：生产级大规模首选"><a href="#五、Milvus：生产级大规模首选" class="headerlink" title="五、Milvus：生产级大规模首选"></a>五、Milvus：生产级大规模首选</h2><h3 id="1-为什么选-Milvus"><a href="#1-为什么选-Milvus" class="headerlink" title="1. 为什么选 Milvus"></a>1. 为什么选 Milvus</h3><p>Milvus 定位是<strong>云原生分布式向量数据库</strong>，CNCF 沙箱项目。适合以下场景：</p>
+<ul>
+<li><strong>大规模生产应用</strong>：向量数 &gt; 百万级，甚至亿级</li>
+<li><strong>高并发实时检索</strong>：要求低延迟、高吞吐</li>
+<li><strong>复杂过滤需求</strong>：需要结合标量字段过滤</li>
+<li><strong>多云部署</strong>：支持 Kubernetes、Docker、云服务</li>
+</ul>
+<h3 id="2-Milvus-架构解析"><a href="#2-Milvus-架构解析" class="headerlink" title="2. Milvus 架构解析"></a>2. Milvus 架构解析</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                        SDK Layer                            │</span><br><span class="line">│          Python &#x2F; Go &#x2F; Java &#x2F; Node.js &#x2F; REST               │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                      Proxy (接入层)                          │</span><br><span class="line">│              负责请求解析、路由、负载均衡                      │</span><br><span class="line">├───────────────┬───────────────┬─────────────────────────────┤</span><br><span class="line">│  Query Coord  │  Data Coord   │  Index Coord  │ Root Coord │</span><br><span class="line">│  (查询协调)    │  (数据协调)    │  (索引协调)    │ (总协调)   │</span><br><span class="line">├───────────────┴───────────────┴─────────────────────────────┤</span><br><span class="line">│           Query Node        Data Node       Index Node       │</span><br><span class="line">│           (查询执行)         (数据写入)       (索引构建)       │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                  etcd (元数据) + MinIO (存储)                 │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br><span class="line"></span><br><span class="line">核心组件职责：</span><br><span class="line">- Root Coord：全局协调者，处理 DDL（创建集合、索引等）</span><br><span class="line">- Query Coord：查询节点调度，负载均衡</span><br><span class="line">- Data Coord：数据节点调度，segment 管理</span><br><span class="line">- Index Coord：索引构建任务调度</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-Milvus-索引选型实战"><a href="#3-Milvus-索引选型实战" class="headerlink" title="3. Milvus 索引选型实战"></a>3. Milvus 索引选型实战</h3><p>不同规模和场景，索引选择策略不同：</p>
+<table>
+<thead>
+<tr>
+<th>数据规模</th>
+<th>内存预算</th>
+<th>推荐索引</th>
+<th>参数建议</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>&lt; 100万</td>
+<td>充足</td>
+<td>FLAT</td>
+<td>精确搜索，召回率100%</td>
+</tr>
+<tr>
+<td>100万-1000万</td>
+<td>充足</td>
+<td>HNSW</td>
+<td>M=16, efConstruction=256</td>
+</tr>
+<tr>
+<td>100万-1000万</td>
+<td>紧张</td>
+<td>IVF-FLAT</td>
+<td>nlist=1024</td>
+</tr>
+<tr>
+<td>&gt; 1000万</td>
+<td>紧张</td>
+<td>IVF-PQ</td>
+<td>nlist=1024, m=8, nbits=8</td>
+</tr>
+<tr>
+<td>&gt; 1亿</td>
+<td>极紧张</td>
+<td>DISKANN</td>
+<td>磁盘索引，SSD必备</td>
+</tr>
+</tbody></table>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pymilvus <span class="keyword">import</span> MilvusClient, IndexType, MetricType</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建 HNSW 索引</span></span><br><span class="line">index_params = MilvusClient.prepare_index_params()</span><br><span class="line">index_params.add_index(</span><br><span class="line">    field_name=<span class="string">"vector"</span>,</span><br><span class="line">    index_type=IndexType.HNSW,</span><br><span class="line">    metric_type=MetricType.COSINE,</span><br><span class="line">    params=&#123;<span class="string">"M"</span>: <span class="number">16</span>, <span class="string">"efConstruction"</span>: <span class="number">256</span>&#125;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 查询参数：动态调整 ef 提高召回率</span></span><br><span class="line">search_params = &#123;<span class="string">"params"</span>: &#123;<span class="string">"ef"</span>: <span class="number">64</span>&#125;&#125;  <span class="comment"># ef越大，召回率越高，延迟越长</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="4-Milvus-集合设计最佳实践"><a href="#4-Milvus-集合设计最佳实践" class="headerlink" title="4. Milvus 集合设计最佳实践"></a>4. Milvus 集合设计最佳实践</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pymilvus <span class="keyword">import</span> MilvusClient</span><br><span class="line"></span><br><span class="line">client = MilvusClient(<span class="string">"http://localhost:19530"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建集合：向量字段 + 标量字段</span></span><br><span class="line">client.create_collection(</span><br><span class="line">    collection_name=<span class="string">"products"</span>,</span><br><span class="line">    dimension=<span class="number">1536</span>,  <span class="comment"># OpenAI text-embedding-3-small 维度</span></span><br><span class="line">    metric_type=<span class="string">"COSINE"</span>,</span><br><span class="line">    auto_id=<span class="literal">False</span>,</span><br><span class="line">    fields=[</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"id"</span>, <span class="string">"dtype"</span>: <span class="string">"VARCHAR"</span>, <span class="string">"max_length"</span>: <span class="number">64</span>, <span class="string">"is_primary"</span>: <span class="literal">True</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"vector"</span>, <span class="string">"dtype"</span>: <span class="string">"FLOAT_VECTOR"</span>, <span class="string">"dim"</span>: <span class="number">1536</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"title"</span>, <span class="string">"dtype"</span>: <span class="string">"VARCHAR"</span>, <span class="string">"max_length"</span>: <span class="number">256</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"category"</span>, <span class="string">"dtype"</span>: <span class="string">"VARCHAR"</span>, <span class="string">"max_length"</span>: <span class="number">64</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"price"</span>, <span class="string">"dtype"</span>: <span class="string">"FLOAT"</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"created_at"</span>, <span class="string">"dtype"</span>: <span class="string">"INT64"</span>&#125;  <span class="comment"># 时间戳</span></span><br><span class="line">    ]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建标量字段索引（加速过滤）</span></span><br><span class="line">client.create_index(</span><br><span class="line">    collection_name=<span class="string">"products"</span>,</span><br><span class="line">    field_name=<span class="string">"category"</span>,</span><br><span class="line">    index_type=<span class="string">"Trie"</span>  <span class="comment"># 字符串用 Trie，数值用 STL_SORT</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-Milvus-过滤查询实战"><a href="#5-Milvus-过滤查询实战" class="headerlink" title="5. Milvus 过滤查询实战"></a>5. Milvus 过滤查询实战</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 过滤表达式语法</span></span><br><span class="line">results = client.search(</span><br><span class="line">    collection_name=<span class="string">"products"</span>,</span><br><span class="line">    data=[[<span class="number">0.1</span>, <span class="number">0.2</span>, ...]],  <span class="comment"># 查询向量</span></span><br><span class="line">    filter=<span class="string">'category == "electronics" and price &gt;= 100 and price &lt;= 500'</span>,</span><br><span class="line">    limit=<span class="number">10</span>,</span><br><span class="line">    output_fields=[<span class="string">"title"</span>, <span class="string">"category"</span>, <span class="string">"price"</span>]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 复杂过滤：支持 AND、OR、NOT、IN、LIKE</span></span><br><span class="line">filter_expr = <span class="string">'''</span></span><br><span class="line"><span class="string">    (category in ["electronics", "books"]) </span></span><br><span class="line"><span class="string">    and price &gt; 50 </span></span><br><span class="line"><span class="string">    and created_at &gt; 1700000000</span></span><br><span class="line"><span class="string">'''</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="6-Milvus-部署方案"><a href="#6-Milvus-部署方案" class="headerlink" title="6. Milvus 部署方案"></a>6. Milvus 部署方案</h3><table>
+<thead>
+<tr>
+<th>部署方式</th>
+<th>适用场景</th>
+<th>复杂度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Milvus Lite</td>
+<td>开发测试，pip 安装</td>
+<td>最低</td>
+</tr>
+<tr>
+<td>Docker Compose</td>
+<td>单机生产，快速部署</td>
+<td>低</td>
+</tr>
+<tr>
+<td>Docker + Kubernetes</td>
+<td>集群部署，高可用</td>
+<td>中</td>
+</tr>
+<tr>
+<td>Zilliz Cloud</td>
+<td>全托管，零运维</td>
+<td>无</td>
+</tr>
+</tbody></table>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Docker Compose 快速部署（适合单机生产）</span></span><br><span class="line">wget https://github.com/milvus-io/milvus/releases/download/v2.4.0/milvus-compose.yml</span><br><span class="line">docker-compose -f milvus-compose.yml up -d</span><br><span class="line"></span><br><span class="line"><span class="comment"># Milvus Lite 开发测试（Python 直接使用）</span></span><br><span class="line">pip install milvus</span><br><span class="line"><span class="comment"># 自动启动嵌入式 Milvus，无需额外部署</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="六、选型决策树"><a href="#六、选型决策树" class="headerlink" title="六、选型决策树"></a>六、选型决策树</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">开始选型</span><br><span class="line">    │</span><br><span class="line">    ├─ 数据规模多大？</span><br><span class="line">    │   ├─ &lt; 10万向量 → Chroma 足够</span><br><span class="line">    │   ├─ 10万-100万 → Chroma 单机 &#x2F; Milvus Lite</span><br><span class="line">    │   ├─ 100万-1000万 → Milvus 单机 &#x2F; Qdrant</span><br><span class="line">    │   └─ &gt; 1000万 → Milvus 集群 &#x2F; Pinecone Serverless</span><br><span class="line">    │</span><br><span class="line">    ├─ 是否需要强过滤？</span><br><span class="line">    │   ├─ 简单过滤 → Chroma &#x2F; Milvus</span><br><span class="line">    │   └─ 复杂过滤 → Qdrant（性能最优）</span><br><span class="line">    │</span><br><span class="line">    ├─ 是否接受云服务？</span><br><span class="line">    │   ├─ 必须本地 → Milvus &#x2F; Qdrant &#x2F; Chroma</span><br><span class="line">    │   └─ 可以云端 → Pinecone &#x2F; Zilliz Cloud</span><br><span class="line">    │</span><br><span class="line">    ├─ 团队技术栈？</span><br><span class="line">    │   ├─ Python 主导 → Chroma（最友好）</span><br><span class="line">    │   ├─ Go&#x2F;Rust 主导 → Milvus &#x2F; Qdrant</span><br><span class="line">    │   └─ 已有 MongoDB → Atlas Vector Search</span><br><span class="line">    │</span><br><span class="line">    └─ 运维能力？</span><br><span class="line">        ├─ 无运维团队 → Chroma &#x2F; Pinecone</span><br><span class="line">        ├─ 有运维团队 → Milvus &#x2F; Qdrant</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="七、实战建议"><a href="#七、实战建议" class="headerlink" title="七、实战建议"></a>七、实战建议</h2><h3 id="1-RAG-应用架构"><a href="#1-RAG-应用架构" class="headerlink" title="1. RAG 应用架构"></a>1. RAG 应用架构</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">用户查询</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">Embedding 模型（text-embedding-3-small &#x2F; bge-large-zh）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">向量数据库（Chroma &#x2F; Milvus）</span><br><span class="line">    │  ┌──────────────────────────────────┐</span><br><span class="line">    │  │ Collection: documents            │</span><br><span class="line">    │  │ ├─ vector: [1536 dimensions]    │</span><br><span class="line">    │  │ ├─ content: 原始文本              │</span><br><span class="line">    │  │ ├─ metadata: &#123;source, page, ...&#125; │</span><br><span class="line">    │  │ └─ index: HNSW (M&#x3D;16)           │</span><br><span class="line">    │  └──────────────────────────────────┘</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">Top-K 相关文档（K&#x3D;5~10）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">LLM 生成回答（GPT-4 &#x2F; Claude &#x2F; DeepSeek）</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-向量维度选择"><a href="#2-向量维度选择" class="headerlink" title="2. 向量维度选择"></a>2. 向量维度选择</h3><table>
+<thead>
+<tr>
+<th>Embedding 模型</th>
+<th>维度</th>
+<th>特点</th>
+<th>推荐场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>text-embedding-3-small</td>
+<td>1536</td>
+<td>OpenAI，通用</td>
+<td>英文为主</td>
+</tr>
+<tr>
+<td>text-embedding-3-large</td>
+<td>3072</td>
+<td>OpenAI，更精准</td>
+<td>高精度需求</td>
+</tr>
+<tr>
+<td>bge-large-zh</td>
+<td>1024</td>
+<td>中文优化</td>
+<td>中文场景</td>
+</tr>
+<tr>
+<td>bge-m3</td>
+<td>1024</td>
+<td>多语言</td>
+<td>跨语言场景</td>
+</tr>
+</tbody></table>
+<p><strong>注意</strong>：维度越高，精度越高，但存储和计算成本也越高。1536维是性价比平衡点。</p>
+<h3 id="3-内存估算"><a href="#3-内存估算" class="headerlink" title="3. 内存估算"></a>3. 内存估算</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">单向量存储开销 &#x3D; 维度 × 4字节 + 元数据开销</span><br><span class="line">索引额外开销 ≈ 基础存储 × 索引系数</span><br><span class="line"></span><br><span class="line">示例：100万向量，1536维，HNSW索引</span><br><span class="line">基础存储：1,000,000 × 1536 × 4 &#x3D; 6.14 GB</span><br><span class="line">索引开销：6.14 × 1.5 ≈ 9.2 GB</span><br><span class="line">总内存需求：约 10 GB</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>向量数据库选型的核心逻辑：</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>推荐方案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>原型验证</td>
+<td>Chroma，几行代码搞定</td>
+</tr>
+<tr>
+<td>小规模生产</td>
+<td>Chroma 单机 / Milvus Lite</td>
+</tr>
+<tr>
+<td>大规模生产</td>
+<td>Milvus 集群 / Qdrant</td>
+</tr>
+<tr>
+<td>零运维需求</td>
+<td>Pinecone / Zilliz Cloud</td>
+</tr>
+</tbody></table>
+<p><strong>Chroma</strong> 是入门首选，简单好用，适合快速验证想法。<br><strong>Milvus</strong> 是生产首选，架构成熟，生态完善，能扛大流量。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2023/09/09/oracle_sqlloader/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -3254,315 +4252,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2022/02/15/spring_batch_optimization_partition_step/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/02/15/spring_batch_optimization_partition_step/" class="post-title-link" itemprop="url">Spring Batch 性能调优-分片化Step</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-02-15 09:28:35" itemprop="dateCreated datePublished" datetime="2022-02-15T09:28:35+08:00">2022-02-15</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2022/02/15/spring_batch_optimization_partition_step/" class="post-meta-item leancloud_visitors" data-flag-title="Spring Batch 性能调优-分片化Step" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2022/02/15/spring_batch_optimization_partition_step/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2022/02/15/spring_batch_optimization_partition_step/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <hr>
-<h4 id="一、Spring-Batch-性能优化指标"><a href="#一、Spring-Batch-性能优化指标" class="headerlink" title="一、Spring Batch 性能优化指标"></a>一、Spring Batch 性能优化指标</h4><p>Spring Batch 是一款伸缩性非常好的批处理工具，既可以处理简单的任务，也可以处理复杂的、高容量的任务。在性能调优方面，Spring Batch 提供了丰富的接口支持，各项优化指标可归纳如下：</p>
-<ul>
-<li><a href="https://takeshell.com/2022/02/04/spring_batch_optimization_multi_thread_step/" target="_blank" rel="noopener">多线程 <code>Step</code></a>：由独立线程执行提交块（a chunk of items）的输入、处理和输出过程；</li>
-<li><a href="https://takeshell.com/2022/02/08/spring_batch_optimization_parallel_step/" target="_blank" rel="noopener">并行化 <code>Step</code></a>：对于可并行处理的 <code>Step</code>，交由不同的线程去处理；</li>
-<li>分片化 <code>Step</code>：通过 <code>SPI(Serial Peripheral Interface)</code>，对 <code>Step</code> 分片执行；</li>
-<li>远程组块：对于输入无性能瓶颈，但处理和输出有性能瓶颈的任务，交由远程组块执行；</li>
-</ul>
-<p>详见<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/scalability.html#scalability" target="_blank" rel="noopener">Spring文档</a>。</p>
-<h4 id="二、分片化-Step"><a href="#二、分片化-Step" class="headerlink" title="二、分片化 Step"></a>二、分片化 <code>Step</code></h4><p>如果一个 <code>Step</code> 的任务量比较大，可以尝试将其拆分成多个子任务。子任务之间可并行处理且互不干扰，这将大大提升批处理效率。例如：Master 这个 <code>Step</code> 迁移 100000 条数据需要 100 s，如果将其拆分为 100 个 Slave 任务，那么时间可缩短至 1 s。</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/19_20_41_39_partition_step_2.png" alt=""></p>
-<p><code>Step</code> 分片原理，是一个 Master 处理器对应多个 Salve 处理器。Slave 处理器可以是远程服务，也可以是本地执行线程。主从服务间的消息不需要持久化，也不需要严格保证传递，因为 <code>JobRepository</code> 的元数据管理，是将每个 Salve 独立保存在 <code>batch_step_execution</code> 中的，这样便可以保证每个 Slave 任务只执行一次。</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/19_21_53_13_partition_step_structure.png" alt=""></p>
-<p><code>Step</code> 分片化，需要了解两个组件：分片器（Partitioner）和分片处理（PartitionHandler）。</p>
-<ul>
-<li><p>分片器（Partitioner）：为每个 Slave 服务配置上下文（StepExecutionContext）；</p>
-</li>
-<li><p>分片处理（PartitionHandler）：定义 Slave 服务的数量以及 Slave 任务内容；</p>
-</li>
-</ul>
-<p>比如在一个数据迁移 <code>Step</code> 中，分片处理就是将 1 个主任务拆分成 100 个从任务，并定义从任务的执行内容；分片器就是依次为这 100 个从任务划定数据迁移的范围（<code>select * from table where id between ? and ?</code>）。</p>
-<h4 id="三、批处理配置"><a href="#三、批处理配置" class="headerlink" title="三、批处理配置"></a>三、批处理配置</h4><h5 id="3-1-Job-配置"><a href="#3-1-Job-配置" class="headerlink" title="3.1 Job 配置"></a>3.1 Job 配置</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Job;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Step;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.JobBuilderFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.launch.support.RunIdIncrementer;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="meta">@EnableBatchProcessing</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">PartitionTransferStudentJob</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">public</span> JobBuilderFactory jobBuilderFactory;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"masterTransferStudentStep1"</span>)</span><br><span class="line">    <span class="keyword">private</span> Step masterTransferStudentStep;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Job <span class="title">transferStudentJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"partitionTransferStudentJob"</span>)</span><br><span class="line">                .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">                .flow(masterTransferStudentStep)</span><br><span class="line">                .end()</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h5 id="3-2-Step-配置"><a href="#3-2-Step-配置" class="headerlink" title="3.2 Step 配置"></a>3.2 Step 配置</h5><p><code>MasterTransferStudentStep</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.component.partitioner.TransferStudentPartitioner;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Step;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.StepBuilderFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.partition.PartitionHandler;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> org.springframework.transaction.PlatformTransactionManager;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">MasterTransferStudentStep</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">public</span> StepBuilderFactory stepBuilderFactory;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"transferStudentPartitionHandler1"</span>)</span><br><span class="line">    <span class="keyword">private</span> PartitionHandler transferStudentPartitionHandler;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> TransferStudentPartitioner transferStudentPartitioner;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"masterTransferStudentStep1"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Step <span class="title">masterTransferStudentStep1</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"masterTransferStudentStep1.manager"</span>)</span><br><span class="line">                .partitioner(<span class="string">"masterTransferStudentStep1"</span>, transferStudentPartitioner)</span><br><span class="line">                .partitionHandler(transferStudentPartitionHandler)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><code>SlaveTransferStudentStep</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.component.processor.SlaveStudentItemProcessor;</span><br><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Student;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Step;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.StepBuilderFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcBatchItemWriter;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcPagingItemReader;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> org.springframework.transaction.PlatformTransactionManager;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SlaveTransferStudentStep</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">public</span> StepBuilderFactory stepBuilderFactory;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"slaveTransferStudentItemReader"</span>)</span><br><span class="line">    <span class="keyword">private</span> JdbcPagingItemReader&lt;Student&gt; slaveTransferStudentItemReader;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"slaveTransferStudentItemWriter"</span>)</span><br><span class="line">    <span class="keyword">private</span> JdbcBatchItemWriter&lt;Student&gt; slaveTransferStudentItemWriter;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> SlaveStudentItemProcessor slaveStudentItemProcessor;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"slaveTransferStudentStep1"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Step <span class="title">slaveTransferStudentStep1</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"slaveTransferStudentStep1"</span>)</span><br><span class="line">                .transactionManager(transactionManager)</span><br><span class="line">                .&lt;Student, Student&gt;chunk(<span class="number">1000</span>)</span><br><span class="line">                .reader(slaveTransferStudentItemReader)</span><br><span class="line">                .processor(slaveStudentItemProcessor)</span><br><span class="line">                .writer(slaveTransferStudentItemWriter)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h5 id="3-3-Partitioner-配置"><a href="#3-3-Partitioner-配置" class="headerlink" title="3.3 Partitioner 配置"></a>3.3 Partitioner 配置</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> org.slf4j.Logger;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.LoggerFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.partition.support.Partitioner;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.ExecutionContext;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> java.util.HashMap;</span><br><span class="line"><span class="keyword">import</span> java.util.Map;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">TransferStudentPartitioner</span> <span class="keyword">implements</span> <span class="title">Partitioner</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger LOGGER = LoggerFactory.getLogger(TransferStudentPartitioner<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Map&lt;String, ExecutionContext&gt; <span class="title">partition</span><span class="params">(<span class="keyword">int</span> gridSize)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        Map&lt;String, ExecutionContext&gt; result = <span class="keyword">new</span> HashMap&lt;&gt;(gridSize);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">int</span> range = <span class="number">1000</span>;</span><br><span class="line">        <span class="keyword">int</span> fromId = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">int</span> toId = range;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">1</span>; i &lt;= gridSize; i++) &#123;</span><br><span class="line"></span><br><span class="line">            ExecutionContext value = <span class="keyword">new</span> ExecutionContext();</span><br><span class="line"></span><br><span class="line">            value.putInt(<span class="string">"fromId"</span>, fromId);</span><br><span class="line">            value.putInt(<span class="string">"toId"</span>, toId);</span><br><span class="line"></span><br><span class="line">            result.put(<span class="string">"partition"</span> + i, value);</span><br><span class="line"></span><br><span class="line">            fromId = toId;</span><br><span class="line">            toId += range;</span><br><span class="line"></span><br><span class="line">            LOGGER.info(<span class="string">"partition&#123;&#125;; fromId: &#123;&#125;; toId: &#123;&#125;"</span>, i, fromId, toId);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> result;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h5 id="3-4-Partition-Handler-配置"><a href="#3-4-Partition-Handler-配置" class="headerlink" title="3.4 Partition-Handler 配置"></a>3.4 Partition-Handler 配置</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Step;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.partition.PartitionHandler;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.partition.support.TaskExecutorPartitionHandler;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;</span><br><span class="line"><span class="keyword">import</span> <span class="keyword">static</span> com.example.springbatchdemo.config.ExecutorConfig.TASK_EXECUTOR;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">TransferStudentPartitionHandler</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = TASK_EXECUTOR)</span><br><span class="line">    <span class="keyword">private</span> ThreadPoolTaskExecutor taskExecutor;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"slaveTransferStudentStep1"</span>)</span><br><span class="line">    <span class="keyword">private</span> Step slaveTransferStudentStep;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"transferStudentPartitionHandler1"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> PartitionHandler <span class="title">transferStudentPartitionHandler1</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        TaskExecutorPartitionHandler retVal = <span class="keyword">new</span> TaskExecutorPartitionHandler();</span><br><span class="line">        retVal.setTaskExecutor(taskExecutor);</span><br><span class="line">        retVal.setStep(slaveTransferStudentStep);</span><br><span class="line">        retVal.setGridSize(<span class="number">100</span>);</span><br><span class="line">        <span class="keyword">return</span> retVal;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h5 id="3-5-数据输入器"><a href="#3-5-数据输入器" class="headerlink" title="3.5 数据输入器"></a>3.5 数据输入器</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.component.reader.rowmapper.StudentRowMapper;</span><br><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Person;</span><br><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Student;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.StepScope;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcPagingItemReader;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.Order;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.builder.JdbcPagingItemReaderBuilder;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.support.MySqlPagingQueryProvider;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.file.FlatFileItemReader;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Value;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> org.springframework.core.io.ClassPathResource;</span><br><span class="line"><span class="keyword">import</span> javax.sql.DataSource;</span><br><span class="line"><span class="keyword">import</span> java.util.HashMap;</span><br><span class="line"><span class="keyword">import</span> java.util.Map;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">CustomItemReader</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchDemoDB"</span>)</span><br><span class="line">    <span class="keyword">private</span> DataSource batchDemoDB;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"slaveTransferStudentItemReader"</span>)</span><br><span class="line">    <span class="meta">@StepScope</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> JdbcPagingItemReader&lt;Student&gt; <span class="title">slaveTransferStudentItemReader</span><span class="params">(@Value(<span class="string">"#&#123;stepExecutionContext[fromId]&#125;"</span>)</span> <span class="keyword">final</span> Long fromId,</span></span><br><span class="line"><span class="function">                                                                        @<span class="title">Value</span><span class="params">(<span class="string">"#&#123;stepExecutionContext[toId]&#125;"</span>)</span> <span class="keyword">final</span> Long toId) </span>&#123;</span><br><span class="line"></span><br><span class="line">        MySqlPagingQueryProvider queryProvider = <span class="keyword">new</span> MySqlPagingQueryProvider();</span><br><span class="line">        queryProvider.setSelectClause(<span class="string">"student_id, name, address"</span>);</span><br><span class="line">        queryProvider.setFromClause(<span class="string">"from student_source"</span>);</span><br><span class="line">        queryProvider.setWhereClause(String.format(<span class="string">"where student_id &gt; %s and student_id &lt;= %s"</span>, fromId, toId));</span><br><span class="line"></span><br><span class="line">        Map&lt;String, Order&gt; sortKeys = <span class="keyword">new</span> HashMap&lt;&gt;(<span class="number">1</span>);</span><br><span class="line">        sortKeys.put(<span class="string">"student_id"</span>, Order.ASCENDING);</span><br><span class="line">        queryProvider.setSortKeys(sortKeys);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> JdbcPagingItemReaderBuilder&lt;Student&gt;()</span><br><span class="line">                .name(<span class="string">"studentItemReader"</span>)</span><br><span class="line">                .dataSource(batchDemoDB)</span><br><span class="line">                .fetchSize(<span class="number">1000</span>)</span><br><span class="line">                .rowMapper(<span class="keyword">new</span> StudentRowMapper())</span><br><span class="line">                .queryProvider(queryProvider)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h5 id="3-6-数据处理器"><a href="#3-6-数据处理器" class="headerlink" title="3.6 数据处理器"></a>3.6 数据处理器</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Student;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.Logger;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.LoggerFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.StepScope;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.ItemProcessor;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="meta">@StepScope</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SlaveStudentItemProcessor</span> <span class="keyword">implements</span> <span class="title">ItemProcessor</span>&lt;<span class="title">Student</span>, <span class="title">Student</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(StudentItemProcessor<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Student <span class="title">process</span><span class="params">(<span class="keyword">final</span> Student studentSource)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Long studentId = studentSource.getStudentId();</span><br><span class="line">        <span class="keyword">final</span> String name = studentSource.getName();</span><br><span class="line">        <span class="keyword">final</span> String address = studentSource.getAddress();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Student studentTarget = <span class="keyword">new</span> Student();</span><br><span class="line">        studentTarget.setStudentId(studentId);</span><br><span class="line">        studentTarget.setName(name);</span><br><span class="line">        studentTarget.setAddress(address);</span><br><span class="line"></span><br><span class="line">        log.info(<span class="string">"Converting (&#123;&#125;) into (&#123;&#125;)"</span>, studentSource, studentTarget);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> studentTarget;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h5 id="3-7-数据输出器"><a href="#3-7-数据输出器" class="headerlink" title="3.7 数据输出器"></a>3.7 数据输出器</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Person;</span><br><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Student;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.StepScope;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcBatchItemWriter;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> javax.sql.DataSource;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">CustomItemWriter</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchDemoDB"</span>)</span><br><span class="line">    <span class="keyword">private</span> DataSource batchDemoDB;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"slaveTransferStudentItemWriter"</span>)</span><br><span class="line">    <span class="meta">@StepScope</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> JdbcBatchItemWriter&lt;Student&gt; <span class="title">slaveTransferStudentItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> JdbcBatchItemWriterBuilder&lt;Student&gt;()</span><br><span class="line">                .itemSqlParameterSourceProvider(<span class="keyword">new</span> BeanPropertyItemSqlParameterSourceProvider&lt;&gt;())</span><br><span class="line">                .sql(<span class="string">"INSERT INTO student_target (student_id, name, address) VALUES (:studentId, :name, :address)"</span>)</span><br><span class="line">                .dataSource(batchDemoDB)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h4 id="四、性能测试"><a href="#四、性能测试" class="headerlink" title="四、性能测试"></a>四、性能测试</h4><p>测试数据量：100000</p>
-<p>测试环境：Windows 10，i7-8核，MySQL-8.0.28</p>
-<h5 id="4-1-常规-Step"><a href="#4-1-常规-Step" class="headerlink" title="4.1 常规 Step"></a>4.1 常规 Step</h5><p>省略测试代码，具体请查看 <code>demo</code>。测试结果：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/19_21_20_57_normal_step_transfer.png" alt=""></p>
-<p>耗时：<strong>13s</strong></p>
-<h5 id="4-2-分片化-Step"><a href="#4-2-分片化-Step" class="headerlink" title="4.2 分片化 Step"></a>4.2 分片化 Step</h5><p>测试结果：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/19_21_28_21_partition_step_performance.png" alt=""></p>
-<p>从 <code>batch_step_execution</code> 可以看出，共有 100 个子任务并行处理，每个子任务迁移 1000 条数据。</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/19_21_31_26_partition_step_performance_detail.png" alt=""></p>
-<p>耗时：<strong>7s</strong></p>
-<p>示例代码：<a href="https://github.com/donehub/spring-batch-demo" target="_blank" rel="noopener">spring-batch-demo</a></p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2022/02/08/spring_batch_optimization_parallel_step/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/02/08/spring_batch_optimization_parallel_step/" class="post-title-link" itemprop="url">Spring Batch 性能调优-并行化Step</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-02-08 11:28:35" itemprop="dateCreated datePublished" datetime="2022-02-08T11:28:35+08:00">2022-02-08</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2022/02/08/spring_batch_optimization_parallel_step/" class="post-meta-item leancloud_visitors" data-flag-title="Spring Batch 性能调优-并行化Step" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2022/02/08/spring_batch_optimization_parallel_step/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2022/02/08/spring_batch_optimization_parallel_step/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <hr>
-<h4 id="一、Spring-Batch-性能优化指标"><a href="#一、Spring-Batch-性能优化指标" class="headerlink" title="一、Spring Batch 性能优化指标"></a>一、Spring Batch 性能优化指标</h4><p>Spring Batch 是一款伸缩性非常好的批处理工具，既可以处理简单的任务，也可以处理复杂的、高容量的任务。在性能调优方面，Spring Batch 提供了丰富的接口支持，各项优化指标可归纳如下：</p>
-<ul>
-<li><a href="https://takeshell.com/2022/02/04/spring_batch_optimization_multi_thread_step/" target="_blank" rel="noopener">多线程 <code>Step</code></a>：由独立线程执行提交块（a chunk of items）的输入、处理和输出过程；</li>
-<li>并行化 <code>Step</code>：对于可并行处理的 <code>Step</code>，交由不同的线程去处理；</li>
-<li><a href="https://takeshell.com/2022/02/15/spring_batch_optimization_partition_step/" target="_blank" rel="noopener">分片化 <code>Step</code></a>：通过 <code>SPI(Serial Peripheral Interface)</code>，对 <code>Step</code> 分片执行；</li>
-<li>远程组块：对于输入无性能瓶颈，但处理和输出有性能瓶颈的任务，交由远程组块执行；</li>
-</ul>
-<p>详见<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/scalability.html#scalability" target="_blank" rel="noopener">Spring文档</a>。</p>
-<h4 id="二、并行化-Step"><a href="#二、并行化-Step" class="headerlink" title="二、并行化 Step"></a>二、并行化 <code>Step</code></h4><p>一个 <code>Job</code> 可配置多个 <code>Step</code>，<code>Step</code> 之间可能存在关联，需要有先有后；也可能没有关联，先执行哪一个都可以。那么，若将这些互不关联的 <code>Step</code> 进行并行化处理，将会有效提升批处理性能。</p>
-<p>比如，现有一个批处理任务，包含 4 个 <code>Step</code>：</p>
-<ul>
-<li><code>step1</code>：在学生姓名后面追加字符串 “1”；</li>
-<li><code>step2</code>：在学生姓名后面追加字符串 “2”；</li>
-<li><code>step3</code>：在学生住址后面追加字符串 “8”；</li>
-<li><code>step4</code>：迁移所有学生信息；</li>
-</ul>
-<p>我们发现，修改学生姓名的任务与修改学生住址的任务，互不干扰，并不需要有先后之分。因此，我们可以将 <code>step1</code>、<code>step2</code> 与 <code>step3</code> 并行执行。串行 <code>Step</code> 与并行 <code>Step</code> 流程如下：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/5_21_33_37_parallel_step_2.png" alt=""></p>
-<h4 id="三、批处理配置"><a href="#三、批处理配置" class="headerlink" title="三、批处理配置"></a>三、批处理配置</h4><h5 id="3-1-Job-配置"><a href="#3-1-Job-配置" class="headerlink" title="3.1 Job 配置"></a>3.1 Job 配置</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Job;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Step;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.JobBuilderFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.flow.Flow;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.launch.support.RunIdIncrementer;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="meta">@EnableBatchProcessing</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BatchManageStudentJob</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">public</span> JobBuilderFactory jobBuilderFactory;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchProcessStudentSplitFlow1"</span>)</span><br><span class="line">    <span class="keyword">private</span> Flow batchProcessStudentSplitFlow;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchTransferStudentStep1"</span>)</span><br><span class="line">    <span class="keyword">private</span> Step batchTransferStudentStep;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Job <span class="title">manageStudentJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"manageStudentJob1"</span>)</span><br><span class="line">                .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">            	<span class="comment">// 姓名追加1、姓名追加2、地址追加8</span></span><br><span class="line">                .start(batchProcessStudentSplitFlow)</span><br><span class="line">            	<span class="comment">// 迁移学生信息; student_source -&gt; student_target</span></span><br><span class="line">                .next(batchTransferStudentStep)</span><br><span class="line">                .end()</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h5 id="3-2-Fow-配置"><a href="#3-2-Fow-配置" class="headerlink" title="3.2 Fow 配置"></a>3.2 Fow 配置</h5><p><code>batchProcessStudentSplitFlow</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.builder.FlowBuilder;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.flow.Flow;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.flow.support.SimpleFlow;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;</span><br><span class="line"><span class="keyword">import</span> <span class="keyword">static</span> com.example.springbatchdemo.config.ExecutorConfig.TASK_EXECUTOR;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BatchProcessStudentSplitFlow</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = TASK_EXECUTOR)</span><br><span class="line">    <span class="keyword">private</span> ThreadPoolTaskExecutor taskExecutor;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchUpdateStudentNameOneAndTwoFlow"</span>)</span><br><span class="line">    <span class="keyword">private</span> Flow batchUpdateStudentNameOneAndTwoFlow;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchUpdateStudentAddressFlow1"</span>)</span><br><span class="line">    <span class="keyword">private</span> Flow batchUpdateStudentAddressFlow;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"batchProcessStudentSplitFlow1"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Flow <span class="title">batchProcessStudentSplitFlow1</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> FlowBuilder&lt;SimpleFlow&gt;(<span class="string">"batchProcessStudentSplitFlow1"</span>)</span><br><span class="line">                .split(taskExecutor)</span><br><span class="line">                .add(batchUpdateStudentNameOneAndTwoFlow, batchUpdateStudentAddressFlow)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><code>batchUpdateStudentNameOneAndTwoFlow</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Step;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.builder.FlowBuilder;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.flow.Flow;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.flow.support.SimpleFlow;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BatchUpdateStudentNameFlow</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchUpdateStudentNameStep1"</span>)</span><br><span class="line">    <span class="keyword">private</span> Step batchUpdateStudentNameStep1;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchUpdateStudentNameStep2"</span>)</span><br><span class="line">    <span class="keyword">private</span> Step batchUpdateStudentNameStep2;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"batchUpdateStudentNameOneAndTwoFlow"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Flow <span class="title">updateStudentNameOneAndTwoFlow</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> FlowBuilder&lt;SimpleFlow&gt;(<span class="string">"batchUpdateStudentNameOneAndTwoFlow"</span>)</span><br><span class="line">                .start(batchUpdateStudentNameStep1)</span><br><span class="line">                .next(batchUpdateStudentNameStep2)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><code>batchUpdateStudentNameOneAndTwoFlow</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Step;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.builder.FlowBuilder;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.flow.Flow;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.flow.support.SimpleFlow;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BatchUpdateStudentAddressFlow</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchUpdateStudentAddressStep1"</span>)</span><br><span class="line">    <span class="keyword">private</span> Step batchUpdateStudentAddressStep;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"batchUpdateStudentAddressFlow1"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Flow <span class="title">batchUpdateStudentAddressFlow1</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> FlowBuilder&lt;SimpleFlow&gt;(<span class="string">"batchUpdateStudentAddressFlow1"</span>)</span><br><span class="line">                .start(batchUpdateStudentAddressStep)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h5 id="3-3-Step-配置"><a href="#3-3-Step-配置" class="headerlink" title="3.3 Step 配置"></a>3.3 Step 配置</h5><p><code>BatchUpdateStudentNameStep</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.component.processor.AppendStudentNameOneProcessor;</span><br><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.component.processor.AppendStudentNameTwoProcessor;</span><br><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Student;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Step;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.StepBuilderFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcBatchItemWriter;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcPagingItemReader;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BatchUpdateStudentNameStep</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">public</span> StepBuilderFactory stepBuilderFactory;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"studentItemReader"</span>)</span><br><span class="line">    <span class="keyword">private</span> JdbcPagingItemReader&lt;Student&gt; studentItemReader;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"studentItemUpdateName"</span>)</span><br><span class="line">    <span class="keyword">private</span> JdbcBatchItemWriter&lt;Student&gt; studentItemUpdateName;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> AppendStudentNameOneProcessor appendStudentNameOneProcessor;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> AppendStudentNameTwoProcessor appendStudentNameTwoProcessor;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"batchUpdateStudentNameStep1"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Step <span class="title">batchUpdateStudentNameStep1</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"batchUpdateStudentNameStep1"</span>)</span><br><span class="line">                .&lt;Student, Student&gt;chunk(<span class="number">1000</span>)</span><br><span class="line">                .reader(studentItemReader)</span><br><span class="line">            	<span class="comment">// 姓名追加 1</span></span><br><span class="line">                .processor(appendStudentNameOneProcessor)</span><br><span class="line">                .writer(studentItemUpdateName)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"batchUpdateStudentNameStep2"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Step <span class="title">batchUpdateStudentNameStep2</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"batchUpdateStudentNameStep2"</span>)</span><br><span class="line">                .&lt;Student, Student&gt;chunk(<span class="number">1000</span>)</span><br><span class="line">                .reader(studentItemReader)</span><br><span class="line">            	<span class="comment">// 姓名追加 2</span></span><br><span class="line">                .processor(appendStudentNameTwoProcessor)</span><br><span class="line">                .writer(studentItemUpdateName)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><code>BatchUpdateStudentAddressStep</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.component.processor.AppendStudentAddressProcessor;</span><br><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Student;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Step;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.StepBuilderFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcBatchItemWriter;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcPagingItemReader;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BatchUpdateStudentAddressStep</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">public</span> StepBuilderFactory stepBuilderFactory;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"studentItemReader"</span>)</span><br><span class="line">    <span class="keyword">private</span> JdbcPagingItemReader&lt;Student&gt; studentItemReader;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"studentItemUpdateAddress"</span>)</span><br><span class="line">    <span class="keyword">private</span> JdbcBatchItemWriter&lt;Student&gt; studentItemUpdateAddress;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> AppendStudentAddressProcessor appendStudentAddressProcessor;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"batchUpdateStudentAddressStep1"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Step <span class="title">batchUpdateStudentAddressStep1</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"batchUpdateStudentAddressStep1"</span>)</span><br><span class="line">                .&lt;Student, Student&gt;chunk(<span class="number">1000</span>)</span><br><span class="line">                .reader(studentItemReader)</span><br><span class="line">            	<span class="comment">// 住址追加 8</span></span><br><span class="line">                .processor(appendStudentAddressProcessor)</span><br><span class="line">                .writer(studentItemUpdateAddress)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><code>BatchProcessStudentStep</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.component.processor.StudentItemProcessor;</span><br><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Student;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Step;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.StepBuilderFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcBatchItemWriter;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcPagingItemReader;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BatchProcessStudentStep</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">public</span> StepBuilderFactory stepBuilderFactory;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"studentItemReader"</span>)</span><br><span class="line">    <span class="keyword">private</span> JdbcPagingItemReader&lt;Student&gt; studentItemReader;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"studentItemWriter"</span>)</span><br><span class="line">    <span class="keyword">private</span> JdbcBatchItemWriter&lt;Student&gt; studentItemWriter;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> StudentItemProcessor studentItemProcessor;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"batchTransferStudentStep1"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Step <span class="title">batchTransferStudentStep1</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"batchTransferStudentStep1"</span>)</span><br><span class="line">                .&lt;Student, Student&gt;chunk(<span class="number">1000</span>)</span><br><span class="line">                .reader(studentItemReader)</span><br><span class="line">            	<span class="comment">// 迁移数据; student_source -&gt; student_target</span></span><br><span class="line">                .processor(studentItemProcessor)</span><br><span class="line">                .writer(studentItemWriter)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h5 id="3-4-数据输入器"><a href="#3-4-数据输入器" class="headerlink" title="3.4 数据输入器"></a>3.4 数据输入器</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.component.reader.rowmapper.StudentRowMapper;</span><br><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Person;</span><br><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Student;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.StepScope;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcPagingItemReader;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.Order;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.builder.JdbcPagingItemReaderBuilder;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.support.MySqlPagingQueryProvider;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.file.FlatFileItemReader;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> org.springframework.core.io.ClassPathResource;</span><br><span class="line"><span class="keyword">import</span> javax.sql.DataSource;</span><br><span class="line"><span class="keyword">import</span> java.util.HashMap;</span><br><span class="line"><span class="keyword">import</span> java.util.Map;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">CustomItemReader</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchDemoDB"</span>)</span><br><span class="line">    <span class="keyword">private</span> DataSource batchDemoDB;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"studentItemReader"</span>)</span><br><span class="line">    <span class="meta">@StepScope</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> JdbcPagingItemReader&lt;Student&gt; <span class="title">studentItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        MySqlPagingQueryProvider queryProvider = <span class="keyword">new</span> MySqlPagingQueryProvider();</span><br><span class="line">        queryProvider.setSelectClause(<span class="string">"student_id, name, address"</span>);</span><br><span class="line">        queryProvider.setFromClause(<span class="string">"from student_source"</span>);</span><br><span class="line"></span><br><span class="line">        Map&lt;String, Order&gt; sortKeys = <span class="keyword">new</span> HashMap&lt;&gt;(<span class="number">1</span>);</span><br><span class="line">        sortKeys.put(<span class="string">"student_id"</span>, Order.ASCENDING);</span><br><span class="line">        queryProvider.setSortKeys(sortKeys);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> JdbcPagingItemReaderBuilder&lt;Student&gt;()</span><br><span class="line">                .name(<span class="string">"studentItemReader"</span>)</span><br><span class="line">                .dataSource(batchDemoDB)</span><br><span class="line">                .fetchSize(<span class="number">1000</span>)</span><br><span class="line">                .rowMapper(<span class="keyword">new</span> StudentRowMapper())</span><br><span class="line">                .queryProvider(queryProvider)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h5 id="3-5-数据处理器"><a href="#3-5-数据处理器" class="headerlink" title="3.5 数据处理器"></a>3.5 数据处理器</h5><p><code>AppendStudentNameOneProcessor</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Student;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.Logger;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.LoggerFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.ItemProcessor;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">AppendStudentNameOneProcessor</span> <span class="keyword">implements</span> <span class="title">ItemProcessor</span>&lt;<span class="title">Student</span>, <span class="title">Student</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(AppendStudentNameOneProcessor<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Student <span class="title">process</span><span class="params">(<span class="keyword">final</span> Student studentSource)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Long studentId = studentSource.getStudentId();</span><br><span class="line">        <span class="keyword">final</span> String name = studentSource.getName();</span><br><span class="line">        <span class="keyword">final</span> String address = studentSource.getAddress();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Student studentTarget = <span class="keyword">new</span> Student();</span><br><span class="line">        studentTarget.setStudentId(studentId);</span><br><span class="line">        studentTarget.setName(name.concat(<span class="string">"_1"</span>));</span><br><span class="line">        studentTarget.setAddress(address);</span><br><span class="line"></span><br><span class="line">        log.info(<span class="string">"Converting (&#123;&#125;) into (&#123;&#125;)"</span>, studentSource, studentTarget);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> studentTarget;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><code>AppendStudentNameTwoProcessor</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Student;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.Logger;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.LoggerFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.ItemProcessor;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">AppendStudentNameTwoProcessor</span> <span class="keyword">implements</span> <span class="title">ItemProcessor</span>&lt;<span class="title">Student</span>, <span class="title">Student</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(AppendStudentNameTwoProcessor<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Student <span class="title">process</span><span class="params">(<span class="keyword">final</span> Student studentSource)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Long studentId = studentSource.getStudentId();</span><br><span class="line">        <span class="keyword">final</span> String name = studentSource.getName();</span><br><span class="line">        <span class="keyword">final</span> String address = studentSource.getAddress();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Student studentTarget = <span class="keyword">new</span> Student();</span><br><span class="line">        studentTarget.setStudentId(studentId);</span><br><span class="line">        studentTarget.setName(name.concat(<span class="string">"_2"</span>));</span><br><span class="line">        studentTarget.setAddress(address);</span><br><span class="line"></span><br><span class="line">        log.info(<span class="string">"Converting (&#123;&#125;) into (&#123;&#125;)"</span>, studentSource, studentTarget);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> studentTarget;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><code>AppendStudentAddressProcessor</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Student;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.Logger;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.LoggerFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.ItemProcessor;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">AppendStudentAddressProcessor</span> <span class="keyword">implements</span> <span class="title">ItemProcessor</span>&lt;<span class="title">Student</span>, <span class="title">Student</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(AppendStudentAddressProcessor<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Student <span class="title">process</span><span class="params">(<span class="keyword">final</span> Student studentSource)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Long studentId = studentSource.getStudentId();</span><br><span class="line">        <span class="keyword">final</span> String name = studentSource.getName();</span><br><span class="line">        <span class="keyword">final</span> String address = studentSource.getAddress();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Student studentTarget = <span class="keyword">new</span> Student();</span><br><span class="line">        studentTarget.setStudentId(studentId);</span><br><span class="line">        studentTarget.setName(name);</span><br><span class="line">        studentTarget.setAddress(address.concat(<span class="string">"_8"</span>));</span><br><span class="line"></span><br><span class="line">        log.info(<span class="string">"Converting (&#123;&#125;) into (&#123;&#125;)"</span>, studentSource, studentTarget);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> studentTarget;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><code>StudentItemProcessor</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Student;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.Logger;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.LoggerFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.ItemProcessor;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">StudentItemProcessor</span> <span class="keyword">implements</span> <span class="title">ItemProcessor</span>&lt;<span class="title">Student</span>, <span class="title">Student</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(StudentItemProcessor<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Student <span class="title">process</span><span class="params">(<span class="keyword">final</span> Student studentSource)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Long studentId = studentSource.getStudentId();</span><br><span class="line">        <span class="keyword">final</span> String name = studentSource.getName();</span><br><span class="line">        <span class="keyword">final</span> String address = studentSource.getAddress();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Student studentTarget = <span class="keyword">new</span> Student();</span><br><span class="line">        studentTarget.setStudentId(studentId);</span><br><span class="line">        studentTarget.setName(name);</span><br><span class="line">        studentTarget.setAddress(address);</span><br><span class="line"></span><br><span class="line">        log.info(<span class="string">"Converting (&#123;&#125;) into (&#123;&#125;)"</span>, studentSource, studentTarget);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> studentTarget;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h5 id="3-6-数据输出器"><a href="#3-6-数据输出器" class="headerlink" title="3.6 数据输出器"></a>3.6 数据输出器</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Person;</span><br><span class="line"><span class="keyword">import</span> com.example.springbatchdemo.entity.Student;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.StepScope;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.JdbcBatchItemWriter;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> javax.sql.DataSource;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">CustomItemWriter</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchDemoDB"</span>)</span><br><span class="line">    <span class="keyword">private</span> DataSource batchDemoDB;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"studentItemWriter"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> JdbcBatchItemWriter&lt;Student&gt; <span class="title">studentItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> JdbcBatchItemWriterBuilder&lt;Student&gt;()</span><br><span class="line">                .itemSqlParameterSourceProvider(<span class="keyword">new</span> BeanPropertyItemSqlParameterSourceProvider&lt;&gt;())</span><br><span class="line">                .sql(<span class="string">"INSERT INTO student_target (student_id, name, address) VALUES (:studentId, :name, :address)"</span>)</span><br><span class="line">                .dataSource(batchDemoDB)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"studentItemUpdateName"</span>)</span><br><span class="line">    <span class="meta">@StepScope</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> JdbcBatchItemWriter&lt;Student&gt; <span class="title">studentItemUpdateName</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> JdbcBatchItemWriterBuilder&lt;Student&gt;()</span><br><span class="line">                .itemSqlParameterSourceProvider(<span class="keyword">new</span> BeanPropertyItemSqlParameterSourceProvider&lt;&gt;())</span><br><span class="line">                .sql(<span class="string">"UPDATE student_source SET name = :name WHERE student_id = :studentId"</span>)</span><br><span class="line">                .dataSource(batchDemoDB)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"studentItemUpdateAddress"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> JdbcBatchItemWriter&lt;Student&gt; <span class="title">studentItemUpdateAddress</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> JdbcBatchItemWriterBuilder&lt;Student&gt;()</span><br><span class="line">                .itemSqlParameterSourceProvider(<span class="keyword">new</span> BeanPropertyItemSqlParameterSourceProvider&lt;&gt;())</span><br><span class="line">                .sql(<span class="string">"UPDATE student_source SET address = :address WHERE student_id = :studentId"</span>)</span><br><span class="line">                .dataSource(batchDemoDB)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>@StepScope：</p>
-<p>从上面的 <code>Step</code> 配置可知，<code>studentItemReader</code> 被多个 <code>Step</code> 引用。默认情况下 <code>studentItemReader</code> 的生命周期是与 <code>Job</code> 保持一致，那么在多 <code>Step</code> 引用的情况下，就会抛出类似下面这种异常：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&gt;Caused by: java.lang.IllegalStateException: Cannot open an already opened ItemReader, call close first</span><br></pre></td></tr></table></figure>
-
-<p>使用注解 <code>StepScope</code>，让 <code>studentItemReader</code> 的生命周期与 <code>Step</code> 保持同步，保证每个 <code>Step</code> 拿到的 <code>ItemReader</code> 都是新的实例。同样，<code>ItemWriter</code>、<code>ItemProcessor</code> 存在多 <code>Step</code> 引用的，都要使用该注解。</p>
-</blockquote>
-<h4 id="四、性能测试"><a href="#四、性能测试" class="headerlink" title="四、性能测试"></a>四、性能测试</h4><p>测试数据量：100000</p>
-<p>测试环境：Windows 10，i7-8核，MySQL-8.0.28</p>
-<h5 id="4-1-串行-Step"><a href="#4-1-串行-Step" class="headerlink" title="4.1 串行 Step"></a>4.1 串行 Step</h5><p>串行 <code>Step</code> 批处理，只需要按照顺序配置 <code>Step</code>（省略代码示例）。测试结果：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/8_12_36_15_serial_step_performance.png" alt=""></p>
-<p>耗时：<strong>91s</strong></p>
-<h5 id="4-2-并行-Step"><a href="#4-2-并行-Step" class="headerlink" title="4.2 并行 Step"></a>4.2 并行 Step</h5><p>测试结果：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/8_12_41_53_parallel_step_performance.png" alt=""></p>
-<p>耗时：<strong>68s</strong></p>
-<p>示例代码：<a href="https://github.com/donehub/spring-batch-demo" target="_blank" rel="noopener">spring-batch-demo</a></p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -3635,7 +4324,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">46</span>
+          <span class="site-state-item-count">48</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -3648,7 +4337,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">21</span>
+        <span class="site-state-item-count">23</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

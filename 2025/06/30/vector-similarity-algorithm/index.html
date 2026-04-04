@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="写在前面向量数据库的核心问题只有一个：给定一个查询向量，如何快速找出数据库中最相似的 K 个向量？ 这个问题看似简单，实则涉及数学、算法、工程三个层面。数学层面是相似度度量，算法层面是近似最近邻搜索（ANN），工程层面是索引结构与存储优化。 这篇文章从研究角度切入，深入剖析相似度计算的数学原理和核心算法，不谈产品选型，只谈技术本质。  一、相似度度量：三种主流方法1. 余弦相似度（Cosine S">
+<meta property="og:type" content="article">
+<meta property="og:title" content="向量相似度计算：从数学原理到算法实现">
+<meta property="og:url" content="https://donehub.github.io/2025/06/30/vector-similarity-algorithm/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="写在前面向量数据库的核心问题只有一个：给定一个查询向量，如何快速找出数据库中最相似的 K 个向量？ 这个问题看似简单，实则涉及数学、算法、工程三个层面。数学层面是相似度度量，算法层面是近似最近邻搜索（ANN），工程层面是索引结构与存储优化。 这篇文章从研究角度切入，深入剖析相似度计算的数学原理和核心算法，不谈产品选型，只谈技术本质。  一、相似度度量：三种主流方法1. 余弦相似度（Cosine S">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-06-29T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-04T10:04:17.893Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="向量检索">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2025/06/30/vector-similarity-algorithm/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>向量相似度计算：从数学原理到算法实现 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2025/06/30/vector-similarity-algorithm/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          向量相似度计算：从数学原理到算法实现
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-06-30 00:00:00" itemprop="dateCreated datePublished" datetime="2025-06-30T00:00:00+08:00">2025-06-30</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-04 18:04:17" itemprop="dateModified" datetime="2026-04-04T18:04:17+08:00">2026-04-04</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2025/06/30/vector-similarity-algorithm/" class="post-meta-item leancloud_visitors" data-flag-title="向量相似度计算：从数学原理到算法实现" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2025/06/30/vector-similarity-algorithm/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2025/06/30/vector-similarity-algorithm/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h2><p>向量数据库的核心问题只有一个：<strong>给定一个查询向量，如何快速找出数据库中最相似的 K 个向量？</strong></p>
+<p>这个问题看似简单，实则涉及数学、算法、工程三个层面。数学层面是相似度度量，算法层面是近似最近邻搜索（ANN），工程层面是索引结构与存储优化。</p>
+<p>这篇文章从研究角度切入，深入剖析相似度计算的数学原理和核心算法，不谈产品选型，只谈技术本质。</p>
+<hr>
+<h2 id="一、相似度度量：三种主流方法"><a href="#一、相似度度量：三种主流方法" class="headerlink" title="一、相似度度量：三种主流方法"></a>一、相似度度量：三种主流方法</h2><h3 id="1-余弦相似度（Cosine-Similarity）"><a href="#1-余弦相似度（Cosine-Similarity）" class="headerlink" title="1. 余弦相似度（Cosine Similarity）"></a>1. 余弦相似度（Cosine Similarity）</h3><p><strong>定义</strong>：两个向量夹角的余弦值。</p>
+<p>$$<br>\cos(\theta) = \frac{\vec{A} \cdot \vec{B}}{|\vec{A}| \times |\vec{B}|} = \frac{\sum_{i=1}^{n} A_i B_i}{\sqrt{\sum_{i=1}^{n} A_i^2} \times \sqrt{\sum_{i=1}^{n} B_i^2}}<br>$$</p>
+<p><strong>特点</strong>：</p>
+<ul>
+<li>值域 [-1, 1]，1 表示方向完全相同，-1 表示方向相反</li>
+<li>只关注方向，忽略向量长度（magnitude）</li>
+<li>对向量长度不敏感，适合文本语义相似度</li>
+</ul>
+<p><strong>为什么文本向量用余弦</strong>：Embedding 模型输出的向量长度（norm）本身就蕴含信息，但语义相似度主要看方向。两篇文章讨论同一话题，即使篇幅不同（向量长度不同），方向应该相近。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">cosine_similarity</span><span class="params">(a, b)</span>:</span></span><br><span class="line">    <span class="string">"""余弦相似度计算"""</span></span><br><span class="line">    dot_product = np.dot(a, b)</span><br><span class="line">    norm_a = np.linalg.norm(a)</span><br><span class="line">    norm_b = np.linalg.norm(b)</span><br><span class="line">    <span class="keyword">return</span> dot_product / (norm_a * norm_b)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 示例</span></span><br><span class="line">a = np.array([<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>])</span><br><span class="line">b = np.array([<span class="number">2</span>, <span class="number">4</span>, <span class="number">6</span>])  <span class="comment"># b = 2a，方向完全相同</span></span><br><span class="line"></span><br><span class="line">print(cosine_similarity(a, b))  <span class="comment"># 输出 1.0</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>计算复杂度</strong>：O(d)，d 为向量维度。</p>
+<h3 id="2-欧氏距离（Euclidean-Distance）"><a href="#2-欧氏距离（Euclidean-Distance）" class="headerlink" title="2. 欧氏距离（Euclidean Distance）"></a>2. 欧氏距离（Euclidean Distance）</h3><p><strong>定义</strong>：两个向量在欧氏空间中的直线距离。</p>
+<p>$$<br>d_{L2}(\vec{A}, \vec{B}) = \sqrt{\sum_{i=1}^{n} (A_i - B_i)^2}<br>$$</p>
+<p><strong>特点</strong>：</p>
+<ul>
+<li>值域 [0, ∞)，越小越相似</li>
+<li>同时考虑方向和长度</li>
+<li>适合图像特征、物理坐标等绝对距离有意义的场景</li>
+</ul>
+<p><strong>与余弦的关系</strong>：对归一化向量，欧氏距离和余弦相似度有单调关系：</p>
+<p>$$<br>d_{L2} = \sqrt{2(1 - \cos(\theta))}<br>$$</p>
+<p>证明：设 $\vec{A}$ 和 $\vec{B}$ 均归一化（$|\vec{A}| = |\vec{B}| = 1$），则：</p>
+<p>$$<br>|\vec{A} - \vec{B}|^2 = |\vec{A}|^2 + |\vec{B}|^2 - 2\vec{A}\cdot\vec{B} = 2 - 2\cos(\theta)<br>$$</p>
+<p><strong>结论</strong>：如果向量已归一化，用 L2 或余弦结果一致。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">euclidean_distance</span><span class="params">(a, b)</span>:</span></span><br><span class="line">    <span class="string">"""欧氏距离计算"""</span></span><br><span class="line">    <span class="keyword">return</span> np.sqrt(np.sum((a - b) ** <span class="number">2</span>))</span><br><span class="line"></span><br><span class="line"><span class="comment"># 归一化后与余弦的关系</span></span><br><span class="line">a_norm = a / np.linalg.norm(a)</span><br><span class="line">b_norm = b / np.linalg.norm(b)</span><br><span class="line"></span><br><span class="line">d = euclidean_distance(a_norm, b_norm)</span><br><span class="line">cos = cosine_similarity(a_norm, b_norm)</span><br><span class="line"></span><br><span class="line">print(np.sqrt(<span class="number">2</span> * (<span class="number">1</span> - cos)))  <span class="comment"># 与 d 相等</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="3-内积（Inner-Product-Dot-Product）"><a href="#3-内积（Inner-Product-Dot-Product）" class="headerlink" title="3. 内积（Inner Product / Dot Product）"></a>3. 内积（Inner Product / Dot Product）</h3><p><strong>定义</strong>：两个向量对应分量乘积之和。</p>
+<p>$$<br>\vec{A} \cdot \vec{B} = \sum_{i=1}^{n} A_i B_i<br>$$</p>
+<p><strong>特点</strong>：</p>
+<ul>
+<li>值域取决于向量，无固定范围</li>
+<li>计算最快，无需计算 norm</li>
+<li>要求向量归一化，否则结果不可比</li>
+</ul>
+<p><strong>为什么内积最快</strong>：省去了 norm 计算（两遍向量遍历），只需一遍遍历。在大规模检索中，这个差异很显著。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">dot_product</span><span class="params">(a, b)</span>:</span></span><br><span class="line">    <span class="string">"""内积计算"""</span></span><br><span class="line">    <span class="keyword">return</span> np.dot(a, b)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 归一化向量：内积 = 余弦相似度</span></span><br><span class="line">a_norm = a / np.linalg.norm(a)</span><br><span class="line">b_norm = b / np.linalg.norm(b)</span><br><span class="line"></span><br><span class="line">print(dot_product(a_norm, b_norm))  <span class="comment"># 与 cosine_similarity 相等</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="4-三种度量对比"><a href="#4-三种度量对比" class="headerlink" title="4. 三种度量对比"></a>4. 三种度量对比</h3><table>
+<thead>
+<tr>
+<th>度量方法</th>
+<th>公式复杂度</th>
+<th>值域</th>
+<th>计算速度</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>余弦相似度</td>
+<td>O(d) + norm</td>
+<td>[-1, 1]</td>
+<td>中等</td>
+<td>文本语义、方向敏感</td>
+</tr>
+<tr>
+<td>欧氏距离</td>
+<td>O(d)</td>
+<td>[0, ∞)</td>
+<td>中等</td>
+<td>图像特征、物理位置</td>
+</tr>
+<tr>
+<td>内积</td>
+<td>O(d)</td>
+<td>不固定</td>
+<td>最快</td>
+<td>归一化向量、追求速度</td>
+</tr>
+</tbody></table>
+<p><strong>工程选择</strong>：</p>
+<ul>
+<li>文本向量默认归一化 → 内积或余弦，推荐内积（快）</li>
+<li>未归一化向量 → 余弦或 L2</li>
+<li>物理坐标、图像特征 → L2</li>
+</ul>
+<hr>
+<h2 id="二、精确搜索-vs-近似搜索"><a href="#二、精确搜索-vs-近似搜索" class="headerlink" title="二、精确搜索 vs 近似搜索"></a>二、精确搜索 vs 近似搜索</h2><h3 id="1-暴力搜索（FLAT）"><a href="#1-暴力搜索（FLAT）" class="headerlink" title="1. 暴力搜索（FLAT）"></a>1. 暴力搜索（FLAT）</h3><p>遍历所有向量，逐一计算相似度，排序取 Top-K。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">brute_force_search</span><span class="params">(query, database, k=<span class="number">10</span>)</span>:</span></span><br><span class="line">    <span class="string">"""暴力搜索"""</span></span><br><span class="line">    <span class="comment"># 计算所有相似度</span></span><br><span class="line">    similarities = [cosine_similarity(query, vec) <span class="keyword">for</span> vec <span class="keyword">in</span> database]</span><br><span class="line">    <span class="comment"># 排序取 Top-K</span></span><br><span class="line">    indices = np.argsort(similarities)[-k:]</span><br><span class="line">    <span class="keyword">return</span> indices, [similarities[i] <span class="keyword">for</span> i <span class="keyword">in</span> indices]</span><br></pre></td></tr></table></figure>
+
+<p><strong>复杂度分析</strong>：</p>
+<ul>
+<li>时间：O(N × d)，N 为向量数，d 为维度</li>
+<li>空间：O(1)，无需额外索引</li>
+</ul>
+<p><strong>问题</strong>：N 达到百万级时，单次查询耗时秒级，无法满足实时需求。</p>
+<h3 id="2-维度灾难（Curse-of-Dimensionality）"><a href="#2-维度灾难（Curse-of-Dimensionality）" class="headerlink" title="2. 维度灾难（Curse of Dimensionality）"></a>2. 维度灾难（Curse of Dimensionality）</h3><p>高维空间的几何特性与低维截然不同：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>特性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2D/3D</td>
+<td>距离有意义，近邻真的”近”</td>
+</tr>
+<tr>
+<td>高维（&gt;100）</td>
+<td>所有向量距离趋于均匀，近邻与远邻差距缩小</td>
+</tr>
+</tbody></table>
+<p><strong>定量分析</strong>：在 d 维超立方体中，随机两点距离的方差：</p>
+<p>$$<br>\text{Var}(d) \approx \frac{d}{12}<br>$$</p>
+<p>随着 d 增加，距离分布趋于集中，”最近”和”最远”的区分度下降。</p>
+<p><strong>结论</strong>：高维空间中，精确找到最近邻代价极高，但”足够近”的近似最近邻（ANN）足够好——这是 ANN 算法的理论基础。</p>
+<hr>
+<h2 id="三、ANN-算法：核心思想与分类"><a href="#三、ANN-算法：核心思想与分类" class="headerlink" title="三、ANN 算法：核心思想与分类"></a>三、ANN 算法：核心思想与分类</h2><p>ANN（Approximate Nearest Neighbor）牺牲少量精度换取大幅提升的速度。核心思想：<strong>构建索引结构，搜索时只考察部分候选，而非全量遍历</strong>。</p>
+<h3 id="算法分类"><a href="#算法分类" class="headerlink" title="算法分类"></a>算法分类</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">ANN 算法家族</span><br><span class="line">├── 基于树（Tree-based）</span><br><span class="line">│   ├── KD-Tree：低维有效，高维失效</span><br><span class="line">│   ├── Ball Tree：球形划分，中等维度</span><br><span class="line">│   └── Annoy（Spotify）：多棵随机投影树</span><br><span class="line">│</span><br><span class="line">├── 基于图（Graph-based）</span><br><span class="line">│   ├── NSW：可导航小世界图</span><br><span class="line">│   ├── HNSW：分层 NSW，当前最优</span><br><span class="line">│   └── NGT&#x2F;ONNG：日本 Yahoo 开源</span><br><span class="line">│</span><br><span class="line">├── 基于量化（Quantization-based）</span><br><span class="line">│   ├── PQ：乘积量化，压缩向量</span><br><span class="line">│   ├── OPQ：优化乘积量化</span><br><span class="line">│   └── ScaNN：Google 开源，量化+重排</span><br><span class="line">│</span><br><span class="line">├── 基于哈希（Hash-based）</span><br><span class="line">│   ├── LSH：局部敏感哈希</span><br><span class="line">│   └── Multi-probe LSH：改进版</span><br><span class="line">│</span><br><span class="line">└── 基于聚类（Clustering-based）</span><br><span class="line">    ├── IVF：倒排文件索引</span><br><span class="line">    └── IVF-PQ：倒排+量化组合</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="四、HNSW：当前最优的图索引算法"><a href="#四、HNSW：当前最优的图索引算法" class="headerlink" title="四、HNSW：当前最优的图索引算法"></a>四、HNSW：当前最优的图索引算法</h2><h3 id="1-核心思想"><a href="#1-核心思想" class="headerlink" title="1. 核心思想"></a>1. 核心思想</h3><p>HNSW（Hierarchical Navigable Small World）由 Malkov 等人在 2016 年提出，是当前最主流的 ANN 算法。</p>
+<p><strong>灵感来源</strong>：跳表（Skip List）。跳表通过多层索引实现 O(log N) 查找，HNSW 将这个思想移植到图结构。</p>
+<p><strong>结构设计</strong>：</p>
+<ul>
+<li>多层图，上层稀疏，下层密集</li>
+<li>搜索从顶层开始，逐层向下逼近</li>
+<li>每层内节点通过边连接，边代表”邻居关系”</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">层级结构示意：</span><br><span class="line"></span><br><span class="line">Layer 2 (最高层，概率 p²)：    ●───────●</span><br><span class="line">                                 │       │</span><br><span class="line">Layer 1 (概率 p¹)：        ●───●───●───●</span><br><span class="line">                           │   │   │   │</span><br><span class="line">Layer 0 (全量节点)：    ●─●─●─●─●─●─●─●─●─●─●</span><br><span class="line">                      (每个节点都在 Layer 0)</span><br><span class="line"></span><br><span class="line">节点进入高层概率：p^l &#x3D; 1 &#x2F; (ln(M) × M^(level))</span><br><span class="line">高层节点数 ≈ N &#x2F; (ln M × M^level)</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-构建算法"><a href="#2-构建算法" class="headerlink" title="2. 构建算法"></a>2. 构建算法</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">算法：INSERT(element, hnsw)</span><br><span class="line">输入：新元素 q，HNSW 图</span><br><span class="line">输出：更新后的 HNSW 图</span><br><span class="line"></span><br><span class="line">1. 确定插入层数 l &#x3D; floor(-ln(uniform(0,1)) × mL)</span><br><span class="line">2. 从顶层 entry point 开始，贪心搜索到 l 层的入口</span><br><span class="line">3. 从 l 层向下到 0 层，每层：</span><br><span class="line">   a. 在当前层搜索 efConstruction 个最近邻候选</span><br><span class="line">   b. 从候选中选择 M 个最近邻连接</span><br><span class="line">   c. 处理连接边：保持每节点最大 M 条边</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键参数</strong>：</p>
+<ul>
+<li><strong>M</strong>：每节点最大连接数（默认 16）</li>
+<li><strong>efConstruction</strong>：构建时搜索宽度（默认 200）</li>
+<li><strong>mL</strong>：层数乘数，通常取 $1/\ln M$</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># HNSW 构建伪代码</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">insert</span><span class="params">(q, hnsw, M=<span class="number">16</span>, ef_construction=<span class="number">200</span>, mL=<span class="number">1</span>/np.log<span class="params">(<span class="number">16</span>)</span>)</span>:</span></span><br><span class="line">    <span class="comment"># 1. 确定插入层数</span></span><br><span class="line">    level = int(-np.log(np.random.random()) * mL)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 2. 从顶层搜索到 level 层的入口</span></span><br><span class="line">    entry = hnsw.entry_point</span><br><span class="line">    <span class="keyword">for</span> l <span class="keyword">in</span> range(hnsw.max_level, level + <span class="number">1</span>):</span><br><span class="line">        entry = greedy_search(q, entry, ef=<span class="number">1</span>, layer=l)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 3. 从 level 层向下插入</span></span><br><span class="line">    <span class="keyword">for</span> l <span class="keyword">in</span> range(level, <span class="number">-1</span>, <span class="number">-1</span>):</span><br><span class="line">        candidates = search_layer(q, entry, ef_construction, l)</span><br><span class="line">        neighbors = select_neighbors(q, candidates, M)</span><br><span class="line">        connect(q, neighbors, l)</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-搜索算法"><a href="#3-搜索算法" class="headerlink" title="3. 搜索算法"></a>3. 搜索算法</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">算法：SEARCH(query, hnsw, ef, K)</span><br><span class="line">输入：查询向量 q，HNSW 图，搜索宽度 ef，返回数量 K</span><br><span class="line">输出：K 个最近邻</span><br><span class="line"></span><br><span class="line">1. 从顶层 entry point 开始</span><br><span class="line">2. 逐层向下贪心搜索：</span><br><span class="line">   - 在当前层找最近的节点作为下一层入口</span><br><span class="line">3. 到达 Layer 0 后，搜索 ef 个候选</span><br><span class="line">4. 从候选中取 Top-K 返回</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">search</span><span class="params">(q, hnsw, ef=<span class="number">50</span>, k=<span class="number">10</span>)</span>:</span></span><br><span class="line">    entry = hnsw.entry_point</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 从顶层贪心向下</span></span><br><span class="line">    <span class="keyword">for</span> l <span class="keyword">in</span> range(hnsw.max_level, <span class="number">0</span>):</span><br><span class="line">        entry = greedy_search_layer(q, entry, ef=<span class="number">1</span>, layer=l)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Layer 0：扩展搜索</span></span><br><span class="line">    candidates = search_layer(q, entry, ef, layer=<span class="number">0</span>)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 返回 Top-K</span></span><br><span class="line">    <span class="keyword">return</span> sorted(candidates, key=<span class="keyword">lambda</span> x: x.distance)[:k]</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-参数调优指南"><a href="#4-参数调优指南" class="headerlink" title="4. 参数调优指南"></a>4. 参数调优指南</h3><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>影响</th>
+<th>调优建议</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>M ↑</td>
+<td>精度↑，内存↑，构建时间↑</td>
+<td>16-32 是平衡点</td>
+</tr>
+<tr>
+<td>efConstruction ↑</td>
+<td>构建质量↑，构建时间↑</td>
+<td>200-400 足够</td>
+</tr>
+<tr>
+<td>ef ↑</td>
+<td>召回率↑，查询延迟↑</td>
+<td>动态调整：在线查询用 50-100</td>
+</tr>
+</tbody></table>
+<p><strong>召回率与延迟权衡</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">ef 值      召回率      延迟</span><br><span class="line">─────────────────────────────</span><br><span class="line">10         70%         1ms</span><br><span class="line">50         95%         5ms</span><br><span class="line">100        98%         10ms</span><br><span class="line">200        99.5%       20ms</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="五、IVF：倒排文件索引"><a href="#五、IVF：倒排文件索引" class="headerlink" title="五、IVF：倒排文件索引"></a>五、IVF：倒排文件索引</h2><h3 id="1-核心思想-1"><a href="#1-核心思想-1" class="headerlink" title="1. 核心思想"></a>1. 核心思想</h3><p>聚类 + 倒排：将向量空间划分为多个区域（cluster），每个区域维护一个倒排列表。</p>
+<p><strong>搜索流程</strong>：</p>
+<ol>
+<li>找出查询向量最近的几个聚类中心</li>
+<li>只在这些聚类内搜索，而非全量遍历</li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">IVF 结构示意：</span><br><span class="line"></span><br><span class="line">向量空间划分：</span><br><span class="line">┌──────────────────────────────┐</span><br><span class="line">│  ┌─────┐    ┌─────┐          │</span><br><span class="line">│  │ C1  │    │ C2  │   ┌───┐  │</span><br><span class="line">│  │ ●●● │    │ ●●  │   │C3 │  │</span><br><span class="line">│  │ ●●  │    │  ●  │   │ ● │  │</span><br><span class="line">│  └─────┘    └─────┘   └───┘  │</span><br><span class="line">└──────────────────────────────┘</span><br><span class="line"></span><br><span class="line">倒排列表：</span><br><span class="line">C1 → [vec1, vec5, vec8, vec12, ...]</span><br><span class="line">C2 → [vec3, vec7, vec11, ...]</span><br><span class="line">C3 → [vec2, vec4, vec6, ...]</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-算法流程"><a href="#2-算法流程" class="headerlink" title="2. 算法流程"></a>2. 算法流程</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">构建阶段：</span><br><span class="line">1. 对全量向量做 K-means 聚类，得到 nlist 个聚类中心</span><br><span class="line">2. 每个向量分配到最近的聚类中心</span><br><span class="line">3. 每个聚类维护一个倒排列表</span><br><span class="line"></span><br><span class="line">搜索阶段：</span><br><span class="line">1. 找出查询向量最近的 nprobe 个聚类中心</span><br><span class="line">2. 只在这些聚类内做 FLAT 搜索</span><br><span class="line">3. 合并结果，返回 Top-K</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键参数</strong>：</p>
+<ul>
+<li><strong>nlist</strong>：聚类数量（通常取 $\sqrt{N}$）</li>
+<li><strong>nprobe</strong>：搜索时探查的聚类数</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># IVF 构建伪代码</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">build_ivf</span><span class="params">(vectors, nlist=<span class="number">1024</span>)</span>:</span></span><br><span class="line">    <span class="comment"># K-means 聚类</span></span><br><span class="line">    centroids = kmeans(vectors, nlist)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 分配向量到聚类</span></span><br><span class="line">    clusters = &#123;i: [] <span class="keyword">for</span> i <span class="keyword">in</span> range(nlist)&#125;</span><br><span class="line">    <span class="keyword">for</span> vec <span class="keyword">in</span> vectors:</span><br><span class="line">        nearest = argmin(distance(vec, centroids))</span><br><span class="line">        clusters[nearest].append(vec)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> centroids, clusters</span><br><span class="line"></span><br><span class="line"><span class="comment"># IVF 搜索伪代码</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">search_ivf</span><span class="params">(query, centroids, clusters, nprobe=<span class="number">10</span>, k=<span class="number">10</span>)</span>:</span></span><br><span class="line">    <span class="comment"># 找最近的 nprobe 个聚类</span></span><br><span class="line">    nearest_clusters = argsort(distance(query, centroids))[:nprobe]</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 在这些聚类内搜索</span></span><br><span class="line">    candidates = []</span><br><span class="line">    <span class="keyword">for</span> c <span class="keyword">in</span> nearest_clusters:</span><br><span class="line">        <span class="keyword">for</span> vec <span class="keyword">in</span> clusters[c]:</span><br><span class="line">            candidates.append((vec, distance(query, vec)))</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 返回 Top-K</span></span><br><span class="line">    <span class="keyword">return</span> sorted(candidates, key=<span class="keyword">lambda</span> x: x[<span class="number">1</span>])[:k]</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-性能分析"><a href="#3-性能分析" class="headerlink" title="3. 性能分析"></a>3. 性能分析</h3><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>nlist ↑</td>
+<td>聚类更精细，单聚类内向量更少，搜索更快</td>
+</tr>
+<tr>
+<td>nprobe ↑</td>
+<td>搜索更多聚类，召回率↑，延迟↑</td>
+</tr>
+</tbody></table>
+<p><strong>召回率与 nprobe 关系</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">nprobe&#x2F;nlist    召回率</span><br><span class="line">────────────────────────</span><br><span class="line">1%              60-70%</span><br><span class="line">5%              85-90%</span><br><span class="line">10%             92-96%</span><br><span class="line">20%             95-98%</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="六、PQ：乘积量化压缩"><a href="#六、PQ：乘积量化压缩" class="headerlink" title="六、PQ：乘积量化压缩"></a>六、PQ：乘积量化压缩</h2><h3 id="1-问题背景"><a href="#1-问题背景" class="headerlink" title="1. 问题背景"></a>1. 问题背景</h3><p>高维向量存储和计算成本高。1536 维向量，100万个需要 6GB 内存。如何压缩？</p>
+<h3 id="2-核心思想"><a href="#2-核心思想" class="headerlink" title="2. 核心思想"></a>2. 核心思想</h3><p>将高维向量切分成多个低维子向量，每个子空间独立量化。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">PQ 量化过程：</span><br><span class="line"></span><br><span class="line">原始向量：[v1, v2, v3, v4, v5, v6, v7, v8]  (8维)</span><br><span class="line">         ↓ 切分为 4 个子向量（每个2维）</span><br><span class="line">子向量：  [v1,v2]  [v3,v4]  [v5,v6]  [v7,v8]</span><br><span class="line">         ↓ 每个子空间独立聚类量化</span><br><span class="line">量化码：  [P1&#x3D;3]   [P2&#x3D;7]   [P3&#x3D;1]   [P4&#x3D;5]</span><br><span class="line">         ↓ 存储为码本索引</span><br><span class="line">存储：    [3, 7, 1, 5]  (4字节，压缩率 50%)</span><br><span class="line"></span><br><span class="line">码本：每个子空间 256 个中心点（8bit索引）</span><br></pre></td></tr></table></figure>
+
+<p><strong>数学表示</strong>：</p>
+<p>设向量 $\vec{x} \in \mathbb{R}^d$，切分为 $m$ 个子向量：</p>
+<p>$$<br>\vec{x} = [\vec{x}^1, \vec{x}^2, …, \vec{x}^m], \quad \vec{x}^i \in \mathbb{R}^{d/m}<br>$$</p>
+<p>每个子空间有 $K^<em>$ 个中心点（通常 $K^</em> = 256$），量化函数：</p>
+<p>$$<br>q^i(\vec{x}^i) = \arg\min_k ||\vec{x}^i - \vec{c}_k^i||^2<br>$$</p>
+<p>压缩后向量表示为 $[q^1, q^2, …, q^m]$，共 $m$ 字节。</p>
+<h3 id="3-距离计算：ADC（Asymmetric-Distance-Computation）"><a href="#3-距离计算：ADC（Asymmetric-Distance-Computation）" class="headerlink" title="3. 距离计算：ADC（Asymmetric Distance Computation）"></a>3. 距离计算：ADC（Asymmetric Distance Computation）</h3><p><strong>关键洞察</strong>：查询向量不压缩，只压缩数据库向量。预先计算查询向量与码本中心的距离表。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">pq_distance</span><span class="params">(query, pq_code, codebooks, m=<span class="number">8</span>)</span>:</span></span><br><span class="line">    <span class="string">"""PQ 距离计算"""</span></span><br><span class="line">    <span class="comment"># 1. 预计算距离表</span></span><br><span class="line">    <span class="comment"># distance_table[i][k] = distance(query的第i段, 第i个码本的第k个中心)</span></span><br><span class="line">    distance_table = precompute_distance_table(query, codebooks, m)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 2. 查表累加</span></span><br><span class="line">    d = <span class="number">0</span></span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> range(m):</span><br><span class="line">        d += distance_table[i][pq_code[i]]</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> d</span><br></pre></td></tr></table></figure>
+
+<p><strong>复杂度分析</strong>：</p>
+<ul>
+<li>距离表构建：$O(m \times K^* \times d/m) = O(d \times K^*)$</li>
+<li>单向量距离查表：$O(m)$</li>
+</ul>
+<p>相比原始距离计算 $O(d)$，PQ 距离查表 $O(m)$ 快得多（$m \ll d$）。</p>
+<h3 id="4-压缩率计算"><a href="#4-压缩率计算" class="headerlink" title="4. 压缩率计算"></a>4. 压缩率计算</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">原始存储：d × 4 字节（float32）</span><br><span class="line">PQ 存储：m 字节（m 个 uint8 码）</span><br><span class="line"></span><br><span class="line">压缩率：d × 4 &#x2F; m &#x3D; 4d&#x2F;m</span><br><span class="line"></span><br><span class="line">示例：d&#x3D;1536, m&#x3D;48</span><br><span class="line">压缩率 &#x3D; 1536 × 4 &#x2F; 48 &#x3D; 128 倍</span><br><span class="line">100万向量：6GB → 48MB</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="七、IVF-PQ：组合优化"><a href="#七、IVF-PQ：组合优化" class="headerlink" title="七、IVF-PQ：组合优化"></a>七、IVF-PQ：组合优化</h2><p>将 IVF 和 PQ 组合，兼顾速度和内存：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">IVF-PQ 结构：</span><br><span class="line"></span><br><span class="line">┌────────────────────────────────────────────┐</span><br><span class="line">│              IVF 聚类层                     │</span><br><span class="line">│   C1    C2    C3    C4    ...    Cnlist   │</span><br><span class="line">├────────────────────────────────────────────┤</span><br><span class="line">│              PQ 量化层                      │</span><br><span class="line">│   每个聚类内向量用 PQ 压缩存储              │</span><br><span class="line">│   C1 → [pq_code1, pq_code2, ...]           │</span><br><span class="line">└────────────────────────────────────────────┘</span><br><span class="line"></span><br><span class="line">搜索流程：</span><br><span class="line">1. 找最近的 nprobe 个聚类中心（FLAT）</span><br><span class="line">2. 在这些聚类内用 PQ 查表计算距离</span><br><span class="line">3. 可选：重排（rerank）Top-K 用原始向量精确计算</span><br></pre></td></tr></table></figure>
+
+<p><strong>重排策略</strong>：PQ 计算的是近似距离，对 Top-K 候选用原始向量重新计算精确距离。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">search_ivf_pq</span><span class="params">(query, nprobe=<span class="number">10</span>, k=<span class="number">10</span>, rerank=True)</span>:</span></span><br><span class="line">    <span class="comment"># 1. 找聚类</span></span><br><span class="line">    nearest_clusters = find_nearest_clusters(query, nprobe)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 2. PQ 查表搜索</span></span><br><span class="line">    candidates = pq_search(query, nearest_clusters, k * rerank_factor)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 3. 重排（可选）</span></span><br><span class="line">    <span class="keyword">if</span> rerank:</span><br><span class="line">        candidates = rerank_with_original_vectors(query, candidates, k)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> candidates[:k]</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="八、算法性能对比"><a href="#八、算法性能对比" class="headerlink" title="八、算法性能对比"></a>八、算法性能对比</h2><h3 id="1-理论复杂度"><a href="#1-理论复杂度" class="headerlink" title="1. 理论复杂度"></a>1. 理论复杂度</h3><table>
+<thead>
+<tr>
+<th>算法</th>
+<th>构建复杂度</th>
+<th>搜索复杂度</th>
+<th>空间复杂度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FLAT</td>
+<td>O(1)</td>
+<td>O(Nd)</td>
+<td>O(Nd)</td>
+</tr>
+<tr>
+<td>IVF</td>
+<td>O(Ndnlist)</td>
+<td>O(nprobe × Nd/nlist)</td>
+<td>O(Nd)</td>
+</tr>
+<tr>
+<td>HNSW</td>
+<td>O(Nd × efConstruction × logN)</td>
+<td>O(d × ef × logN)</td>
+<td>O(Nd × M)</td>
+</tr>
+<tr>
+<td>PQ</td>
+<td>O(Nd × K^*)</td>
+<td>O(dK^* + Nm)</td>
+<td>O(Nm)</td>
+</tr>
+<tr>
+<td>IVF-PQ</td>
+<td>O(Nd × nlist × K^*)</td>
+<td>O(nprobe × (dK^* + N/nlist × m))</td>
+<td>O(Nm)</td>
+</tr>
+</tbody></table>
+<h3 id="2-实测性能（SIFT-1M-数据集）"><a href="#2-实测性能（SIFT-1M-数据集）" class="headerlink" title="2. 实测性能（SIFT-1M 数据集）"></a>2. 实测性能（SIFT-1M 数据集）</h3><table>
+<thead>
+<tr>
+<th>算法</th>
+<th>召回率@10</th>
+<th>QPS</th>
+<th>内存</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FLAT</td>
+<td>100%</td>
+<td>200</td>
+<td>512MB</td>
+</tr>
+<tr>
+<td>IVF (nlist=1024, nprobe=64)</td>
+<td>95%</td>
+<td>8000</td>
+<td>512MB</td>
+</tr>
+<tr>
+<td>HNSW (M=16, ef=64)</td>
+<td>96%</td>
+<td>15000</td>
+<td>700MB</td>
+</tr>
+<tr>
+<td>PQ (m=8)</td>
+<td>85%</td>
+<td>30000</td>
+<td>16MB</td>
+</tr>
+<tr>
+<td>IVF-PQ (nlist=1024, m=8)</td>
+<td>90%</td>
+<td>20000</td>
+<td>16MB</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="九、研究前沿与新算法"><a href="#九、研究前沿与新算法" class="headerlink" title="九、研究前沿与新算法"></a>九、研究前沿与新算法</h2><h3 id="1-ScaNN（Google，2020）"><a href="#1-ScaNN（Google，2020）" class="headerlink" title="1. ScaNN（Google，2020）"></a>1. ScaNN（Google，2020）</h3><p>创新点：<strong>量化 + 内积优化 + 重排</strong>。</p>
+<ul>
+<li>量化时考虑内积最大化的方向</li>
+<li>用 SIMD 加速距离表计算</li>
+<li>比 HNSW 在内积度量上更快</li>
+</ul>
+<h3 id="2-DiskANN（Microsoft，2019）"><a href="#2-DiskANN（Microsoft，2019）" class="headerlink" title="2. DiskANN（Microsoft，2019）"></a>2. DiskANN（Microsoft，2019）</h3><p>创新点：<strong>磁盘索引 + SSD 优化</strong>。</p>
+<ul>
+<li>向量和索引存储在 SSD，内存只放聚类中心</li>
+<li>利用 SSD 高并发读取特性</li>
+<li>支持 10 亿级向量，内存需求 &lt; 16GB</li>
+</ul>
+<h3 id="3-Faiss（Facebook，2017）"><a href="#3-Faiss（Facebook，2017）" class="headerlink" title="3. Faiss（Facebook，2017）"></a>3. Faiss（Facebook，2017）</h3><p>工业界最成熟的开源库：</p>
+<ul>
+<li>GPU 加速（10倍提速）</li>
+<li>支持 IVF、PQ、HNSW 等多种索引</li>
+<li>灵活的组合索引（IVF-PQ, IVF-HNSW）</li>
+</ul>
+<hr>
+<h2 id="十、工程实践要点"><a href="#十、工程实践要点" class="headerlink" title="十、工程实践要点"></a>十、工程实践要点</h2><h3 id="1-索引选择决策"><a href="#1-索引选择决策" class="headerlink" title="1. 索引选择决策"></a>1. 索引选择决策</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">数据规模 &lt; 10万：FLAT（精确搜索）</span><br><span class="line">数据规模 10万-100万：</span><br><span class="line">    - 内存充足 → HNSW（最快）</span><br><span class="line">    - 内存紧张 → IVF-PQ（压缩）</span><br><span class="line">数据规模 &gt; 100万：</span><br><span class="line">    - 内存充足 → HNSW</span><br><span class="line">    - 内存紧张 → IVF-PQ</span><br><span class="line">    - 超大规模 → DiskANN</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-参数调优经验"><a href="#2-参数调优经验" class="headerlink" title="2. 参数调优经验"></a>2. 参数调优经验</h3><table>
+<thead>
+<tr>
+<th>目标</th>
+<th>参数调整</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>提高召回率</td>
+<td>HNSW: ef↑ / IVF: nprobe↑</td>
+</tr>
+<tr>
+<td>降低延迟</td>
+<td>HNSW: M↓, ef↓ / IVF: nlist↑, nprobe↓</td>
+</tr>
+<tr>
+<td>降低内存</td>
+<td>使用 PQ 压缩</td>
+</tr>
+<tr>
+<td>加速构建</td>
+<td>HNSW: efConstruction↓</td>
+</tr>
+</tbody></table>
+<h3 id="3-常见陷阱"><a href="#3-常见陷阱" class="headerlink" title="3. 常见陷阱"></a>3. 常见陷阱</h3><table>
+<thead>
+<tr>
+<th>问题</th>
+<th>解决方案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>召回率不够</td>
+<td>ef/nprobe 调高；检查向量质量</td>
+</tr>
+<tr>
+<td>延迟太高</td>
+<td>减少候选数量；检查是否做了不必要的重排</td>
+</tr>
+<tr>
+<td>内存爆炸</td>
+<td>使用 PQ 压缩；检查索引参数 M</td>
+</tr>
+<tr>
+<td>构建太慢</td>
+<td>efConstruction 适度降低；分批构建</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>向量相似度计算的核心要点：</p>
+<ol>
+<li><strong>度量选择</strong>：归一化向量用内积（最快），文本用余弦，物理坐标用 L2</li>
+<li><strong>算法选择</strong>：小数据 FLAT，大数据 HNSW 或 IVF-PQ</li>
+<li><strong>参数调优</strong>：ef/nprobe 控制召回率，M/nlist 控制内存</li>
+<li><strong>压缩策略</strong>：PQ 压缩率可达 100 倍，代价是精度下降 5-10%</li>
+</ol>
+<p>数学是本质，算法是手段，工程是落地。理解原理，才能在选型和调优时做出正确决策。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/%E5%90%91%E9%87%8F%E6%A3%80%E7%B4%A2/" rel="tag"><i class="fa fa-tag"></i> 向量检索</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/05/19/vector-database-deep-analysis/" rel="prev" title="向量数据库深度解析">
+      <i class="fa fa-chevron-left"></i> 向量数据库深度解析
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2025/08/22/ai-concepts-guide/" rel="next" title="AI 概念指南：从 LLM 到 Agent，一文理清人工智能的迷宫">
+      AI 概念指南：从 LLM 到 Agent，一文理清人工智能的迷宫 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#写在前面"><span class="nav-number">1.</span> <span class="nav-text">写在前面</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、相似度度量：三种主流方法"><span class="nav-number">2.</span> <span class="nav-text">一、相似度度量：三种主流方法</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-余弦相似度（Cosine-Similarity）"><span class="nav-number">2.1.</span> <span class="nav-text">1. 余弦相似度（Cosine Similarity）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-欧氏距离（Euclidean-Distance）"><span class="nav-number">2.2.</span> <span class="nav-text">2. 欧氏距离（Euclidean Distance）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-内积（Inner-Product-Dot-Product）"><span class="nav-number">2.3.</span> <span class="nav-text">3. 内积（Inner Product &#x2F; Dot Product）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-三种度量对比"><span class="nav-number">2.4.</span> <span class="nav-text">4. 三种度量对比</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、精确搜索-vs-近似搜索"><span class="nav-number">3.</span> <span class="nav-text">二、精确搜索 vs 近似搜索</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-暴力搜索（FLAT）"><span class="nav-number">3.1.</span> <span class="nav-text">1. 暴力搜索（FLAT）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-维度灾难（Curse-of-Dimensionality）"><span class="nav-number">3.2.</span> <span class="nav-text">2. 维度灾难（Curse of Dimensionality）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、ANN-算法：核心思想与分类"><span class="nav-number">4.</span> <span class="nav-text">三、ANN 算法：核心思想与分类</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#算法分类"><span class="nav-number">4.1.</span> <span class="nav-text">算法分类</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、HNSW：当前最优的图索引算法"><span class="nav-number">5.</span> <span class="nav-text">四、HNSW：当前最优的图索引算法</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-核心思想"><span class="nav-number">5.1.</span> <span class="nav-text">1. 核心思想</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-构建算法"><span class="nav-number">5.2.</span> <span class="nav-text">2. 构建算法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-搜索算法"><span class="nav-number">5.3.</span> <span class="nav-text">3. 搜索算法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-参数调优指南"><span class="nav-number">5.4.</span> <span class="nav-text">4. 参数调优指南</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、IVF：倒排文件索引"><span class="nav-number">6.</span> <span class="nav-text">五、IVF：倒排文件索引</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-核心思想-1"><span class="nav-number">6.1.</span> <span class="nav-text">1. 核心思想</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-算法流程"><span class="nav-number">6.2.</span> <span class="nav-text">2. 算法流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-性能分析"><span class="nav-number">6.3.</span> <span class="nav-text">3. 性能分析</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、PQ：乘积量化压缩"><span class="nav-number">7.</span> <span class="nav-text">六、PQ：乘积量化压缩</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-问题背景"><span class="nav-number">7.1.</span> <span class="nav-text">1. 问题背景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-核心思想"><span class="nav-number">7.2.</span> <span class="nav-text">2. 核心思想</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-距离计算：ADC（Asymmetric-Distance-Computation）"><span class="nav-number">7.3.</span> <span class="nav-text">3. 距离计算：ADC（Asymmetric Distance Computation）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-压缩率计算"><span class="nav-number">7.4.</span> <span class="nav-text">4. 压缩率计算</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、IVF-PQ：组合优化"><span class="nav-number">8.</span> <span class="nav-text">七、IVF-PQ：组合优化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、算法性能对比"><span class="nav-number">9.</span> <span class="nav-text">八、算法性能对比</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-理论复杂度"><span class="nav-number">9.1.</span> <span class="nav-text">1. 理论复杂度</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-实测性能（SIFT-1M-数据集）"><span class="nav-number">9.2.</span> <span class="nav-text">2. 实测性能（SIFT-1M 数据集）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#九、研究前沿与新算法"><span class="nav-number">10.</span> <span class="nav-text">九、研究前沿与新算法</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-ScaNN（Google，2020）"><span class="nav-number">10.1.</span> <span class="nav-text">1. ScaNN（Google，2020）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-DiskANN（Microsoft，2019）"><span class="nav-number">10.2.</span> <span class="nav-text">2. DiskANN（Microsoft，2019）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-Faiss（Facebook，2017）"><span class="nav-number">10.3.</span> <span class="nav-text">3. Faiss（Facebook，2017）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#十、工程实践要点"><span class="nav-number">11.</span> <span class="nav-text">十、工程实践要点</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-索引选择决策"><span class="nav-number">11.1.</span> <span class="nav-text">1. 索引选择决策</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-参数调优经验"><span class="nav-number">11.2.</span> <span class="nav-text">2. 参数调优经验</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-常见陷阱"><span class="nav-number">11.3.</span> <span class="nav-text">3. 常见陷阱</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#总结"><span class="nav-number">12.</span> <span class="nav-text">总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">48</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">8</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">23</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>
