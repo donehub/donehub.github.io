@@ -283,28 +283,8 @@
 <p><img src="https://s1.ax1x.com/2020/03/29/GEePgI.png" alt=""></p>
 <h4 id="二、引入-Blob-容器实现文件下载"><a href="#二、引入-Blob-容器实现文件下载" class="headerlink" title="二、引入 Blob  容器实现文件下载"></a>二、引入 <code>Blob</code>  容器实现文件下载</h4><p>既然 <code>Axios</code> 无法正确处理文件流，便需要采用其他技术来达到预期效果。<a href="https://developer.mozilla.org/zh-CN/docs/Web/API/Blob" target="_blank" rel="noopener"><code>Blob</code></a> 对象表示一个不可变、原始数据的类文件对象；从字面意思来看，<code>Blob</code> 也是一个可以存储二进制文件的容器。通过这项技术，可以完美地弥补 <code>Axios</code> 的不足。具体实现如下:</p>
 <figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 下载文件请求</span></span><br><span class="line"><span class="keyword">export</span> <span class="function"><span class="keyword">function</span> <span class="title">download</span> (<span class="params">param</span>) </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> axios(&#123;</span><br><span class="line">    url: <span class="string">'/web/bill/download'</span>,</span><br><span class="line">    method: <span class="string">'post'</span>,</span><br><span class="line">    data: param,</span><br><span class="line">    responseType: <span class="string">'blob'</span></span><br><span class="line">  &#125;)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 下载文件入口方法</span></span><br><span class="line">download(<span class="keyword">this</span>.param).then(<span class="function"><span class="params">response</span> =&gt;</span> &#123;</span><br><span class="line">    <span class="comment">// 执行文件下载</span></span><br><span class="line">    <span class="keyword">this</span>.exeDownloadFile(response)</span><br><span class="line">&#125;)</span><br><span class="line"></span><br><span class="line"><span class="comment">// 执行文件下载</span></span><br><span class="line">exeDownloadFile (response) &#123;</span><br><span class="line">    <span class="comment">// 创建 Blob 对象</span></span><br><span class="line">    <span class="keyword">let</span> blob = <span class="keyword">new</span> Blob([response.data], &#123;<span class="attr">type</span>: response.headers[<span class="string">'content-type'</span>]&#125;)</span><br><span class="line">    <span class="comment">// 获取文件名</span></span><br><span class="line">    <span class="keyword">let</span> fileName = response.headers[<span class="string">'content-disposition'</span>].match(<span class="regexp">/filename=(.*)/</span>)[<span class="number">1</span>]</span><br><span class="line">    <span class="comment">// 创建指向 Blob 对象地址的URL</span></span><br><span class="line">    <span class="keyword">let</span> href = <span class="built_in">window</span>.URL.createObjectURL(blob)</span><br><span class="line">    <span class="comment">// 创建用于跳转至下载链接的 a 标签</span></span><br><span class="line">    <span class="keyword">let</span> downloadElement = <span class="built_in">document</span>.createElement(<span class="string">'a'</span>)</span><br><span class="line">    <span class="comment">// 属性配置</span></span><br><span class="line">    downloadElement.style.display = <span class="string">'none'</span></span><br><span class="line">    downloadElement.href = href</span><br><span class="line">    downloadElement.download = fileName</span><br><span class="line">    <span class="comment">// 将 a 标签挂载至当前页面</span></span><br><span class="line">    <span class="built_in">document</span>.body.appendChild(downloadElement)</span><br><span class="line">    <span class="comment">// 触发下载事件</span></span><br><span class="line">    downloadElement.click()</span><br><span class="line">    <span class="comment">// 移除已挂载的 a 标签</span></span><br><span class="line">    <span class="built_in">document</span>.body.removeChild(downloadElement)</span><br><span class="line">    <span class="comment">// 释放 Blob URL</span></span><br><span class="line">    <span class="built_in">window</span>.URL.revokeObjectURL(href)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
 <p>虽然以上可以实现文件下载，但美中不足的是，当后台返回异常时，通过 <code>Blob</code> 对象依然可以下载到一个 undefined 文件。因此，在执行下载之前，需要对下载请求是否存在异常做出判断。具体实现如下:</p>
 <figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 下载文件入口方法</span></span><br><span class="line">download(<span class="keyword">this</span>.param).then(<span class="function"><span class="params">response</span> =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">let</span> fr = <span class="keyword">new</span> FileReader()</span><br><span class="line">    fr.readAsText(response.data)</span><br><span class="line">    fr.onload = <span class="function"><span class="keyword">function</span> (<span class="params"></span>) </span>&#123;</span><br><span class="line">        <span class="comment">// 新增-异常校验; 若 Blob 对象可 JSON 格式化，则说明文件下载异常</span></span><br><span class="line">    	<span class="keyword">try</span> &#123;</span><br><span class="line">    	    <span class="keyword">let</span> jsonRet = <span class="built_in">JSON</span>.parse(<span class="keyword">this</span>.result)</span><br><span class="line">    	&#125; <span class="keyword">catch</span> (e) &#123;</span><br><span class="line">    	    <span class="comment">// 执行文件下载</span></span><br><span class="line">            <span class="keyword">this</span>.exeDownloadFile(response)</span><br><span class="line">    	&#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     </div>
 
@@ -606,6 +586,8 @@
 
 
 
+
+  
 
   
 

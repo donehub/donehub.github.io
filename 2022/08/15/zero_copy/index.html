@@ -279,7 +279,6 @@
 <h4 id="一、零拷贝技术"><a href="#一、零拷贝技术" class="headerlink" title="一、零拷贝技术"></a>一、零拷贝技术</h4><p>零拷贝技术，是相对于传统 IO 的一种技术思想。传统 IO ：读写数据是在用户空间和内核空间来回复制，而内核空间的数据是通过操作系统层面的 IO 接口从磁盘读取或写入的，中间也需要多次拷贝，因此效率较低。零拷贝技术，目的是尽可能地减少上下文切换和拷贝次数，提升操作性能。</p>
 <h4 id="二、传统-IO-实现原理"><a href="#二、传统-IO-实现原理" class="headerlink" title="二、传统 IO 实现原理"></a>二、传统 IO 实现原理</h4><p>当应用服务接收客户端的请求时，传统 IO 通常需要两种系统调用：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 读取</span></span><br><span class="line">read(file, tmp_buf, len);</span><br><span class="line"><span class="comment">// 写入</span></span><br><span class="line">write(socket, tmp_buf, len);</span><br></pre></td></tr></table></figure>
-
 <p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/16_19_22_10_%E4%BC%A0%E7%BB%9F%20IO.png" alt=""></p>
 <p>从细分图中可知，虽然只是简单的读写操作，但内部的流程还是比较复杂的。</p>
 <p><strong>一次读写将发生 4 次上下文切换：</strong></p>
@@ -308,8 +307,7 @@
 <p>在传统 IO 中，read() 调用会把内核缓冲区的数据拷贝到用户缓冲区，耗时又耗力。如果把内核空间和用户空间的虚拟地址映射到同一个物理地址，那么就不需要 CPU 来回复制了。</p>
 <p>mmap() 正是利用了虚拟内存的这一特性，取代传统 IO 的 read() 操作，并将内核缓冲区和用户缓冲区地址映射到同一物理内存地址，省去一次 CPU 拷贝的过程，提升 IO 性能。具体过程如下：</p>
 <ul>
-<li><p>应用进程调用 mmap() 后，DMA 会把磁盘文件数据拷贝到内核缓冲区；</p>
-</li>
+<li>应用进程调用 mmap() 后，DMA 会把磁盘文件数据拷贝到内核缓冲区；</li>
 <li><p>应用进程跟操作系统内核共享这个缓冲区；</p>
 </li>
 <li><p>应用进程再调用 write()，直接将内核缓冲区的数据拷贝到内核 socket 缓冲区；</p>
@@ -655,6 +653,8 @@
 
 
 
+
+  
 
   
 
