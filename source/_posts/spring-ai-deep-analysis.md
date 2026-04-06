@@ -1,5 +1,5 @@
 ---
-title: Spring AI 学习有使用
+title: Spring AI 学习与使用
 date: 2026-01-05
 tags: Spring AI
 categories: AI
