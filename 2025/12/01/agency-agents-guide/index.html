@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="如果你是一个人做项目，你不需要成为产品经理、架构师、营销专家——只需要知道何时调用哪个「虚拟专家」。Agency-Agents 这个开源项目，就是把 200 多个专业角色打包成了可以直接导入 Claude Code 的 Agent 文件。本文会介绍这个工具是什么、怎么用，以及如何用它协作开发一个完整项目。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="如何使用 Agency-Agents 开好你的一人公司">
+<meta property="og:url" content="https://donehub.github.io/2025/12/01/agency-agents-guide/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="如果你是一个人做项目，你不需要成为产品经理、架构师、营销专家——只需要知道何时调用哪个「虚拟专家」。Agency-Agents 这个开源项目，就是把 200 多个专业角色打包成了可以直接导入 Claude Code 的 Agent 文件。本文会介绍这个工具是什么、怎么用，以及如何用它协作开发一个完整项目。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-11-30T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-06T13:40:18.835Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Multi Agent">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2025/12/01/agency-agents-guide/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>如何使用 Agency-Agents 开好你的一人公司 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2025/12/01/agency-agents-guide/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          如何使用 Agency-Agents 开好你的一人公司
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-12-01 00:00:00" itemprop="dateCreated datePublished" datetime="2025-12-01T00:00:00+08:00">2025-12-01</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-06 21:40:18" itemprop="dateModified" datetime="2026-04-06T21:40:18+08:00">2026-04-06</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2025/12/01/agency-agents-guide/" class="post-meta-item leancloud_visitors" data-flag-title="如何使用 Agency-Agents 开好你的一人公司" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2025/12/01/agency-agents-guide/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2025/12/01/agency-agents-guide/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>如果你是一个人做项目，你不需要成为产品经理、架构师、营销专家——只需要知道何时调用哪个「虚拟专家」。Agency-Agents 这个开源项目，就是把 200 多个专业角色打包成了可以直接导入 Claude Code 的 Agent 文件。本文会介绍这个工具是什么、怎么用，以及如何用它协作开发一个完整项目。</p>
+</blockquote>
+<a id="more"></a>
+<h2 id="一人公司的痛点"><a href="#一人公司的痛点" class="headerlink" title="一人公司的痛点"></a>一人公司的痛点</h2><p>假设你是一个独立开发者，想做一个「数字游民社区」：</p>
+<ul>
+<li><strong>产品规划</strong>：你不知道怎么定义用户画像、功能优先级</li>
+<li><strong>技术架构</strong>：你不确定用什么技术栈、数据库怎么设计</li>
+<li><strong>营销推广</strong>：你不懂小红书怎么运营、知乎怎么引流</li>
+</ul>
+<p>传统解决方案：要么自己学（费时间），要么花钱找人（费钱），要么凭感觉做（可能做错）。</p>
+<p>Agency-Agents 提供了第四种方案：<strong>让 AI 以「专业角色」的身份帮你输出方案</strong>。</p>
+<hr>
+<h2 id="一、Agency-Agents-是什么？"><a href="#一、Agency-Agents-是什么？" class="headerlink" title="一、Agency-Agents 是什么？"></a>一、Agency-Agents 是什么？</h2><h3 id="1-1-一句话定义"><a href="#1-1-一句话定义" class="headerlink" title="1.1 一句话定义"></a>1.1 一句话定义</h3><blockquote>
+<p><strong>Agency-Agents 是一个包含 200+ 专业角色定义的开源仓库，每个角色都可以直接导入到 Claude Code、Cursor、Copilot 等工具中使用。</strong></p>
+</blockquote>
+<p>它不是传统意义上的「软件框架」，而是 <strong>精心设计的 Agent 提示词模板库</strong>。</p>
+<h3 id="1-2-仓库结构"><a href="#1-2-仓库结构" class="headerlink" title="1.2 仓库结构"></a>1.2 仓库结构</h3><p>整个仓库有 <strong>21 个分类目录</strong>，<strong>201 个 Agent 文件</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>分类</th>
+<th>Agent 数量</th>
+<th>核心角色示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>engineering</code></td>
+<td>27</td>
+<td>AI工程师、后端架构师、前端开发、安全工程师、DevOps</td>
+</tr>
+<tr>
+<td><code>marketing</code></td>
+<td>29</td>
+<td>小红书运营、抖音策略师、SEO专家、增长黑客、知乎运营</td>
+</tr>
+<tr>
+<td><code>sales</code></td>
+<td>8</td>
+<td>销售教练、客户策略师、提案专家</td>
+</tr>
+<tr>
+<td><code>product</code></td>
+<td>5</td>
+<td>产品经理、趋势研究员、反馈分析师</td>
+</tr>
+<tr>
+<td><code>design</code></td>
+<td>8</td>
+<td>UI设计师、UX架构师、品牌守护者</td>
+</tr>
+<tr>
+<td><code>project-management</code></td>
+<td>6</td>
+<td>项目经理、工作室运营、实验追踪器</td>
+</tr>
+<tr>
+<td><code>specialized</code></td>
+<td>28</td>
+<td>合规审计、招聘专家、区块链安全审计、供应链策略师</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>还有针对 <strong>中国市场</strong> 的本地化 Agent：</p>
+<ul>
+<li>小红书运营专家 (<code>marketing-xiaohongshu-specialist.md</code>)</li>
+<li>抖音短视频策略 (<code>marketing-douyin-strategist.md</code>)</li>
+<li>微信公众号运营 (<code>marketing-wechat-official-account.md</code>)</li>
+<li>知乎话题运营 (<code>marketing-zhihu-strategist.md</code>)</li>
+<li>钉钉/飞书集成开发 (<code>engineering-feishu-integration-developer.md</code>)</li>
+</ul>
+<h3 id="1-3-每个-Agent-的设计结构"><a href="#1-3-每个-Agent-的设计结构" class="headerlink" title="1.3 每个 Agent 的设计结构"></a>1.3 每个 Agent 的设计结构</h3><p>每个 Agent 文件都遵循统一的结构化模板：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">---</span><br><span class="line">name: Product Manager</span><br><span class="line">description: 产品负责人，负责完整的产品生命周期</span><br><span class="line">color: blue</span><br><span class="line">emoji: 🧭</span><br><span class="line">vibe: 运送正确的东西，而不仅仅是下一个东西</span><br><span class="line">---</span><br><span class="line"></span><br><span class="line"><span class="section"># Product Manager Agent</span></span><br><span class="line"></span><br><span class="line"><span class="section">## 🧠 身份与记忆</span></span><br><span class="line"><span class="section">## 🎯 核心使命</span></span><br><span class="line"><span class="section">## 🚨 关键规则</span></span><br><span class="line"><span class="section">## 🛠️ 技术交付物</span></span><br><span class="line"><span class="section">## 🔄 工作流程</span></span><br><span class="line"><span class="section">## 💭 沟通风格</span></span><br><span class="line"><span class="section">## 🎯 成功指标</span></span><br></pre></td></tr></table></figure>
+<p>这种设计让 Agent 具备：</p>
+<ul>
+<li><strong>明确的角色身份</strong>：不是泛泛的「助手」，而是有专业背景的「专家」</li>
+<li><strong>工作方法论</strong>：具体的流程步骤和技术栈清单</li>
+<li><strong>约束边界</strong>：<code>Critical Rules</code> 定义了不可逾越的原则</li>
+<li><strong>可衡量的成功指标</strong>：有明确的 KPI 期望</li>
+</ul>
+<hr>
+<h2 id="二、支持的工具生态"><a href="#二、支持的工具生态" class="headerlink" title="二、支持的工具生态"></a>二、支持的工具生态</h2><h3 id="2-1-可导入的工具列表"><a href="#2-1-可导入的工具列表" class="headerlink" title="2.1 可导入的工具列表"></a>2.1 可导入的工具列表</h3><p>Agency-Agents 的安装脚本支持 <strong>11 种 AI 编程工具</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>安装位置</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Claude Code</strong></td>
+<td><code>~/.claude/agents/</code></td>
+<td>原生支持，直接可用</td>
+</tr>
+<tr>
+<td><strong>GitHub Copilot</strong></td>
+<td><code>~/.github/agents/</code></td>
+<td>VS Code / JetBrains 集成</td>
+</tr>
+<tr>
+<td><strong>Cursor</strong></td>
+<td><code>.cursor/rules/</code></td>
+<td>项目级规则文件</td>
+</tr>
+<tr>
+<td><strong>Gemini CLI</strong></td>
+<td><code>~/.gemini/extensions/</code></td>
+<td>扩展形式</td>
+</tr>
+<tr>
+<td><strong>Windsurf</strong></td>
+<td><code>.windsurfrules</code></td>
+<td>Codeium 规则系统</td>
+</tr>
+<tr>
+<td><strong>Qwen Code</strong></td>
+<td><code>.qwen/agents/</code></td>
+<td>通义千问项目级 Agent</td>
+</tr>
+<tr>
+<td><strong>Aider</strong></td>
+<td><code>CONVENTIONS.md</code></td>
+<td>终端 AI 编程助手</td>
+</tr>
+<tr>
+<td><strong>OpenCode</strong></td>
+<td><code>.opencode/agents/</code></td>
+<td>项目级配置</td>
+</tr>
+<tr>
+<td><strong>OpenClaw</strong></td>
+<td><code>~/.openclaw/</code></td>
+<td>工作空间模式</td>
+</tr>
+<tr>
+<td><strong>Kimi Code</strong></td>
+<td><code>~/.config/kimi/agents/</code></td>
+<td>月之暗面 Agent</td>
+</tr>
+<tr>
+<td><strong>Antigravity</strong></td>
+<td><code>~/.gemini/antigravity/</code></td>
+<td>Gemini 技能系统</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="2-2-安装方法"><a href="#2-2-安装方法" class="headerlink" title="2.2 安装方法"></a>2.2 安装方法</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 克隆仓库</span></span><br><span class="line">git <span class="built_in">clone</span> https://github.com/msitarzewski/agency-agents.git</span><br><span class="line"><span class="built_in">cd</span> agency-agents</span><br><span class="line"></span><br><span class="line"><span class="comment"># 先转换（生成各工具格式的文件）</span></span><br><span class="line">./scripts/convert.sh</span><br><span class="line"></span><br><span class="line"><span class="comment"># 安装到指定工具</span></span><br><span class="line">./scripts/install.sh --tool claude-code</span><br><span class="line"></span><br><span class="line"><span class="comment"># 或交互式选择</span></span><br><span class="line">./scripts/install.sh --interactive</span><br></pre></td></tr></table></figure>
+<p>安装后，Agent 文件会出现在对应目录，你就可以在工具中调用了。</p>
+<hr>
+<h2 id="三、在-Claude-Code-中如何使用？"><a href="#三、在-Claude-Code-中如何使用？" class="headerlink" title="三、在 Claude Code 中如何使用？"></a>三、在 Claude Code 中如何使用？</h2><h3 id="3-1-调用方式"><a href="#3-1-调用方式" class="headerlink" title="3.1 调用方式"></a>3.1 调用方式</h3><p>安装完成后，在 Claude Code 中有三种调用方式：</p>
+<p><strong>方式一：直接调用特定 Agent</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;agent product-manager</span><br></pre></td></tr></table></figure>
+<p>然后提出你的需求：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">我想做一个数字游民社区，帮我做产品规划</span><br></pre></td></tr></table></figure>
+<p><strong>方式二：自然语言描述</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">帮我做数字游民社区的产品规划</span><br></pre></td></tr></table></figure>
+<p>Claude Code 会自动判断你需要产品经理角色，并输出专业方案。</p>
+<p><strong>方式三：组合多个 Agent</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">需要产品经理和后端架构师一起帮我规划数字游民社区</span><br></pre></td></tr></table></figure>
+<p>Claude Code 会先用产品经理角色输出产品规划，再用架构师角色输出技术方案。</p>
+<h3 id="3-2-实际输出示例"><a href="#3-2-实际输出示例" class="headerlink" title="3.2 实际输出示例"></a>3.2 实际输出示例</h3><p>当你调用 <strong>产品经理 Agent</strong> 后，它会输出类似这样的内容：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># PRD: 数字游民社区</span></span><br><span class="line"></span><br><span class="line"><span class="section">## 1. 问题陈述</span></span><br><span class="line"></span><br><span class="line"><span class="strong">**核心痛点**</span>：</span><br><span class="line"><span class="bullet">- </span>数字游民缺乏归属感，在不同城市难以找到同类人群</span><br><span class="line"><span class="bullet">- </span>缺乏可靠的工作空间信息（咖啡馆、共享办公、网络质量）</span><br><span class="line"></span><br><span class="line"><span class="strong">**目标用户画像**</span>：</span><br><span class="line">| 类型 | 特征 | 核心需求 |</span><br><span class="line">|------|------|----------|</span><br><span class="line">| 自由职业者 | 设计师、程序员 | 找客户、找工位、找圈子 |</span><br><span class="line">| 远程员工 | 大厂远程岗员工 | 找办公环境、社群连接 |</span><br><span class="line"></span><br><span class="line"><span class="section">## 2. MVP 功能清单</span></span><br><span class="line"></span><br><span class="line">| 功能 | 用户价值 | 优先级 |</span><br><span class="line">|------|----------|--------|</span><br><span class="line">| 用户注册/登录 | 身份建立 | P0 |</span><br><span class="line">| 城市指南 | 找办公地点 | P0 |</span><br><span class="line">| 社区帖子 | 交流分享 | P0 |</span><br><span class="line">| 工作机会发布 | 找远程工作 | P1 |</span><br><span class="line"></span><br><span class="line"><span class="section">## 3. 成功指标</span></span><br><span class="line"></span><br><span class="line">| 指标 | 目标 | 测量周期 |</span><br><span class="line">|------|------|----------|</span><br><span class="line">| 注册用户 | 1000人 | 上线30天 |</span><br><span class="line">| DAU | 100人 | 上线30天 |</span><br></pre></td></tr></table></figure>
+<p>这不是泛泛的「建议」，而是 <strong>结构化的专业文档</strong>，可以直接作为项目规划使用。</p>
+<hr>
+<h2 id="四、协作开发实战：数字游民社区"><a href="#四、协作开发实战：数字游民社区" class="headerlink" title="四、协作开发实战：数字游民社区"></a>四、协作开发实战：数字游民社区</h2><p>下面用一个完整案例，展示 Agency-Agents + Claude Code 如何协作开发。</p>
+<h3 id="4-1-协作架构"><a href="#4-1-协作架构" class="headerlink" title="4.1 协作架构"></a>4.1 协作架构</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">┌────────────────────────────────────────────────┐</span><br><span class="line">│           你（决策者）                           │</span><br><span class="line">│         定义目标、审核方案、做决策               │</span><br><span class="line">└──────────────────────┬─────────────────────────┘</span><br><span class="line">                       │</span><br><span class="line">                       ▼</span><br><span class="line">┌────────────────────────────────────────────────┐</span><br><span class="line">│           Claude Code（执行引擎）               │</span><br><span class="line">│     读文件、写代码、跑命令、调 Agent             │</span><br><span class="line">└──────────────────────┬─────────────────────────┘</span><br><span class="line">                       │</span><br><span class="line">       ┌───────────────┼───────────────┬─────────┐</span><br><span class="line">       ▼               ▼               ▼         ▼</span><br><span class="line">┌──────────┐    ┌──────────┐    ┌──────────┐ ┌──────────┐</span><br><span class="line">│产品经理   │    │后端架构师│    │前端开发   │ │营销策略师│</span><br><span class="line">│Agent     │    │Agent    │    │Agent    │ │Agent    │</span><br><span class="line">└──────────┘    └──────────┘    └──────────┘ └──────────┘</span><br><span class="line">     │               │               │           │</span><br><span class="line">     ▼               ▼               ▼           ▼</span><br><span class="line">  PRD文档         API设计         UI组件      营销方案</span><br><span class="line">  功能规划        数据库结构       页面实现    内容策略</span><br></pre></td></tr></table></figure>
+<h3 id="4-2-阶段一：产品规划（第1周）"><a href="#4-2-阶段一：产品规划（第1周）" class="headerlink" title="4.2 阶段一：产品规划（第1周）"></a>4.2 阶段一：产品规划（第1周）</h3><p><strong>你的输入：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;agent product-manager</span><br><span class="line"></span><br><span class="line">我想做一个数字游民社区，帮我做产品规划</span><br></pre></td></tr></table></figure>
+<p><strong>Claude Code 输出（基于产品经理 Agent）：</strong></p>
+<ul>
+<li>用户画像分析</li>
+<li>MVP 功能清单（用户认证、城市指南、社区帖子）</li>
+<li>功能优先级排序</li>
+<li>成功指标定义</li>
+</ul>
+<p><strong>你的决策：</strong></p>
+<blockquote>
+<p>「这个规划合理，先做 MVP，包含用户认证、城市指南、社区帖子三个模块。」</p>
+</blockquote>
+<h3 id="4-3-阶段二：技术架构（第2周）"><a href="#4-3-阶段二：技术架构（第2周）" class="headerlink" title="4.3 阶段二：技术架构（第2周）"></a>4.3 阶段二：技术架构（第2周）</h3><p><strong>你的输入：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;agent engineering-backend-architect</span><br><span class="line"></span><br><span class="line">基于产品经理的规划，设计技术架构和数据库结构</span><br><span class="line">技术栈选择 React + Node.js + PostgreSQL</span><br></pre></td></tr></table></figure>
+<p><strong>Claude Code 输出（基于架构师 Agent）：</strong></p>
+<p>数据库设计：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 用户表</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="keyword">users</span> (</span><br><span class="line">    <span class="keyword">id</span> <span class="keyword">UUID</span> PRIMARY <span class="keyword">KEY</span> <span class="keyword">DEFAULT</span> gen_random_uuid(),</span><br><span class="line">    email <span class="built_in">VARCHAR</span>(<span class="number">255</span>) <span class="keyword">UNIQUE</span> <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    username <span class="built_in">VARCHAR</span>(<span class="number">50</span>) <span class="keyword">UNIQUE</span> <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    avatar_url <span class="built_in">VARCHAR</span>(<span class="number">500</span>),</span><br><span class="line">    location <span class="built_in">VARCHAR</span>(<span class="number">100</span>),  <span class="comment">-- 当前城市</span></span><br><span class="line">    created_at <span class="built_in">TIMESTAMP</span> <span class="keyword">DEFAULT</span> <span class="keyword">NOW</span>()</span><br><span class="line">);</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 城市指南表</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> city_guides (</span><br><span class="line">    <span class="keyword">id</span> <span class="keyword">UUID</span> PRIMARY <span class="keyword">KEY</span>,</span><br><span class="line">    city_name <span class="built_in">VARCHAR</span>(<span class="number">100</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    country <span class="built_in">VARCHAR</span>(<span class="number">100</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    internet_speed <span class="built_in">VARCHAR</span>(<span class="number">50</span>),</span><br><span class="line">    cost_of_living <span class="built_in">VARCHAR</span>(<span class="number">50</span>),</span><br><span class="line">    created_at <span class="built_in">TIMESTAMP</span> <span class="keyword">DEFAULT</span> <span class="keyword">NOW</span>()</span><br><span class="line">);</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 社区帖子表</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> posts (</span><br><span class="line">    <span class="keyword">id</span> <span class="keyword">UUID</span> PRIMARY <span class="keyword">KEY</span>,</span><br><span class="line">    user_id <span class="keyword">UUID</span> <span class="keyword">REFERENCES</span> <span class="keyword">users</span>(<span class="keyword">id</span>),</span><br><span class="line">    title <span class="built_in">VARCHAR</span>(<span class="number">200</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    <span class="keyword">content</span> <span class="built_in">TEXT</span> <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    <span class="keyword">category</span> <span class="built_in">VARCHAR</span>(<span class="number">50</span>),</span><br><span class="line">    created_at <span class="built_in">TIMESTAMP</span> <span class="keyword">DEFAULT</span> <span class="keyword">NOW</span>()</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+<p>API 接口设计：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">POST   &#x2F;api&#x2F;auth&#x2F;register    - 用户注册</span><br><span class="line">POST   &#x2F;api&#x2F;auth&#x2F;login       - 用户登录</span><br><span class="line">GET    &#x2F;api&#x2F;cities           - 获取城市列表</span><br><span class="line">GET    &#x2F;api&#x2F;cities&#x2F;:id       - 获取城市详情</span><br><span class="line">GET    &#x2F;api&#x2F;posts            - 获取帖子列表</span><br><span class="line">POST   &#x2F;api&#x2F;posts            - 发布帖子</span><br></pre></td></tr></table></figure>
+<h3 id="4-4-阶段三：前端开发（第3-4周）"><a href="#4-4-阶段三：前端开发（第3-4周）" class="headerlink" title="4.4 阶段三：前端开发（第3-4周）"></a>4.4 阶段三：前端开发（第3-4周）</h3><p><strong>你的输入：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;agent engineering-frontend-developer</span><br><span class="line"></span><br><span class="line">基于架构师的API设计，帮我搭建前端项目框架</span><br><span class="line">实现用户登录注册页面和城市指南列表页</span><br></pre></td></tr></table></figure>
+<p><strong>Claude Code 实际执行：</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 创建项目</span></span><br><span class="line">npm create vite@latest nomad-community-web -- --template react-ts</span><br><span class="line"><span class="built_in">cd</span> nomad-community-web</span><br><span class="line">npm install tailwindcss react-router-dom axios lucide-react</span><br></pre></td></tr></table></figure>
+<p><strong>Claude Code 创建的文件：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">src&#x2F;</span><br><span class="line">├── components&#x2F;</span><br><span class="line">│   ├── auth&#x2F;LoginForm.tsx</span><br><span class="line">│   ├── auth&#x2F;RegisterForm.tsx</span><br><span class="line">│   └── common&#x2F;Button.tsx</span><br><span class="line">├── pages&#x2F;</span><br><span class="line">│   ├── LoginPage.tsx</span><br><span class="line">│   ├── HomePage.tsx</span><br><span class="line">│   └── CityGuidePage.tsx</span><br><span class="line">├── api&#x2F;</span><br><span class="line">│   ├── auth.ts</span><br><span class="line">│   ├── cities.ts</span><br><span class="line">│   └── posts.ts</span><br><span class="line">└── hooks&#x2F;</span><br><span class="line">    └── useAuth.ts</span><br></pre></td></tr></table></figure>
+<h3 id="4-5-阶段四：营销策略（第6周）"><a href="#4-5-阶段四：营销策略（第6周）" class="headerlink" title="4.5 阶段四：营销策略（第6周）"></a>4.5 阶段四：营销策略（第6周）</h3><p><strong>你的输入：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;agent marketing-social-media-strategist</span><br><span class="line"></span><br><span class="line">产品即将上线，帮我制定数字游民社区的营销策略</span><br><span class="line">重点关注小红书和知乎</span><br></pre></td></tr></table></figure>
+<p><strong>Claude Code 输出（基于营销策略 Agent）：</strong></p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># 数字游民社区营销策略</span></span><br><span class="line"></span><br><span class="line"><span class="section">## 1. 目标用户触达渠道</span></span><br><span class="line"></span><br><span class="line">| 渠道 | 用户特征 | 内容方向 |</span><br><span class="line">|------|----------|----------|</span><br><span class="line">| 小红书 | 年轻女性多 | 城市探店、办公空间打卡 |</span><br><span class="line">| 知乎 | 高知人群 | 数字游民攻略、城市对比 |</span><br><span class="line">| 抖音 | 流量大 | 办公日常、城市vlog |</span><br><span class="line"></span><br><span class="line"><span class="section">## 2. 小红书内容矩阵</span></span><br><span class="line"></span><br><span class="line"><span class="bullet">- </span>「数字游民在XX城市」系列 - 办公咖啡馆探店</span><br><span class="line"><span class="bullet">- </span>「远程工作神器」系列 - 工具推荐</span><br><span class="line"><span class="bullet">- </span>「自由职业入坑指南」系列 - 转型经验分享</span><br><span class="line"></span><br><span class="line"><span class="section">## 3. 种子用户获取</span></span><br><span class="line"></span><br><span class="line"><span class="bullet">- </span>搜索关键词用户主动触达</span><br><span class="line"><span class="bullet">- </span>加入相关微信群、知乎话题</span><br><span class="line"><span class="bullet">- </span>预期效果：第一月 300 个活跃用户</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="五、传统方式-vs-Agent-协作"><a href="#五、传统方式-vs-Agent-协作" class="headerlink" title="五、传统方式 vs Agent 协作"></a>五、传统方式 vs Agent 协作</h2><h3 id="5-1-效率对比"><a href="#5-1-效率对比" class="headerlink" title="5.1 效率对比"></a>5.1 效率对比</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>传统方式</th>
+<th>Agent 协作方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>产品规划</td>
+<td>搜索资料+凭感觉</td>
+<td>PM Agent 专业输出</td>
+</tr>
+<tr>
+<td>技术架构</td>
+<td>看教程+试错</td>
+<td>架构师 Agent 最佳实践</td>
+</tr>
+<tr>
+<td>前端实现</td>
+<td>边学边写</td>
+<td>前端 Agent + Claude Code 自动生成</td>
+</tr>
+<tr>
+<td>营销策略</td>
+<td>猜测渠道</td>
+<td>营销 Agent 专业策略</td>
+</tr>
+<tr>
+<td><strong>总耗时</strong></td>
+<td>估计 16-20 周</td>
+<td>估计 8-12 周</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="5-2-核心价值"><a href="#5-2-核心价值" class="headerlink" title="5.2 核心价值"></a>5.2 核心价值</h3><p>Agency-Agents 解决了三个核心问题：</p>
+<p><strong>1. 人力不足 → Agent 填补专业能力</strong></p>
+<p>你不需要懂营销，营销 Agent 给你专业策略；你不需要懂安全，安全 Agent 给你审计清单。</p>
+<p><strong>2. 知识盲区 → Agent 提供最佳实践</strong></p>
+<p>每个 Agent 的输出都是基于该领域的最佳实践，不是凭感觉。</p>
+<p><strong>3. 执行效率 → Claude Code 自动化执行</strong></p>
+<p>Agent 输出方案后，Claude Code 直接生成代码、创建文件、运行命令。</p>
+<hr>
+<h2 id="六、使用建议"><a href="#六、使用建议" class="headerlink" title="六、使用建议"></a>六、使用建议</h2><h3 id="6-1-按阶段调用-Agent"><a href="#6-1-按阶段调用-Agent" class="headerlink" title="6.1 按阶段调用 Agent"></a>6.1 按阶段调用 Agent</h3><p>不要一次性调用所有 Agent，而是按开发阶段逐步调用：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">规划阶段 → 产品经理 Agent</span><br><span class="line">设计阶段 → 架构师 Agent + UI设计 Agent</span><br><span class="line">开发阶段 → 前端&#x2F;后端 Agent</span><br><span class="line">上线阶段 → 营销 Agent + 安全审计 Agent</span><br></pre></td></tr></table></figure>
+<h3 id="6-2-Agent-是顾问，不是决策者"><a href="#6-2-Agent-是顾问，不是决策者" class="headerlink" title="6.2 Agent 是顾问，不是决策者"></a>6.2 Agent 是顾问，不是决策者</h3><p>Agent 给的是「专业建议」，不是「最终答案」：</p>
+<ul>
+<li>你需要判断方案是否符合你的实际情况</li>
+<li>你需要做最终决策</li>
+<li>Agent 不知道你的预算、时间、技术能力等限制</li>
+</ul>
+<h3 id="6-3-保持上下文一致性"><a href="#6-3-保持上下文一致性" class="headerlink" title="6.3 保持上下文一致性"></a>6.3 保持上下文一致性</h3><p>告诉 Claude Code 之前的决策：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">我们之前决定用 React + Node.js 技术栈，</span><br><span class="line">现在继续基于这个方案设计前端</span><br></pre></td></tr></table></figure>
+<h3 id="6-4-迭代优化"><a href="#6-4-迭代优化" class="headerlink" title="6.4 迭代优化"></a>6.4 迭代优化</h3><p>不要期望一次就完美：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">这个数据库设计太简单了，帮我补充更多字段</span><br><span class="line"></span><br><span class="line">这个营销策略太泛了，给我具体的小红书发布计划</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、总结"><a href="#七、总结" class="headerlink" title="七、总结"></a>七、总结</h2><p>Agency-Agents + Claude Code 的协作本质是：</p>
+<blockquote>
+<p><strong>你拥有了一个「虚拟专业团队」，每个 Agent 代表一个专业角色。你不需要成为每个领域的专家，只需要知道何时调用哪个专家。</strong></p>
+</blockquote>
+<p>对于一人公司来说，这解决了最核心的痛点：</p>
+<ul>
+<li><strong>人力不足</strong>：Agent 填补专业能力</li>
+<li><strong>知识盲区</strong>：Agent 提供最佳实践</li>
+<li><strong>执行效率</strong>：Claude Code 自动化执行</li>
+</ul>
+<p>你的角色从「一个人做所有事」变成了「一个项目经理指挥团队」。</p>
+<hr>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://github.com/msitarzewski/agency-agents" target="_blank" rel="noopener">Agency-Agents GitHub Repository</a></li>
+<li><a href="https://github.com/msitarzewski/agency-agents/blob/main/CONTRIBUTING_zh-CN.md" target="_blank" rel="noopener">Agency-Agents 中文贡献指南</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Multi-Agent/" rel="tag"><i class="fa fa-tag"></i> Multi Agent</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/10/11/ai-model-vs-tool-guide/" rel="prev" title="AI 模型与工具关系指南">
+      <i class="fa fa-chevron-left"></i> AI 模型与工具关系指南
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/01/05/spring-ai-deep-analysis/" rel="next" title="Spring AI 学习与使用">
+      Spring AI 学习与使用 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#一人公司的痛点"><span class="nav-number">1.</span> <span class="nav-text">一人公司的痛点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、Agency-Agents-是什么？"><span class="nav-number">2.</span> <span class="nav-text">一、Agency-Agents 是什么？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-一句话定义"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 一句话定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-仓库结构"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 仓库结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-3-每个-Agent-的设计结构"><span class="nav-number">2.3.</span> <span class="nav-text">1.3 每个 Agent 的设计结构</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、支持的工具生态"><span class="nav-number">3.</span> <span class="nav-text">二、支持的工具生态</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-可导入的工具列表"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 可导入的工具列表</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-安装方法"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 安装方法</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、在-Claude-Code-中如何使用？"><span class="nav-number">4.</span> <span class="nav-text">三、在 Claude Code 中如何使用？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-调用方式"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 调用方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-实际输出示例"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 实际输出示例</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、协作开发实战：数字游民社区"><span class="nav-number">5.</span> <span class="nav-text">四、协作开发实战：数字游民社区</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-协作架构"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 协作架构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-阶段一：产品规划（第1周）"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 阶段一：产品规划（第1周）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-阶段二：技术架构（第2周）"><span class="nav-number">5.3.</span> <span class="nav-text">4.3 阶段二：技术架构（第2周）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-阶段三：前端开发（第3-4周）"><span class="nav-number">5.4.</span> <span class="nav-text">4.4 阶段三：前端开发（第3-4周）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-阶段四：营销策略（第6周）"><span class="nav-number">5.5.</span> <span class="nav-text">4.5 阶段四：营销策略（第6周）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、传统方式-vs-Agent-协作"><span class="nav-number">6.</span> <span class="nav-text">五、传统方式 vs Agent 协作</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-效率对比"><span class="nav-number">6.1.</span> <span class="nav-text">5.1 效率对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-核心价值"><span class="nav-number">6.2.</span> <span class="nav-text">5.2 核心价值</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、使用建议"><span class="nav-number">7.</span> <span class="nav-text">六、使用建议</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-按阶段调用-Agent"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 按阶段调用 Agent</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-Agent-是顾问，不是决策者"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 Agent 是顾问，不是决策者</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-保持上下文一致性"><span class="nav-number">7.3.</span> <span class="nav-text">6.3 保持上下文一致性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-4-迭代优化"><span class="nav-number">7.4.</span> <span class="nav-text">6.4 迭代优化</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、总结"><span class="nav-number">8.</span> <span class="nav-text">七、总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考资料"><span class="nav-number">9.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">63</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">9</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">38</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>
