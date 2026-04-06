@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="Claude Code 有 48+ 个内置工具，每个工具都是一个完整的生命周期管理单元。从定义到执行，工具要经过七步管道：查找、解析、验证、钩子、权限、执行、后处理。这个设计使得每个工具都是自描述、自验证、自渲染的——框架不需要了解工具的内部逻辑，只需调用标准接口。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="工具系统设计：从定义到执行的七步管道">
+<meta property="og:url" content="https://donehub.github.io/2026/04/06/claude-code-tool-system/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="Claude Code 有 48+ 个内置工具，每个工具都是一个完整的生命周期管理单元。从定义到执行，工具要经过七步管道：查找、解析、验证、钩子、权限、执行、后处理。这个设计使得每个工具都是自描述、自验证、自渲染的——框架不需要了解工具的内部逻辑，只需调用标准接口。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-04-05T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-06T06:28:22.161Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Tool System">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/04/06/claude-code-tool-system/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>工具系统设计：从定义到执行的七步管道 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-tool-system/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          工具系统设计：从定义到执行的七步管道
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:22" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/04/06/claude-code-tool-system/" class="post-meta-item leancloud_visitors" data-flag-title="工具系统设计：从定义到执行的七步管道" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/claude-code-tool-system/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-tool-system/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>Claude Code 有 48+ 个内置工具，每个工具都是一个完整的生命周期管理单元。从定义到执行，工具要经过七步管道：查找、解析、验证、钩子、权限、执行、后处理。这个设计使得每个工具都是自描述、自验证、自渲染的——框架不需要了解工具的内部逻辑，只需调用标准接口。</p>
+</blockquote>
+<a id="more"></a>
+<h2 id="导读：工具不只是函数调用"><a href="#导读：工具不只是函数调用" class="headerlink" title="导读：工具不只是函数调用"></a>导读：工具不只是函数调用</h2><p>在很多 AI Agent 框架中，工具只是一个简单的函数：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@tool</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">read_file</span><span class="params">(path: str)</span> -&gt; str:</span></span><br><span class="line">    <span class="keyword">with</span> open(path) <span class="keyword">as</span> f:</span><br><span class="line">        <span class="keyword">return</span> f.read()</span><br></pre></td></tr></table></figure>
+<p>但在 Claude Code 中，工具是一个<strong>完整的生命周期管理单元</strong>：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> Tool&lt;Input, Output&gt; = &#123;</span><br><span class="line">  <span class="comment">// 身份</span></span><br><span class="line">  name: <span class="built_in">string</span></span><br><span class="line">  aliases?: <span class="built_in">string</span>[]</span><br><span class="line">  searchHint?: <span class="built_in">string</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 能力声明</span></span><br><span class="line">  isEnabled(): <span class="built_in">boolean</span></span><br><span class="line">  isConcurrencySafe(input): <span class="built_in">boolean</span></span><br><span class="line">  isReadOnly(input): <span class="built_in">boolean</span></span><br><span class="line">  isDestructive(input): <span class="built_in">boolean</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 生命周期</span></span><br><span class="line">  validateInput(input, context)</span><br><span class="line">  checkPermissions(input, context)</span><br><span class="line">  call(input, context, ...)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 输出与渲染</span></span><br><span class="line">  renderToolUseMessage(input)</span><br><span class="line">  renderToolResultMessage(content)</span><br><span class="line">  mapToolResultToToolResultBlockParam()</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 智能特性</span></span><br><span class="line">  inputSchema: Zod schema</span><br><span class="line">  maxResultSizeChars: <span class="built_in">number</span></span><br><span class="line">  getToolUseSummary?(input): <span class="built_in">string</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这种设计使得每个工具都是<strong>自描述、自验证、自渲染</strong>的——框架不需要了解工具的内部逻辑，只需调用标准接口。</p>
+<hr>
+<h2 id="一、工具的定义：不只是名称和函数"><a href="#一、工具的定义：不只是名称和函数" class="headerlink" title="一、工具的定义：不只是名称和函数"></a>一、工具的定义：不只是名称和函数</h2><h3 id="1-1-Tool-接口详解"><a href="#1-1-Tool-接口详解" class="headerlink" title="1.1 Tool 接口详解"></a>1.1 Tool 接口详解</h3><p><code>src/Tool.ts</code>（约 792 行）定义了工具的完整接口：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">type</span> Tool&lt;Input, Output, P <span class="keyword">extends</span> ToolProgressData&gt; = &#123;</span><br><span class="line">  <span class="comment">// ===== 身份 =====</span></span><br><span class="line">  name: <span class="built_in">string</span>                    <span class="comment">// 工具名称</span></span><br><span class="line">  aliases?: <span class="built_in">string</span>[]              <span class="comment">// 向后兼容的旧名称</span></span><br><span class="line">  searchHint?: <span class="built_in">string</span>             <span class="comment">// ToolSearch 关键词匹配</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// ===== 能力声明 =====</span></span><br><span class="line">  isEnabled(): <span class="built_in">boolean</span>            <span class="comment">// 是否可用</span></span><br><span class="line">  isConcurrencySafe(input): <span class="built_in">boolean</span>   <span class="comment">// 是否可并行执行</span></span><br><span class="line">  isReadOnly(input): <span class="built_in">boolean</span>          <span class="comment">// 是否只读操作</span></span><br><span class="line">  isDestructive?(input): <span class="built_in">boolean</span>      <span class="comment">// 是否破坏性操作</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// ===== 生命周期 =====</span></span><br><span class="line">  validateInput?(input, context): <span class="built_in">Promise</span>&lt;ValidationResult&gt;  <span class="comment">// 输入验证</span></span><br><span class="line">  checkPermissions?(input, context): <span class="built_in">Promise</span>&lt;PermissionResult&gt;  <span class="comment">// 权限检查</span></span><br><span class="line">  call(input, context, canUseTool, parentMessage, onProgress): <span class="built_in">Promise</span>&lt;ToolResult&lt;Output&gt;&gt;  <span class="comment">// 执行</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// ===== 输出与渲染 =====</span></span><br><span class="line">  renderToolUseMessage?(input): ReactNode     <span class="comment">// 渲染调用信息</span></span><br><span class="line">  renderToolResultMessage?(content): ReactNode  <span class="comment">// 渲染结果</span></span><br><span class="line">  renderToolUseProgressMessage?(...): ReactNode  <span class="comment">// 渲染进度</span></span><br><span class="line">  mapToolResultToToolResultBlockParam?(...): ToolResultBlockParam  <span class="comment">// 映射为 API 格式</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// ===== 智能特性 =====</span></span><br><span class="line">  inputSchema: Input                        <span class="comment">// Zod schema</span></span><br><span class="line">  outputSchema?: z.ZodType&lt;Output&gt;          <span class="comment">// 输出 schema</span></span><br><span class="line">  maxResultSizeChars?: <span class="built_in">number</span>               <span class="comment">// 结果大小阈值</span></span><br><span class="line">  getToolUseSummary?(input): <span class="built_in">string</span>         <span class="comment">// 工具使用摘要</span></span><br><span class="line">  shouldDefer?: <span class="built_in">boolean</span>                     <span class="comment">// 是否延迟加载</span></span><br><span class="line">  alwaysLoad?: <span class="built_in">boolean</span>                      <span class="comment">// 是否始终加载</span></span><br><span class="line">  toAutoClassifierInput?(input): <span class="built_in">string</span>     <span class="comment">// 安全分类器输入</span></span><br><span class="line">  preparePermissionMatcher?<span class="function">(<span class="params">input</span>): <span class="params">Promise</span>&lt;(<span class="params">pattern: <span class="built_in">string</span></span>) =&gt;</span> <span class="built_in">boolean</span>&gt;  <span class="comment">// 权限匹配器</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="1-2-buildTool-工厂函数"><a href="#1-2-buildTool-工厂函数" class="headerlink" title="1.2 buildTool 工厂函数"></a>1.2 buildTool 工厂函数</h3><p><code>buildTool()</code> 函数提供了工具定义的便捷方式：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> BashTool = buildTool(&#123;</span><br><span class="line">  name: <span class="string">'Bash'</span>,</span><br><span class="line">  description: <span class="keyword">async</span> (input) =&gt; <span class="string">`Execute command: <span class="subst">$&#123;input.command&#125;</span>`</span>,</span><br><span class="line">  inputSchema: z.object(&#123;</span><br><span class="line">    command: z.string(),</span><br><span class="line">    timeout: z.number().optional(),</span><br><span class="line">  &#125;),</span><br><span class="line">  isConcurrencySafe: <span class="function">(<span class="params">input</span>) =&gt;</span> <span class="literal">false</span>,  <span class="comment">// Bash 可能修改状态</span></span><br><span class="line">  isReadOnly: <span class="function">(<span class="params">input</span>) =&gt;</span> isReadOnlyCommand(input.command),</span><br><span class="line">  isDestructive: <span class="function">(<span class="params">input</span>) =&gt;</span> isDestructiveCommand(input.command),</span><br><span class="line">  validateInput: <span class="keyword">async</span> (input, context) =&gt; &#123; <span class="comment">/* ... */</span> &#125;,</span><br><span class="line">  checkPermissions: <span class="keyword">async</span> (input, context) =&gt; &#123; <span class="comment">/* ... */</span> &#125;,</span><br><span class="line">  call: <span class="keyword">async</span> (input, context, canUseTool, parentMessage, onProgress) =&gt; &#123; <span class="comment">/* ... */</span> &#125;,</span><br><span class="line">  <span class="comment">// ...</span></span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="二、工具注册：三阶段流水线"><a href="#二、工具注册：三阶段流水线" class="headerlink" title="二、工具注册：三阶段流水线"></a>二、工具注册：三阶段流水线</h2><p>工具的发现和注册分三个阶段（<code>src/tools.ts</code>）：</p>
+<h3 id="2-1-阶段1：基础工具池"><a href="#2-1-阶段1：基础工具池" class="headerlink" title="2.1 阶段1：基础工具池"></a>2.1 阶段1：基础工具池</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools.ts:50-150</span></span><br><span class="line"><span class="keyword">export</span> <span class="function"><span class="keyword">function</span> <span class="title">getAllBaseTools</span>(<span class="params"></span>): <span class="title">Tools</span> </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> [</span><br><span class="line">    <span class="comment">// 文件操作</span></span><br><span class="line">    FileReadTool,</span><br><span class="line">    FileEditTool,</span><br><span class="line">    FileWriteTool,</span><br><span class="line">    GlobTool,</span><br><span class="line">    GrepTool,</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// Shell 执行</span></span><br><span class="line">    BashTool,</span><br><span class="line">    PowerShellTool,</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 网络</span></span><br><span class="line">    WebFetchTool,</span><br><span class="line">    WebSearchTool,</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// Agent 编排</span></span><br><span class="line">    AgentTool,</span><br><span class="line">    TeamCreateTool,</span><br><span class="line">    SendMessageTool,</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 任务管理</span></span><br><span class="line">    TaskCreateTool,</span><br><span class="line">    TaskOutputTool,</span><br><span class="line">    TodoWriteTool,</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 其他...</span></span><br><span class="line">    AskUserQuestionTool,</span><br><span class="line">    SkillTool,</span><br><span class="line">    SleepTool,</span><br><span class="line">    <span class="comment">// ... 共 48+ 个</span></span><br><span class="line">  ].filter(<span class="function"><span class="params">tool</span> =&gt;</span> &#123;</span><br><span class="line">    <span class="comment">// Feature Flag 过滤</span></span><br><span class="line">    <span class="keyword">if</span> (tool.name === <span class="string">'Agent'</span> &amp;&amp; !feature(<span class="string">'FORK_SUBAGENT'</span>)) <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">    <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line">  &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="2-2-阶段2：过滤"><a href="#2-2-阶段2：过滤" class="headerlink" title="2.2 阶段2：过滤"></a>2.2 阶段2：过滤</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools.ts:200-280</span></span><br><span class="line"><span class="keyword">export</span> <span class="function"><span class="keyword">function</span> <span class="title">getTools</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  baseTools: Tools,</span></span></span><br><span class="line"><span class="function"><span class="params">  permissionContext: ToolPermissionContext,</span></span></span><br><span class="line"><span class="function"><span class="params">  options: GetToolsOptions,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Tools</span> </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> baseTools.filter(<span class="function"><span class="params">tool</span> =&gt;</span> &#123;</span><br><span class="line">    <span class="comment">// 1. 权限模式过滤</span></span><br><span class="line">    <span class="keyword">if</span> (permissionContext.mode === <span class="string">'dontAsk'</span> &amp;&amp; !tool.isReadOnly?.()) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 2. REPL 模式过滤</span></span><br><span class="line">    <span class="keyword">if</span> (options.isReplMode &amp;&amp; !isReplCompatible(tool)) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 3. isEnabled 检查</span></span><br><span class="line">    <span class="keyword">if</span> (!tool.isEnabled()) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line">  &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="2-3-阶段3：MCP-合并"><a href="#2-3-阶段3：MCP-合并" class="headerlink" title="2.3 阶段3：MCP 合并"></a>2.3 阶段3：MCP 合并</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools.ts:300-350</span></span><br><span class="line"><span class="keyword">export</span> <span class="function"><span class="keyword">function</span> <span class="title">assembleToolPool</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  baseTools: Tools,</span></span></span><br><span class="line"><span class="function"><span class="params">  mcpClients: MCPServerConnection[],</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Tools</span> </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> mcpTools: Tools = []</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> client of mcpClients) &#123;</span><br><span class="line">    <span class="keyword">if</span> (client.type !== <span class="string">'connected'</span>) <span class="keyword">continue</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">const</span> mcpTool of client.tools) &#123;</span><br><span class="line">      <span class="comment">// MCP 工具命名：mcp__&#123;serverName&#125;__&#123;toolName&#125;</span></span><br><span class="line">      <span class="keyword">const</span> name = <span class="string">`mcp__<span class="subst">$&#123;normalizeNameForMCP(client.name)&#125;</span>__<span class="subst">$&#123;mcpTool.name&#125;</span>`</span></span><br><span class="line">      mcpTools.push(convertMcpToolToTool(name, mcpTool, client))</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 合并：内置优先，去重，排序（缓存稳定性）</span></span><br><span class="line">  <span class="keyword">return</span> mergeAndDeduplicate(baseTools, mcpTools)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>工具池构建流程图：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">getAllBaseTools()</span><br><span class="line">  │  48+ 个内置工具</span><br><span class="line">  │  + Feature Flag 过滤</span><br><span class="line">  │</span><br><span class="line">  ▼</span><br><span class="line">getTools()</span><br><span class="line">  │  权限模式过滤</span><br><span class="line">  │  REPL 模式过滤</span><br><span class="line">  │  isEnabled() 过滤</span><br><span class="line">  │</span><br><span class="line">  ▼</span><br><span class="line">assembleToolPool()</span><br><span class="line">  │  + MCP 工具</span><br><span class="line">  │  去重（内置优先）</span><br><span class="line">  │  排序（缓存稳定性）</span><br><span class="line">  │</span><br><span class="line">  ▼</span><br><span class="line">最终工具池</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="三、七步执行管道"><a href="#三、七步执行管道" class="headerlink" title="三、七步执行管道"></a>三、七步执行管道</h2><p>一次工具调用要经过<strong>7 步管道</strong>（<code>src/services/tools/toolExecution.ts</code>）：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    工具执行管道                              │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  Step 1: 工具查找                                           │</span><br><span class="line">│    └─ findToolByName(name) → 支持别名回退                   │</span><br><span class="line">│                                                             │</span><br><span class="line">│  Step 2: 输入解析（Zod）                                     │</span><br><span class="line">│    └─ inputSchema.safeParse(input) → 类型验证               │</span><br><span class="line">│                                                             │</span><br><span class="line">│  Step 3: 自定义验证                                         │</span><br><span class="line">│    └─ tool.validateInput?(input, context)                   │</span><br><span class="line">│                                                             │</span><br><span class="line">│  Step 4: Pre-Tool 钩子                                      │</span><br><span class="line">│    └─ runPreToolUseHooks(tool, input, context)              │</span><br><span class="line">│       ├─ 退出码 0: 成功，继续                               │</span><br><span class="line">│       ├─ 退出码 2: 阻塞，展示错误                           │</span><br><span class="line">│       └─ 其他: 展示给用户                                   │</span><br><span class="line">│                                                             │</span><br><span class="line">│  Step 5: 权限检查                                           │</span><br><span class="line">│    └─ hasPermissionsToUseTool(tool, input, context)         │</span><br><span class="line">│       ├─ behavior: &#39;allow&#39; → 继续                           │</span><br><span class="line">│       ├─ behavior: &#39;deny&#39; → 返回拒绝                        │</span><br><span class="line">│       └─ behavior: &#39;ask&#39; → 弹出确认对话框                   │</span><br><span class="line">│                                                             │</span><br><span class="line">│  Step 6: 实际执行                                           │</span><br><span class="line">│    └─ tool.call(input, context, canUseTool, ...)            │</span><br><span class="line">│       ├─ 成功 → ToolResult                                  │</span><br><span class="line">│       └─ 失败 → ToolError                                   │</span><br><span class="line">│                                                             │</span><br><span class="line">│  Step 7: Post-Tool 钩子                                     │</span><br><span class="line">│    └─ runPostToolUseHooks(tool, input, result)              │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<h3 id="3-1-Step-1-工具查找"><a href="#3-1-Step-1-工具查找" class="headerlink" title="3.1 Step 1: 工具查找"></a>3.1 Step 1: 工具查找</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/Tool.ts:500-530</span></span><br><span class="line"><span class="keyword">export</span> <span class="function"><span class="keyword">function</span> <span class="title">findToolByName</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  name: <span class="built_in">string</span>,</span></span></span><br><span class="line"><span class="function"><span class="params">  tools: Tools,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Tool</span>&lt;<span class="title">unknown</span>, <span class="title">unknown</span>, <span class="title">ToolProgressData</span>&gt; | <span class="title">undefined</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 精确匹配</span></span><br><span class="line">  <span class="keyword">const</span> exact = tools.find(<span class="function"><span class="params">t</span> =&gt;</span> t.name === name)</span><br><span class="line">  <span class="keyword">if</span> (exact) <span class="keyword">return</span> exact</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 别名匹配（向后兼容）</span></span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> tool of tools) &#123;</span><br><span class="line">    <span class="keyword">if</span> (tool.aliases?.includes(name)) &#123;</span><br><span class="line">      <span class="keyword">return</span> tool</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. MCP 工具特殊处理</span></span><br><span class="line">  <span class="keyword">if</span> (name.startsWith(<span class="string">'mcp__'</span>)) &#123;</span><br><span class="line">    <span class="keyword">return</span> findMcpTool(name, tools)</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> <span class="literal">undefined</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="3-2-Step-2-输入解析"><a href="#3-2-Step-2-输入解析" class="headerlink" title="3.2 Step 2: 输入解析"></a>3.2 Step 2: 输入解析</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/tools/toolExecution.ts:200-230</span></span><br><span class="line"><span class="keyword">const</span> parseResult = tool.inputSchema.safeParse(input)</span><br><span class="line"><span class="keyword">if</span> (!parseResult.success) &#123;</span><br><span class="line">  <span class="keyword">const</span> formattedError = formatZodValidationError(parseResult.error)</span><br><span class="line">  <span class="keyword">return</span> &#123;</span><br><span class="line">    <span class="keyword">type</span>: <span class="string">'tool_result'</span>,</span><br><span class="line">    content: formattedError,</span><br><span class="line">    is_error: <span class="literal">true</span>,</span><br><span class="line">    tool_use_id: toolUseId,</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">const</span> validatedInput = parseResult.data</span><br></pre></td></tr></table></figure>
+<h3 id="3-3-Step-3-自定义验证"><a href="#3-3-Step-3-自定义验证" class="headerlink" title="3.3 Step 3: 自定义验证"></a>3.3 Step 3: 自定义验证</h3><p>某些工具需要额外的验证逻辑：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/FileEditTool/FileEditTool.ts:150-200</span></span><br><span class="line"><span class="keyword">async</span> validateInput(input, context): <span class="built_in">Promise</span>&lt;ValidationResult&gt; &#123;</span><br><span class="line">  <span class="comment">// 1. 文件存在性检查</span></span><br><span class="line">  <span class="keyword">if</span> (!<span class="keyword">await</span> fileExists(input.file_path)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; result: <span class="literal">false</span>, message: <span class="string">'File does not exist'</span>, errorCode: <span class="number">1</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 文件大小限制</span></span><br><span class="line">  <span class="keyword">const</span> stats = <span class="keyword">await</span> stat(input.file_path)</span><br><span class="line">  <span class="keyword">if</span> (stats.size &gt; <span class="number">1</span>_000_000_000) &#123;  <span class="comment">// 1 GiB</span></span><br><span class="line">    <span class="keyword">return</span> &#123; result: <span class="literal">false</span>, message: <span class="string">'File too large'</span>, errorCode: <span class="number">2</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 必须先读取</span></span><br><span class="line">  <span class="keyword">const</span> readState = context.readFileState.get(input.file_path)</span><br><span class="line">  <span class="keyword">if</span> (!readState) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; result: <span class="literal">false</span>, message: <span class="string">'Must read file before editing'</span>, errorCode: <span class="number">3</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 文件未被修改</span></span><br><span class="line">  <span class="keyword">const</span> currentMtime = (<span class="keyword">await</span> stat(input.file_path)).mtimeMs</span><br><span class="line">  <span class="keyword">if</span> (currentMtime &gt; readState.timestamp) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; result: <span class="literal">false</span>, message: <span class="string">'File was modified after reading'</span>, errorCode: <span class="number">4</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> &#123; result: <span class="literal">true</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="3-4-Step-4-Pre-Tool-钩子"><a href="#3-4-Step-4-Pre-Tool-钩子" class="headerlink" title="3.4 Step 4: Pre-Tool 钩子"></a>3.4 Step 4: Pre-Tool 钩子</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/tools/toolHooks.ts:50-100</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">runPreToolUseHooks</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  tool: Tool,</span></span></span><br><span class="line"><span class="function"><span class="params">  input: unknown,</span></span></span><br><span class="line"><span class="function"><span class="params">  context: ToolUseContext,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">HookResult</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> hooks = getHooksForTool(tool.name, context)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> hook of hooks) &#123;</span><br><span class="line">    <span class="keyword">const</span> result = <span class="keyword">await</span> executeHook(hook, &#123;</span><br><span class="line">      tool_name: tool.name,</span><br><span class="line">      tool_input: input,</span><br><span class="line">    &#125;)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (result.exitCode === <span class="number">2</span>) &#123;</span><br><span class="line">      <span class="comment">// 阻塞：展示错误给模型</span></span><br><span class="line">      <span class="keyword">return</span> &#123;</span><br><span class="line">        blocked: <span class="literal">true</span>,</span><br><span class="line">        message: result.stderr,</span><br><span class="line">        modifiedInput: parseModifiedInput(result.stdout),</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> &#123; blocked: <span class="literal">false</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="3-5-Step-5-权限检查"><a href="#3-5-Step-5-权限检查" class="headerlink" title="3.5 Step 5: 权限检查"></a>3.5 Step 5: 权限检查</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/utils/permissions/permissions.ts:200-300</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">hasPermissionsToUseTool</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  tool: Tool,</span></span></span><br><span class="line"><span class="function"><span class="params">  input: unknown,</span></span></span><br><span class="line"><span class="function"><span class="params">  context: ToolUseContext,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">PermissionResult</span>&gt; </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 检查 deny 规则（最高优先级）</span></span><br><span class="line">  <span class="keyword">const</span> denyResult = checkDenyRules(tool.name, input, context)</span><br><span class="line">  <span class="keyword">if</span> (denyResult) <span class="keyword">return</span> &#123; behavior: <span class="string">'deny'</span>, ...denyResult &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 检查工具特定权限</span></span><br><span class="line">  <span class="keyword">if</span> (tool.checkPermissions) &#123;</span><br><span class="line">    <span class="keyword">const</span> toolResult = <span class="keyword">await</span> tool.checkPermissions(input, context)</span><br><span class="line">    <span class="keyword">if</span> (toolResult.behavior !== <span class="string">'passthrough'</span>) &#123;</span><br><span class="line">      <span class="keyword">return</span> toolResult</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 检查 bypass 模式</span></span><br><span class="line">  <span class="keyword">if</span> (context.permissionContext.mode === <span class="string">'bypassPermissions'</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span>, decisionReason: &#123; <span class="keyword">type</span>: <span class="string">'mode'</span> &#125; &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 检查 allow 规则</span></span><br><span class="line">  <span class="keyword">const</span> allowResult = checkAllowRules(tool.name, input, context)</span><br><span class="line">  <span class="keyword">if</span> (allowResult) <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span>, ...allowResult &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 5. 默认：询问用户</span></span><br><span class="line">  <span class="keyword">return</span> &#123;</span><br><span class="line">    behavior: <span class="string">'ask'</span>,</span><br><span class="line">    message: generatePermissionMessage(tool, input),</span><br><span class="line">    suggestions: generateSuggestions(tool, input),</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="3-6-Step-6-实际执行"><a href="#3-6-Step-6-实际执行" class="headerlink" title="3.6 Step 6: 实际执行"></a>3.6 Step 6: 实际执行</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/tools/toolExecution.ts:400-500</span></span><br><span class="line"><span class="keyword">const</span> startTime = <span class="built_in">Date</span>.now()</span><br><span class="line"><span class="keyword">try</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> result = <span class="keyword">await</span> tool.call(</span><br><span class="line">    validatedInput,</span><br><span class="line">    context,</span><br><span class="line">    canUseTool,</span><br><span class="line">    parentMessage,</span><br><span class="line">    onProgress,</span><br><span class="line">  )</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">const</span> durationMs = <span class="built_in">Date</span>.now() - startTime</span><br><span class="line">  addToToolDuration(durationMs)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> &#123;</span><br><span class="line">    <span class="keyword">type</span>: <span class="string">'tool_result'</span>,</span><br><span class="line">    content: result.content,</span><br><span class="line">    tool_use_id: toolUseId,</span><br><span class="line">  &#125;</span><br><span class="line">&#125; <span class="keyword">catch</span> (error) &#123;</span><br><span class="line">  <span class="keyword">const</span> classifiedError = classifyToolError(error)</span><br><span class="line">  <span class="keyword">return</span> &#123;</span><br><span class="line">    <span class="keyword">type</span>: <span class="string">'tool_result'</span>,</span><br><span class="line">    content: <span class="string">`Error: <span class="subst">$&#123;classifiedError&#125;</span>`</span>,</span><br><span class="line">    is_error: <span class="literal">true</span>,</span><br><span class="line">    tool_use_id: toolUseId,</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="3-7-Step-7-Post-Tool-钩子"><a href="#3-7-Step-7-Post-Tool-钩子" class="headerlink" title="3.7 Step 7: Post-Tool 钩子"></a>3.7 Step 7: Post-Tool 钩子</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/tools/toolHooks.ts:150-200</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">runPostToolUseHooks</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  tool: Tool,</span></span></span><br><span class="line"><span class="function"><span class="params">  input: unknown,</span></span></span><br><span class="line"><span class="function"><span class="params">  result: ToolResult,</span></span></span><br><span class="line"><span class="function"><span class="params">  context: ToolUseContext,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">void</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> hooks = getPostToolUseHooks(tool.name, context)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> hook of hooks) &#123;</span><br><span class="line">    <span class="keyword">await</span> executeHook(hook, &#123;</span><br><span class="line">      tool_name: tool.name,</span><br><span class="line">      tool_input: input,</span><br><span class="line">      tool_result: result.content,</span><br><span class="line">      tool_result_is_error: result.is_error,</span><br><span class="line">    &#125;)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="四、工具延迟加载"><a href="#四、工具延迟加载" class="headerlink" title="四、工具延迟加载"></a>四、工具延迟加载</h2><p>Claude Code 有 48+ 个内置工具。如果每次 API 调用都把所有工具定义发给模型，会浪费大量 token。</p>
+<h3 id="4-1-延迟加载设计"><a href="#4-1-延迟加载设计" class="headerlink" title="4.1 延迟加载设计"></a>4.1 延迟加载设计</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 工具可以标记为"延迟加载"</span></span><br><span class="line">&#123;</span><br><span class="line">  shouldDefer: <span class="literal">true</span>,       <span class="comment">// 只在 ToolSearch 中列出名称</span></span><br><span class="line">  alwaysLoad: <span class="literal">false</span>,       <span class="comment">// 不在初始提示词中包含完整 schema</span></span><br><span class="line">  searchHint: <span class="string">"notebook"</span>   <span class="comment">// 搜索关键词</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="4-2-ToolSearch-工具"><a href="#4-2-ToolSearch-工具" class="headerlink" title="4.2 ToolSearch 工具"></a>4.2 ToolSearch 工具</h3><p>当模型需要使用延迟加载的工具时：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">模型看到:</span><br><span class="line">  &quot;The following tools are available but deferred: NotebookEdit, ...&quot;</span><br><span class="line"></span><br><span class="line">模型调用:</span><br><span class="line">  ToolSearch(&#123; query: &quot;notebook&quot; &#125;)</span><br><span class="line"></span><br><span class="line">返回:</span><br><span class="line">  NotebookEdit 的完整 schema 和使用说明</span><br><span class="line"></span><br><span class="line">模型调用:</span><br><span class="line">  NotebookEdit(&#123; ... &#125;)</span><br></pre></td></tr></table></figure>
+<p><strong>Token 节省</strong>：</p>
+<ul>
+<li>默认情况下，48 个工具的 schema 约 15000 tokens</li>
+<li>延迟加载后，初始提示词只包含核心工具，约 5000 tokens</li>
+<li>节省约 66% 的工具相关 token</li>
+</ul>
+<hr>
+<h2 id="五、工具结果处理"><a href="#五、工具结果处理" class="headerlink" title="五、工具结果处理"></a>五、工具结果处理</h2><h3 id="5-1-结果大小限制"><a href="#5-1-结果大小限制" class="headerlink" title="5.1 结果大小限制"></a>5.1 结果大小限制</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/utils/toolResultStorage.ts</span></span><br><span class="line"><span class="keyword">const</span> TOOL_RESULT_PERSIST_THRESHOLD_CHARS = <span class="number">20</span>_000</span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">processToolResultBlock</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  tool: Tool,</span></span></span><br><span class="line"><span class="function"><span class="params">  result: <span class="built_in">string</span>,</span></span></span><br><span class="line"><span class="function"><span class="params">  toolUseID: <span class="built_in">string</span>,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">ToolResultBlockParam</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (result.length &gt; TOOL_RESULT_PERSIST_THRESHOLD_CHARS) &#123;</span><br><span class="line">    <span class="comment">// 保存到磁盘</span></span><br><span class="line">    <span class="keyword">const</span> filePath = getToolResultPath(toolUseID)</span><br><span class="line">    <span class="keyword">await</span> writeFile(filePath, result)</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 返回预览</span></span><br><span class="line">    <span class="keyword">const</span> preview = result.slice(<span class="number">0</span>, <span class="number">4096</span>)</span><br><span class="line">    <span class="keyword">return</span> &#123;</span><br><span class="line">      content: <span class="string">`<span class="subst">$&#123;preview&#125;</span>\n\n[Output saved to <span class="subst">$&#123;filePath&#125;</span>. Use Read tool to view full output.]`</span>,</span><br><span class="line">      tool_use_id: toolUseID,</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> &#123; content: result, tool_use_id: toolUseID &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-文件读取缓存"><a href="#5-2-文件读取缓存" class="headerlink" title="5.2 文件读取缓存"></a>5.2 文件读取缓存</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/utils/fileStateCache.ts</span></span><br><span class="line"><span class="keyword">class</span> FileStateCache &#123;</span><br><span class="line">  <span class="keyword">private</span> cache = <span class="keyword">new</span> Map&lt;<span class="built_in">string</span>, &#123;</span><br><span class="line">    timestamp: <span class="built_in">number</span></span><br><span class="line">    content: <span class="built_in">string</span></span><br><span class="line">    offset?: <span class="built_in">number</span></span><br><span class="line">    limit?: <span class="built_in">number</span></span><br><span class="line">  &#125;&gt;()</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">get</span>(path: <span class="built_in">string</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">this</span>.cache.get(path)</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">set</span>(path: <span class="built_in">string</span>, state: &#123; timestamp: <span class="built_in">number</span>, content: <span class="built_in">string</span> &#125;) &#123;</span><br><span class="line">    <span class="keyword">this</span>.cache.set(path, state)</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 用于检测并发修改</span></span><br><span class="line">  validate(path: <span class="built_in">string</span>): <span class="built_in">boolean</span> &#123;</span><br><span class="line">    <span class="keyword">const</span> cached = <span class="keyword">this</span>.cache.get(path)</span><br><span class="line">    <span class="keyword">if</span> (!cached) <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">const</span> currentMtime = statSync(path).mtimeMs</span><br><span class="line">    <span class="keyword">return</span> currentMtime &lt;= cached.timestamp</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="六、关键设计原则"><a href="#六、关键设计原则" class="headerlink" title="六、关键设计原则"></a>六、关键设计原则</h2><h3 id="6-1-自描述工具"><a href="#6-1-自描述工具" class="headerlink" title="6.1 自描述工具"></a>6.1 自描述工具</h3><p>每个工具通过接口暴露所有必要信息，框架无需了解内部：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 框架只知道接口，不知道实现</span></span><br><span class="line"><span class="keyword">const</span> isReadOnly = tool.isReadOnly?.(input)</span><br><span class="line"><span class="keyword">const</span> isDestructive = tool.isDestructive?.(input)</span><br><span class="line"></span><br><span class="line"><span class="comment">// 工具自己决定</span></span><br><span class="line">tool.checkPermissions(input, context)</span><br></pre></td></tr></table></figure>
+<h3 id="6-2-验证前置"><a href="#6-2-验证前置" class="headerlink" title="6.2 验证前置"></a>6.2 验证前置</h3><p>输入验证在权限检查之前：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">输入 → Zod 解析 → 自定义验证 → Pre-Tool 钩子 → 权限检查 → 执行</span><br></pre></td></tr></table></figure>
+<p>这确保了权限检查不会因为无效输入而触发。</p>
+<h3 id="6-3-钩子可扩展"><a href="#6-3-钩子可扩展" class="headerlink" title="6.3 钩子可扩展"></a>6.3 钩子可扩展</h3><p>钩子系统允许用户在任何阶段注入自定义逻辑：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// settings.json</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="attr">"hooks"</span>: &#123;</span><br><span class="line">    <span class="attr">"PreToolUse"</span>: [&#123;</span><br><span class="line">      <span class="attr">"matcher"</span>: <span class="string">"Bash"</span>,</span><br><span class="line">      <span class="attr">"hooks"</span>: [&#123; <span class="attr">"type"</span>: <span class="string">"command"</span>, <span class="attr">"command"</span>: <span class="string">"echo 'Bash called'"</span> &#125;]</span><br><span class="line">    &#125;]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、关键源文件索引"><a href="#七、关键源文件索引" class="headerlink" title="七、关键源文件索引"></a>七、关键源文件索引</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>行数</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/Tool.ts</code></td>
+<td>~792</td>
+<td>Tool 类型定义和构建器</td>
+</tr>
+<tr>
+<td><code>src/tools.ts</code></td>
+<td>~389</td>
+<td>工具发现和注册</td>
+</tr>
+<tr>
+<td><code>src/services/tools/toolExecution.ts</code></td>
+<td>~1500</td>
+<td>执行管道</td>
+</tr>
+<tr>
+<td><code>src/services/tools/toolOrchestration.ts</code></td>
+<td>~200</td>
+<td>并行/串行策略</td>
+</tr>
+<tr>
+<td><code>src/services/tools/toolHooks.ts</code></td>
+<td>~300</td>
+<td>钩子执行</td>
+</tr>
+<tr>
+<td><code>src/utils/toolResultStorage.ts</code></td>
+<td>~200</td>
+<td>结果存储</td>
+</tr>
+<tr>
+<td><code>src/utils/fileStateCache.ts</code></td>
+<td>~100</td>
+<td>文件状态缓存</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="八、总结"><a href="#八、总结" class="headerlink" title="八、总结"></a>八、总结</h2><p>Claude Code 的工具系统设计体现了几个核心原则：</p>
+<ol>
+<li><strong>接口驱动</strong>：统一的 Tool 接口，框架无需了解实现</li>
+<li><strong>管道模式</strong>：七步执行管道，每步职责清晰</li>
+<li><strong>延迟加载</strong>：减少初始 token 消耗</li>
+<li><strong>钩子扩展</strong>：用户可在任意阶段注入逻辑</li>
+<li><strong>结果管理</strong>：自动处理大型结果</li>
+</ol>
+<p>这个设计使得添加新工具变得简单——只需实现 Tool 接口，框架会自动处理验证、权限、执行和结果处理。</p>
+<hr>
+<p><strong>系列文章导航：</strong></p>
+<ul>
+<li>上一篇：<a href="/claude-code-async-generator-state-machine/">打破 ReAct 迷思：Async Generator 状态机</a></li>
+<li>下一篇：<a href="/claude-code-multi-agent/">多 Agent 编排：四种代理类型与协作机制</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Tool-System/" rel="tag"><i class="fa fa-tag"></i> Tool System</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-why-better/" rel="prev" title="Claude Code 为什么更强：超越 Prompt 的 Agent 运行时">
+      <i class="fa fa-chevron-left"></i> Claude Code 为什么更强：超越 Prompt 的 Agent 运行时
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-system-prompt/" rel="next" title="System Prompt 工程：动态组装与缓存优化">
+      System Prompt 工程：动态组装与缓存优化 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#导读：工具不只是函数调用"><span class="nav-number">1.</span> <span class="nav-text">导读：工具不只是函数调用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、工具的定义：不只是名称和函数"><span class="nav-number">2.</span> <span class="nav-text">一、工具的定义：不只是名称和函数</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-Tool-接口详解"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 Tool 接口详解</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-buildTool-工厂函数"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 buildTool 工厂函数</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、工具注册：三阶段流水线"><span class="nav-number">3.</span> <span class="nav-text">二、工具注册：三阶段流水线</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-阶段1：基础工具池"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 阶段1：基础工具池</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-阶段2：过滤"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 阶段2：过滤</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-阶段3：MCP-合并"><span class="nav-number">3.3.</span> <span class="nav-text">2.3 阶段3：MCP 合并</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、七步执行管道"><span class="nav-number">4.</span> <span class="nav-text">三、七步执行管道</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-Step-1-工具查找"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 Step 1: 工具查找</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-Step-2-输入解析"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 Step 2: 输入解析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-Step-3-自定义验证"><span class="nav-number">4.3.</span> <span class="nav-text">3.3 Step 3: 自定义验证</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-Step-4-Pre-Tool-钩子"><span class="nav-number">4.4.</span> <span class="nav-text">3.4 Step 4: Pre-Tool 钩子</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-5-Step-5-权限检查"><span class="nav-number">4.5.</span> <span class="nav-text">3.5 Step 5: 权限检查</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-6-Step-6-实际执行"><span class="nav-number">4.6.</span> <span class="nav-text">3.6 Step 6: 实际执行</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-7-Step-7-Post-Tool-钩子"><span class="nav-number">4.7.</span> <span class="nav-text">3.7 Step 7: Post-Tool 钩子</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、工具延迟加载"><span class="nav-number">5.</span> <span class="nav-text">四、工具延迟加载</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-延迟加载设计"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 延迟加载设计</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-ToolSearch-工具"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 ToolSearch 工具</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、工具结果处理"><span class="nav-number">6.</span> <span class="nav-text">五、工具结果处理</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-结果大小限制"><span class="nav-number">6.1.</span> <span class="nav-text">5.1 结果大小限制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-文件读取缓存"><span class="nav-number">6.2.</span> <span class="nav-text">5.2 文件读取缓存</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、关键设计原则"><span class="nav-number">7.</span> <span class="nav-text">六、关键设计原则</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-自描述工具"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 自描述工具</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-验证前置"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 验证前置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-钩子可扩展"><span class="nav-number">7.3.</span> <span class="nav-text">6.3 钩子可扩展</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、关键源文件索引"><span class="nav-number">8.</span> <span class="nav-text">七、关键源文件索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、总结"><span class="nav-number">9.</span> <span class="nav-text">八、总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">62</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">9</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">37</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>

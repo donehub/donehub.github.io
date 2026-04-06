@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="“对话没有上下文限制”——这是 Claude Code 的一个核心承诺。但它真的能做到吗？答案是：通过四级压缩系统，实现”伪无限对话”。这背后的设计非常精妙：不是简单截断，而是智能地压缩和保留关键信息。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Context 管理：四级压缩与无限对话的秘密">
+<meta property="og:url" content="https://donehub.github.io/2026/04/06/claude-code-context-compression/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="“对话没有上下文限制”——这是 Claude Code 的一个核心承诺。但它真的能做到吗？答案是：通过四级压缩系统，实现”伪无限对话”。这背后的设计非常精妙：不是简单截断，而是智能地压缩和保留关键信息。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-04-05T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-06T06:28:24.210Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Context Compression">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/04/06/claude-code-context-compression/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Context 管理：四级压缩与无限对话的秘密 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-context-compression/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Context 管理：四级压缩与无限对话的秘密
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:24" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/04/06/claude-code-context-compression/" class="post-meta-item leancloud_visitors" data-flag-title="Context 管理：四级压缩与无限对话的秘密" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/claude-code-context-compression/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-context-compression/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>“对话没有上下文限制”——这是 Claude Code 的一个核心承诺。但它真的能做到吗？答案是：通过四级压缩系统，实现”伪无限对话”。这背后的设计非常精妙：不是简单截断，而是智能地压缩和保留关键信息。</p>
+</blockquote>
+<a id="more"></a>
+<h2 id="导读：上下文限制的困境"><a href="#导读：上下文限制的困境" class="headerlink" title="导读：上下文限制的困境"></a>导读：上下文限制的困境</h2><p>所有 LLM 都有上下文限制。Claude 3.5 Sonnet 是 200k tokens，但实际可用空间更小，因为：</p>
+<ul>
+<li>系统提示词占用 ~20k tokens</li>
+<li>工具定义占用 ~15k tokens</li>
+<li>每轮对话累积消息</li>
+</ul>
+<p>假设你进行了 50 轮对话，每轮平均 4k tokens，那就是 200k tokens —— 已经触及限制。</p>
+<p><strong>传统解决方案</strong>：简单截断历史消息。但问题很明显：</p>
+<ul>
+<li>用户之前的重要信息被丢弃</li>
+<li>Agent 可能重复问同样的问题</li>
+<li>长期任务上下文丢失</li>
+</ul>
+<p><strong>Claude Code 的方案</strong>：四级渐进式压缩。</p>
+<hr>
+<h2 id="一、四级压缩策略概览"><a href="#一、四级压缩策略概览" class="headerlink" title="一、四级压缩策略概览"></a>一、四级压缩策略概览</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    四级压缩策略                              │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  第 1 级：Snip 压缩                                          │</span><br><span class="line">│    对已处理的消息进行智能裁剪                                │</span><br><span class="line">│    ├─ 移除重复的文件内容                                    │</span><br><span class="line">│    ├─ 截断过长的工具输出                                    │</span><br><span class="line">│    └─ 触发时机：每轮自动                                    │</span><br><span class="line">│                                                             │</span><br><span class="line">│  第 2 级：Micro 压缩                                         │</span><br><span class="line">│    修改已缓存消息的内容                                     │</span><br><span class="line">│    ├─ 不改变缓存键                                          │</span><br><span class="line">│    └─ 触发时机：每轮自动                                    │</span><br><span class="line">│                                                             │</span><br><span class="line">│  第 3 级：上下文折叠（Context Collapse）                     │</span><br><span class="line">│    分阶段摘要历史消息                                       │</span><br><span class="line">│    ├─ 先摘要最旧的消息                                      │</span><br><span class="line">│    ├─ 保留最近的细节                                        │</span><br><span class="line">│    └─ 触发时机：上下文接近限制                              │</span><br><span class="line">│                                                             │</span><br><span class="line">│  第 4 级：Auto Compact                                       │</span><br><span class="line">│    通过 Claude 生成完整摘要                                 │</span><br><span class="line">│    ├─ 替换所有历史消息                                      │</span><br><span class="line">│    └─ 触发时机：上下文严重不足                              │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="二、第一级：Snip-压缩"><a href="#二、第一级：Snip-压缩" class="headerlink" title="二、第一级：Snip 压缩"></a>二、第一级：Snip 压缩</h2><h3 id="2-1-工作原理"><a href="#2-1-工作原理" class="headerlink" title="2.1 工作原理"></a>2.1 工作原理</h3><p>Snip 压缩对已处理的消息进行智能裁剪——移除重复的文件内容、过长的工具输出等。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/compact/snipCompact.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">snipMessages</span>(<span class="params">messages: Message[]</span>): <span class="title">Message</span>[] </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> seen = <span class="keyword">new</span> Set&lt;<span class="built_in">string</span>&gt;()</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> messages.map(<span class="function"><span class="params">msg</span> =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (msg.type === <span class="string">'user'</span>) &#123;</span><br><span class="line">      <span class="comment">// 检测重复的文件内容</span></span><br><span class="line">      <span class="keyword">const</span> content = extractFileContent(msg)</span><br><span class="line">      <span class="keyword">if</span> (seen.has(content)) &#123;</span><br><span class="line">        <span class="comment">// 重复内容，替换为引用</span></span><br><span class="line">        <span class="keyword">return</span> &#123;</span><br><span class="line">          ...msg,</span><br><span class="line">          content: <span class="string">`[Duplicate file content, see earlier in conversation]`</span></span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">      seen.add(content)</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (msg.type === <span class="string">'tool_result'</span>) &#123;</span><br><span class="line">      <span class="comment">// 截断过长的工具输出</span></span><br><span class="line">      <span class="keyword">if</span> (msg.content.length &gt; MAX_TOOL_RESULT_SIZE) &#123;</span><br><span class="line">        <span class="keyword">return</span> &#123;</span><br><span class="line">          ...msg,</span><br><span class="line">          content: msg.content.slice(<span class="number">0</span>, MAX_TOOL_RESULT_SIZE) + </span><br><span class="line">            <span class="string">`\n... [truncated, <span class="subst">$&#123;msg.content.length&#125;</span> total chars]`</span></span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> msg</span><br><span class="line">  &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="2-2-智能裁剪规则"><a href="#2-2-智能裁剪规则" class="headerlink" title="2.2 智能裁剪规则"></a>2.2 智能裁剪规则</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>内容类型</th>
+<th>裁剪策略</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>重复文件内容</td>
+<td>替换为引用标记</td>
+</tr>
+<tr>
+<td>大型工具输出</td>
+<td>保留前 4KB + 截断标记</td>
+</tr>
+<tr>
+<td>Base64 图片</td>
+<td>保留元数据，替换内容</td>
+</tr>
+<tr>
+<td>长对话引用</td>
+<td>摘要化</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="三、第二级：Micro-压缩"><a href="#三、第二级：Micro-压缩" class="headerlink" title="三、第二级：Micro 压缩"></a>三、第二级：Micro 压缩</h2><h3 id="3-1-工作原理"><a href="#3-1-工作原理" class="headerlink" title="3.1 工作原理"></a>3.1 工作原理</h3><p>Micro 压缩修改已缓存消息的内容，而不改变缓存键。这是一种”原地优化”策略。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/compact/microCompact.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">microCompactMessages</span>(<span class="params">messages: Message[]</span>): <span class="title">Message</span>[] </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> messages.map(<span class="function"><span class="params">msg</span> =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (msg.type === <span class="string">'assistant'</span>) &#123;</span><br><span class="line">      <span class="comment">// 移除多余的空白和格式</span></span><br><span class="line">      <span class="keyword">const</span> compressed = compressContent(msg.content)</span><br><span class="line">      </span><br><span class="line">      <span class="comment">// 移除重复的 tool_use 说明</span></span><br><span class="line">      <span class="keyword">const</span> deduped = deduplicateToolUses(compressed)</span><br><span class="line">      </span><br><span class="line">      <span class="keyword">return</span> &#123; ...msg, content: deduped &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> msg</span><br><span class="line">  &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="3-2-关键特性"><a href="#3-2-关键特性" class="headerlink" title="3.2 关键特性"></a>3.2 关键特性</h3><ul>
+<li><strong>不影响缓存</strong>：缓存键基于消息 ID 和位置，不基于内容</li>
+<li><strong>无损压缩</strong>：保留所有语义信息</li>
+<li><strong>增量应用</strong>：每次处理一点点，避免大变动</li>
+</ul>
+<hr>
+<h2 id="四、第三级：上下文折叠（Context-Collapse）"><a href="#四、第三级：上下文折叠（Context-Collapse）" class="headerlink" title="四、第三级：上下文折叠（Context Collapse）"></a>四、第三级：上下文折叠（Context Collapse）</h2><h3 id="4-1-工作原理"><a href="#4-1-工作原理" class="headerlink" title="4.1 工作原理"></a>4.1 工作原理</h3><p>当上下文接近限制时，系统启动 Context Collapse —— 将历史消息分阶段摘要。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/contextCollapse/index.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">contextCollapse</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  messages: Message[],</span></span></span><br><span class="line"><span class="function"><span class="params">  options: CollapseOptions</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">Message</span>[]&gt; </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 识别可折叠的消息段</span></span><br><span class="line">  <span class="keyword">const</span> segments = identifyCollapsibleSegments(messages)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 按优先级排序（最旧的优先）</span></span><br><span class="line">  <span class="keyword">const</span> sortedSegments = segments.sort(<span class="function">(<span class="params">a, b</span>) =&gt;</span> </span><br><span class="line">    a.startIndex - b.startIndex</span><br><span class="line">  )</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 对每个段生成摘要</span></span><br><span class="line">  <span class="keyword">const</span> summaries: Message[] = []</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> segment of sortedSegments) &#123;</span><br><span class="line">    <span class="keyword">if</span> (shouldCollapse(segment, options)) &#123;</span><br><span class="line">      <span class="keyword">const</span> summary = <span class="keyword">await</span> generateSummary(segment.messages)</span><br><span class="line">      summaries.push(createSummaryMessage(summary, segment))</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 替换原消息段</span></span><br><span class="line">  <span class="keyword">return</span> replaceSegmentsWithSummaries(messages, summaries)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="4-2-折叠策略"><a href="#4-2-折叠策略" class="headerlink" title="4.2 折叠策略"></a>4.2 折叠策略</h3><p><strong>渐进式折叠</strong>：不是一次性摘要全部，而是<strong>渐进式折叠</strong>——先摘要最旧的消息，保留最近的细节。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">原消息序列：</span><br><span class="line">[Msg1] [Msg2] [Msg3] [Msg4] [Msg5] [Msg6] [Msg7] [Msg8] [Msg9] [Msg10]</span><br><span class="line">  ↑                                                           ↑</span><br><span class="line">  最旧                                                        最新</span><br><span class="line"></span><br><span class="line">第一次折叠（上下文 &gt; 150k）：</span><br><span class="line">[Summary1] [Msg6] [Msg7] [Msg8] [Msg9] [Msg10]</span><br><span class="line">  ↑ 摘要了 Msg1-Msg5</span><br><span class="line"></span><br><span class="line">第二次折叠（上下文 &gt; 180k）：</span><br><span class="line">[Summary1] [Summary2] [Msg8] [Msg9] [Msg10]</span><br><span class="line">                        ↑ 摘要了 Msg6-Msg7</span><br><span class="line"></span><br><span class="line">第三次折叠（上下文 &gt; 195k）：</span><br><span class="line">[Summary1] [Summary2] [Summary3] [Msg10]</span><br><span class="line">                                  ↑ 摘要了 Msg8-Msg9</span><br></pre></td></tr></table></figure>
+<h3 id="4-3-摘要格式"><a href="#4-3-摘要格式" class="headerlink" title="4.3 摘要格式"></a>4.3 摘要格式</h3><figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">## Summary of Previous Work</span></span><br><span class="line"></span><br><span class="line"><span class="section">### Tasks Completed</span></span><br><span class="line"><span class="bullet">- </span>Implemented user authentication with JWT</span><br><span class="line"><span class="bullet">- </span>Added password reset functionality</span><br><span class="line"><span class="bullet">- </span>Created user profile page</span><br><span class="line"></span><br><span class="line"><span class="section">### Files Modified</span></span><br><span class="line"><span class="bullet">- </span>src/auth/auth.service.ts: Added JWT token generation</span><br><span class="line"><span class="bullet">- </span>src/user/user.controller.ts: Added profile endpoints</span><br><span class="line"><span class="bullet">- </span>src/user/user.service.ts: Added password reset logic</span><br><span class="line"></span><br><span class="line"><span class="section">### Current State</span></span><br><span class="line"><span class="bullet">- </span>Authentication system is fully functional</span><br><span class="line"><span class="bullet">- </span>Password reset emails are being sent</span><br><span class="line"><span class="bullet">- </span>Profile page is accessible at /profile</span><br><span class="line"></span><br><span class="line"><span class="section">### Pending Items</span></span><br><span class="line"><span class="bullet">- </span>Need to add email verification</span><br><span class="line"><span class="bullet">- </span>Need to implement rate limiting</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="五、第四级：Auto-Compact"><a href="#五、第四级：Auto-Compact" class="headerlink" title="五、第四级：Auto Compact"></a>五、第四级：Auto Compact</h2><h3 id="5-1-工作原理"><a href="#5-1-工作原理" class="headerlink" title="5.1 工作原理"></a>5.1 工作原理</h3><p>当所有局部优化都不够时，通过 Claude 自身生成一个完整的对话摘要，替换所有历史消息。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/compact/autoCompact.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">autoCompact</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  messages: Message[],</span></span></span><br><span class="line"><span class="function"><span class="params">  context: ToolUseContext</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">Message</span>[]&gt; </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 构建 compact 请求</span></span><br><span class="line">  <span class="keyword">const</span> compactPrompt = buildCompactPrompt(messages)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 调用 Claude 生成摘要</span></span><br><span class="line">  <span class="keyword">const</span> summary = <span class="keyword">await</span> query(&#123;</span><br><span class="line">    messages: [createUserMessage(compactPrompt)],</span><br><span class="line">    systemPrompt: COMPACT_SYSTEM_PROMPT,</span><br><span class="line">    toolUseContext: context,</span><br><span class="line">    maxTurns: <span class="number">1</span>,</span><br><span class="line">  &#125;)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 创建新的消息序列</span></span><br><span class="line">  <span class="keyword">const</span> summaryMessage = createSummaryMessage(summary)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 替换历史消息</span></span><br><span class="line">  <span class="keyword">return</span> [summaryMessage]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-触发条件"><a href="#5-2-触发条件" class="headerlink" title="5.2 触发条件"></a>5.2 触发条件</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/compact/autoCompact.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">shouldTriggerAutoCompact</span>(<span class="params">state: AutoCompactTracking</span>): <span class="title">boolean</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 检查 token 使用率</span></span><br><span class="line">  <span class="keyword">const</span> usageRatio = state.currentTokens / state.maxTokens</span><br><span class="line">  <span class="keyword">if</span> (usageRatio &lt; <span class="number">0.9</span>) <span class="keyword">return</span> <span class="literal">false</span>  <span class="comment">// 低于 90% 不触发</span></span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 检查是否已经尝试过</span></span><br><span class="line">  <span class="keyword">if</span> (state.hasAttemptedAutoCompact) <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 检查距离上次 compact 的轮数</span></span><br><span class="line">  <span class="keyword">if</span> (state.turnsSinceLastCompact &lt; MIN_TURNS_BETWEEN_COMPACT) <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="5-3-Compact-系统提示词"><a href="#5-3-Compact-系统提示词" class="headerlink" title="5.3 Compact 系统提示词"></a>5.3 Compact 系统提示词</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> COMPACT_SYSTEM_PROMPT = <span class="string">`</span></span><br><span class="line"><span class="string">You are a summarization assistant. Your job is to create a concise but </span></span><br><span class="line"><span class="string">complete summary of a conversation.</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">Your summary should:</span></span><br><span class="line"><span class="string">1. Capture all important decisions and their reasoning</span></span><br><span class="line"><span class="string">2. List all files that were created or modified</span></span><br><span class="line"><span class="string">3. Note any pending tasks or open questions</span></span><br><span class="line"><span class="string">4. Preserve the context needed to continue the work</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">Format your summary as:</span></span><br><span class="line"><span class="string">## Summary</span></span><br><span class="line"><span class="string">[Brief overview of the conversation]</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">## Decisions Made</span></span><br><span class="line"><span class="string">- [Decision 1]: [Reasoning]</span></span><br><span class="line"><span class="string">- [Decision 2]: [Reasoning]</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">## Files Modified</span></span><br><span class="line"><span class="string">- [File path]: [What was changed]</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">## Pending Tasks</span></span><br><span class="line"><span class="string">- [Task 1]</span></span><br><span class="line"><span class="string">- [Task 2]</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">## Context for Continuation</span></span><br><span class="line"><span class="string">[Any other relevant context]</span></span><br><span class="line"><span class="string">`</span></span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="六、上下文注入"><a href="#六、上下文注入" class="headerlink" title="六、上下文注入"></a>六、上下文注入</h2><h3 id="6-1-系统上下文"><a href="#6-1-系统上下文" class="headerlink" title="6.1 系统上下文"></a>6.1 系统上下文</h3><p>每次 API 调用前，自动注入系统上下文：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/context.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">getSystemContext</span>(<span class="params"></span>): <span class="title">SystemContext</span> </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> &#123;</span><br><span class="line">    gitStatus: getGitStatus(),          <span class="comment">// 当前分支、最近提交、文件状态</span></span><br><span class="line">    currentDate: <span class="keyword">new</span> <span class="built_in">Date</span>().toISOString(),</span><br><span class="line">    cacheBreakerInjection: getSystemInjection(),</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="6-2-用户上下文"><a href="#6-2-用户上下文" class="headerlink" title="6.2 用户上下文"></a>6.2 用户上下文</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/context.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">getUserContext</span>(<span class="params"></span>): <span class="title">UserContext</span> </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> &#123;</span><br><span class="line">    claudeMdContent: loadClaudeMdFiles(),  <span class="comment">// 所有 CLAUDE.md 合并内容</span></span><br><span class="line">    mcpInstructions: getMcpInstructions(),  <span class="comment">// MCP 服务器指令</span></span><br><span class="line">    memoryContent: loadMemoryPrompt(),      <span class="comment">// 记忆系统内容</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="6-3-系统提醒"><a href="#6-3-系统提醒" class="headerlink" title="6.3 系统提醒"></a>6.3 系统提醒</h3><p>系统提醒是一种特殊的<strong>附件消息</strong>，注入到工具结果或用户消息中：</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">system-reminder</span>&gt;</span></span><br><span class="line">  这里是系统级的上下文信息，与具体的工具结果无关。</span><br><span class="line"><span class="tag">&lt;/<span class="name">system-reminder</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<p>用途包括：</p>
+<ul>
+<li>文件读取时的安全警告</li>
+<li>记忆系统的时效提醒</li>
+<li>用户侧问的附带信息</li>
+<li>Deferred 工具的可用通知</li>
+</ul>
+<hr>
+<h2 id="七、Token-预算管理"><a href="#七、Token-预算管理" class="headerlink" title="七、Token 预算管理"></a>七、Token 预算管理</h2><h3 id="7-1-预算计算"><a href="#7-1-预算计算" class="headerlink" title="7.1 预算计算"></a>7.1 预算计算</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/query/tokenBudget.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">calculateTokenBudget</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  model: <span class="built_in">string</span>,</span></span></span><br><span class="line"><span class="function"><span class="params">  messages: Message[],</span></span></span><br><span class="line"><span class="function"><span class="params">  systemPrompt: <span class="built_in">string</span>,</span></span></span><br><span class="line"><span class="function"><span class="params">  tools: Tools,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">TokenBudget</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 获取模型上下文限制</span></span><br><span class="line">  <span class="keyword">const</span> contextLimit = getModelContextLimit(model)  <span class="comment">// 如 200k</span></span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 计算固定消耗</span></span><br><span class="line">  <span class="keyword">const</span> systemPromptTokens = countTokens(systemPrompt)</span><br><span class="line">  <span class="keyword">const</span> toolsTokens = countToolsTokens(tools)</span><br><span class="line">  <span class="keyword">const</span> fixedCost = systemPromptTokens + toolsTokens</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 计算消息消耗</span></span><br><span class="line">  <span class="keyword">const</span> messagesTokens = countMessagesTokens(messages)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 计算可用预算</span></span><br><span class="line">  <span class="keyword">const</span> availableBudget = contextLimit - fixedCost - messagesTokens</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 5. 预留输出空间</span></span><br><span class="line">  <span class="keyword">const</span> outputReserve = <span class="number">8192</span>  <span class="comment">// 默认输出限制</span></span><br><span class="line">  <span class="keyword">const</span> finalBudget = availableBudget - outputReserve</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> &#123;</span><br><span class="line">    total: contextLimit,</span><br><span class="line">    fixed: fixedCost,</span><br><span class="line">    messages: messagesTokens,</span><br><span class="line">    available: finalBudget,</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="7-2-预算警告"><a href="#7-2-预算警告" class="headerlink" title="7.2 预算警告"></a>7.2 预算警告</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/utils/tokens.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">calculateTokenWarningState</span>(<span class="params">budget: TokenBudget</span>): <span class="title">TokenWarningState</span> </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> usageRatio = budget.messages / budget.available</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">if</span> (usageRatio &gt; <span class="number">0.95</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; level: <span class="string">'critical'</span>, message: <span class="string">'Context nearly exhausted'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">if</span> (usageRatio &gt; <span class="number">0.85</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; level: <span class="string">'warning'</span>, message: <span class="string">'Context running low'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">if</span> (usageRatio &gt; <span class="number">0.70</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; level: <span class="string">'info'</span>, message: <span class="string">'Context usage moderate'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> &#123; level: <span class="string">'ok'</span>, message: <span class="string">''</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="八、恢复与压缩的关系"><a href="#八、恢复与压缩的关系" class="headerlink" title="八、恢复与压缩的关系"></a>八、恢复与压缩的关系</h2><h3 id="8-1-压缩触发的恢复"><a href="#8-1-压缩触发的恢复" class="headerlink" title="8.1 压缩触发的恢复"></a>8.1 压缩触发的恢复</h3><p>当压缩策略执行后，会记录状态：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">state = &#123;</span><br><span class="line">  ...state,</span><br><span class="line">  autoCompactTracking: &#123;</span><br><span class="line">    hasAttemptedAutoCompact: <span class="literal">true</span>,</span><br><span class="line">    turnsSinceLastCompact: <span class="number">0</span>,</span><br><span class="line">    compressedTokens: savedTokens,</span><br><span class="line">  &#125;,</span><br><span class="line">  transition: &#123; reason: <span class="string">'reactive_compact_retry'</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="8-2-恢复链"><a href="#8-2-恢复链" class="headerlink" title="8.2 恢复链"></a>8.2 恢复链</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">prompt_too_long 错误</span><br><span class="line">  │</span><br><span class="line">  ├─ 尝试 Snip 压缩 → 重试</span><br><span class="line">  │   └─ 成功 → 继续</span><br><span class="line">  │</span><br><span class="line">  ├─ 尝试 Micro 压缩 → 重试</span><br><span class="line">  │   └─ 成功 → 继续</span><br><span class="line">  │</span><br><span class="line">  ├─ 尝试 Context Collapse → 重试</span><br><span class="line">  │   └─ 成功 → 继续</span><br><span class="line">  │</span><br><span class="line">  └─ 尝试 Auto Compact → 重试</span><br><span class="line">      └─ 成功 → 继续</span><br><span class="line">      └─ 失败 → 报错给用户</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="九、关键源文件索引"><a href="#九、关键源文件索引" class="headerlink" title="九、关键源文件索引"></a>九、关键源文件索引</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/services/compact/autoCompact.ts</code></td>
+<td>自动压缩触发和管理</td>
+</tr>
+<tr>
+<td><code>src/services/compact/compact.ts</code></td>
+<td>压缩实现</td>
+</tr>
+<tr>
+<td><code>src/services/compact/reactiveCompact.ts</code></td>
+<td>反应式压缩（错误触发）</td>
+</tr>
+<tr>
+<td><code>src/services/contextCollapse/index.ts</code></td>
+<td>上下文折叠实现</td>
+</tr>
+<tr>
+<td><code>src/services/compact/snipCompact.ts</code></td>
+<td>Snip 压缩</td>
+</tr>
+<tr>
+<td><code>src/utils/tokens.ts</code></td>
+<td>Token 计数和预算管理</td>
+</tr>
+<tr>
+<td><code>src/context.ts</code></td>
+<td>系统和用户上下文</td>
+</tr>
+<tr>
+<td><code>src/utils/attachments.ts</code></td>
+<td>系统提醒附件</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="十、总结"><a href="#十、总结" class="headerlink" title="十、总结"></a>十、总结</h2><p>Claude Code 的四级压缩系统是其”无限对话”承诺的技术基础：</p>
+<ol>
+<li><strong>Snip 压缩</strong>：智能移除重复内容，每轮自动</li>
+<li><strong>Micro 压缩</strong>：原地优化缓存消息，不影响缓存</li>
+<li><strong>Context Collapse</strong>：渐进式摘要，保留最近细节</li>
+<li><strong>Auto Compact</strong>：Claude 生成的完整摘要</li>
+</ol>
+<p>这个设计的关键洞察是：<strong>不是简单截断，而是智能压缩</strong>。通过保留关键信息（决策、文件修改、待办事项），Agent 能够在压缩后继续有效工作。</p>
+<hr>
+<p><strong>系列文章导航：</strong></p>
+<ul>
+<li>上一篇：<a href="/claude-code-multi-agent/">多 Agent 编排：四种代理类型与协作机制</a></li>
+<li>下一篇：<a href="/claude-code-system-prompt/">System Prompt 工程：动态组装与缓存优化</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Context-Compression/" rel="tag"><i class="fa fa-tag"></i> Context Compression</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-terminal-ui/" rel="prev" title="Terminal UI：React + Ink 的 TUI 实现">
+      <i class="fa fa-chevron-left"></i> Terminal UI：React + Ink 的 TUI 实现
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-permission-security/" rel="next" title="权限与安全：分层模型与人机协作">
+      权限与安全：分层模型与人机协作 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#导读：上下文限制的困境"><span class="nav-number">1.</span> <span class="nav-text">导读：上下文限制的困境</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、四级压缩策略概览"><span class="nav-number">2.</span> <span class="nav-text">一、四级压缩策略概览</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、第一级：Snip-压缩"><span class="nav-number">3.</span> <span class="nav-text">二、第一级：Snip 压缩</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-工作原理"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 工作原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-智能裁剪规则"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 智能裁剪规则</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、第二级：Micro-压缩"><span class="nav-number">4.</span> <span class="nav-text">三、第二级：Micro 压缩</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-工作原理"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 工作原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-关键特性"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 关键特性</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、第三级：上下文折叠（Context-Collapse）"><span class="nav-number">5.</span> <span class="nav-text">四、第三级：上下文折叠（Context Collapse）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-工作原理"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 工作原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-折叠策略"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 折叠策略</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-摘要格式"><span class="nav-number">5.3.</span> <span class="nav-text">4.3 摘要格式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、第四级：Auto-Compact"><span class="nav-number">6.</span> <span class="nav-text">五、第四级：Auto Compact</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-工作原理"><span class="nav-number">6.1.</span> <span class="nav-text">5.1 工作原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-触发条件"><span class="nav-number">6.2.</span> <span class="nav-text">5.2 触发条件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-Compact-系统提示词"><span class="nav-number">6.3.</span> <span class="nav-text">5.3 Compact 系统提示词</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、上下文注入"><span class="nav-number">7.</span> <span class="nav-text">六、上下文注入</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-系统上下文"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 系统上下文</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-用户上下文"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 用户上下文</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-系统提醒"><span class="nav-number">7.3.</span> <span class="nav-text">6.3 系统提醒</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、Token-预算管理"><span class="nav-number">8.</span> <span class="nav-text">七、Token 预算管理</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-预算计算"><span class="nav-number">8.1.</span> <span class="nav-text">7.1 预算计算</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-2-预算警告"><span class="nav-number">8.2.</span> <span class="nav-text">7.2 预算警告</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、恢复与压缩的关系"><span class="nav-number">9.</span> <span class="nav-text">八、恢复与压缩的关系</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#8-1-压缩触发的恢复"><span class="nav-number">9.1.</span> <span class="nav-text">8.1 压缩触发的恢复</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-2-恢复链"><span class="nav-number">9.2.</span> <span class="nav-text">8.2 恢复链</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#九、关键源文件索引"><span class="nav-number">10.</span> <span class="nav-text">九、关键源文件索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#十、总结"><span class="nav-number">11.</span> <span class="nav-text">十、总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">62</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">9</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">37</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="你在手机上打开 Telegram，给 Claude Code 发一条消息，它就开始在你的电脑上工作——这就是 Channel 系统。它打破了 AI 编程助手只能在终端中交互的限制，实现了真正的远程控制。更精妙的是，它有六层访问控制和权限中继机制，确保安全性。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Channel 系统：IM 远程控制 Agent">
+<meta property="og:url" content="https://donehub.github.io/2026/04/06/claude-code-channel-system/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="你在手机上打开 Telegram，给 Claude Code 发一条消息，它就开始在你的电脑上工作——这就是 Channel 系统。它打破了 AI 编程助手只能在终端中交互的限制，实现了真正的远程控制。更精妙的是，它有六层访问控制和权限中继机制，确保安全性。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-04-05T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-06T06:28:38.708Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Channel">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/04/06/claude-code-channel-system/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Channel 系统：IM 远程控制 Agent | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-channel-system/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Channel 系统：IM 远程控制 Agent
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:38" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/04/06/claude-code-channel-system/" class="post-meta-item leancloud_visitors" data-flag-title="Channel 系统：IM 远程控制 Agent" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/claude-code-channel-system/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-channel-system/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>你在手机上打开 Telegram，给 Claude Code 发一条消息，它就开始在你的电脑上工作——这就是 Channel 系统。它打破了 AI 编程助手只能在终端中交互的限制，实现了真正的远程控制。更精妙的是，它有六层访问控制和权限中继机制，确保安全性。</p>
+</blockquote>
+<a id="more"></a>
+<h2 id="导读：打破终端的边界"><a href="#导读：打破终端的边界" class="headerlink" title="导读：打破终端的边界"></a>导读：打破终端的边界</h2><p>传统的 AI 编程助手只能在终端中交互。如果你想让它工作，你必须坐在电脑前。</p>
+<p>Channel 系统改变了这一切：</p>
+<ul>
+<li>你在手机上通过 Telegram 发消息</li>
+<li>Claude Code 收到消息，理解意图，执行操作</li>
+<li>结果回复到你的 Telegram 聊天窗口</li>
+</ul>
+<p><strong>这不是简单的消息转发</strong>——这是一个完整的远程控制系统：</p>
+<ul>
+<li>六层访问控制确保只有授权的 Channel 能推送消息</li>
+<li>权限中继让你在手机上也能审批危险操作</li>
+<li>MCP 协议让任何 IM 平台都能集成</li>
+</ul>
+<hr>
+<h2 id="一、Channel-的本质"><a href="#一、Channel-的本质" class="headerlink" title="一、Channel 的本质"></a>一、Channel 的本质</h2><h3 id="1-1-Channel-就是一个-MCP-Server"><a href="#1-1-Channel-就是一个-MCP-Server" class="headerlink" title="1.1 Channel 就是一个 MCP Server"></a>1.1 Channel 就是一个 MCP Server</h3><p>从技术角度看，一个 Channel 就是一个特殊的 <strong>MCP Server</strong>：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Channel 的能力声明</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="string">"experimental"</span>: &#123;</span><br><span class="line">    <span class="string">"claude/channel"</span>: &#123;&#125;           <span class="comment">// 声明 Channel 能力</span></span><br><span class="line">    <span class="string">"claude/channel/permission"</span>: &#123;&#125;  <span class="comment">// 声明权限中继能力（可选）</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="1-2-Channel-的两种形态"><a href="#1-2-Channel-的两种形态" class="headerlink" title="1.2 Channel 的两种形态"></a>1.2 Channel 的两种形态</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> ChannelEntry =</span><br><span class="line">  | &#123; kind: <span class="string">'plugin'</span>; name: <span class="built_in">string</span>; marketplace: <span class="built_in">string</span>; dev?: <span class="built_in">boolean</span> &#125;</span><br><span class="line">  | &#123; kind: <span class="string">'server'</span>; name: <span class="built_in">string</span>; dev?: <span class="built_in">boolean</span> &#125;</span><br></pre></td></tr></table></figure>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>形态</th>
+<th>说明</th>
+<th>安全性</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>plugin</strong></td>
+<td>来自 marketplace 的验证插件</td>
+<td>需要白名单</td>
+</tr>
+<tr>
+<td><strong>server</strong></td>
+<td>直接指定的 MCP 服务器名称</td>
+<td>需要 dev 旁路</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="二、消息流转全链路"><a href="#二、消息流转全链路" class="headerlink" title="二、消息流转全链路"></a>二、消息流转全链路</h2><h3 id="2-1-入站流程（IM-→-Agent）"><a href="#2-1-入站流程（IM-→-Agent）" class="headerlink" title="2.1 入站流程（IM → Agent）"></a>2.1 入站流程（IM → Agent）</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    入站消息流程                              │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  Telegram&#x2F;Feishu&#x2F;Discord                                    │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  Channel Plugin（MCP Server）                               │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  notifications&#x2F;claude&#x2F;channel &#123; content, meta &#125;             │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  useManageMCPConnections → registerNotificationHandler      │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  wrapChannelMessage() → &lt;channel source&#x3D;&quot;...&quot; user&#x3D;&quot;...&quot;&gt;  │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  enqueue(&#123; priority: &#39;next&#39;, isMeta: true &#125;)                │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  SleepTool 每 ~1s 轮询 hasCommandsInQueue()                │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  Model 看到 &lt;channel&gt; 标签，理解消息来源                      │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<h3 id="2-2-出站流程（Agent-→-IM）"><a href="#2-2-出站流程（Agent-→-IM）" class="headerlink" title="2.2 出站流程（Agent → IM）"></a>2.2 出站流程（Agent → IM）</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    出站消息流程                              │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  Model 决定使用哪个工具回复                                   │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  callTool() → Channel 的 MCP 工具                           │</span><br><span class="line">│  （reply &#x2F; react &#x2F; edit_message &#x2F; download_attachment）      │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  MCP 协议调用 Channel Server                                │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  Channel Server 发送消息到 IM 平台                           │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  Telegram&#x2F;Feishu&#x2F;Discord 用户收到回复                        │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<h3 id="2-3-消息封装格式"><a href="#2-3-消息封装格式" class="headerlink" title="2.3 消息封装格式"></a>2.3 消息封装格式</h3><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">channel</span> <span class="attr">source</span>=<span class="string">"plugin:telegram:tg"</span> <span class="attr">user</span>=<span class="string">"alice"</span> <span class="attr">chat_id</span>=<span class="string">"123456"</span>&gt;</span></span><br><span class="line">帮我看看 main.ts 有什么问题</span><br><span class="line"><span class="tag">&lt;/<span class="name">channel</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<p>模型看到这个标签后，就知道消息来自 Telegram 的用户 alice，并会使用 Telegram 的 <code>reply</code> 工具回复。</p>
+<hr>
+<h2 id="三、六层访问控制"><a href="#三、六层访问控制" class="headerlink" title="三、六层访问控制"></a>三、六层访问控制</h2><h3 id="3-1-Gate-函数"><a href="#3-1-Gate-函数" class="headerlink" title="3.1 Gate 函数"></a>3.1 Gate 函数</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/mcp/channelNotification.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">gateChannelServer</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  serverName: <span class="built_in">string</span>,</span></span></span><br><span class="line"><span class="function"><span class="params">  capabilities: ServerCapabilities | <span class="literal">undefined</span>,</span></span></span><br><span class="line"><span class="function"><span class="params">  pluginSource: <span class="built_in">string</span> | <span class="literal">undefined</span>,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">ChannelGateResult</span>  // </span>&#123; action: <span class="string">'register'</span> &#125; | &#123; action: <span class="string">'skip'</span>, kind, reason &#125;</span><br></pre></td></tr></table></figure>
+<h3 id="3-2-六层关卡详解"><a href="#3-2-六层关卡详解" class="headerlink" title="3.2 六层关卡详解"></a>3.2 六层关卡详解</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    六层访问控制                              │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  Gate 1: 能力声明（Capability）                             │</span><br><span class="line">│    └─ MCP Server 必须声明 claude&#x2F;channel 能力              │</span><br><span class="line">│                                                             │</span><br><span class="line">│  Gate 2: 运行时开关（Runtime Gate）                         │</span><br><span class="line">│    └─ tengu_harbor Feature Flag 必须开启                   │</span><br><span class="line">│                                                             │</span><br><span class="line">│  Gate 3: OAuth 认证（Auth）                                 │</span><br><span class="line">│    └─ 必须通过 OAuth 认证（API Key 用户被阻止）             │</span><br><span class="line">│                                                             │</span><br><span class="line">│  Gate 4: 组织策略（Policy）                                 │</span><br><span class="line">│    └─ Teams&#x2F;Enterprise 必须在托管设置中显式启用             │</span><br><span class="line">│                                                             │</span><br><span class="line">│  Gate 5: 会话白名单（Session）                              │</span><br><span class="line">│    └─ 必须在 --channels 参数列表中                         │</span><br><span class="line">│                                                             │</span><br><span class="line">│  Gate 6: Marketplace 验证 + 白名单（Allowlist）             │</span><br><span class="line">│    ├─ 验证插件来源标签与实际安装来源匹配                    │</span><br><span class="line">│    └─ 插件必须在 GrowthBook 审批白名单中                   │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<h3 id="3-3-Gate-结果类型"><a href="#3-3-Gate-结果类型" class="headerlink" title="3.3 Gate 结果类型"></a>3.3 Gate 结果类型</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> ChannelGateResult =</span><br><span class="line">  | &#123; action: <span class="string">'register'</span> &#125;           <span class="comment">// 通过所有检查</span></span><br><span class="line">  | &#123; action: <span class="string">'skip'</span>; kind: <span class="built_in">string</span>; reason: <span class="built_in">string</span> &#125;  <span class="comment">// 某层拦截</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// kind 枚举：capability | disabled | auth | policy | session | marketplace | allowlist</span></span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="四、权限中继系统"><a href="#四、权限中继系统" class="headerlink" title="四、权限中继系统"></a>四、权限中继系统</h2><h3 id="4-1-为什么需要权限中继"><a href="#4-1-为什么需要权限中继" class="headerlink" title="4.1 为什么需要权限中继"></a>4.1 为什么需要权限中继</h3><p>当 Claude Code 需要执行敏感操作（如运行 Bash 命令），会弹出权限确认对话框。但如果用户通过 Telegram 远程控制 Agent，他看不到本地终端的对话框。</p>
+<p><strong>权限中继</strong>解决了这个问题：将权限提示转发到 IM 平台，让用户在手机上也能审批或拒绝操作。</p>
+<h3 id="4-2-出站：权限请求"><a href="#4-2-出站：权限请求" class="headerlink" title="4.2 出站：权限请求"></a>4.2 出站：权限请求</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 通知 Schema</span></span><br><span class="line"><span class="keyword">const</span> CHANNEL_PERMISSION_REQUEST_METHOD =</span><br><span class="line">  <span class="string">'notifications/claude/channel/permission_request'</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> ChannelPermissionRequestParams = &#123;</span><br><span class="line">  request_id: <span class="built_in">string</span>      <span class="comment">// 5 字母标识符（如 "tbxkq"）</span></span><br><span class="line">  tool_name: <span class="built_in">string</span>       <span class="comment">// 工具名（如 "Bash"）</span></span><br><span class="line">  description: <span class="built_in">string</span>     <span class="comment">// 人类可读描述</span></span><br><span class="line">  input_preview: <span class="built_in">string</span>   <span class="comment">// JSON 输入预览，截断到 200 字符</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="4-3-Short-Request-ID-设计"><a href="#4-3-Short-Request-ID-设计" class="headerlink" title="4.3 Short Request ID 设计"></a>4.3 Short Request ID 设计</h3><p>5 个字母标识符的设计充满巧思：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/mcp/channelPermissions.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">shortRequestId</span>(<span class="params">toolUseID: <span class="built_in">string</span></span>): <span class="title">string</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 25 字母表：a-z 去掉 l（与 1/I 混淆）</span></span><br><span class="line">  <span class="keyword">const</span> alphabet = <span class="string">'abcdefghijkmnopqrstuvwxyz'</span></span><br><span class="line">  <span class="keyword">const</span> id = hashToId(toolUseID, alphabet)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 脏话过滤</span></span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> bad of ID_AVOID_SUBSTRINGS) &#123;</span><br><span class="line">    <span class="keyword">if</span> (id.includes(bad)) &#123;</span><br><span class="line">      <span class="keyword">return</span> shortRequestId(<span class="string">`<span class="subst">$&#123;toolUseID&#125;</span>:retry`</span>)  <span class="comment">// 重试</span></span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> id</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>设计决策</strong>：</p>
+<ul>
+<li><strong>纯字母</strong>：手机用户不需要切换键盘模式</li>
+<li><strong>大小写不敏感</strong>：适配手机自动更正</li>
+<li><strong>脏话过滤</strong>：防止尴尬场景</li>
+</ul>
+<h3 id="4-4-入站：权限响应"><a href="#4-4-入站：权限响应" class="headerlink" title="4.4 入站：权限响应"></a>4.4 入站：权限响应</h3><p>用户在 IM 中回复格式：<code>yes tbxkq</code> 或 <code>no tbxkq</code></p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 服务端解析正则</span></span><br><span class="line"><span class="keyword">const</span> PERMISSION_REPLY_RE = <span class="regexp">/^\s*(y|yes|n|no)\s+([a-km-z]&#123;5&#125;)\s*$/i</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 结构化通知</span></span><br><span class="line"><span class="keyword">const</span> ChannelPermissionNotificationSchema = z.object(&#123;</span><br><span class="line">  method: z.literal(<span class="string">'notifications/claude/channel/permission'</span>),</span><br><span class="line">  params: z.object(&#123;</span><br><span class="line">    request_id: z.string(),</span><br><span class="line">    behavior: z.enum([<span class="string">'allow'</span>, <span class="string">'deny'</span>]),</span><br><span class="line">  &#125;),</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
+<h3 id="4-5-多源竞争"><a href="#4-5-多源竞争" class="headerlink" title="4.5 多源竞争"></a>4.5 多源竞争</h3><p>权限响应来自四个来源，先到先得：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐</span><br><span class="line">│   本地终端    │   │    Bridge    │   │   Channels   │   │    Hooks     │</span><br><span class="line">│  Local UI    │   │   远程控制    │   │ Telegram etc │   │  Permission  │</span><br><span class="line">└──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘</span><br><span class="line">       │                   │                   │                  │</span><br><span class="line">       └───────────────────┴───────────────────┴──────────────────┘</span><br><span class="line">                                    │</span><br><span class="line">                              claim() — 先到先得</span><br><span class="line">                                    │</span><br><span class="line">                              ┌─────┴─────┐</span><br><span class="line">                              │  resolve   │</span><br><span class="line">                              │  allow&#x2F;deny│</span><br><span class="line">                              └───────────┘</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="五、安全设计"><a href="#五、安全设计" class="headerlink" title="五、安全设计"></a>五、安全设计</h2><h3 id="5-1-XML-注入防护"><a href="#5-1-XML-注入防护" class="headerlink" title="5.1 XML 注入防护"></a>5.1 XML 注入防护</h3><p>Channel 消息中的元数据会成为 XML 属性。两道防线：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 键名过滤：只允许纯标识符格式</span></span><br><span class="line"><span class="keyword">const</span> SAFE_META_KEY = <span class="regexp">/^[a-zA-Z_][a-zA-Z0-9_]*$/</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 值转义</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">escapeXmlAttr</span>(<span class="params">value: <span class="built_in">string</span></span>): <span class="title">string</span> </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> value</span><br><span class="line">    .replace(<span class="regexp">/&amp;/g</span>, <span class="string">'&amp;amp;'</span>)</span><br><span class="line">    .replace(<span class="regexp">/"/g</span>, <span class="string">'&amp;quot;'</span>)</span><br><span class="line">    .replace(<span class="regexp">/&lt;/g</span>, <span class="string">'&amp;lt;'</span>)</span><br><span class="line">    .replace(<span class="regexp">/&gt;/g</span>, <span class="string">'&amp;gt;'</span>)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-Marketplace-验证"><a href="#5-2-Marketplace-验证" class="headerlink" title="5.2 Marketplace 验证"></a>5.2 Marketplace 验证</h3><p><code>--channels plugin:slack@anthropic</code> 只是用户的”意图声明”。运行时验证：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> actual = pluginSource</span><br><span class="line">  ? parsePluginIdentifier(pluginSource).marketplace</span><br><span class="line">  : <span class="literal">undefined</span></span><br><span class="line"><span class="keyword">if</span> (actual !== entry.marketplace) &#123;</span><br><span class="line">  <span class="keyword">return</span> &#123; action: <span class="string">'skip'</span>, kind: <span class="string">'marketplace'</span>, reason: <span class="string">'Tag mismatch'</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="5-3-权限中继的信任边界"><a href="#5-3-权限中继的信任边界" class="headerlink" title="5.3 权限中继的信任边界"></a>5.3 权限中继的信任边界</h3><p><strong>问题</strong>：Claude 会自我审批吗？</p>
+<p><strong>答案</strong>：审批方是通过 Channel 的人类，不是 Claude。但信任边界不是终端——而是白名单。一个被妥协的 Channel Server 可以伪造响应，但：</p>
+<ul>
+<li>它本来就有无限的对话注入能力</li>
+<li>权限对话框减缓攻击速度，但不能完全阻止</li>
+</ul>
+<h3 id="5-4-skipSlashCommands"><a href="#5-4-skipSlashCommands" class="headerlink" title="5.4 skipSlashCommands"></a>5.4 skipSlashCommands</h3><p>Channel 消息入队时设置 <code>skipSlashCommands: true</code>，确保 IM 用户发送的 <code>/help</code> 等文本不会被解释为 Claude Code 的斜杠命令。</p>
+<hr>
+<h2 id="六、插件-Channel-架构"><a href="#六、插件-Channel-架构" class="headerlink" title="六、插件 Channel 架构"></a>六、插件 Channel 架构</h2><h3 id="6-1-Plugin-Manifest-声明"><a href="#6-1-Plugin-Manifest-声明" class="headerlink" title="6.1 Plugin Manifest 声明"></a>6.1 Plugin Manifest 声明</h3><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"name"</span>: <span class="string">"telegram"</span>,</span><br><span class="line">  <span class="attr">"version"</span>: <span class="string">"1.0.0"</span>,</span><br><span class="line">  <span class="attr">"mcpServers"</span>: &#123;</span><br><span class="line">    <span class="attr">"tg"</span>: &#123;</span><br><span class="line">      <span class="attr">"command"</span>: <span class="string">"node"</span>,</span><br><span class="line">      <span class="attr">"args"</span>: [<span class="string">"./server.js"</span>],</span><br><span class="line">      <span class="attr">"env"</span>: &#123;</span><br><span class="line">        <span class="attr">"BOT_TOKEN"</span>: <span class="string">"$&#123;user_config.bot_token&#125;"</span>,</span><br><span class="line">        <span class="attr">"OWNER_ID"</span>: <span class="string">"$&#123;user_config.owner_id&#125;"</span></span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;,</span><br><span class="line">  <span class="attr">"channels"</span>: [</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">"server"</span>: <span class="string">"tg"</span>,</span><br><span class="line">      <span class="attr">"displayName"</span>: <span class="string">"Telegram"</span>,</span><br><span class="line">      <span class="attr">"userConfig"</span>: &#123;</span><br><span class="line">        <span class="attr">"bot_token"</span>: &#123;</span><br><span class="line">          <span class="attr">"type"</span>: <span class="string">"string"</span>,</span><br><span class="line">          <span class="attr">"description"</span>: <span class="string">"Telegram Bot API Token"</span>,</span><br><span class="line">          <span class="attr">"required"</span>: <span class="literal">true</span>,</span><br><span class="line">          <span class="attr">"secret"</span>: <span class="literal">true</span></span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">"owner_id"</span>: &#123;</span><br><span class="line">          <span class="attr">"type"</span>: <span class="string">"string"</span>,</span><br><span class="line">          <span class="attr">"description"</span>: <span class="string">"Your Telegram User ID"</span>,</span><br><span class="line">          <span class="attr">"required"</span>: <span class="literal">true</span></span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="6-2-作用域命名"><a href="#6-2-作用域命名" class="headerlink" title="6.2 作用域命名"></a>6.2 作用域命名</h3><p>插件提供的 MCP Server 会被添加作用域前缀：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 输入：&#123; "tg": &#123; ... &#125; &#125; from telegram@anthropic</span></span><br><span class="line"><span class="comment">// 输出：&#123; "plugin:telegram:tg": &#123; ... &#125; &#125;</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">addPluginScopeToServers</span>(<span class="params">servers, pluginName, pluginSource</span>) </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> scopedServers = &#123;&#125;</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> [name, config] of <span class="built_in">Object</span>.entries(servers)) &#123;</span><br><span class="line">    <span class="keyword">const</span> scopedName = <span class="string">`plugin:<span class="subst">$&#123;pluginName&#125;</span>:<span class="subst">$&#123;name&#125;</span>`</span></span><br><span class="line">    scopedServers[scopedName] = &#123;</span><br><span class="line">      ...config,</span><br><span class="line">      scope: <span class="string">'dynamic'</span>,</span><br><span class="line">      pluginSource,</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> scopedServers</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、命令行接口"><a href="#七、命令行接口" class="headerlink" title="七、命令行接口"></a>七、命令行接口</h2><h3 id="7-1-启动参数"><a href="#7-1-启动参数" class="headerlink" title="7.1 启动参数"></a>7.1 启动参数</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 使用已审批的 Channel 插件</span></span><br><span class="line">claude --channels plugin:telegram@anthropic plugin:feishu@anthropic</span><br><span class="line"></span><br><span class="line"><span class="comment"># 本地开发模式（旁路白名单）</span></span><br><span class="line">claude --dangerously-load-development-channels plugin:my-channel@<span class="built_in">local</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 两者可以同时使用</span></span><br><span class="line">claude --channels plugin:telegram@anthropic \</span><br><span class="line">       --dangerously-load-development-channels plugin:dev-channel@<span class="built_in">local</span></span><br></pre></td></tr></table></figure>
+<h3 id="7-2-特性门控"><a href="#7-2-特性门控" class="headerlink" title="7.2 特性门控"></a>7.2 特性门控</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/main.tsx</span></span><br><span class="line"><span class="keyword">if</span> (feature(<span class="string">'KAIROS'</span>) || feature(<span class="string">'KAIROS_CHANNELS'</span>)) &#123;</span><br><span class="line">  program.addOption(<span class="keyword">new</span> Option(<span class="string">'--channels &lt;servers...&gt;'</span>, <span class="string">'...'</span>).hideHelp())</span><br><span class="line">  program.addOption(<span class="keyword">new</span> Option(<span class="string">'--dangerously-load-development-channels &lt;servers...&gt;'</span>, <span class="string">'...'</span>).hideHelp())</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>hideHelp()</code> 表示这些选项不会出现在 <code>--help</code> 输出中——Channel 功能目前处于隐藏特性阶段。</p>
+<hr>
+<h2 id="八、关键源文件索引"><a href="#八、关键源文件索引" class="headerlink" title="八、关键源文件索引"></a>八、关键源文件索引</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>行数</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/services/mcp/channelNotification.ts</code></td>
+<td>~320</td>
+<td>门控、消息封装、白名单集成</td>
+</tr>
+<tr>
+<td><code>src/services/mcp/channelPermissions.ts</code></td>
+<td>~240</td>
+<td>权限中继、请求 ID 生成</td>
+</tr>
+<tr>
+<td><code>src/services/mcp/channelAllowlist.ts</code></td>
+<td>~80</td>
+<td>GrowthBook 白名单查询</td>
+</tr>
+<tr>
+<td><code>src/services/mcp/useManageMCPConnections.ts</code></td>
+<td>-</td>
+<td>连接管理、通知处理器注册</td>
+</tr>
+<tr>
+<td><code>src/components/messages/UserChannelMessage.tsx</code></td>
+<td>~140</td>
+<td>终端渲染 Channel 消息</td>
+</tr>
+<tr>
+<td><code>src/components/DevChannelsDialog.tsx</code></td>
+<td>~105</td>
+<td>开发模式确认对话框</td>
+</tr>
+<tr>
+<td><code>src/utils/plugins/mcpPluginIntegration.ts</code></td>
+<td>-</td>
+<td>插件 MCP 集成、作用域命名</td>
+</tr>
+<tr>
+<td><code>src/bootstrap/state.ts</code></td>
+<td>-</td>
+<td>全局 Channel 白名单状态</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="九、总结"><a href="#九、总结" class="headerlink" title="九、总结"></a>九、总结</h2><p>Channel 系统体现了几个核心设计原则：</p>
+<ol>
+<li><strong>安全优先</strong>：六层访问控制确保只有授权 Channel 能推送消息</li>
+<li><strong>协议驱动</strong>：Channel 就是 MCP Server，任何语言都可以实现</li>
+<li><strong>松耦合</strong>：Channel 失败不会阻断本地工作流</li>
+<li><strong>渐进式信任</strong>：从全局开关到白名单，信任级别逐级递增</li>
+<li><strong>插件友好</strong>：声明式配置，自动用户配置提示</li>
+<li><strong>权限中继</strong>：远程审批危险操作</li>
+</ol>
+<p>这个设计让 Claude Code 真正成为一个”无处不在”的 AI 编程助手。</p>
+<hr>
+<p><strong>系列文章导航：</strong></p>
+<ul>
+<li>上一篇：<a href="/claude-code-memory-system/">Memory 系统：跨会话持久化知识库</a></li>
+<li>下一篇：<a href="/claude-code-computer-use/">Computer Use：桌面控制的九层安全关卡</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Channel/" rel="tag"><i class="fa fa-tag"></i> Channel</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-async-generator-state-machine/" rel="prev" title="打破 ReAct 迷思：Async Generator 状态机">
+      <i class="fa fa-chevron-left"></i> 打破 ReAct 迷思：Async Generator 状态机
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-architecture-overview/" rel="next" title="Claude Code 源码揭秘：整体架构概览">
+      Claude Code 源码揭秘：整体架构概览 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#导读：打破终端的边界"><span class="nav-number">1.</span> <span class="nav-text">导读：打破终端的边界</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、Channel-的本质"><span class="nav-number">2.</span> <span class="nav-text">一、Channel 的本质</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-Channel-就是一个-MCP-Server"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 Channel 就是一个 MCP Server</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-Channel-的两种形态"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 Channel 的两种形态</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、消息流转全链路"><span class="nav-number">3.</span> <span class="nav-text">二、消息流转全链路</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-入站流程（IM-→-Agent）"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 入站流程（IM → Agent）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-出站流程（Agent-→-IM）"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 出站流程（Agent → IM）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-消息封装格式"><span class="nav-number">3.3.</span> <span class="nav-text">2.3 消息封装格式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、六层访问控制"><span class="nav-number">4.</span> <span class="nav-text">三、六层访问控制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-Gate-函数"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 Gate 函数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-六层关卡详解"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 六层关卡详解</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-Gate-结果类型"><span class="nav-number">4.3.</span> <span class="nav-text">3.3 Gate 结果类型</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、权限中继系统"><span class="nav-number">5.</span> <span class="nav-text">四、权限中继系统</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-为什么需要权限中继"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 为什么需要权限中继</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-出站：权限请求"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 出站：权限请求</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-Short-Request-ID-设计"><span class="nav-number">5.3.</span> <span class="nav-text">4.3 Short Request ID 设计</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-入站：权限响应"><span class="nav-number">5.4.</span> <span class="nav-text">4.4 入站：权限响应</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-多源竞争"><span class="nav-number">5.5.</span> <span class="nav-text">4.5 多源竞争</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、安全设计"><span class="nav-number">6.</span> <span class="nav-text">五、安全设计</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-XML-注入防护"><span class="nav-number">6.1.</span> <span class="nav-text">5.1 XML 注入防护</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-Marketplace-验证"><span class="nav-number">6.2.</span> <span class="nav-text">5.2 Marketplace 验证</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-权限中继的信任边界"><span class="nav-number">6.3.</span> <span class="nav-text">5.3 权限中继的信任边界</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-4-skipSlashCommands"><span class="nav-number">6.4.</span> <span class="nav-text">5.4 skipSlashCommands</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、插件-Channel-架构"><span class="nav-number">7.</span> <span class="nav-text">六、插件 Channel 架构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-Plugin-Manifest-声明"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 Plugin Manifest 声明</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-作用域命名"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 作用域命名</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、命令行接口"><span class="nav-number">8.</span> <span class="nav-text">七、命令行接口</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-启动参数"><span class="nav-number">8.1.</span> <span class="nav-text">7.1 启动参数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-2-特性门控"><span class="nav-number">8.2.</span> <span class="nav-text">7.2 特性门控</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、关键源文件索引"><span class="nav-number">9.</span> <span class="nav-text">八、关键源文件索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#九、总结"><span class="nav-number">10.</span> <span class="nav-text">九、总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">62</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">9</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">37</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>

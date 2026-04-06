@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="Claude Code 的系统提示词不是一个静态字符串，而是一个动态组装的管道。通过分层构建、缓存边界、Section 类型等设计，实现了跨会话的缓存复用，大幅降低了延迟和成本。这是 Prompt 工程的教科书级案例。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="System Prompt 工程：动态组装与缓存优化">
+<meta property="og:url" content="https://donehub.github.io/2026/04/06/claude-code-system-prompt/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="Claude Code 的系统提示词不是一个静态字符串，而是一个动态组装的管道。通过分层构建、缓存边界、Section 类型等设计，实现了跨会话的缓存复用，大幅降低了延迟和成本。这是 Prompt 工程的教科书级案例。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-04-05T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-06T06:28:25.235Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="System Prompt">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/04/06/claude-code-system-prompt/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>System Prompt 工程：动态组装与缓存优化 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-system-prompt/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          System Prompt 工程：动态组装与缓存优化
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:25" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/04/06/claude-code-system-prompt/" class="post-meta-item leancloud_visitors" data-flag-title="System Prompt 工程：动态组装与缓存优化" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/claude-code-system-prompt/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-system-prompt/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>Claude Code 的系统提示词不是一个静态字符串，而是一个动态组装的管道。通过分层构建、缓存边界、Section 类型等设计，实现了跨会话的缓存复用，大幅降低了延迟和成本。这是 Prompt 工程的教科书级案例。</p>
+</blockquote>
+<a id="more"></a>
+<h2 id="导读：系统提示词的挑战"><a href="#导读：系统提示词的挑战" class="headerlink" title="导读：系统提示词的挑战"></a>导读：系统提示词的挑战</h2><p>系统提示词是 Agent 的”操作系统”——它定义了 Agent 的角色、规则、能力和约束。但系统提示词面临几个挑战：</p>
+<p><strong>挑战一：长度</strong><br>Claude Code 的系统提示词约 20k tokens，每次 API 调用都要发送。</p>
+<p><strong>挑战二：动态性</strong><br>系统提示词需要包含：</p>
+<ul>
+<li>当前日期</li>
+<li>项目结构</li>
+<li>Git 状态</li>
+<li>MCP 服务器指令</li>
+<li>用户自定义指令（CLAUDE.md）</li>
+</ul>
+<p>这些内容会变化，无法静态缓存。</p>
+<p><strong>挑战三：优先级</strong><br>多个来源的指令需要按优先级合并：</p>
+<ul>
+<li>用户全局指令</li>
+<li>项目级指令</li>
+<li>本地私有指令</li>
+</ul>
+<p>Claude Code 的解决方案：<strong>分层管道 + 缓存边界 + Section 类型</strong>。</p>
+<hr>
+<h2 id="一、分层构建架构"><a href="#一、分层构建架构" class="headerlink" title="一、分层构建架构"></a>一、分层构建架构</h2><h3 id="1-1-提示词管道"><a href="#1-1-提示词管道" class="headerlink" title="1.1 提示词管道"></a>1.1 提示词管道</h3><p>系统提示词通过分层管道动态组装：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    静态可缓存区域                              │</span><br><span class="line">│  ┌───────────────────────────────────────────────────────┐  │</span><br><span class="line">│  │ 角色定义  │  系统规则  │  任务指导  │  工具说明  │  风格  │  │</span><br><span class="line">│  └───────────────────────────────────────────────────────┘  │</span><br><span class="line">├─────────────────────── 缓存边界 ────────────────────────────┤</span><br><span class="line">│                    动态可变区域                                │</span><br><span class="line">│  ┌───────────────────────────────────────────────────────┐  │</span><br><span class="line">│  │ 会话指引 │ 记忆系统 │ 环境信息 │ MCP 指令 │ Token 预算 │  │</span><br><span class="line">│  └───────────────────────────────────────────────────────┘  │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<h3 id="1-2-缓存边界"><a href="#1-2-缓存边界" class="headerlink" title="1.2 缓存边界"></a>1.2 缓存边界</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/constants/prompts.ts:114-116</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> SYSTEM_PROMPT_DYNAMIC_BOUNDARY =</span><br><span class="line">  <span class="string">'__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__'</span></span><br></pre></td></tr></table></figure>
+<p><strong>缓存边界的作用</strong>：</p>
+<ul>
+<li><strong>边界之上</strong>：跨用户、跨组织通用的内容，使用 <code>scope: &#39;global&#39;</code> 缓存</li>
+<li><strong>边界之下</strong>：用户/会话特定的内容，使用 <code>scope: &#39;ephemeral&#39;</code> 缓存</li>
+</ul>
+<p>这意味着 Claude Code 的系统提示词<strong>不需要每次都重新处理</strong>——静态部分在全球范围内共享缓存，大幅降低延迟和成本。</p>
+<hr>
+<h2 id="二、两种-Section-类型"><a href="#二、两种-Section-类型" class="headerlink" title="二、两种 Section 类型"></a>二、两种 Section 类型</h2><h3 id="2-1-缓存-Section"><a href="#2-1-缓存-Section" class="headerlink" title="2.1 缓存 Section"></a>2.1 缓存 Section</h3><p>计算一次，整个会话复用：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/constants/systemPromptSections.ts</span></span><br><span class="line">systemPromptSection(<span class="string">'memory'</span>, <span class="keyword">async</span> () =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> buildMemoryLines()  <span class="comment">// 读取 CLAUDE.md、记忆文件等</span></span><br><span class="line">&#125;, &#123; scope: <span class="string">'ephemeral'</span> &#125;)  <span class="comment">// 会话级缓存</span></span><br></pre></td></tr></table></figure>
+<h3 id="2-2-缓存破坏-Section"><a href="#2-2-缓存破坏-Section" class="headerlink" title="2.2 缓存破坏 Section"></a>2.2 缓存破坏 Section</h3><p>每轮重新计算：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/constants/systemPromptSections.ts</span></span><br><span class="line">DANGEROUS_uncachedSystemPromptSection(<span class="string">'mcp_instructions'</span>, <span class="keyword">async</span> () =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> getMcpInstructions()  <span class="comment">// MCP 服务器可能中途连接/断开</span></span><br><span class="line">&#125;, <span class="string">'MCP servers can connect/disconnect mid-session'</span>)</span><br></pre></td></tr></table></figure>
+<p><strong>何时使用缓存破坏 Section</strong>：</p>
+<ul>
+<li>MCP 指令：服务器可能动态连接/断开</li>
+<li>当前日期：每轮都不同</li>
+<li>Git 状态：可能快速变化</li>
+<li>Token 预算：每轮重新计算</li>
+</ul>
+<hr>
+<h2 id="三、优先级解析链"><a href="#三、优先级解析链" class="headerlink" title="三、优先级解析链"></a>三、优先级解析链</h2><h3 id="3-1-系统提示词优先级"><a href="#3-1-系统提示词优先级" class="headerlink" title="3.1 系统提示词优先级"></a>3.1 系统提示词优先级</h3><p>最终的系统提示词通过 <code>buildEffectiveSystemPrompt()</code> 按优先级决定：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">Override System Prompt     ← 最高优先级，完全替换</span><br><span class="line">  ↓</span><br><span class="line">Coordinator System Prompt  ← 协调者模式专用</span><br><span class="line">  ↓</span><br><span class="line">Agent System Prompt        ← agentDefinition.getSystemPrompt()</span><br><span class="line">  ↓                          - proactive 模式：追加到默认</span><br><span class="line">  ↓                          - 其他：替换默认</span><br><span class="line">Custom System Prompt       ← --system-prompt 参数</span><br><span class="line">  ↓</span><br><span class="line">Default System Prompt      ← Claude Code 标准提示词</span><br><span class="line">  ↓</span><br><span class="line">Append System Prompt       ← 始终追加到末尾</span><br></pre></td></tr></table></figure>
+<h3 id="3-2-代码实现"><a href="#3-2-代码实现" class="headerlink" title="3.2 代码实现"></a>3.2 代码实现</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/utils/systemPrompt.ts:41-123</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">buildEffectiveSystemPrompt</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  options: BuildSystemPromptOptions,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">SystemPrompt</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> sections: SystemPromptSection[] = []</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 1. 检查 Override</span></span><br><span class="line">  <span class="keyword">if</span> (options.overrideSystemPrompt) &#123;</span><br><span class="line">    <span class="keyword">return</span> asSystemPrompt(options.overrideSystemPrompt)</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 检查 Coordinator</span></span><br><span class="line">  <span class="keyword">if</span> (isCoordinatorMode() &amp;&amp; options.coordinatorSystemPrompt) &#123;</span><br><span class="line">    <span class="keyword">return</span> asSystemPrompt(options.coordinatorSystemPrompt)</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 构建 Section 序列</span></span><br><span class="line">  <span class="keyword">const</span> defaultSections = <span class="keyword">await</span> buildDefaultSections()</span><br><span class="line">  sections.push(...defaultSections)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 处理 Agent 提示词</span></span><br><span class="line">  <span class="keyword">if</span> (options.agentDefinition?.getSystemPrompt) &#123;</span><br><span class="line">    <span class="keyword">const</span> agentPrompt = <span class="keyword">await</span> options.agentDefinition.getSystemPrompt(options)</span><br><span class="line">    <span class="keyword">if</span> (options.agentDefinition.promptMode === <span class="string">'proactive'</span>) &#123;</span><br><span class="line">      <span class="comment">// 追加到默认提示词后</span></span><br><span class="line">      sections.push(&#123; <span class="keyword">type</span>: <span class="string">'text'</span>, text: agentPrompt &#125;)</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      <span class="comment">// 替换默认提示词</span></span><br><span class="line">      <span class="keyword">return</span> asSystemPrompt(agentPrompt)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 5. 追加 Custom 和 Append</span></span><br><span class="line">  <span class="keyword">if</span> (options.customSystemPrompt) &#123;</span><br><span class="line">    sections.push(&#123; <span class="keyword">type</span>: <span class="string">'text'</span>, text: options.customSystemPrompt &#125;)</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">if</span> (options.appendSystemPrompt) &#123;</span><br><span class="line">    sections.push(&#123; <span class="keyword">type</span>: <span class="string">'text'</span>, text: options.appendSystemPrompt &#125;)</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> resolveSystemPromptSections(sections)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="四、CLAUDE-md-加载机制"><a href="#四、CLAUDE-md-加载机制" class="headerlink" title="四、CLAUDE.md 加载机制"></a>四、CLAUDE.md 加载机制</h2><h3 id="4-1-加载优先级"><a href="#4-1-加载优先级" class="headerlink" title="4.1 加载优先级"></a>4.1 加载优先级</h3><p>CLAUDE.md 是用户自定义指令系统，按优先级从低到高加载：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;etc&#x2F;claude-code&#x2F;CLAUDE.md          ← 全局管理配置（最低优先级）</span><br><span class="line">  ↓</span><br><span class="line">~&#x2F;.claude&#x2F;CLAUDE.md                 ← 用户全局指令</span><br><span class="line">  ↓</span><br><span class="line">项目根目录&#x2F;CLAUDE.md                 ← 项目级指令</span><br><span class="line">项目根目录&#x2F;.claude&#x2F;CLAUDE.md</span><br><span class="line">项目根目录&#x2F;.claude&#x2F;rules&#x2F;*.md</span><br><span class="line">  ↓</span><br><span class="line">项目根目录&#x2F;CLAUDE.local.md           ← 本地私有指令（最高优先级）</span><br></pre></td></tr></table></figure>
+<h3 id="4-2-递归引用"><a href="#4-2-递归引用" class="headerlink" title="4.2 递归引用"></a>4.2 递归引用</h3><p>支持 <code>@path</code> 语法递归引用其他文件：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># 项目配置</span></span><br><span class="line"></span><br><span class="line"><span class="section">## 编码规范</span></span><br><span class="line">@./docs/coding-standards.md</span><br><span class="line"></span><br><span class="line"><span class="section">## API 文档</span></span><br><span class="line">@./docs/api-spec.md</span><br></pre></td></tr></table></figure>
+<h3 id="4-3-循环引用检测"><a href="#4-3-循环引用检测" class="headerlink" title="4.3 循环引用检测"></a>4.3 循环引用检测</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/utils/claudemd.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">loadClaudeMdFile</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  path: <span class="built_in">string</span>,</span></span></span><br><span class="line"><span class="function"><span class="params">  visited: Set&lt;<span class="built_in">string</span>&gt; = <span class="keyword">new</span> Set(),</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">string</span>&gt; </span>&#123;</span><br><span class="line">  <span class="comment">// 检测循环引用</span></span><br><span class="line">  <span class="keyword">if</span> (visited.has(path)) &#123;</span><br><span class="line">    <span class="built_in">console</span>.warn(<span class="string">`Circular reference detected: <span class="subst">$&#123;path&#125;</span>`</span>)</span><br><span class="line">    <span class="keyword">return</span> <span class="string">''</span></span><br><span class="line">  &#125;</span><br><span class="line">  visited.add(path)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">let</span> content = <span class="keyword">await</span> readFile(path, <span class="string">'utf-8'</span>)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 处理 @path 引用</span></span><br><span class="line">  <span class="keyword">const</span> references = extractReferences(content)</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> ref of references) &#123;</span><br><span class="line">    <span class="keyword">const</span> refPath = resolveReference(path, ref)</span><br><span class="line">    <span class="keyword">const</span> refContent = <span class="keyword">await</span> loadClaudeMdFile(refPath, visited)</span><br><span class="line">    content = content.replace(<span class="string">`@<span class="subst">$&#123;ref&#125;</span>`</span>, refContent)</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> content</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="五、Agent-特有的提示词增强"><a href="#五、Agent-特有的提示词增强" class="headerlink" title="五、Agent 特有的提示词增强"></a>五、Agent 特有的提示词增强</h2><h3 id="5-1-环境详情注入"><a href="#5-1-环境详情注入" class="headerlink" title="5.1 环境详情注入"></a>5.1 环境详情注入</h3><p>子代理会额外注入环境详情：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/AgentTool/runAgent.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">getAgentSystemPrompt</span>(<span class="params">agentDef, toolUseContext</span>) </span>&#123;</span><br><span class="line">  <span class="keyword">let</span> prompt = agentDef.getSystemPrompt(&#123; toolUseContext &#125;)</span><br><span class="line">  prompt = enhanceSystemPromptWithEnvDetails(prompt)</span><br><span class="line">  <span class="comment">// 添加：工作目录、启用工具列表、模型信息、环境变量</span></span><br><span class="line">  <span class="keyword">return</span> prompt</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-Fork-约束注入"><a href="#5-2-Fork-约束注入" class="headerlink" title="5.2 Fork 约束注入"></a>5.2 Fork 约束注入</h3><p>Fork Agent 会注入行为约束：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> FORK_BOILERPLATE_TAG = <span class="string">`</span></span><br><span class="line"><span class="string">You are a forked worker process. Your job is to execute tasks efficiently.</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">CRITICAL RULES:</span></span><br><span class="line"><span class="string">1. You are NOT the main agent. Do not engage in conversation or ask follow-up questions.</span></span><br><span class="line"><span class="string">2. Use tools directly (Bash, Read, Write, etc.) to complete your assigned task.</span></span><br><span class="line"><span class="string">3. If you modify files, commit your changes before reporting.</span></span><br><span class="line"><span class="string">4. Do NOT output text between tool calls - just use tools.</span></span><br><span class="line"><span class="string">5. Stay strictly within the scope of your directive.</span></span><br><span class="line"><span class="string">6. Keep your final report under 500 words.</span></span><br><span class="line"><span class="string">7. Your response MUST start with "Scope:" followed by what you accomplished.</span></span><br><span class="line"><span class="string">`</span></span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="六、缓存策略详解"><a href="#六、缓存策略详解" class="headerlink" title="六、缓存策略详解"></a>六、缓存策略详解</h2><h3 id="6-1-三级缓存"><a href="#6-1-三级缓存" class="headerlink" title="6.1 三级缓存"></a>6.1 三级缓存</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">Global Cache（跨组织）    ← 静态系统提示词</span><br><span class="line">  ↓  scope: &#39;global&#39;</span><br><span class="line">Ephemeral Cache（会话级） ← 动态系统提示词</span><br><span class="line">  ↓  scope: &#39;ephemeral&#39;</span><br><span class="line">Section Cache（轮级）     ← systemPromptSection 记忆化</span><br><span class="line">     每个 Section 独立缓存</span><br></pre></td></tr></table></figure>
+<h3 id="6-2-缓存失效"><a href="#6-2-缓存失效" class="headerlink" title="6.2 缓存失效"></a>6.2 缓存失效</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 触发缓存的场景</span></span><br><span class="line"><span class="keyword">const</span> cacheTriggers = &#123;</span><br><span class="line">  <span class="comment">// Global Cache</span></span><br><span class="line">  <span class="string">'static_system_prompt'</span>: <span class="string">'never'</span>,  <span class="comment">// 永不失效</span></span><br><span class="line">  </span><br><span class="line">  <span class="comment">// Ephemeral Cache</span></span><br><span class="line">  <span class="string">'memory_content'</span>: <span class="string">'on_claudemd_change'</span>,  <span class="comment">// CLAUDE.md 变化时</span></span><br><span class="line">  <span class="string">'mcp_instructions'</span>: <span class="string">'on_mcp_connection'</span>,  <span class="comment">// MCP 连接/断开时</span></span><br><span class="line">  </span><br><span class="line">  <span class="comment">// Section Cache</span></span><br><span class="line">  <span class="string">'user_context'</span>: <span class="string">'per_turn'</span>,  <span class="comment">// 每轮重新计算（但有 memoize）</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="6-3-缓存命中优化"><a href="#6-3-缓存命中优化" class="headerlink" title="6.3 缓存命中优化"></a>6.3 缓存命中优化</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/api/claude.ts:3213-3237</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">buildSystemPromptBlocks</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  systemPrompt: SystemPrompt,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">ContentBlockParam</span>[] </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> blocks: ContentBlockParam[] = []</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 在缓存边界处分割</span></span><br><span class="line">  <span class="keyword">const</span> [staticPart, dynamicPart] = splitAtBoundary(systemPrompt)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 静态部分使用 global 缓存</span></span><br><span class="line">  <span class="keyword">if</span> (staticPart) &#123;</span><br><span class="line">    blocks.push(&#123;</span><br><span class="line">      <span class="keyword">type</span>: <span class="string">'text'</span>,</span><br><span class="line">      text: staticPart,</span><br><span class="line">      cache_control: &#123; <span class="keyword">type</span>: <span class="string">'ephemeral'</span> &#125;,  <span class="comment">// API 会自动识别为 global</span></span><br><span class="line">    &#125;)</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 动态部分使用 ephemeral 缓存</span></span><br><span class="line">  <span class="keyword">if</span> (dynamicPart) &#123;</span><br><span class="line">    blocks.push(&#123;</span><br><span class="line">      <span class="keyword">type</span>: <span class="string">'text'</span>,</span><br><span class="line">      text: dynamicPart,</span><br><span class="line">      cache_control: &#123; <span class="keyword">type</span>: <span class="string">'ephemeral'</span> &#125;,</span><br><span class="line">    &#125;)</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> blocks</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、提示词结构示例"><a href="#七、提示词结构示例" class="headerlink" title="七、提示词结构示例"></a>七、提示词结构示例</h2><h3 id="7-1-完整系统提示词结构"><a href="#7-1-完整系统提示词结构" class="headerlink" title="7.1 完整系统提示词结构"></a>7.1 完整系统提示词结构</h3><figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># Claude Code System Prompt</span></span><br><span class="line"></span><br><span class="line"><span class="section">## Role</span></span><br><span class="line">You are an interactive agent that helps users with software engineering tasks.</span><br><span class="line"></span><br><span class="line"><span class="section">## System Rules</span></span><br><span class="line"><span class="bullet">- </span>All text you output is displayed to the user</span><br><span class="line"><span class="bullet">- </span>Tools are executed in a permission mode</span><br><span class="line"><span class="bullet">- </span>The conversation has unlimited context through automatic summarization</span><br><span class="line"></span><br><span class="line"><span class="section">## Doing Tasks</span></span><br><span class="line"><span class="bullet">- </span>Use tools available to you to assist the user</span><br><span class="line"><span class="bullet">- </span>When creating new code, follow the conventions of the existing codebase</span><br><span class="line"><span class="bullet">- </span>After completing a task, do not summarize what you did</span><br><span class="line"></span><br><span class="line"><span class="section">## Tools</span></span><br><span class="line">You have access to the following tools:</span><br><span class="line"><span class="bullet">- </span>Read: Read a file from the filesystem</span><br><span class="line"><span class="bullet">- </span>Edit: Make edits to a file</span><br><span class="line"><span class="bullet">- </span>Write: Write a new file</span><br><span class="line"><span class="bullet">- </span>Bash: Execute a bash command</span><br><span class="line"><span class="bullet">- </span>Grep: Search for patterns in files</span><br><span class="line"><span class="bullet">- </span>...</span><br><span class="line"></span><br><span class="line">--- SYSTEM_PROMPT_DYNAMIC_BOUNDARY ---</span><br><span class="line"></span><br><span class="line"><span class="section">## Current Date</span></span><br><span class="line">Today's date is 2026-04-06.</span><br><span class="line"></span><br><span class="line"><span class="section">## Project Context</span></span><br><span class="line">Working directory: /Users/dev/my-project</span><br><span class="line">Git branch: main</span><br><span class="line">Git status: 2 modified files</span><br><span class="line"></span><br><span class="line"><span class="section">## User Instructions</span></span><br><span class="line">(CLADE.md content here)</span><br><span class="line"></span><br><span class="line"><span class="section">## MCP Instructions</span></span><br><span class="line"><span class="bullet">- </span>Filesystem MCP: provides file operations</span><br><span class="line"><span class="bullet">- </span>GitHub MCP: provides issue and PR operations</span><br><span class="line"></span><br><span class="line"><span class="section">## Token Budget</span></span><br><span class="line">You have approximately 150,000 tokens available for this turn.</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="八、关键源文件索引"><a href="#八、关键源文件索引" class="headerlink" title="八、关键源文件索引"></a>八、关键源文件索引</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/constants/prompts.ts</code></td>
+<td>系统提示词组装</td>
+</tr>
+<tr>
+<td><code>src/constants/systemPromptSections.ts</code></td>
+<td>Section 定义和缓存</td>
+</tr>
+<tr>
+<td><code>src/utils/systemPrompt.ts</code></td>
+<td>优先级解析</td>
+</tr>
+<tr>
+<td><code>src/utils/claudemd.ts</code></td>
+<td>CLAUDE.md 加载</td>
+</tr>
+<tr>
+<td><code>src/context.ts</code></td>
+<td>系统和用户上下文</td>
+</tr>
+<tr>
+<td><code>src/utils/api.ts</code></td>
+<td>缓存边界分割</td>
+</tr>
+<tr>
+<td><code>src/services/api/claude.ts</code></td>
+<td>API 缓存块构建</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="九、总结"><a href="#九、总结" class="headerlink" title="九、总结"></a>九、总结</h2><p>Claude Code 的 System Prompt 工程体现了几个核心设计原则：</p>
+<ol>
+<li><strong>分层构建</strong>：静态和动态分离，最大化缓存利用</li>
+<li><strong>优先级解析</strong>：多来源指令按优先级合并</li>
+<li><strong>缓存边界</strong>：明确的缓存策略，降低延迟和成本</li>
+<li><strong>Section 类型</strong>：缓存和缓存破坏两种类型，适应不同需求</li>
+<li><strong>递归引用</strong>：支持 @path 语法，模块化指令组织</li>
+</ol>
+<p>这个设计是 Prompt 工程的教科书级案例——既满足了动态性需求，又最大化了缓存效率。</p>
+<hr>
+<p><strong>系列文章导航：</strong></p>
+<ul>
+<li>上一篇：<a href="/claude-code-context-compression/">Context 管理：四级压缩与无限对话的秘密</a></li>
+<li>下一篇：<a href="/claude-code-skills-system/">Skills 系统：条件激活与动态发现</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/System-Prompt/" rel="tag"><i class="fa fa-tag"></i> System Prompt</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-tool-system/" rel="prev" title="工具系统设计：从定义到执行的七步管道">
+      <i class="fa fa-chevron-left"></i> 工具系统设计：从定义到执行的七步管道
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-terminal-ui/" rel="next" title="Terminal UI：React + Ink 的 TUI 实现">
+      Terminal UI：React + Ink 的 TUI 实现 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#导读：系统提示词的挑战"><span class="nav-number">1.</span> <span class="nav-text">导读：系统提示词的挑战</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、分层构建架构"><span class="nav-number">2.</span> <span class="nav-text">一、分层构建架构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-提示词管道"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 提示词管道</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-缓存边界"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 缓存边界</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、两种-Section-类型"><span class="nav-number">3.</span> <span class="nav-text">二、两种 Section 类型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-缓存-Section"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 缓存 Section</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-缓存破坏-Section"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 缓存破坏 Section</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、优先级解析链"><span class="nav-number">4.</span> <span class="nav-text">三、优先级解析链</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-系统提示词优先级"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 系统提示词优先级</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-代码实现"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 代码实现</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、CLAUDE-md-加载机制"><span class="nav-number">5.</span> <span class="nav-text">四、CLAUDE.md 加载机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-加载优先级"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 加载优先级</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-递归引用"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 递归引用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-循环引用检测"><span class="nav-number">5.3.</span> <span class="nav-text">4.3 循环引用检测</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、Agent-特有的提示词增强"><span class="nav-number">6.</span> <span class="nav-text">五、Agent 特有的提示词增强</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-环境详情注入"><span class="nav-number">6.1.</span> <span class="nav-text">5.1 环境详情注入</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-Fork-约束注入"><span class="nav-number">6.2.</span> <span class="nav-text">5.2 Fork 约束注入</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、缓存策略详解"><span class="nav-number">7.</span> <span class="nav-text">六、缓存策略详解</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-三级缓存"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 三级缓存</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-缓存失效"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 缓存失效</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-缓存命中优化"><span class="nav-number">7.3.</span> <span class="nav-text">6.3 缓存命中优化</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、提示词结构示例"><span class="nav-number">8.</span> <span class="nav-text">七、提示词结构示例</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-完整系统提示词结构"><span class="nav-number">8.1.</span> <span class="nav-text">7.1 完整系统提示词结构</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、关键源文件索引"><span class="nav-number">9.</span> <span class="nav-text">八、关键源文件索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#九、总结"><span class="nav-number">10.</span> <span class="nav-text">九、总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">62</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">9</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">37</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>

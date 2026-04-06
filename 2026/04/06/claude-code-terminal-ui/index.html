@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="Claude Code 的终端界面不是传统的 CLI——它是一个完整的 React 应用，运行在终端中。通过 Ink 框架（自定义 React Reconciler + Yoga 布局引擎），Claude Code 实现了组件化 UI、双缓冲渲染、交互式对话框等高级特性。这是 Terminal UI 开发的教科书级案例。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Terminal UI：React + Ink 的 TUI 实现">
+<meta property="og:url" content="https://donehub.github.io/2026/04/06/claude-code-terminal-ui/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="Claude Code 的终端界面不是传统的 CLI——它是一个完整的 React 应用，运行在终端中。通过 Ink 框架（自定义 React Reconciler + Yoga 布局引擎），Claude Code 实现了组件化 UI、双缓冲渲染、交互式对话框等高级特性。这是 Terminal UI 开发的教科书级案例。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-04-05T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-06T06:28:40.760Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Terminal UI">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/04/06/claude-code-terminal-ui/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Terminal UI：React + Ink 的 TUI 实现 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-terminal-ui/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Terminal UI：React + Ink 的 TUI 实现
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:40" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/04/06/claude-code-terminal-ui/" class="post-meta-item leancloud_visitors" data-flag-title="Terminal UI：React + Ink 的 TUI 实现" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/claude-code-terminal-ui/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-terminal-ui/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>Claude Code 的终端界面不是传统的 CLI——它是一个完整的 React 应用，运行在终端中。通过 Ink 框架（自定义 React Reconciler + Yoga 布局引擎），Claude Code 实现了组件化 UI、双缓冲渲染、交互式对话框等高级特性。这是 Terminal UI 开发的教科书级案例。</p>
+</blockquote>
+<a id="more"></a>
+<h2 id="导读：终端里的-React-应用"><a href="#导读：终端里的-React-应用" class="headerlink" title="导读：终端里的 React 应用"></a>导读：终端里的 React 应用</h2><p>当你打开 Claude Code，看到的不是普通的命令行输出：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│ Claude Code                                                 │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│ ▶ What would you like me to help you with?                 │</span><br><span class="line">│                                                             │</span><br><span class="line">│ ┌─ Tools ─────────────────────────────────────────────────┐│</span><br><span class="line">│ │ Read  Edit  Write  Bash  Grep  Glob  WebSearch          ││</span><br><span class="line">│ └─────────────────────────────────────────────────────────┘│</span><br><span class="line">│                                                             │</span><br><span class="line">│ ┌─ Context ────────────────────────────────────────────────┐│</span><br><span class="line">│ │ Memory: 3 entries loaded                                 ││</span><br><span class="line">│ │ MCP: 2 servers connected                                 ││</span><br><span class="line">│ │ Token budget: 150,000                                    ││</span><br><span class="line">│ └─────────────────────────────────────────────────────────┘│</span><br><span class="line">│                                                             │</span><br><span class="line">│ [Type your message or press Enter for suggestions]         │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p>这是一个<strong>完整的 GUI 应用</strong>，运行在终端中。背后是 React + Ink 的魔法。</p>
+<hr>
+<h2 id="一、Ink-框架基础"><a href="#一、Ink-框架基础" class="headerlink" title="一、Ink 框架基础"></a>一、Ink 框架基础</h2><h3 id="1-1-React-Reconciler-架构"><a href="#1-1-React-Reconciler-架构" class="headerlink" title="1.1 React Reconciler 架构"></a>1.1 React Reconciler 架构</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    React + Ink 架构                          │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  React Components                                           │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  React Reconciler（自定义）                                  │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  Ink Host Config                                            │</span><br><span class="line">│       ├─ createInstance() → 创建 Yoga Node                 │</span><br><span class="line">│       ├─ appendChild() → 添加子节点                         │</span><br><span class="line">│       ├─ removeChild() → 删除子节点                         │</span><br><span class="line">│       └─ commitUpdate() → 更新属性                          │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  Yoga Layout Engine                                         │</span><br><span class="line">│       ├─ Flexbox 布局计算                                   │</span><br><span class="line">│       ├─ 文字测量（基于终端字符）                            │</span><br><span class="line">│       └─ 位置计算                                           │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  Terminal Renderer                                          │</span><br><span class="line">│       ├─ ANSI 转义序列                                      │</span><br><span class="line">│       ├─ 双缓冲渲染                                         │</span><br><span class="line">│       └─ 输出合并                                           │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  stdout                                                     │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<h3 id="1-2-为什么选择-Ink？"><a href="#1-2-为什么选择-Ink？" class="headerlink" title="1.2 为什么选择 Ink？"></a>1.2 为什么选择 Ink？</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>优势</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>React 生态</strong></td>
+<td>复用 React 的组件化思想、状态管理、生命周期</td>
+</tr>
+<tr>
+<td><strong>Flexbox 布局</strong></td>
+<td>Yoga 引擎提供完整的 Flexbox 支持</td>
+</tr>
+<tr>
+<td><strong>跨平台</strong></td>
+<td>Windows/macOS/Linux 终端一致性</td>
+</tr>
+<tr>
+<td><strong>双缓冲</strong></td>
+<td>避免闪烁，平滑更新</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="二、核心组件设计"><a href="#二、核心组件设计" class="headerlink" title="二、核心组件设计"></a>二、核心组件设计</h2><h3 id="2-1-组件树结构"><a href="#2-1-组件树结构" class="headerlink" title="2.1 组件树结构"></a>2.1 组件树结构</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">&lt;App&gt;</span><br><span class="line">  &lt;Header&gt;</span><br><span class="line">    &lt;Title &#x2F;&gt;</span><br><span class="line">    &lt;StatusIndicator &#x2F;&gt;</span><br><span class="line">  &lt;&#x2F;Header&gt;</span><br><span class="line">  </span><br><span class="line">  &lt;Main&gt;</span><br><span class="line">    &lt;MessageList&gt;</span><br><span class="line">      &lt;UserMessage &#x2F;&gt;</span><br><span class="line">      &lt;AssistantMessage&gt;</span><br><span class="line">        &lt;ToolCall &#x2F;&gt;</span><br><span class="line">        &lt;ToolResult &#x2F;&gt;</span><br><span class="line">      &lt;&#x2F;AssistantMessage&gt;</span><br><span class="line">    &lt;&#x2F;MessageList&gt;</span><br><span class="line">    </span><br><span class="line">    &lt;ToolBar&gt;</span><br><span class="line">      &lt;ToolButton tool&#x3D;&quot;Read&quot; &#x2F;&gt;</span><br><span class="line">      &lt;ToolButton tool&#x3D;&quot;Edit&quot; &#x2F;&gt;</span><br><span class="line">      ...</span><br><span class="line">    &lt;&#x2F;ToolBar&gt;</span><br><span class="line">    </span><br><span class="line">    &lt;ContextPanel&gt;</span><br><span class="line">      &lt;MemoryStatus &#x2F;&gt;</span><br><span class="line">      &lt;MCPStatus &#x2F;&gt;</span><br><span class="line">      &lt;TokenBudget &#x2F;&gt;</span><br><span class="line">    &lt;&#x2F;ContextPanel&gt;</span><br><span class="line">  &lt;&#x2F;Main&gt;</span><br><span class="line">  </span><br><span class="line">  &lt;Footer&gt;</span><br><span class="line">    &lt;InputBox &#x2F;&gt;</span><br><span class="line">    &lt;Suggestions &#x2F;&gt;</span><br><span class="line">  &lt;&#x2F;Footer&gt;</span><br><span class="line">&lt;&#x2F;App&gt;</span><br></pre></td></tr></table></figure>
+<h3 id="2-2-基础组件实现"><a href="#2-2-基础组件实现" class="headerlink" title="2.2 基础组件实现"></a>2.2 基础组件实现</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; src&#x2F;components&#x2F;App.tsx</span><br><span class="line">import &#123; Box, Text, useInput, useApp &#125; from &#39;ink&#39;</span><br><span class="line"></span><br><span class="line">function App() &#123;</span><br><span class="line">  const &#123; exit &#125; &#x3D; useApp()</span><br><span class="line">  const [messages, setMessages] &#x3D; useState&lt;Message[]&gt;([])</span><br><span class="line">  const [input, setInput] &#x3D; useState(&#39;&#39;)</span><br><span class="line"></span><br><span class="line">  useInput((char, key) &#x3D;&gt; &#123;</span><br><span class="line">    if (key.escape) &#123;</span><br><span class="line">      exit()</span><br><span class="line">    &#125; else if (key.return) &#123;</span><br><span class="line">      handleSubmit(input)</span><br><span class="line">      setInput(&#39;&#39;)</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">      setInput(prev &#x3D;&gt; prev + char)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  return (</span><br><span class="line">    &lt;Box flexDirection&#x3D;&quot;column&quot; height&#x3D;&quot;100%&quot;&gt;</span><br><span class="line">      &lt;Header &#x2F;&gt;</span><br><span class="line">      &lt;Box flexGrow&#x3D;&#123;1&#125;&gt;</span><br><span class="line">        &lt;MessageList messages&#x3D;&#123;messages&#125; &#x2F;&gt;</span><br><span class="line">        &lt;ContextPanel &#x2F;&gt;</span><br><span class="line">      &lt;&#x2F;Box&gt;</span><br><span class="line">      &lt;Footer input&#x3D;&#123;input&#125; &#x2F;&gt;</span><br><span class="line">    &lt;&#x2F;Box&gt;</span><br><span class="line">  )</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="三、布局系统"><a href="#三、布局系统" class="headerlink" title="三、布局系统"></a>三、布局系统</h2><h3 id="3-1-Yoga-Flexbox"><a href="#3-1-Yoga-Flexbox" class="headerlink" title="3.1 Yoga Flexbox"></a>3.1 Yoga Flexbox</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; Flexbox 属性完全支持</span><br><span class="line">&lt;Box </span><br><span class="line">  flexDirection&#x3D;&quot;column&quot;    &#x2F;&#x2F; 垂直布局</span><br><span class="line">  justifyContent&#x3D;&quot;center&quot;   &#x2F;&#x2F; 居中</span><br><span class="line">  alignItems&#x3D;&quot;stretch&quot;      &#x2F;&#x2F; 拉伸</span><br><span class="line">  flexGrow&#x3D;&#123;1&#125;              &#x2F;&#x2F; 占满剩余空间</span><br><span class="line">  padding&#x3D;&#123;1&#125;               &#x2F;&#x2F; 1 字符边距</span><br><span class="line">  margin&#x3D;&#123;2&#125;                &#x2F;&#x2F; 2 字符外边距</span><br><span class="line">  borderStyle&#x3D;&quot;single&quot;      &#x2F;&#x2F; 单线边框</span><br><span class="line">&gt;</span><br><span class="line">  &lt;Text&gt;Content&lt;&#x2F;Text&gt;</span><br><span class="line">&lt;&#x2F;Box&gt;</span><br></pre></td></tr></table></figure>
+<h3 id="3-2-文字测量"><a href="#3-2-文字测量" class="headerlink" title="3.2 文字测量"></a>3.2 文字测量</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ink/lib/measureText.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">measureText</span>(<span class="params">text: <span class="built_in">string</span></span>): </span>&#123; width: <span class="built_in">number</span>; height: <span class="built_in">number</span> &#125; &#123;</span><br><span class="line">  <span class="comment">// 1. 处理 ANSI 转义序列（不计入宽度）</span></span><br><span class="line">  <span class="keyword">const</span> cleanText = stripAnsi(text)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 处理多行文本</span></span><br><span class="line">  <span class="keyword">const</span> lines = cleanText.split(<span class="string">'\n'</span>)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 每行宽度 = 字符数（考虑宽字符）</span></span><br><span class="line">  <span class="keyword">const</span> widths = lines.map(<span class="function"><span class="params">line</span> =&gt;</span> &#123;</span><br><span class="line">    <span class="comment">// 中文字符占 2 列</span></span><br><span class="line">    <span class="keyword">return</span> line.split(<span class="string">''</span>).reduce(<span class="function">(<span class="params">width, char</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="keyword">return</span> width + (isFullWidth(char) ? <span class="number">2</span> : <span class="number">1</span>)</span><br><span class="line">    &#125;, <span class="number">0</span>)</span><br><span class="line">  &#125;)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> &#123;</span><br><span class="line">    width: <span class="built_in">Math</span>.max(...widths),</span><br><span class="line">    height: lines.length,</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="四、双缓冲渲染"><a href="#四、双缓冲渲染" class="headerlink" title="四、双缓冲渲染"></a>四、双缓冲渲染</h2><h3 id="4-1-渲染流程"><a href="#4-1-渲染流程" class="headerlink" title="4.1 渲染流程"></a>4.1 渲染流程</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    双缓冲渲染流程                            │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  State Update                                               │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  Reconciler 更新 Yoga Tree                                  │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  Layout 计算                                                │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  Render to Buffer A                                         │</span><br><span class="line">│       ├─ 遍历 Yoga Tree                                    │</span><br><span class="line">│       ├─ 生成 ANSI 序列                                    │</span><br><span class="line">│       └─ 写入 Buffer A                                     │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  Swap Buffers                                               │</span><br><span class="line">│       ├─ Buffer A → Previous Frame                         │</span><br><span class="line">│       ├─ Buffer B → Current Frame                          │</span><br><span class="line">│       ↓                                                     │</span><br><span class="line">│  Diff &amp; Output                                              │</span><br><span class="line">│       ├─ 对比 Previous vs Current                          │</span><br><span class="line">│       ├─ 只输出变化的区域                                   │</span><br><span class="line">│       └─ ANSI 光标移动 + 更新                               │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<h3 id="4-2-Diff-算法"><a href="#4-2-Diff-算法" class="headerlink" title="4.2 Diff 算法"></a>4.2 Diff 算法</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ink/lib/diff.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">diffScreens</span>(<span class="params">prev: <span class="built_in">string</span>[], curr: <span class="built_in">string</span>[]</span>): <span class="title">DiffOutput</span>[] </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> outputs: DiffOutput[] = []</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">let</span> y = <span class="number">0</span>; y &lt; <span class="built_in">Math</span>.max(prev.length, curr.length); y++) &#123;</span><br><span class="line">    <span class="keyword">const</span> prevLine = prev[y] || <span class="string">''</span></span><br><span class="line">    <span class="keyword">const</span> currLine = curr[y] || <span class="string">''</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (prevLine !== currLine) &#123;</span><br><span class="line">      <span class="comment">// 移动光标到该行</span></span><br><span class="line">      outputs.push(&#123; <span class="keyword">type</span>: <span class="string">'move'</span>, x: <span class="number">0</span>, y &#125;)</span><br><span class="line">      </span><br><span class="line">      <span class="comment">// 清除该行</span></span><br><span class="line">      outputs.push(&#123; <span class="keyword">type</span>: <span class="string">'clear_line'</span> &#125;)</span><br><span class="line">      </span><br><span class="line">      <span class="comment">// 写入新内容</span></span><br><span class="line">      outputs.push(&#123; <span class="keyword">type</span>: <span class="string">'write'</span>, content: currLine &#125;)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> outputs</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="五、交互式组件"><a href="#五、交互式组件" class="headerlink" title="五、交互式组件"></a>五、交互式组件</h2><h3 id="5-1-InputBox-实现"><a href="#5-1-InputBox-实现" class="headerlink" title="5.1 InputBox 实现"></a>5.1 InputBox 实现</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; src&#x2F;components&#x2F;InputBox.tsx</span><br><span class="line">import &#123; Box, Text, useInput &#125; from &#39;ink&#39;</span><br><span class="line">import &#123; useState &#125; from &#39;react&#39;</span><br><span class="line"></span><br><span class="line">function InputBox(&#123; onSubmit &#125;) &#123;</span><br><span class="line">  const [value, setValue] &#x3D; useState(&#39;&#39;)</span><br><span class="line">  const [cursorPosition, setCursorPosition] &#x3D; useState(0)</span><br><span class="line"></span><br><span class="line">  useInput((char, key) &#x3D;&gt; &#123;</span><br><span class="line">    if (key.leftArrow) &#123;</span><br><span class="line">      setCursorPosition(Math.max(0, cursorPosition - 1))</span><br><span class="line">    &#125; else if (key.rightArrow) &#123;</span><br><span class="line">      setCursorPosition(Math.min(value.length, cursorPosition + 1))</span><br><span class="line">    &#125; else if (key.backspace) &#123;</span><br><span class="line">      setValue(prev &#x3D;&gt; prev.slice(0, cursorPosition - 1) + prev.slice(cursorPosition))</span><br><span class="line">      setCursorPosition(Math.max(0, cursorPosition - 1))</span><br><span class="line">    &#125; else if (key.return) &#123;</span><br><span class="line">      onSubmit(value)</span><br><span class="line">      setValue(&#39;&#39;)</span><br><span class="line">      setCursorPosition(0)</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">      setValue(prev &#x3D;&gt; prev.slice(0, cursorPosition) + char + prev.slice(cursorPosition))</span><br><span class="line">      setCursorPosition(cursorPosition + 1)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  return (</span><br><span class="line">    &lt;Box borderStyle&#x3D;&quot;single&quot; padding&#x3D;&#123;1&#125;&gt;</span><br><span class="line">      &lt;Text bold&gt;▶ &lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;Text&gt;&#123;value.slice(0, cursorPosition)&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;Text backgroundColor&#x3D;&quot;cyan&quot;&gt;&#123;value[cursorPosition] || &#39; &#39;&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;Text&gt;&#123;value.slice(cursorPosition + 1)&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">    &lt;&#x2F;Box&gt;</span><br><span class="line">  )</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-SelectMenu-实现"><a href="#5-2-SelectMenu-实现" class="headerlink" title="5.2 SelectMenu 实现"></a>5.2 SelectMenu 实现</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; src&#x2F;components&#x2F;SelectMenu.tsx</span><br><span class="line">import &#123; Box, Text, useInput &#125; from &#39;ink&#39;</span><br><span class="line"></span><br><span class="line">function SelectMenu(&#123; items, onSelect &#125;) &#123;</span><br><span class="line">  const [selectedIndex, setSelectedIndex] &#x3D; useState(0)</span><br><span class="line"></span><br><span class="line">  useInput((char, key) &#x3D;&gt; &#123;</span><br><span class="line">    if (key.upArrow) &#123;</span><br><span class="line">      setSelectedIndex(Math.max(0, selectedIndex - 1))</span><br><span class="line">    &#125; else if (key.downArrow) &#123;</span><br><span class="line">      setSelectedIndex(Math.min(items.length - 1, selectedIndex + 1))</span><br><span class="line">    &#125; else if (key.return) &#123;</span><br><span class="line">      onSelect(items[selectedIndex])</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  return (</span><br><span class="line">    &lt;Box flexDirection&#x3D;&quot;column&quot;&gt;</span><br><span class="line">      &#123;items.map((item, index) &#x3D;&gt; (</span><br><span class="line">        &lt;Box key&#x3D;&#123;item.value&#125;&gt;</span><br><span class="line">          &lt;Text color&#x3D;&#123;index &#x3D;&#x3D;&#x3D; selectedIndex ? &#39;cyan&#39; : &#39;gray&#39;&#125;&gt;</span><br><span class="line">            &#123;index &#x3D;&#x3D;&#x3D; selectedIndex ? &#39;▶ &#39; : &#39;  &#39;&#125;</span><br><span class="line">          &lt;&#x2F;Text&gt;</span><br><span class="line">          &lt;Text bold&#x3D;&#123;index &#x3D;&#x3D;&#x3D; selectedIndex&#125;&gt;&#123;item.label&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">        &lt;&#x2F;Box&gt;</span><br><span class="line">      ))&#125;</span><br><span class="line">    &lt;&#x2F;Box&gt;</span><br><span class="line">  )</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="六、工具调用可视化"><a href="#六、工具调用可视化" class="headerlink" title="六、工具调用可视化"></a>六、工具调用可视化</h2><h3 id="6-1-ToolCall-组件"><a href="#6-1-ToolCall-组件" class="headerlink" title="6.1 ToolCall 组件"></a>6.1 ToolCall 组件</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; src&#x2F;components&#x2F;ToolCall.tsx</span><br><span class="line">function ToolCall(&#123; toolName, input, status &#125;) &#123;</span><br><span class="line">  const statusColor &#x3D; &#123;</span><br><span class="line">    pending: &#39;yellow&#39;,</span><br><span class="line">    running: &#39;blue&#39;,</span><br><span class="line">    success: &#39;green&#39;,</span><br><span class="line">    error: &#39;red&#39;,</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  return (</span><br><span class="line">    &lt;Box flexDirection&#x3D;&quot;column&quot; borderStyle&#x3D;&quot;single&quot; borderColor&#x3D;&#123;statusColor[status]&#125;&gt;</span><br><span class="line">      &lt;Box&gt;</span><br><span class="line">        &lt;Text bold color&#x3D;&#123;statusColor[status]&#125;&gt;</span><br><span class="line">          ⚙ &#123;toolName&#125;</span><br><span class="line">        &lt;&#x2F;Text&gt;</span><br><span class="line">        &lt;Text dimColor&gt; (&#123;status&#125;)&lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;&#x2F;Box&gt;</span><br><span class="line">      </span><br><span class="line">      &#123;status &#x3D;&#x3D;&#x3D; &#39;running&#39; &amp;&amp; (</span><br><span class="line">        &lt;Box marginLeft&#x3D;&#123;2&#125;&gt;</span><br><span class="line">          &lt;Text dimColor&gt;Input: &#123;JSON.stringify(input).slice(0, 100)&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">        &lt;&#x2F;Box&gt;</span><br><span class="line">      )&#125;</span><br><span class="line">      </span><br><span class="line">      &#123;status &#x3D;&#x3D;&#x3D; &#39;success&#39; &amp;&amp; (</span><br><span class="line">        &lt;Box marginLeft&#x3D;&#123;2&#125;&gt;</span><br><span class="line">          &lt;Text color&#x3D;&quot;green&quot;&gt;✓ Completed in &#123;duration&#125;ms&lt;&#x2F;Text&gt;</span><br><span class="line">        &lt;&#x2F;Box&gt;</span><br><span class="line">      )&#125;</span><br><span class="line">      </span><br><span class="line">      &#123;status &#x3D;&#x3D;&#x3D; &#39;error&#39; &amp;&amp; (</span><br><span class="line">        &lt;Box marginLeft&#x3D;&#123;2&#125;&gt;</span><br><span class="line">          &lt;Text color&#x3D;&quot;red&quot;&gt;✗ &#123;error.message&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">        &lt;&#x2F;Box&gt;</span><br><span class="line">      )&#125;</span><br><span class="line">    &lt;&#x2F;Box&gt;</span><br><span class="line">  )</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="6-2-ToolResult-组件"><a href="#6-2-ToolResult-组件" class="headerlink" title="6.2 ToolResult 组件"></a>6.2 ToolResult 组件</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; src&#x2F;components&#x2F;ToolResult.tsx</span><br><span class="line">function ToolResult(&#123; output, truncated &#125;) &#123;</span><br><span class="line">  const [expanded, setExpanded] &#x3D; useState(false)</span><br><span class="line">  </span><br><span class="line">  const displayOutput &#x3D; expanded ? output : output.slice(0, 500)</span><br><span class="line">  </span><br><span class="line">  return (</span><br><span class="line">    &lt;Box flexDirection&#x3D;&quot;column&quot;&gt;</span><br><span class="line">      &lt;Box borderStyle&#x3D;&quot;single&quot; borderColor&#x3D;&quot;gray&quot;&gt;</span><br><span class="line">        &lt;Text dimColor&gt;Output:&lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;&#x2F;Box&gt;</span><br><span class="line">      </span><br><span class="line">      &lt;Box padding&#x3D;&#123;1&#125;&gt;</span><br><span class="line">        &lt;Text&gt;&#123;displayOutput&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;&#x2F;Box&gt;</span><br><span class="line">      </span><br><span class="line">      &#123;truncated &amp;&amp; !expanded &amp;&amp; (</span><br><span class="line">        &lt;Box&gt;</span><br><span class="line">          &lt;Text dimColor&gt;... (&#123;output.length - 500&#125; more characters)&lt;&#x2F;Text&gt;</span><br><span class="line">          &lt;Text color&#x3D;&quot;cyan&quot; bold&gt; [Press Enter to expand]&lt;&#x2F;Text&gt;</span><br><span class="line">        &lt;&#x2F;Box&gt;</span><br><span class="line">      )&#125;</span><br><span class="line">    &lt;&#x2F;Box&gt;</span><br><span class="line">  )</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、权限对话框"><a href="#七、权限对话框" class="headerlink" title="七、权限对话框"></a>七、权限对话框</h2><h3 id="7-1-PermissionDialog-组件"><a href="#7-1-PermissionDialog-组件" class="headerlink" title="7.1 PermissionDialog 组件"></a>7.1 PermissionDialog 组件</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; src&#x2F;components&#x2F;PermissionDialog.tsx</span><br><span class="line">function PermissionDialog(&#123; toolName, description, onAllow, onDeny &#125;) &#123;</span><br><span class="line">  const [selected, setSelected] &#x3D; useState&lt;&#39;allow&#39; | &#39;deny&#39;&gt;(&#39;deny&#39;)</span><br><span class="line"></span><br><span class="line">  useInput((char, key) &#x3D;&gt; &#123;</span><br><span class="line">    if (key.leftArrow || key.rightArrow) &#123;</span><br><span class="line">      setSelected(prev &#x3D;&gt; prev &#x3D;&#x3D;&#x3D; &#39;allow&#39; ? &#39;deny&#39; : &#39;allow&#39;)</span><br><span class="line">    &#125; else if (key.return) &#123;</span><br><span class="line">      if (selected &#x3D;&#x3D;&#x3D; &#39;allow&#39;) &#123;</span><br><span class="line">        onAllow()</span><br><span class="line">      &#125; else &#123;</span><br><span class="line">        onDeny()</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  return (</span><br><span class="line">    &lt;Box </span><br><span class="line">      flexDirection&#x3D;&quot;column&quot; </span><br><span class="line">      borderStyle&#x3D;&quot;double&quot; </span><br><span class="line">      borderColor&#x3D;&quot;yellow&quot;</span><br><span class="line">      padding&#x3D;&#123;2&#125;</span><br><span class="line">    &gt;</span><br><span class="line">      &lt;Box&gt;</span><br><span class="line">        &lt;Text bold color&#x3D;&quot;yellow&quot;&gt;⚠ Permission Required&lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;&#x2F;Box&gt;</span><br><span class="line">      </span><br><span class="line">      &lt;Box marginTop&#x3D;&#123;1&#125;&gt;</span><br><span class="line">        &lt;Text&gt;Tool: &lt;Text bold&gt;&#123;toolName&#125;&lt;&#x2F;Text&gt;&lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;&#x2F;Box&gt;</span><br><span class="line">      </span><br><span class="line">      &lt;Box marginTop&#x3D;&#123;1&#125;&gt;</span><br><span class="line">        &lt;Text&gt;&#123;description&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;&#x2F;Box&gt;</span><br><span class="line">      </span><br><span class="line">      &lt;Box marginTop&#x3D;&#123;2&#125; justifyContent&#x3D;&quot;space-around&quot;&gt;</span><br><span class="line">        &lt;Box&gt;</span><br><span class="line">          &lt;Text </span><br><span class="line">            backgroundColor&#x3D;&#123;selected &#x3D;&#x3D;&#x3D; &#39;deny&#39; ? &#39;red&#39; : undefined&#125;</span><br><span class="line">            bold&#x3D;&#123;selected &#x3D;&#x3D;&#x3D; &#39;deny&#39;&#125;</span><br><span class="line">          &gt;</span><br><span class="line">            [Deny]</span><br><span class="line">          &lt;&#x2F;Text&gt;</span><br><span class="line">        &lt;&#x2F;Box&gt;</span><br><span class="line">        &lt;Box&gt;</span><br><span class="line">          &lt;Text </span><br><span class="line">            backgroundColor&#x3D;&#123;selected &#x3D;&#x3D;&#x3D; &#39;allow&#39; ? &#39;green&#39; : undefined&#125;</span><br><span class="line">            bold&#x3D;&#123;selected &#x3D;&#x3D;&#x3D; &#39;allow&#39;&#125;</span><br><span class="line">          &gt;</span><br><span class="line">            [Allow]</span><br><span class="line">          &lt;&#x2F;Text&gt;</span><br><span class="line">        &lt;&#x2F;Box&gt;</span><br><span class="line">      &lt;&#x2F;Box&gt;</span><br><span class="line">      </span><br><span class="line">      &lt;Box marginTop&#x3D;&#123;1&#125;&gt;</span><br><span class="line">        &lt;Text dimColor&gt;← → to select, Enter to confirm&lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;&#x2F;Box&gt;</span><br><span class="line">    &lt;&#x2F;Box&gt;</span><br><span class="line">  )</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="八、非交互模式"><a href="#八、非交互模式" class="headerlink" title="八、非交互模式"></a>八、非交互模式</h2><h3 id="8-1-模式切换"><a href="#8-1-模式切换" class="headerlink" title="8.1 模式切换"></a>8.1 模式切换</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/cli.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">detectInteractiveMode</span>(<span class="params"></span>): <span class="title">boolean</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 检查 stdout 是否是 TTY</span></span><br><span class="line">  <span class="keyword">if</span> (!process.stdout.isTTY) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 2. 检查 CI 环境</span></span><br><span class="line">  <span class="keyword">if</span> (process.env.CI === <span class="string">'true'</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 3. 检查 --non-interactive 参数</span></span><br><span class="line">  <span class="keyword">if</span> (process.argv.includes(<span class="string">'--non-interactive'</span>)) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="8-2-非交互输出"><a href="#8-2-非交互输出" class="headerlink" title="8.2 非交互输出"></a>8.2 非交互输出</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/renderers/nonInteractive.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">renderNonInteractive</span>(<span class="params">message: Message</span>): <span class="title">void</span> </span>&#123;</span><br><span class="line">  <span class="keyword">switch</span> (message.type) &#123;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">'user'</span>:</span><br><span class="line">      <span class="built_in">console</span>.log(<span class="string">`\n&gt; <span class="subst">$&#123;message.content&#125;</span>`</span>)</span><br><span class="line">      <span class="keyword">break</span></span><br><span class="line">      </span><br><span class="line">    <span class="keyword">case</span> <span class="string">'assistant'</span>:</span><br><span class="line">      <span class="built_in">console</span>.log(<span class="string">`\n<span class="subst">$&#123;message.content&#125;</span>`</span>)</span><br><span class="line">      <span class="keyword">break</span></span><br><span class="line">      </span><br><span class="line">    <span class="keyword">case</span> <span class="string">'tool_use'</span>:</span><br><span class="line">      <span class="built_in">console</span>.log(<span class="string">`\n[Tool: <span class="subst">$&#123;message.toolName&#125;</span>]`</span>)</span><br><span class="line">      <span class="keyword">if</span> (message.input) &#123;</span><br><span class="line">        <span class="built_in">console</span>.log(<span class="string">`  Input: <span class="subst">$&#123;<span class="built_in">JSON</span>.stringify(message.input)&#125;</span>`</span>)</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">break</span></span><br><span class="line">      </span><br><span class="line">    <span class="keyword">case</span> <span class="string">'tool_result'</span>:</span><br><span class="line">      <span class="built_in">console</span>.log(<span class="string">`  Result: <span class="subst">$&#123;message.output.slice(<span class="number">0</span>, <span class="number">500</span>)&#125;</span>`</span>)</span><br><span class="line">      <span class="keyword">break</span></span><br><span class="line">      </span><br><span class="line">    <span class="keyword">case</span> <span class="string">'error'</span>:</span><br><span class="line">      <span class="built_in">console</span>.error(<span class="string">`\n[Error] <span class="subst">$&#123;message.message&#125;</span>`</span>)</span><br><span class="line">      <span class="keyword">break</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="九、颜色和样式系统"><a href="#九、颜色和样式系统" class="headerlink" title="九、颜色和样式系统"></a>九、颜色和样式系统</h2><h3 id="9-1-ANSI-颜色映射"><a href="#9-1-ANSI-颜色映射" class="headerlink" title="9.1 ANSI 颜色映射"></a>9.1 ANSI 颜色映射</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/styles/colors.ts</span></span><br><span class="line"><span class="keyword">const</span> COLORS = &#123;</span><br><span class="line">  <span class="comment">// 用户消息</span></span><br><span class="line">  user: <span class="string">'cyan'</span>,</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// AI 响应</span></span><br><span class="line">  assistant: <span class="string">'white'</span>,</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 工具调用</span></span><br><span class="line">  tool_pending: <span class="string">'yellow'</span>,</span><br><span class="line">  tool_running: <span class="string">'blue'</span>,</span><br><span class="line">  tool_success: <span class="string">'green'</span>,</span><br><span class="line">  tool_error: <span class="string">'red'</span>,</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 状态指示</span></span><br><span class="line">  status_active: <span class="string">'green'</span>,</span><br><span class="line">  status_idle: <span class="string">'gray'</span>,</span><br><span class="line">  status_error: <span class="string">'red'</span>,</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 强调</span></span><br><span class="line">  emphasis: <span class="string">'bold'</span>,</span><br><span class="line">  dim: <span class="string">'dim'</span>,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// ANSI 转义序列</span></span><br><span class="line"><span class="keyword">const</span> ANSI_COLORS = &#123;</span><br><span class="line">  cyan: <span class="string">'\x1b[36m'</span>,</span><br><span class="line">  green: <span class="string">'\x1b[32m'</span>,</span><br><span class="line">  red: <span class="string">'\x1b[31m'</span>,</span><br><span class="line">  yellow: <span class="string">'\x1b[33m'</span>,</span><br><span class="line">  blue: <span class="string">'\x1b[34m'</span>,</span><br><span class="line">  gray: <span class="string">'\x1b[90m'</span>,</span><br><span class="line">  bold: <span class="string">'\x1b[1m'</span>,</span><br><span class="line">  dim: <span class="string">'\x1b[2m'</span>,</span><br><span class="line">  reset: <span class="string">'\x1b[0m'</span>,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="9-2-边框样式"><a href="#9-2-边框样式" class="headerlink" title="9.2 边框样式"></a>9.2 边框样式</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ink/lib/borders.ts</span></span><br><span class="line"><span class="keyword">const</span> BORDERS = &#123;</span><br><span class="line">  single: &#123;</span><br><span class="line">    topLeft: <span class="string">'┌'</span>, top: <span class="string">'─'</span>, topRight: <span class="string">'┐'</span>,</span><br><span class="line">    left: <span class="string">'│'</span>, right: <span class="string">'│'</span>,</span><br><span class="line">    bottomLeft: <span class="string">'└'</span>, bottom: <span class="string">'─'</span>, bottomRight: <span class="string">'┘'</span>,</span><br><span class="line">  &#125;,</span><br><span class="line">  double: &#123;</span><br><span class="line">    topLeft: <span class="string">'╔'</span>, top: <span class="string">'═'</span>, topRight: <span class="string">'╗'</span>,</span><br><span class="line">    left: <span class="string">'║'</span>, right: <span class="string">'║'</span>,</span><br><span class="line">    bottomLeft: <span class="string">'╚'</span>, bottom: <span class="string">'═'</span>, bottomRight: <span class="string">'╝'</span>,</span><br><span class="line">  &#125;,</span><br><span class="line">  rounded: &#123;</span><br><span class="line">    topLeft: <span class="string">'╭'</span>, top: <span class="string">'─'</span>, topRight: <span class="string">'╮'</span>,</span><br><span class="line">    left: <span class="string">'│'</span>, right: <span class="string">'│'</span>,</span><br><span class="line">    bottomLeft: <span class="string">'╰'</span>, bottom: <span class="string">'─'</span>, bottomRight: <span class="string">'╯'</span>,</span><br><span class="line">  &#125;,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="十、性能优化"><a href="#十、性能优化" class="headerlink" title="十、性能优化"></a>十、性能优化</h2><h3 id="10-1-渲染节流"><a href="#10-1-渲染节流" class="headerlink" title="10.1 渲染节流"></a>10.1 渲染节流</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ink/lib/renderer.ts</span></span><br><span class="line"><span class="keyword">const</span> RENDER_INTERVAL = <span class="number">16</span>  <span class="comment">// ~60fps</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">scheduleRender</span>(<span class="params">callback: () =&gt; <span class="built_in">void</span></span>): <span class="title">void</span> </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (renderScheduled) &#123;</span><br><span class="line">    <span class="keyword">return</span></span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  renderScheduled = <span class="literal">true</span></span><br><span class="line">  setTimeout(<span class="function"><span class="params">()</span> =&gt;</span> &#123;</span><br><span class="line">    callback()</span><br><span class="line">    renderScheduled = <span class="literal">false</span></span><br><span class="line">  &#125;, RENDER_INTERVAL)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="10-2-虚拟滚动"><a href="#10-2-虚拟滚动" class="headerlink" title="10.2 虚拟滚动"></a>10.2 虚拟滚动</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/components/VirtualList.tsx</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">VirtualList</span>(<span class="params">&#123; items, height &#125;</span>) </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> [scrollTop, setScrollTop] = useState(<span class="number">0</span>)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 只渲染可见区域</span></span><br><span class="line">  <span class="keyword">const</span> visibleStart = scrollTop</span><br><span class="line">  <span class="keyword">const</span> visibleEnd = scrollTop + height</span><br><span class="line">  <span class="keyword">const</span> visibleItems = items.slice(visibleStart, visibleEnd)</span><br><span class="line"></span><br><span class="line">  useInput(<span class="function">(<span class="params">char, key</span>) =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (key.upArrow) &#123;</span><br><span class="line">      setScrollTop(<span class="built_in">Math</span>.max(<span class="number">0</span>, scrollTop - <span class="number">1</span>))</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (key.downArrow) &#123;</span><br><span class="line">      setScrollTop(<span class="built_in">Math</span>.min(items.length - height, scrollTop + <span class="number">1</span>))</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> (</span><br><span class="line">    &lt;Box flexDirection=<span class="string">"column"</span> height=&#123;height&#125;&gt;</span><br><span class="line">      &#123;visibleItems.map(<span class="function">(<span class="params">item, index</span>) =&gt;</span> (</span><br><span class="line">        &lt;Box key=&#123;visibleStart + index&#125;&gt;</span><br><span class="line">          &lt;Text&gt;&#123;item.content&#125;&lt;<span class="regexp">/Text&gt;</span></span><br><span class="line"><span class="regexp">        &lt;/</span>Box&gt;</span><br><span class="line">      ))&#125;</span><br><span class="line">    &lt;<span class="regexp">/Box&gt;</span></span><br><span class="line"><span class="regexp">  )</span></span><br><span class="line"><span class="regexp">&#125;</span></span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="十一、关键源文件索引"><a href="#十一、关键源文件索引" class="headerlink" title="十一、关键源文件索引"></a>十一、关键源文件索引</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/components/App.tsx</code></td>
+<td>主应用入口</td>
+</tr>
+<tr>
+<td><code>src/components/Header.tsx</code></td>
+<td>标题栏和状态指示</td>
+</tr>
+<tr>
+<td><code>src/components/MessageList.tsx</code></td>
+<td>消息列表渲染</td>
+</tr>
+<tr>
+<td><code>src/components/ToolCall.tsx</code></td>
+<td>工具调用可视化</td>
+</tr>
+<tr>
+<td><code>src/components/InputBox.tsx</code></td>
+<td>输入框组件</td>
+</tr>
+<tr>
+<td><code>src/components/PermissionDialog.tsx</code></td>
+<td>权限对话框</td>
+</tr>
+<tr>
+<td><code>src/renderers/nonInteractive.ts</code></td>
+<td>非交互模式渲染</td>
+</tr>
+<tr>
+<td><code>src/styles/colors.ts</code></td>
+<td>颜色系统</td>
+</tr>
+<tr>
+<td><code>ink/lib/renderer.ts</code></td>
+<td>双缓冲渲染引擎</td>
+</tr>
+<tr>
+<td><code>ink/lib/measureText.ts</code></td>
+<td>文字测量</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="十二、总结"><a href="#十二、总结" class="headerlink" title="十二、总结"></a>十二、总结</h2><p>Claude Code 的 Terminal UI 系统体现了几个核心设计原则：</p>
+<ol>
+<li><strong>React 组件化</strong>：复用 React 生态，组件化 UI 设计</li>
+<li><strong>Flexbox 布局</strong>：Yoga 引擎提供完整的 Flexbox 支持</li>
+<li><strong>双缓冲渲染</strong>：避免闪烁，只更新变化的区域</li>
+<li><strong>交互式组件</strong>：InputBox、SelectMenu、PermissionDialog</li>
+<li><strong>非交互模式</strong>：自动检测环境，降级为简单输出</li>
+<li><strong>性能优化</strong>：渲染节流、虚拟滚动</li>
+</ol>
+<p>这个设计让终端应用拥有了 GUI 级别的交互体验，是 Terminal UI 开发的教科书级案例。</p>
+<hr>
+<p><strong>系列文章导航：</strong></p>
+<ul>
+<li>上一篇：<a href="/claude-code-computer-use/">Computer Use：桌面控制的九层安全关卡</a></li>
+<li>系列完结</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Terminal-UI/" rel="tag"><i class="fa fa-tag"></i> Terminal UI</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-system-prompt/" rel="prev" title="System Prompt 工程：动态组装与缓存优化">
+      <i class="fa fa-chevron-left"></i> System Prompt 工程：动态组装与缓存优化
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-context-compression/" rel="next" title="Context 管理：四级压缩与无限对话的秘密">
+      Context 管理：四级压缩与无限对话的秘密 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#导读：终端里的-React-应用"><span class="nav-number">1.</span> <span class="nav-text">导读：终端里的 React 应用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、Ink-框架基础"><span class="nav-number">2.</span> <span class="nav-text">一、Ink 框架基础</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-React-Reconciler-架构"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 React Reconciler 架构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-为什么选择-Ink？"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 为什么选择 Ink？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、核心组件设计"><span class="nav-number">3.</span> <span class="nav-text">二、核心组件设计</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-组件树结构"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 组件树结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-基础组件实现"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 基础组件实现</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、布局系统"><span class="nav-number">4.</span> <span class="nav-text">三、布局系统</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-Yoga-Flexbox"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 Yoga Flexbox</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-文字测量"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 文字测量</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、双缓冲渲染"><span class="nav-number">5.</span> <span class="nav-text">四、双缓冲渲染</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-渲染流程"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 渲染流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-Diff-算法"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 Diff 算法</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、交互式组件"><span class="nav-number">6.</span> <span class="nav-text">五、交互式组件</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-InputBox-实现"><span class="nav-number">6.1.</span> <span class="nav-text">5.1 InputBox 实现</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-SelectMenu-实现"><span class="nav-number">6.2.</span> <span class="nav-text">5.2 SelectMenu 实现</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、工具调用可视化"><span class="nav-number">7.</span> <span class="nav-text">六、工具调用可视化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-ToolCall-组件"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 ToolCall 组件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-ToolResult-组件"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 ToolResult 组件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、权限对话框"><span class="nav-number">8.</span> <span class="nav-text">七、权限对话框</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-PermissionDialog-组件"><span class="nav-number">8.1.</span> <span class="nav-text">7.1 PermissionDialog 组件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、非交互模式"><span class="nav-number">9.</span> <span class="nav-text">八、非交互模式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#8-1-模式切换"><span class="nav-number">9.1.</span> <span class="nav-text">8.1 模式切换</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-2-非交互输出"><span class="nav-number">9.2.</span> <span class="nav-text">8.2 非交互输出</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#九、颜色和样式系统"><span class="nav-number">10.</span> <span class="nav-text">九、颜色和样式系统</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#9-1-ANSI-颜色映射"><span class="nav-number">10.1.</span> <span class="nav-text">9.1 ANSI 颜色映射</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#9-2-边框样式"><span class="nav-number">10.2.</span> <span class="nav-text">9.2 边框样式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#十、性能优化"><span class="nav-number">11.</span> <span class="nav-text">十、性能优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#10-1-渲染节流"><span class="nav-number">11.1.</span> <span class="nav-text">10.1 渲染节流</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#10-2-虚拟滚动"><span class="nav-number">11.2.</span> <span class="nav-text">10.2 虚拟滚动</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#十一、关键源文件索引"><span class="nav-number">12.</span> <span class="nav-text">十一、关键源文件索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#十二、总结"><span class="nav-number">13.</span> <span class="nav-text">十二、总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">62</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">9</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">37</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>

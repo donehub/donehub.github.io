@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="让 Claude Code 跨会话记住你是谁、你偏好什么、项目正在发生什么——这是 Memory 系统的核心目标。它不是简单的聊天记录持久化，而是一个结构化的知识管理系统，通过四种记忆类型、自动提取机制、团队同步等功能，让 AI 真正”理解”你。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Memory 系统：跨会话持久化知识库">
+<meta property="og:url" content="https://donehub.github.io/2026/04/06/claude-code-memory-system/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="让 Claude Code 跨会话记住你是谁、你偏好什么、项目正在发生什么——这是 Memory 系统的核心目标。它不是简单的聊天记录持久化，而是一个结构化的知识管理系统，通过四种记忆类型、自动提取机制、团队同步等功能，让 AI 真正”理解”你。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-04-05T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-06T06:28:37.686Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Memory">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/04/06/claude-code-memory-system/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Memory 系统：跨会话持久化知识库 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-memory-system/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Memory 系统：跨会话持久化知识库
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:37" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/04/06/claude-code-memory-system/" class="post-meta-item leancloud_visitors" data-flag-title="Memory 系统：跨会话持久化知识库" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/claude-code-memory-system/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-memory-system/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>让 Claude Code 跨会话记住你是谁、你偏好什么、项目正在发生什么——这是 Memory 系统的核心目标。它不是简单的聊天记录持久化，而是一个结构化的知识管理系统，通过四种记忆类型、自动提取机制、团队同步等功能，让 AI 真正”理解”你。</p>
+</blockquote>
+<a id="more"></a>
+<h2 id="导读：为什么需要-Memory？"><a href="#导读：为什么需要-Memory？" class="headerlink" title="导读：为什么需要 Memory？"></a>导读：为什么需要 Memory？</h2><p>假设你今天让 Claude Code 帮你重构代码，明天让它继续优化。如果没有 Memory：</p>
+<ul>
+<li>Claude 不知道你昨天做了什么</li>
+<li>Claude 不知道你的编码风格偏好</li>
+<li>Claude 不知道项目正在进行的决策</li>
+</ul>
+<p>每次对话都从零开始，这是 AI 编程助手的一个根本性限制。</p>
+<p>Claude Code 的 Memory 系统解决了这个问题：<strong>让 AI 跨会话积累知识</strong>。</p>
+<hr>
+<h2 id="一、四种记忆类型"><a href="#一、四种记忆类型" class="headerlink" title="一、四种记忆类型"></a>一、四种记忆类型</h2><h3 id="1-1-类型定义"><a href="#1-1-类型定义" class="headerlink" title="1.1 类型定义"></a>1.1 类型定义</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────┐</span><br><span class="line">│                   四种记忆类型                        │</span><br><span class="line">├─────────────────────────────────────────────────────┤</span><br><span class="line">│                                                     │</span><br><span class="line">│  User（用户画像）                                    │</span><br><span class="line">│    └─ 角色、目标、技能水平、偏好                     │</span><br><span class="line">│    └─ 示例：&quot;用户是数据科学家，关注日志系统&quot;        │</span><br><span class="line">│                                                     │</span><br><span class="line">│  Feedback（行为反馈）                                │</span><br><span class="line">│    └─ 对 Claude 工作方式的纠正或肯定                │</span><br><span class="line">│    └─ 示例：&quot;集成测试用真实数据库，不用 mock&quot;        │</span><br><span class="line">│                                                     │</span><br><span class="line">│  Project（项目动态）                                 │</span><br><span class="line">│    └─ 谁在做什么、为什么、截止日期                  │</span><br><span class="line">│    └─ 示例：&quot;3&#x2F;5 起合并冻结，移动团队发版&quot;          │</span><br><span class="line">│                                                     │</span><br><span class="line">│  Reference（外部引用）                               │</span><br><span class="line">│    └─ 外部系统指针：仪表板、工单系统、Slack 频道    │</span><br><span class="line">│    └─ 示例：&quot;Pipeline bug 在 Linear &#39;INGEST&#39; 项目&quot;  │</span><br><span class="line">│                                                     │</span><br><span class="line">└─────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<h3 id="1-2-不存储的内容"><a href="#1-2-不存储的内容" class="headerlink" title="1.2 不存储的内容"></a>1.2 不存储的内容</h3><p>Memory 系统有一个核心原则：<strong>只记住无法从代码中推断出来的东西</strong>。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>记住</th>
+<th>不记住</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>你是数据科学家，关注日志系统</td>
+<td>代码架构、文件结构</td>
+</tr>
+<tr>
+<td>“不要 mock 数据库”</td>
+<td>Git 历史、谁改了什么</td>
+</tr>
+<tr>
+<td>周四后冻结非关键合并</td>
+<td>已有的 CLAUDE.md 内容</td>
+</tr>
+<tr>
+<td>Bug 跟踪在 Linear 的 INGEST 项目</td>
+<td>调试方案（修复已在代码里）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="二、Memory-存储格式"><a href="#二、Memory-存储格式" class="headerlink" title="二、Memory 存储格式"></a>二、Memory 存储格式</h2><h3 id="2-1-文件结构"><a href="#2-1-文件结构" class="headerlink" title="2.1 文件结构"></a>2.1 文件结构</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">~&#x2F;.claude&#x2F;</span><br><span class="line">└── projects&#x2F;</span><br><span class="line">    └── &#123;项目路径哈希&#125;&#x2F;</span><br><span class="line">        └── memory&#x2F;                    ← 自动记忆目录</span><br><span class="line">            ├── MEMORY.md              ← 索引文件</span><br><span class="line">            ├── user_role.md           ← 用户画像记忆</span><br><span class="line">            ├── feedback_testing.md    ← 行为反馈记忆</span><br><span class="line">            ├── project_freeze.md      ← 项目动态记忆</span><br><span class="line">            ├── reference_linear.md    ← 外部引用记忆</span><br><span class="line">            └── team&#x2F;                  ← 团队共享记忆</span><br><span class="line">                ├── MEMORY.md</span><br><span class="line">                └── ...</span><br></pre></td></tr></table></figure>
+<h3 id="2-2-记忆文件格式"><a href="#2-2-记忆文件格式" class="headerlink" title="2.2 记忆文件格式"></a>2.2 记忆文件格式</h3><p>每个记忆文件使用 YAML frontmatter + Markdown：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">---</span><br><span class="line">name: testing_policy</span><br><span class="line">description: 集成测试必须用真实数据库，不能用 mock</span><br><span class="line">type: feedback</span><br><span class="line">---</span><br><span class="line"></span><br><span class="line"><span class="strong">**规则：**</span> 集成测试必须连接真实数据库，禁止使用 mock。</span><br><span class="line"></span><br><span class="line"><span class="strong">**Why:**</span> 去年第四季度出现过 mock 测试通过但生产迁移失败的问题。</span><br><span class="line"></span><br><span class="line"><span class="strong">**How to apply:**</span> 所有标记为 integration test 的测试文件都要使用测试数据库连接。</span><br></pre></td></tr></table></figure>
+<h3 id="2-3-MEMORY-md-索引文件"><a href="#2-3-MEMORY-md-索引文件" class="headerlink" title="2.3 MEMORY.md 索引文件"></a>2.3 MEMORY.md 索引文件</h3><p>MEMORY.md 是索引而不是内容，它<strong>始终加载到上下文</strong>中：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># Memory Index</span></span><br><span class="line"></span><br><span class="line"><span class="bullet">- </span>[<span class="string">用户角色</span>](<span class="link">user_role.md</span>) — 数据科学家，关注可观测性/日志</span><br><span class="line"><span class="bullet">- </span>[<span class="string">测试策略</span>](<span class="link">feedback_testing.md</span>) — 集成测试用真实数据库，不 mock</span><br><span class="line"><span class="bullet">- </span>[<span class="string">合并冻结</span>](<span class="link">project_freeze.md</span>) — 2026-03-05 起冻结非关键合并</span><br><span class="line"><span class="bullet">- </span>[<span class="string">Bug 追踪</span>](<span class="link">reference_linear.md</span>) — 流水线 bug 在 Linear INGEST 项目</span><br></pre></td></tr></table></figure>
+<p><strong>限制</strong>：最多 200 行或 25KB，超出会被截断。</p>
+<hr>
+<h2 id="三、Memory-提取机制"><a href="#三、Memory-提取机制" class="headerlink" title="三、Memory 提取机制"></a>三、Memory 提取机制</h2><h3 id="3-1-自动提取流程"><a href="#3-1-自动提取流程" class="headerlink" title="3.1 自动提取流程"></a>3.1 自动提取流程</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">触发时机：每次模型完成回复（无 tool_use）时</span><br><span class="line">         ↓</span><br><span class="line">守卫检查：主代理？功能门控开启？自动记忆启用？</span><br><span class="line">         ↓</span><br><span class="line">频率控制：turnsSinceLastExtraction++ (默认每 1 次)</span><br><span class="line">         ↓</span><br><span class="line">互斥检查：主代理自己写了记忆？→ 跳过</span><br><span class="line">         ↓</span><br><span class="line">扫描现有记忆 → 生成清单</span><br><span class="line">         ↓</span><br><span class="line">运行分叉代理（runForkedAgent）</span><br><span class="line">  - 共享父会话提示词缓存</span><br><span class="line">  - 最多 5 个 turn</span><br><span class="line">  - 限制工具权限</span><br><span class="line">         ↓</span><br><span class="line">写入新记忆文件 + 更新 MEMORY.md</span><br><span class="line">         ↓</span><br><span class="line">通知用户：&quot;Memory updated in ...&quot;</span><br></pre></td></tr></table></figure>
+<h3 id="3-2-工具权限限制"><a href="#3-2-工具权限限制" class="headerlink" title="3.2 工具权限限制"></a>3.2 工具权限限制</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/extractMemories/extractMemories.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">createAutoMemCanUseTool</span>(<span class="params">memoryDir: <span class="built_in">string</span></span>): <span class="title">CanUseToolFn</span> </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="function">(<span class="params">toolName, input</span>) =&gt;</span> &#123;</span><br><span class="line">    <span class="comment">// ✅ 允许：Read, Grep, Glob（无限制）</span></span><br><span class="line">    <span class="keyword">if</span> ([<span class="string">'Read'</span>, <span class="string">'Grep'</span>, <span class="string">'Glob'</span>].includes(toolName)) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// ✅ 允许：Bash（只读命令：ls, find, grep, cat...）</span></span><br><span class="line">    <span class="keyword">if</span> (toolName === <span class="string">'Bash'</span> &amp;&amp; isReadOnlyCommand(input.command)) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// ✅ 允许：Edit/Write（仅 auto-memory 目录内）</span></span><br><span class="line">    <span class="keyword">if</span> ([<span class="string">'Edit'</span>, <span class="string">'Write'</span>].includes(toolName)) &#123;</span><br><span class="line">      <span class="keyword">return</span> isInsideMemoryDir(input.file_path, memoryDir)</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// ❌ 拒绝：MCP, Agent, 非只读 Bash</span></span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="3-3-互斥机制"><a href="#3-3-互斥机制" class="headerlink" title="3.3 互斥机制"></a>3.3 互斥机制</h3><p>防止重复保存：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">hasMemoryWritesSince</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  messages: Message[],</span></span></span><br><span class="line"><span class="function"><span class="params">  sinceUuid: <span class="built_in">string</span>,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">boolean</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 扫描 sinceUuid 之后的所有 assistant 消息</span></span><br><span class="line">  <span class="comment">// 如果有任何 Edit/Write 指向 auto-memory 目录 → return true</span></span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> msg of messages) &#123;</span><br><span class="line">    <span class="keyword">if</span> (msg.uuid === sinceUuid) <span class="keyword">break</span></span><br><span class="line">    <span class="keyword">if</span> (msg.type === <span class="string">'assistant'</span>) &#123;</span><br><span class="line">      <span class="keyword">for</span> (<span class="keyword">const</span> block of msg.content) &#123;</span><br><span class="line">        <span class="keyword">if</span> (block.type === <span class="string">'tool_use'</span> &amp;&amp; </span><br><span class="line">            [<span class="string">'Edit'</span>, <span class="string">'Write'</span>].includes(block.name) &amp;&amp;</span><br><span class="line">            isMemoryPath(block.input.file_path)) &#123;</span><br><span class="line">          <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="四、Memory-在-Prompt-中的使用"><a href="#四、Memory-在-Prompt-中的使用" class="headerlink" title="四、Memory 在 Prompt 中的使用"></a>四、Memory 在 Prompt 中的使用</h2><h3 id="4-1-系统提示词注入"><a href="#4-1-系统提示词注入" class="headerlink" title="4.1 系统提示词注入"></a>4.1 系统提示词注入</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/memdir/memdir.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">loadMemoryPrompt</span>(<span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">string</span> | <span class="title">null</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> sections = []</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 1. 记忆类型说明</span></span><br><span class="line">  sections.push(<span class="string">`## Types of memory`</span>)</span><br><span class="line">  sections.push(...getMemoryTypeDescriptions())</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 不存储的内容</span></span><br><span class="line">  sections.push(<span class="string">`## What NOT to save`</span>)</span><br><span class="line">  sections.push(...getWhatNotToSaveList())</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 如何保存记忆</span></span><br><span class="line">  sections.push(<span class="string">`## How to save memories`</span>)</span><br><span class="line">  sections.push(getSaveInstructions())</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 何时查阅记忆</span></span><br><span class="line">  sections.push(<span class="string">`## When to access memories`</span>)</span><br><span class="line">  sections.push(getAccessGuidelines())</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 5. 引用前验证</span></span><br><span class="line">  sections.push(<span class="string">`## Before recommending`</span>)</span><br><span class="line">  sections.push(getValidationGuidelines())</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 6. MEMORY.md 索引内容</span></span><br><span class="line">  sections.push(<span class="string">`## MEMORY.md`</span>)</span><br><span class="line">  sections.push(<span class="keyword">await</span> loadMemoryIndex())</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> sections.join(<span class="string">'\n\n'</span>)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="4-2-智能检索"><a href="#4-2-智能检索" class="headerlink" title="4.2 智能检索"></a>4.2 智能检索</h3><p>每次用户查询时动态选择相关记忆：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/memdir/findRelevantMemories.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">findRelevantMemories</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  query: <span class="built_in">string</span>,</span></span></span><br><span class="line"><span class="function"><span class="params">  memoryDir: <span class="built_in">string</span>,</span></span></span><br><span class="line"><span class="function"><span class="params">  recentTools: <span class="built_in">string</span>[] = [],</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">RelevantMemory</span>[]&gt; </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 扫描所有 .md 文件（排除 MEMORY.md）</span></span><br><span class="line">  <span class="keyword">const</span> files = <span class="keyword">await</span> scanMemoryFiles(memoryDir)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 解析 frontmatter（前 30 行）</span></span><br><span class="line">  <span class="keyword">const</span> candidates = <span class="keyword">await</span> <span class="built_in">Promise</span>.all(</span><br><span class="line">    files.map(<span class="function"><span class="params">f</span> =&gt;</span> parseMemoryFile(f))</span><br><span class="line">  )</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. Sonnet 模型选择</span></span><br><span class="line">  <span class="keyword">const</span> selected = <span class="keyword">await</span> sideQuery(&#123;</span><br><span class="line">    model: <span class="string">'claude-sonnet-4-5'</span>,</span><br><span class="line">    systemPrompt: MEMORY_SELECTOR_PROMPT,</span><br><span class="line">    messages: [&#123; role: <span class="string">'user'</span>, content: query &#125;],</span><br><span class="line">    context: &#123; candidates, recentTools &#125;,</span><br><span class="line">  &#125;)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 返回选中记忆</span></span><br><span class="line">  <span class="keyword">return</span> selected.map(<span class="function"><span class="params">s</span> =&gt;</span> (&#123; path: s.path, mtimeMs: s.mtimeMs &#125;))</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>Sonnet 选择器提示词</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">你是记忆选择器。从候选记忆中选择对处理用户查询有用的记忆。</span><br><span class="line"></span><br><span class="line">规则：</span><br><span class="line">- 最多选 5 个</span><br><span class="line">- 不确定是否有用就不要选</span><br><span class="line">- 如果提供了最近使用的工具列表，不要选这些工具的使用文档</span><br><span class="line">  （但要选择关于这些工具的警告&#x2F;陷阱&#x2F;已知问题）</span><br><span class="line"></span><br><span class="line">返回格式：</span><br><span class="line">- memory_path: 选择原因</span><br></pre></td></tr></table></figure>
+<h3 id="4-3-新鲜度警告"><a href="#4-3-新鲜度警告" class="headerlink" title="4.3 新鲜度警告"></a>4.3 新鲜度警告</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">memoryFreshnessText</span>(<span class="params">mtimeMs: <span class="built_in">number</span></span>): <span class="title">string</span> </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> days = memoryAgeDays(mtimeMs)</span><br><span class="line">  <span class="keyword">if</span> (days &lt;= <span class="number">1</span>) <span class="keyword">return</span> <span class="string">''</span>  <span class="comment">// 今天/昨天：无警告</span></span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> <span class="string">`This memory is <span class="subst">$&#123;days&#125;</span> days old. Memories are point-in-time </span></span><br><span class="line"><span class="string">observations that may become stale. Verify against current code before </span></span><br><span class="line"><span class="string">asserting as fact.`</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="五、团队-Memory-同步"><a href="#五、团队-Memory-同步" class="headerlink" title="五、团队 Memory 同步"></a>五、团队 Memory 同步</h2><h3 id="5-1-API-端点"><a href="#5-1-API-端点" class="headerlink" title="5.1 API 端点"></a>5.1 API 端点</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">GET  &#x2F;api&#x2F;claude_code&#x2F;team_memory?repo&#x3D;&#123;owner&#x2F;repo&#125;  ← 拉取</span><br><span class="line">PUT  &#x2F;api&#x2F;claude_code&#x2F;team_memory?repo&#x3D;&#123;owner&#x2F;repo&#125;  ← 推送</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-同步语义"><a href="#5-2-同步语义" class="headerlink" title="5.2 同步语义"></a>5.2 同步语义</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pull</strong></td>
+<td>服务器内容覆盖本地文件（服务器优先）</td>
+</tr>
+<tr>
+<td><strong>Push</strong></td>
+<td>仅上传内容哈希不同的键（delta 上传）</td>
+</tr>
+<tr>
+<td><strong>删除</strong></td>
+<td>本地删除不会删除远程（下次 pull 会恢复）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="5-3-冲突解决"><a href="#5-3-冲突解决" class="headerlink" title="5.3 冲突解决"></a>5.3 冲突解决</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">pushTeamMemory</span>(<span class="params">state</span>): <span class="title">Promise</span>&lt;<span class="title">PushResult</span>&gt; </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 读取本地文件 → 计算哈希</span></span><br><span class="line">  <span class="keyword">const</span> localFiles = <span class="keyword">await</span> readLocalMemoryFiles()</span><br><span class="line">  <span class="keyword">const</span> localHashes = computeHashes(localFiles)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 对比 serverChecksums → 生成 delta</span></span><br><span class="line">  <span class="keyword">const</span> delta = computeDelta(localHashes, state.serverChecksums)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 上传 delta</span></span><br><span class="line">  <span class="keyword">const</span> response = <span class="keyword">await</span> api.pushTeamMemory(delta)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 遇到 412 冲突：</span></span><br><span class="line">  <span class="keyword">if</span> (response.status === <span class="number">412</span>) &#123;</span><br><span class="line">    <span class="comment">// 探测 GET ?view=hashes 获取最新 checksums</span></span><br><span class="line">    <span class="keyword">const</span> latest = <span class="keyword">await</span> api.getTeamMemoryHashes()</span><br><span class="line">    <span class="comment">// 重新计算 delta（排除队友已推送的相同内容）</span></span><br><span class="line">    <span class="keyword">const</span> newDelta = recomputeDelta(localHashes, latest)</span><br><span class="line">    <span class="comment">// 重试（最多 2 次）</span></span><br><span class="line">    <span class="keyword">return</span> pushTeamMemory(&#123; ...state, serverChecksums: latest &#125;)</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> &#123; success: <span class="literal">true</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="5-4-安全限制"><a href="#5-4-安全限制" class="headerlink" title="5.4 安全限制"></a>5.4 安全限制</h3><ul>
+<li><strong>单文件最大</strong>：250KB</li>
+<li><strong>上传体最大</strong>：200KB（分批上传）</li>
+<li><strong>秘密扫描</strong>：使用 gitleaks 规则扫描凭证，检测到则跳过该文件</li>
+</ul>
+<hr>
+<h2 id="六、AutoDream：后台记忆整合"><a href="#六、AutoDream：后台记忆整合" class="headerlink" title="六、AutoDream：后台记忆整合"></a>六、AutoDream：后台记忆整合</h2><h3 id="6-1-触发条件"><a href="#6-1-触发条件" class="headerlink" title="6.1 触发条件"></a>6.1 触发条件</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/autoDream/autoDream.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">shouldTriggerAutoDream</span>(<span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">boolean</span>&gt; </span>&#123;</span><br><span class="line">  <span class="comment">// 四重门控</span></span><br><span class="line">  <span class="keyword">if</span> (hoursSinceLastConsolidation &lt; minHours) <span class="keyword">return</span> <span class="literal">false</span>  <span class="comment">// 时间门：默认 24h</span></span><br><span class="line">  <span class="keyword">if</span> (sessionsSinceLastConsolidation &lt; minSessions) <span class="keyword">return</span> <span class="literal">false</span>  <span class="comment">// 会话门：默认 5 次</span></span><br><span class="line">  <span class="keyword">if</span> (otherProcessConsolidating) <span class="keyword">return</span> <span class="literal">false</span>  <span class="comment">// 锁门：互斥</span></span><br><span class="line">  <span class="keyword">if</span> (timeSinceLastScan &lt; <span class="number">10</span> * <span class="number">60</span> * <span class="number">1000</span>) <span class="keyword">return</span> <span class="literal">false</span>  <span class="comment">// 扫描节流：10 分钟</span></span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="6-2-四阶段流程"><a href="#6-2-四阶段流程" class="headerlink" title="6.2 四阶段流程"></a>6.2 四阶段流程</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────┐</span><br><span class="line">│              AutoDream 四阶段流程                    │</span><br><span class="line">├─────────────────────────────────────────────────────┤</span><br><span class="line">│                                                     │</span><br><span class="line">│  Phase 1: 定向（Orientation）                       │</span><br><span class="line">│    └─ 确定要审查的会话列表                          │</span><br><span class="line">│                                                     │</span><br><span class="line">│  Phase 2: 收集（Collection）                        │</span><br><span class="line">│    └─ 从会话中提取候选记忆                          │</span><br><span class="line">│                                                     │</span><br><span class="line">│  Phase 3: 整合（Consolidation）                     │</span><br><span class="line">│    └─ 合并、去重、更新记忆文件                      │</span><br><span class="line">│                                                     │</span><br><span class="line">│  Phase 4: 修剪（Pruning）                           │</span><br><span class="line">│    └─ 删除过时或重复的记忆                          │</span><br><span class="line">│                                                     │</span><br><span class="line">└─────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<h3 id="6-3-DreamTask-状态"><a href="#6-3-DreamTask-状态" class="headerlink" title="6.3 DreamTask 状态"></a>6.3 DreamTask 状态</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> DreamTaskState = &#123;</span><br><span class="line">  <span class="keyword">type</span>: <span class="string">'dream'</span></span><br><span class="line">  phase: <span class="string">'starting'</span> | <span class="string">'updating'</span>  <span class="comment">// updating = 已开始编辑文件</span></span><br><span class="line">  sessionsReviewing: <span class="built_in">number</span>       <span class="comment">// 正在审查的会话数</span></span><br><span class="line">  filesTouched: <span class="built_in">string</span>[]          <span class="comment">// 编辑过的文件路径</span></span><br><span class="line">  turns: DreamTurn[]              <span class="comment">// 对话轮次记录</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、关键源文件索引"><a href="#七、关键源文件索引" class="headerlink" title="七、关键源文件索引"></a>七、关键源文件索引</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/memdir/paths.ts</code></td>
+<td>路径解析，优先级链</td>
+</tr>
+<tr>
+<td><code>src/memdir/memdir.ts</code></td>
+<td>提示词构建，MEMORY.md 截断</td>
+</tr>
+<tr>
+<td><code>src/memdir/memoryScan.ts</code></td>
+<td>扫描目录、解析 frontmatter</td>
+</tr>
+<tr>
+<td><code>src/memdir/memoryTypes.ts</code></td>
+<td>四种记忆类型定义</td>
+</tr>
+<tr>
+<td><code>src/memdir/findRelevantMemories.ts</code></td>
+<td>Sonnet 智能检索</td>
+</tr>
+<tr>
+<td><code>src/services/extractMemories/</code></td>
+<td>自动提取服务</td>
+</tr>
+<tr>
+<td><code>src/services/teamMemorySync/</code></td>
+<td>团队记忆同步</td>
+</tr>
+<tr>
+<td><code>src/services/autoDream/</code></td>
+<td>AutoDream 后台整合</td>
+</tr>
+<tr>
+<td><code>src/utils/frontmatterParser.ts</code></td>
+<td>YAML frontmatter 解析</td>
+</tr>
+<tr>
+<td><code>src/components/memory/</code></td>
+<td>UI 组件</td>
+</tr>
+<tr>
+<td><code>src/commands/memory/</code></td>
+<td><code>/memory</code> 命令</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="八、总结"><a href="#八、总结" class="headerlink" title="八、总结"></a>八、总结</h2><p>Claude Code 的 Memory 系统体现了几个核心设计原则：</p>
+<ol>
+<li><strong>结构化知识</strong>：四种记忆类型，避免信息混淆</li>
+<li><strong>自动提取</strong>：后台智能分析对话，提取有价值信息</li>
+<li><strong>智能检索</strong>：Sonnet 模型动态选择相关记忆</li>
+<li><strong>新鲜度管理</strong>：旧记忆附带警告，使用前需验证</li>
+<li><strong>团队同步</strong>：服务器优先语义，支持协作</li>
+<li><strong>AutoDream</strong>：后台”做梦”整理记忆</li>
+</ol>
+<p>这个设计让 AI 真正能够”记住”用户，而不是每次都从零开始。</p>
+<hr>
+<p><strong>系列文章导航：</strong></p>
+<ul>
+<li>上一篇：<a href="/claude-code-permission-security/">权限与安全：分层模型与人机协作</a></li>
+<li>下一篇：<a href="/claude-code-channel-system/">Channel 系统：IM 远程控制 Agent</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Memory/" rel="tag"><i class="fa fa-tag"></i> Memory</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-permission-security/" rel="prev" title="权限与安全：分层模型与人机协作">
+      <i class="fa fa-chevron-left"></i> 权限与安全：分层模型与人机协作
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-skills-system/" rel="next" title="Skills 系统：条件激活与动态发现">
+      Skills 系统：条件激活与动态发现 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#导读：为什么需要-Memory？"><span class="nav-number">1.</span> <span class="nav-text">导读：为什么需要 Memory？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、四种记忆类型"><span class="nav-number">2.</span> <span class="nav-text">一、四种记忆类型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-类型定义"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 类型定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-不存储的内容"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 不存储的内容</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、Memory-存储格式"><span class="nav-number">3.</span> <span class="nav-text">二、Memory 存储格式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-文件结构"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 文件结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-记忆文件格式"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 记忆文件格式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-MEMORY-md-索引文件"><span class="nav-number">3.3.</span> <span class="nav-text">2.3 MEMORY.md 索引文件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、Memory-提取机制"><span class="nav-number">4.</span> <span class="nav-text">三、Memory 提取机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-自动提取流程"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 自动提取流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-工具权限限制"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 工具权限限制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-互斥机制"><span class="nav-number">4.3.</span> <span class="nav-text">3.3 互斥机制</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、Memory-在-Prompt-中的使用"><span class="nav-number">5.</span> <span class="nav-text">四、Memory 在 Prompt 中的使用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-系统提示词注入"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 系统提示词注入</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-智能检索"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 智能检索</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-新鲜度警告"><span class="nav-number">5.3.</span> <span class="nav-text">4.3 新鲜度警告</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、团队-Memory-同步"><span class="nav-number">6.</span> <span class="nav-text">五、团队 Memory 同步</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-API-端点"><span class="nav-number">6.1.</span> <span class="nav-text">5.1 API 端点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-同步语义"><span class="nav-number">6.2.</span> <span class="nav-text">5.2 同步语义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-冲突解决"><span class="nav-number">6.3.</span> <span class="nav-text">5.3 冲突解决</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-4-安全限制"><span class="nav-number">6.4.</span> <span class="nav-text">5.4 安全限制</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、AutoDream：后台记忆整合"><span class="nav-number">7.</span> <span class="nav-text">六、AutoDream：后台记忆整合</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-触发条件"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 触发条件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-四阶段流程"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 四阶段流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-DreamTask-状态"><span class="nav-number">7.3.</span> <span class="nav-text">6.3 DreamTask 状态</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、关键源文件索引"><span class="nav-number">8.</span> <span class="nav-text">七、关键源文件索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、总结"><span class="nav-number">9.</span> <span class="nav-text">八、总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">62</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">9</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">37</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>

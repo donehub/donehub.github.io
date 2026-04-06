@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="AI Agent 执行命令、修改文件、访问网络——这些都是高风险操作。Claude Code 的权限系统设计了一个分层的决策模型：规则 → 模式 → 钩子 → 分类器 → 用户确认。每一层都可以独立中断工具调用，确保安全性。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="权限与安全：分层模型与人机协作">
+<meta property="og:url" content="https://donehub.github.io/2026/04/06/claude-code-permission-security/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="AI Agent 执行命令、修改文件、访问网络——这些都是高风险操作。Claude Code 的权限系统设计了一个分层的决策模型：规则 → 模式 → 钩子 → 分类器 → 用户确认。每一层都可以独立中断工具调用，确保安全性。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-04-05T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-06T06:28:36.660Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Permission">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/04/06/claude-code-permission-security/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>权限与安全：分层模型与人机协作 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-permission-security/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          权限与安全：分层模型与人机协作
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:36" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/04/06/claude-code-permission-security/" class="post-meta-item leancloud_visitors" data-flag-title="权限与安全：分层模型与人机协作" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/claude-code-permission-security/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-permission-security/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>AI Agent 执行命令、修改文件、访问网络——这些都是高风险操作。Claude Code 的权限系统设计了一个分层的决策模型：规则 → 模式 → 钩子 → 分类器 → 用户确认。每一层都可以独立中断工具调用，确保安全性。</p>
+</blockquote>
+<a id="more"></a>
+<h2 id="导读：为什么权限如此重要？"><a href="#导读：为什么权限如此重要？" class="headerlink" title="导读：为什么权限如此重要？"></a>导读：为什么权限如此重要？</h2><p>想象这个场景：</p>
+<blockquote>
+<p>AI Agent 正在帮你重构代码，突然它执行了 <code>rm -rf node_modules</code>。</p>
+</blockquote>
+<p>如果没有权限检查，这个命令会直接执行，删除所有依赖。但在 Claude Code 中，这个命令会触发：</p>
+<ol>
+<li><strong>规则检查</strong>：匹配 deny 规则？<code>rm -rf *</code> 通常是 deny 的</li>
+<li><strong>模式检查</strong>：当前是什么权限模式？<code>default</code> 模式需要确认</li>
+<li><strong>钩子检查</strong>：PreToolUse 钩子是否拦截？</li>
+<li><strong>分类器检查</strong>：安全分类器是否判定为危险？</li>
+<li><strong>用户确认</strong>：弹出对话框，让用户决定</li>
+</ol>
+<p>每一层都是独立的防线，确保危险操作不会静默执行。</p>
+<hr>
+<h2 id="一、分层权限模型"><a href="#一、分层权限模型" class="headerlink" title="一、分层权限模型"></a>一、分层权限模型</h2><h3 id="1-1-权限决策层级"><a href="#1-1-权限决策层级" class="headerlink" title="1.1 权限决策层级"></a>1.1 权限决策层级</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────┐</span><br><span class="line">│         权限规则（Rules）             │</span><br><span class="line">│  来源：userSettings, projectSettings │</span><br><span class="line">│        flagSettings, policySettings  │</span><br><span class="line">├─────────────────────────────────────┤</span><br><span class="line">│        权限模式（Modes）              │</span><br><span class="line">│  default | plan | acceptEdits       │</span><br><span class="line">│  bypassPermissions | auto | bubble  │</span><br><span class="line">├─────────────────────────────────────┤</span><br><span class="line">│         钩子（Hooks）                │</span><br><span class="line">│  PreToolUse 可拦截或修改            │</span><br><span class="line">├─────────────────────────────────────┤</span><br><span class="line">│      安全分类器（Classifier）         │</span><br><span class="line">│  ML 模型评估工具调用安全性           │</span><br><span class="line">├─────────────────────────────────────┤</span><br><span class="line">│         用户确认                     │</span><br><span class="line">│  弹出对话框，展示详细信息            │</span><br><span class="line">└─────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<h3 id="1-2-权限模式详解"><a href="#1-2-权限模式详解" class="headerlink" title="1.2 权限模式详解"></a>1.2 权限模式详解</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/types/permissions.ts</span></span><br><span class="line"><span class="keyword">type</span> PermissionMode =</span><br><span class="line">  | <span class="string">'acceptEdits'</span>      <span class="comment">// 工作目录内编辑自动允许</span></span><br><span class="line">  | <span class="string">'bypassPermissions'</span> <span class="comment">// 完全绕过权限</span></span><br><span class="line">  | <span class="string">'default'</span>          <span class="comment">// 默认模式，需要审批</span></span><br><span class="line">  | <span class="string">'dontAsk'</span>          <span class="comment">// 自动拒绝</span></span><br><span class="line">  | <span class="string">'plan'</span>             <span class="comment">// 计划模式</span></span><br><span class="line">  | <span class="string">'auto'</span>             <span class="comment">// 自动模式（AI 分类器决策）</span></span><br><span class="line">  | <span class="string">'bubble'</span>           <span class="comment">// 内部模式（权限冒泡到父代理）</span></span><br></pre></td></tr></table></figure>
+<p><strong>模式行为表</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>读操作</th>
+<th>写操作</th>
+<th>危险操作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>default</code></td>
+<td>可能询问</td>
+<td>询问</td>
+<td>询问</td>
+</tr>
+<tr>
+<td><code>acceptEdits</code></td>
+<td>自动</td>
+<td>自动（工作目录内）</td>
+<td>询问</td>
+</tr>
+<tr>
+<td><code>bypassPermissions</code></td>
+<td>自动</td>
+<td>自动</td>
+<td>自动</td>
+</tr>
+<tr>
+<td><code>dontAsk</code></td>
+<td>自动拒绝</td>
+<td>自动拒绝</td>
+<td>自动拒绝</td>
+</tr>
+<tr>
+<td><code>plan</code></td>
+<td>自动</td>
+<td>询问</td>
+<td>询问</td>
+</tr>
+<tr>
+<td><code>auto</code></td>
+<td>分类器决策</td>
+<td>分类器决策</td>
+<td>询问</td>
+</tr>
+<tr>
+<td><code>bubble</code></td>
+<td>冒泡到父</td>
+<td>冒泡到父</td>
+<td>冒泡到父</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="二、权限决策流程"><a href="#二、权限决策流程" class="headerlink" title="二、权限决策流程"></a>二、权限决策流程</h2><h3 id="2-1-完整决策链"><a href="#2-1-完整决策链" class="headerlink" title="2.1 完整决策链"></a>2.1 完整决策链</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/utils/permissions/permissions.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">hasPermissionsToUseToolInner</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  tool: Tool,</span></span></span><br><span class="line"><span class="function"><span class="params">  input: unknown,</span></span></span><br><span class="line"><span class="function"><span class="params">  context: ToolUseContext,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">PermissionResult</span>&gt; </span>&#123;</span><br><span class="line">  <span class="comment">// ===== Phase 1: 否决阶段 =====</span></span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 1a. 检查工具级 deny 规则</span></span><br><span class="line">  <span class="keyword">const</span> denyResult = checkDenyRules(tool.name, input, context)</span><br><span class="line">  <span class="keyword">if</span> (denyResult) <span class="keyword">return</span> &#123; behavior: <span class="string">'deny'</span>, ...denyResult &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 1b. 检查工具级 ask 规则（沙箱自动允许例外）</span></span><br><span class="line">  <span class="keyword">const</span> askResult = checkAskRules(tool.name, input, context)</span><br><span class="line">  <span class="keyword">if</span> (askResult &amp;&amp; !isSandboxAutoAllow(input, context)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; behavior: <span class="string">'ask'</span>, ...askResult &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 1c. 工具特定权限检查</span></span><br><span class="line">  <span class="keyword">if</span> (tool.checkPermissions) &#123;</span><br><span class="line">    <span class="keyword">const</span> toolResult = <span class="keyword">await</span> tool.checkPermissions(input, context)</span><br><span class="line">    <span class="keyword">if</span> (toolResult.behavior !== <span class="string">'passthrough'</span>) <span class="keyword">return</span> toolResult</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 1d. 工具实现拒绝</span></span><br><span class="line">  <span class="keyword">const</span> implResult = checkImplementationDeny(tool, input, context)</span><br><span class="line">  <span class="keyword">if</span> (implResult) <span class="keyword">return</span> &#123; behavior: <span class="string">'deny'</span>, ...implResult &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 1e. 需要用户交互（绕过模式也需审批）</span></span><br><span class="line">  <span class="keyword">if</span> (requiresUserInteraction(tool, input)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; behavior: <span class="string">'ask'</span>, message: <span class="string">'This operation requires user interaction'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 1f. 内容特定 ask 规则</span></span><br><span class="line">  <span class="keyword">const</span> contentAskResult = checkContentAskRules(tool, input, context)</span><br><span class="line">  <span class="keyword">if</span> (contentAskResult) <span class="keyword">return</span> &#123; behavior: <span class="string">'ask'</span>, ...contentAskResult &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 1g. 安全检查（.git/, .claude/等路径）</span></span><br><span class="line">  <span class="keyword">const</span> safetyResult = checkPathSafety(tool, input, context)</span><br><span class="line">  <span class="keyword">if</span> (safetyResult) <span class="keyword">return</span> &#123; behavior: <span class="string">'ask'</span>, ...safetyResult &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// ===== Phase 2: 允许阶段 =====</span></span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2a. bypassPermissions 模式检查</span></span><br><span class="line">  <span class="keyword">if</span> (context.permissionContext.mode === <span class="string">'bypassPermissions'</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span>, decisionReason: &#123; <span class="keyword">type</span>: <span class="string">'mode'</span> &#125; &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2b. 工具级 allow 规则</span></span><br><span class="line">  <span class="keyword">const</span> allowResult = checkAllowRules(tool.name, input, context)</span><br><span class="line">  <span class="keyword">if</span> (allowResult) <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span>, ...allowResult &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// ===== Phase 3: 默认 =====</span></span><br><span class="line">  <span class="keyword">return</span> &#123; behavior: <span class="string">'passthrough'</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="2-2-决策原因追溯"><a href="#2-2-决策原因追溯" class="headerlink" title="2.2 决策原因追溯"></a>2.2 决策原因追溯</h3><p>每次权限决策都会记录原因：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> DecisionReason =</span><br><span class="line">  | &#123; <span class="keyword">type</span>: <span class="string">'rule'</span>; source: PermissionRuleSource; pattern: <span class="built_in">string</span> &#125;</span><br><span class="line">  | &#123; <span class="keyword">type</span>: <span class="string">'mode'</span>; mode: PermissionMode &#125;</span><br><span class="line">  | &#123; <span class="keyword">type</span>: <span class="string">'hook'</span>; hookName: <span class="built_in">string</span> &#125;</span><br><span class="line">  | &#123; <span class="keyword">type</span>: <span class="string">'classifier'</span>; score: <span class="built_in">number</span> &#125;</span><br><span class="line">  | &#123; <span class="keyword">type</span>: <span class="string">'user'</span>; temporary: <span class="built_in">boolean</span> &#125;</span><br></pre></td></tr></table></figure>
+<p>这对于调试和审计至关重要。</p>
+<hr>
+<h2 id="三、规则匹配机制"><a href="#三、规则匹配机制" class="headerlink" title="三、规则匹配机制"></a>三、规则匹配机制</h2><h3 id="3-1-规则来源"><a href="#3-1-规则来源" class="headerlink" title="3.1 规则来源"></a>3.1 规则来源</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> PermissionRuleSource =</span><br><span class="line">  | <span class="string">'userSettings'</span>      <span class="comment">// 用户全局设置</span></span><br><span class="line">  | <span class="string">'projectSettings'</span>   <span class="comment">// 项目设置</span></span><br><span class="line">  | <span class="string">'localSettings'</span>     <span class="comment">// 本地设置</span></span><br><span class="line">  | <span class="string">'policySettings'</span>    <span class="comment">// 策略设置（只读）</span></span><br><span class="line">  | <span class="string">'flagSettings'</span>      <span class="comment">// 功能标志设置</span></span><br><span class="line">  | <span class="string">'cliArg'</span>            <span class="comment">// CLI 参数</span></span><br><span class="line">  | <span class="string">'command'</span>           <span class="comment">// 命令</span></span><br><span class="line">  | <span class="string">'session'</span>           <span class="comment">// 会话级（临时）</span></span><br></pre></td></tr></table></figure>
+<h3 id="3-2-规则模式匹配"><a href="#3-2-规则模式匹配" class="headerlink" title="3.2 规则模式匹配"></a>3.2 规则模式匹配</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 精确匹配</span></span><br><span class="line">&#123; tool: <span class="string">'Bash'</span>, behavior: <span class="string">'deny'</span> &#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 参数模式匹配</span></span><br><span class="line">&#123; tool: <span class="string">'Bash(git *)'</span>, behavior: <span class="string">'allow'</span> &#125;   <span class="comment">// 允许所有 git 命令</span></span><br><span class="line">&#123; tool: <span class="string">'Bash(rm -rf *)'</span>, behavior: <span class="string">'deny'</span> &#125;  <span class="comment">// 禁止 rm -rf</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 通配符</span></span><br><span class="line">&#123; tool: <span class="string">'File*'</span>, behavior: <span class="string">'allow'</span> &#125;          <span class="comment">// 允许所有 File 开头的工具</span></span><br><span class="line">&#123; tool: <span class="string">'*'</span>, behavior: <span class="string">'deny'</span> &#125;               <span class="comment">// 禁止所有工具</span></span><br></pre></td></tr></table></figure>
+<h3 id="3-3-子命令处理（Bash-工具）"><a href="#3-3-子命令处理（Bash-工具）" class="headerlink" title="3.3 子命令处理（Bash 工具）"></a>3.3 子命令处理（Bash 工具）</h3><p>对于复合命令（如 <code>cmd1 &amp;&amp; cmd2 | cmd3</code>）：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/BashTool/bashPermissions.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">checkCompoundCommand</span>(<span class="params">command: <span class="built_in">string</span>, context</span>): <span class="title">PermissionResult</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 使用 tree-sitter 解析命令</span></span><br><span class="line">  <span class="keyword">const</span> ast = parseCommand(command)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 提取所有子命令</span></span><br><span class="line">  <span class="keyword">const</span> subCommands = extractSubCommands(ast)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 每个子命令独立检查</span></span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> sub of subCommands) &#123;</span><br><span class="line">    <span class="keyword">const</span> result = checkSubCommand(sub, context)</span><br><span class="line">    <span class="keyword">if</span> (result.behavior === <span class="string">'deny'</span>) &#123;</span><br><span class="line">      <span class="keyword">return</span> &#123; behavior: <span class="string">'deny'</span>, message: <span class="string">`Subcommand denied: <span class="subst">$&#123;sub&#125;</span>`</span> &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 所有子命令允许则整个命令允许</span></span><br><span class="line">  <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="四、Bash-工具安全设计"><a href="#四、Bash-工具安全设计" class="headerlink" title="四、Bash 工具安全设计"></a>四、Bash 工具安全设计</h2><h3 id="4-1-安全包装器剥离"><a href="#4-1-安全包装器剥离" class="headerlink" title="4.1 安全包装器剥离"></a>4.1 安全包装器剥离</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/BashTool/bashPermissions.ts</span></span><br><span class="line"><span class="keyword">const</span> SAFE_WRAPPER_PATTERNS = [</span><br><span class="line">  /^timeout[ \t]+.../,  <span class="comment">// timeout 命令</span></span><br><span class="line">  /^time[ \t]+<span class="regexp">/,        /</span><span class="regexp">/ time 命令</span></span><br><span class="line"><span class="regexp">  /</span>^nice(?:[ \t]+...)?<span class="regexp">/, /</span><span class="regexp">/ nice 命令</span></span><br><span class="line"><span class="regexp">  /</span>^stdbuf(?:[ \t]+...)?<span class="regexp">/, /</span><span class="regexp">/ stdbuf 命令</span></span><br><span class="line"><span class="regexp">  /</span>^nohup[ \t]+<span class="regexp">/,       /</span><span class="regexp">/ nohup 命令</span></span><br><span class="line"><span class="regexp">]</span></span><br><span class="line"><span class="regexp"></span></span><br><span class="line"><span class="regexp">function stripSafeWrappers(command: string): string &#123;</span></span><br><span class="line"><span class="regexp">  for (const pattern of SAFE_WRAPPER_PATTERNS) &#123;</span></span><br><span class="line"><span class="regexp">    command = command.replace(pattern, '')</span></span><br><span class="line"><span class="regexp">  &#125;</span></span><br><span class="line"><span class="regexp">  return command.trim()</span></span><br><span class="line"><span class="regexp">&#125;</span></span><br></pre></td></tr></table></figure>
+<p><strong>为什么剥离</strong>：<code>nohup rm -rf /</code> 仍然是 <code>rm -rf /</code>，包装器不改变危险性。</p>
+<h3 id="4-2-Tree-sitter-AST-安全解析"><a href="#4-2-Tree-sitter-AST-安全解析" class="headerlink" title="4.2 Tree-sitter AST 安全解析"></a>4.2 Tree-sitter AST 安全解析</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/BashTool/bashPermissions.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">parseCommandRaw</span>(<span class="params">command: <span class="built_in">string</span></span>): <span class="title">Promise</span>&lt;<span class="title">ParseResult</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> ast = <span class="keyword">await</span> treeSitterParse(command)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">if</span> (containsCommandSubstitution(ast)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; kind: <span class="string">'too-complex'</span>, reason: <span class="string">'Contains command substitution'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">if</span> (containsExpansion(ast)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; kind: <span class="string">'too-complex'</span>, reason: <span class="string">'Contains expansion'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">const</span> sem = checkSemantics(ast.commands)</span><br><span class="line">  <span class="keyword">if</span> (!sem.ok) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; kind: <span class="string">'dangerous'</span>, reason: sem.reason &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> &#123; kind: <span class="string">'simple'</span>, commands: ast.commands &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>检测的危险模式</strong>：</p>
+<ul>
+<li><code>eval</code>、<code>source</code>、<code>.</code> 命令</li>
+<li><code>$(...)</code> 命令替换</li>
+<li>反引号 <code>`...` </code> 命令替换</li>
+<li><code>${...}</code> 变量扩展</li>
+<li>zsh 特殊内置命令</li>
+</ul>
+<h3 id="4-3-安全环境变量"><a href="#4-3-安全环境变量" class="headerlink" title="4.3 安全环境变量"></a>4.3 安全环境变量</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> SAFE_ENV_VARS = <span class="keyword">new</span> Set([</span><br><span class="line">  <span class="string">'NODE_ENV'</span>, <span class="string">'GOOS'</span>, <span class="string">'GOARCH'</span>, <span class="string">'RUST_LOG'</span>,</span><br><span class="line">  <span class="string">'LANG'</span>, <span class="string">'TZ'</span>, <span class="string">'TERM'</span>, <span class="string">'NO_COLOR'</span>,</span><br><span class="line">  <span class="comment">// 注意：PATH, LD_PRELOAD, PYTHONPATH 等危险变量不在白名单中</span></span><br><span class="line">])</span><br></pre></td></tr></table></figure>
+<h3 id="4-4-路径约束检查"><a href="#4-4-路径约束检查" class="headerlink" title="4.4 路径约束检查"></a>4.4 路径约束检查</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/BashTool/pathValidation.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">validateOutputRedirect</span>(<span class="params">command: BashCommand, context</span>): <span class="title">ValidationResult</span> </span>&#123;</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> redirect of command.redirects) &#123;</span><br><span class="line">    <span class="keyword">const</span> resolvedPath = resolvePath(redirect.target)</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 检查是否在允许的工作目录内</span></span><br><span class="line">    <span class="keyword">if</span> (!isInAllowedDirectory(resolvedPath, context)) &#123;</span><br><span class="line">      <span class="keyword">return</span> &#123; ok: <span class="literal">false</span>, reason: <span class="string">`Redirect path not in allowed directory: <span class="subst">$&#123;resolvedPath&#125;</span>`</span> &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 检查是否是危险路径</span></span><br><span class="line">    <span class="keyword">if</span> (isDangerousPath(resolvedPath)) &#123;</span><br><span class="line">      <span class="keyword">return</span> &#123; ok: <span class="literal">false</span>, reason: <span class="string">`Redirect to dangerous path: <span class="subst">$&#123;resolvedPath&#125;</span>`</span> &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> &#123; ok: <span class="literal">true</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="4-5-cd-git-复合命令检查"><a href="#4-5-cd-git-复合命令检查" class="headerlink" title="4.5 cd + git 复合命令检查"></a>4.5 cd + git 复合命令检查</h3><p>防止裸仓库 RCE（Remote Code Execution）：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">checkCdGitCompound</span>(<span class="params">command: <span class="built_in">string</span></span>): <span class="title">ValidationResult</span> </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> parts = parseCompoundCommand(command)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">let</span> i = <span class="number">0</span>; i &lt; parts.length; i++) &#123;</span><br><span class="line">    <span class="keyword">if</span> (parts[i].startsWith(<span class="string">'cd '</span>) &amp;&amp; parts[i + <span class="number">1</span>]?.startsWith(<span class="string">'git '</span>)) &#123;</span><br><span class="line">      <span class="keyword">const</span> targetDir = extractCdTarget(parts[i])</span><br><span class="line">      <span class="keyword">if</span> (<span class="keyword">await</span> isBareRepo(targetDir)) &#123;</span><br><span class="line">        <span class="keyword">return</span> &#123; ok: <span class="literal">false</span>, reason: <span class="string">'Bare repo RCE risk'</span> &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> &#123; ok: <span class="literal">true</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="五、文件操作权限控制"><a href="#五、文件操作权限控制" class="headerlink" title="五、文件操作权限控制"></a>五、文件操作权限控制</h2><h3 id="5-1-危险文件和目录"><a href="#5-1-危险文件和目录" class="headerlink" title="5.1 危险文件和目录"></a>5.1 危险文件和目录</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/utils/permissions/filesystem.ts</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> DANGEROUS_FILES = [</span><br><span class="line">  <span class="string">'.gitconfig'</span>, <span class="string">'.gitmodules'</span>,</span><br><span class="line">  <span class="string">'.bashrc'</span>, <span class="string">'.bash_profile'</span>, <span class="string">'.zshrc'</span>,</span><br><span class="line">  <span class="string">'.ripgreprc'</span>, <span class="string">'.mcp.json'</span>, <span class="string">'.claude.json'</span></span><br><span class="line">]</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> DANGEROUS_DIRECTORIES = [</span><br><span class="line">  <span class="string">'.git'</span>, <span class="string">'.vscode'</span>, <span class="string">'.idea'</span>, <span class="string">'.claude'</span></span><br><span class="line">]</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-编辑前必须读取"><a href="#5-2-编辑前必须读取" class="headerlink" title="5.2 编辑前必须读取"></a>5.2 编辑前必须读取</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/FileEditTool/FileEditTool.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">validateInput</span>(<span class="params">input, context</span>): <span class="title">Promise</span>&lt;<span class="title">ValidationResult</span>&gt; </span>&#123;</span><br><span class="line">  <span class="comment">// 必须先读取</span></span><br><span class="line">  <span class="keyword">const</span> readState = context.readFileState.get(input.file_path)</span><br><span class="line">  <span class="keyword">if</span> (!readState) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; result: <span class="literal">false</span>, message: <span class="string">'Must read file before editing'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 文件未被修改</span></span><br><span class="line">  <span class="keyword">const</span> currentMtime = (<span class="keyword">await</span> stat(input.file_path)).mtimeMs</span><br><span class="line">  <span class="keyword">if</span> (currentMtime &gt; readState.timestamp) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; result: <span class="literal">false</span>, message: <span class="string">'File was modified after reading'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> &#123; result: <span class="literal">true</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="5-3-自动编辑安全检查"><a href="#5-3-自动编辑安全检查" class="headerlink" title="5.3 自动编辑安全检查"></a>5.3 自动编辑安全检查</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">checkPathSafetyForAutoEdit</span>(<span class="params">path: <span class="built_in">string</span></span>): <span class="title">SafetyCheckResult</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 可疑 Windows 路径模式</span></span><br><span class="line">  <span class="keyword">if</span> (<span class="regexp">/[&lt;&gt;:"|?*]/</span>.test(path)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; safe: <span class="literal">false</span>, message: <span class="string">'Invalid characters in path'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. ADS（Alternate Data Stream）攻击</span></span><br><span class="line">  <span class="keyword">if</span> (path.includes(<span class="string">'::'</span>)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; safe: <span class="literal">false</span>, message: <span class="string">'ADS attack detected'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 短名称绕过</span></span><br><span class="line">  <span class="keyword">if</span> (<span class="regexp">/~[0-9]/</span>.test(path)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; safe: <span class="literal">false</span>, message: <span class="string">'Short name bypass detected'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 长路径前缀</span></span><br><span class="line">  <span class="keyword">if</span> (path.startsWith(<span class="string">'\\\\?\\'</span>)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; safe: <span class="literal">false</span>, message: <span class="string">'Long path prefix detected'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 5. Claude 配置文件</span></span><br><span class="line">  <span class="keyword">if</span> (isClaudeConfigFile(path)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; safe: <span class="literal">false</span>, message: <span class="string">'Claude config file'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> &#123; safe: <span class="literal">true</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="六、Auto-模式分类器"><a href="#六、Auto-模式分类器" class="headerlink" title="六、Auto 模式分类器"></a>六、Auto 模式分类器</h2><h3 id="6-1-工作原理"><a href="#6-1-工作原理" class="headerlink" title="6.1 工作原理"></a>6.1 工作原理</h3><p>在 <code>auto</code> 模式下，权限决策通过 AI 分类器：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/utils/permissions/yoloClassifier.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">classifyWithAI</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  tool: Tool,</span></span></span><br><span class="line"><span class="function"><span class="params">  input: unknown,</span></span></span><br><span class="line"><span class="function"><span class="params">  context: ToolUseContext,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">PermissionResult</span>&gt; </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 检查 acceptEdits 快速路径</span></span><br><span class="line">  <span class="keyword">if</span> (isAcceptEditsAllowed(tool, input, context)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 检查安全工具白名单</span></span><br><span class="line">  <span class="keyword">if</span> (isSafeTool(tool)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 调用分类器 API</span></span><br><span class="line">  <span class="keyword">const</span> classifierInput = tool.toAutoClassifierInput?.(input) || <span class="built_in">JSON</span>.stringify(input)</span><br><span class="line">  <span class="keyword">const</span> score = <span class="keyword">await</span> callClassifierAPI(classifierInput)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 根据分数决策</span></span><br><span class="line">  <span class="keyword">if</span> (score &gt; <span class="number">0.8</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span>, decisionReason: &#123; <span class="keyword">type</span>: <span class="string">'classifier'</span>, score &#125; &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">if</span> (score &lt; <span class="number">0.2</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; behavior: <span class="string">'deny'</span>, decisionReason: &#123; <span class="keyword">type</span>: <span class="string">'classifier'</span>, score &#125; &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 5. 不确定时询问用户</span></span><br><span class="line">  <span class="keyword">return</span> &#123; behavior: <span class="string">'ask'</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="6-2-拒绝计数"><a href="#6-2-拒绝计数" class="headerlink" title="6.2 拒绝计数"></a>6.2 拒绝计数</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 防止分类器陷入拒绝循环</span></span><br><span class="line"><span class="keyword">const</span> denialTracking: DenialTrackingState = &#123;</span><br><span class="line">  consecutiveDenials: <span class="number">0</span>,</span><br><span class="line">  maxConsecutiveDenials: <span class="number">3</span>,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">handleDenial</span>(<span class="params"></span>): <span class="title">PermissionResult</span> </span>&#123;</span><br><span class="line">  denialTracking.consecutiveDenials++</span><br><span class="line">  <span class="keyword">if</span> (denialTracking.consecutiveDenials &gt;= denialTracking.maxConsecutiveDenials) &#123;</span><br><span class="line">    <span class="comment">// 回退到用户审批</span></span><br><span class="line">    <span class="keyword">return</span> &#123; behavior: <span class="string">'ask'</span>, message: <span class="string">'Too many denials, please decide'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> &#123; behavior: <span class="string">'deny'</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、钩子拦截"><a href="#七、钩子拦截" class="headerlink" title="七、钩子拦截"></a>七、钩子拦截</h2><h3 id="7-1-PreToolUse-钩子"><a href="#7-1-PreToolUse-钩子" class="headerlink" title="7.1 PreToolUse 钩子"></a>7.1 PreToolUse 钩子</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/services/tools/toolHooks.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">runPreToolUseHooks</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  tool: Tool,</span></span></span><br><span class="line"><span class="function"><span class="params">  input: unknown,</span></span></span><br><span class="line"><span class="function"><span class="params">  context: ToolUseContext,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">HookResult</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> hooks = getHooksForTool(tool.name, context)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> hook of hooks) &#123;</span><br><span class="line">    <span class="keyword">const</span> result = <span class="keyword">await</span> executeHook(hook, &#123;</span><br><span class="line">      tool_name: tool.name,</span><br><span class="line">      tool_input: input,</span><br><span class="line">    &#125;)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">switch</span> (result.exitCode) &#123;</span><br><span class="line">      <span class="keyword">case</span> <span class="number">0</span>:</span><br><span class="line">        <span class="comment">// 成功，可能修改了 input</span></span><br><span class="line">        <span class="keyword">if</span> (result.stdout) &#123;</span><br><span class="line">          input = parseModifiedInput(result.stdout)</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">break</span></span><br><span class="line">      <span class="keyword">case</span> <span class="number">2</span>:</span><br><span class="line">        <span class="comment">// 阻塞，展示错误给模型</span></span><br><span class="line">        <span class="keyword">return</span> &#123;</span><br><span class="line">          blocked: <span class="literal">true</span>,</span><br><span class="line">          message: result.stderr,</span><br><span class="line">          modifiedInput: parseModifiedInput(result.stdout),</span><br><span class="line">        &#125;</span><br><span class="line">      <span class="keyword">default</span>:</span><br><span class="line">        <span class="comment">// 展示给用户</span></span><br><span class="line">        logHookOutput(result.stdout)</span><br><span class="line">        <span class="keyword">break</span></span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> &#123; blocked: <span class="literal">false</span>, modifiedInput: input &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="7-2-钩子配置示例"><a href="#7-2-钩子配置示例" class="headerlink" title="7.2 钩子配置示例"></a>7.2 钩子配置示例</h3><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// settings.json</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="attr">"hooks"</span>: &#123;</span><br><span class="line">    <span class="attr">"PreToolUse"</span>: [&#123;</span><br><span class="line">      <span class="attr">"matcher"</span>: <span class="string">"Bash(rm *)"</span>,</span><br><span class="line">      <span class="attr">"hooks"</span>: [&#123;</span><br><span class="line">        <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">        <span class="attr">"command"</span>: <span class="string">"echo 'Deletion blocked' &amp;&amp; exit 2"</span></span><br><span class="line">      &#125;]</span><br><span class="line">    &#125;],</span><br><span class="line">    <span class="attr">"PostToolUse"</span>: [&#123;</span><br><span class="line">      <span class="attr">"matcher"</span>: <span class="string">"Edit"</span>,</span><br><span class="line">      <span class="attr">"hooks"</span>: [&#123;</span><br><span class="line">        <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">        <span class="attr">"command"</span>: <span class="string">"npm run lint"</span></span><br><span class="line">      &#125;]</span><br><span class="line">    &#125;]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="八、关键源文件索引"><a href="#八、关键源文件索引" class="headerlink" title="八、关键源文件索引"></a>八、关键源文件索引</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/types/permissions.ts</code></td>
+<td>权限类型定义</td>
+</tr>
+<tr>
+<td><code>src/utils/permissions/permissions.ts</code></td>
+<td>权限检查核心逻辑</td>
+</tr>
+<tr>
+<td><code>src/utils/permissions/filesystem.ts</code></td>
+<td>文件系统权限控制</td>
+</tr>
+<tr>
+<td><code>src/utils/permissions/shellRuleMatching.ts</code></td>
+<td>Shell 规则匹配</td>
+</tr>
+<tr>
+<td><code>src/utils/permissions/bashClassifier.ts</code></td>
+<td>Bash 分类器</td>
+</tr>
+<tr>
+<td><code>src/utils/permissions/yoloClassifier.ts</code></td>
+<td>Auto 模式分类器</td>
+</tr>
+<tr>
+<td><code>src/tools/BashTool/bashPermissions.ts</code></td>
+<td>Bash 权限检查</td>
+</tr>
+<tr>
+<td><code>src/tools/BashTool/pathValidation.ts</code></td>
+<td>Bash 路径验证</td>
+</tr>
+<tr>
+<td><code>src/tools/FileEditTool/FileEditTool.ts</code></td>
+<td>文件编辑工具实现</td>
+</tr>
+<tr>
+<td><code>src/services/tools/toolHooks.ts</code></td>
+<td>工具钩子</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="九、总结"><a href="#九、总结" class="headerlink" title="九、总结"></a>九、总结</h2><p>Claude Code 的权限系统体现了几个核心设计原则：</p>
+<ol>
+<li><strong>分层决策</strong>：规则 → 模式 → 钩子 → 分类器 → 用户确认</li>
+<li><strong>Deny 优先</strong>：任何 deny 匹配立即拒绝</li>
+<li><strong>AST 级安全</strong>：使用 tree-sitter 解析 Bash 命令，检测注入</li>
+<li><strong>路径约束</strong>：严格限制文件操作在工作目录内</li>
+<li><strong>编辑前读取</strong>：防止盲目覆盖，检测并发修改</li>
+<li><strong>可追溯性</strong>：每个决策都有原因记录</li>
+</ol>
+<p>这个设计确保了 AI Agent 的安全性，同时保持了良好的用户体验。</p>
+<hr>
+<p><strong>系列文章导航：</strong></p>
+<ul>
+<li>上一篇：<a href="/claude-code-skills-system/">Skills 系统：条件激活与动态发现</a></li>
+<li>下一篇：<a href="/claude-code-memory-system/">Memory 系统：跨会话持久化知识库</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Permission/" rel="tag"><i class="fa fa-tag"></i> Permission</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-context-compression/" rel="prev" title="Context 管理：四级压缩与无限对话的秘密">
+      <i class="fa fa-chevron-left"></i> Context 管理：四级压缩与无限对话的秘密
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/04/06/claude-code-memory-system/" rel="next" title="Memory 系统：跨会话持久化知识库">
+      Memory 系统：跨会话持久化知识库 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#导读：为什么权限如此重要？"><span class="nav-number">1.</span> <span class="nav-text">导读：为什么权限如此重要？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、分层权限模型"><span class="nav-number">2.</span> <span class="nav-text">一、分层权限模型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-权限决策层级"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 权限决策层级</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-权限模式详解"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 权限模式详解</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、权限决策流程"><span class="nav-number">3.</span> <span class="nav-text">二、权限决策流程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-完整决策链"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 完整决策链</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-决策原因追溯"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 决策原因追溯</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、规则匹配机制"><span class="nav-number">4.</span> <span class="nav-text">三、规则匹配机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-规则来源"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 规则来源</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-规则模式匹配"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 规则模式匹配</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-子命令处理（Bash-工具）"><span class="nav-number">4.3.</span> <span class="nav-text">3.3 子命令处理（Bash 工具）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、Bash-工具安全设计"><span class="nav-number">5.</span> <span class="nav-text">四、Bash 工具安全设计</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-安全包装器剥离"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 安全包装器剥离</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-Tree-sitter-AST-安全解析"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 Tree-sitter AST 安全解析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-安全环境变量"><span class="nav-number">5.3.</span> <span class="nav-text">4.3 安全环境变量</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-路径约束检查"><span class="nav-number">5.4.</span> <span class="nav-text">4.4 路径约束检查</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-cd-git-复合命令检查"><span class="nav-number">5.5.</span> <span class="nav-text">4.5 cd + git 复合命令检查</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、文件操作权限控制"><span class="nav-number">6.</span> <span class="nav-text">五、文件操作权限控制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-危险文件和目录"><span class="nav-number">6.1.</span> <span class="nav-text">5.1 危险文件和目录</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-编辑前必须读取"><span class="nav-number">6.2.</span> <span class="nav-text">5.2 编辑前必须读取</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-自动编辑安全检查"><span class="nav-number">6.3.</span> <span class="nav-text">5.3 自动编辑安全检查</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、Auto-模式分类器"><span class="nav-number">7.</span> <span class="nav-text">六、Auto 模式分类器</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-工作原理"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 工作原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-拒绝计数"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 拒绝计数</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、钩子拦截"><span class="nav-number">8.</span> <span class="nav-text">七、钩子拦截</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-PreToolUse-钩子"><span class="nav-number">8.1.</span> <span class="nav-text">7.1 PreToolUse 钩子</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-2-钩子配置示例"><span class="nav-number">8.2.</span> <span class="nav-text">7.2 钩子配置示例</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、关键源文件索引"><span class="nav-number">9.</span> <span class="nav-text">八、关键源文件索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#九、总结"><span class="nav-number">10.</span> <span class="nav-text">九、总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">62</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">9</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">37</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>
