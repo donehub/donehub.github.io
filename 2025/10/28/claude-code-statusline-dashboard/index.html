@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="用 Claude Code 写代码的时候，你有没有过这种焦虑：不知道当前用的什么模型、context 还剩多少、这一轮对话花了多少钱？这三个指标直接影响代码质量和你的钱包，但 Claude Code 默认不显示。好在有个 statusLine 功能，可以自定义一个「仪表盘」实时监控这些数据。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Claude Code 仪表盘">
+<meta property="og:url" content="https://donehub.github.io/2025/10/28/claude-code-statusline-dashboard/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="用 Claude Code 写代码的时候，你有没有过这种焦虑：不知道当前用的什么模型、context 还剩多少、这一轮对话花了多少钱？这三个指标直接影响代码质量和你的钱包，但 Claude Code 默认不显示。好在有个 statusLine 功能，可以自定义一个「仪表盘」实时监控这些数据。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-10-27T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-11T02:13:40.351Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Claude Code DashBoard">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2025/10/28/claude-code-statusline-dashboard/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Claude Code 仪表盘 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2025/10/28/claude-code-statusline-dashboard/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Claude Code 仪表盘
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-10-28 00:00:00" itemprop="dateCreated datePublished" datetime="2025-10-28T00:00:00+08:00">2025-10-28</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-11 10:13:40" itemprop="dateModified" datetime="2026-04-11T10:13:40+08:00">2026-04-11</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2025/10/28/claude-code-statusline-dashboard/" class="post-meta-item leancloud_visitors" data-flag-title="Claude Code 仪表盘" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2025/10/28/claude-code-statusline-dashboard/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2025/10/28/claude-code-statusline-dashboard/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>用 Claude Code 写代码的时候，你有没有过这种焦虑：不知道当前用的什么模型、context 还剩多少、这一轮对话花了多少钱？这三个指标直接影响代码质量和你的钱包，但 Claude Code 默认不显示。好在有个 statusLine 功能，可以自定义一个「仪表盘」实时监控这些数据。</p>
+</blockquote>
+<a id="more"></a>
+<h2 id="为什么要关注这三个指标？"><a href="#为什么要关注这三个指标？" class="headerlink" title="为什么要关注这三个指标？"></a>为什么要关注这三个指标？</h2><h3 id="1-模型类型"><a href="#1-模型类型" class="headerlink" title="1. 模型类型"></a>1. 模型类型</h3><p>不同模型能力不同、价格不同：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>能力</th>
+<th>价格</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Claude Opus</td>
+<td>最强推理能力</td>
+<td>最贵</td>
+</tr>
+<tr>
+<td>glm-5</td>
+<td>智谱出品，中文能力强</td>
+<td>国内定价</td>
+</tr>
+<tr>
+<td>kimi-k2.5</td>
+<td>月之暗面，长文本处理强</td>
+<td>国内定价</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Claude 系列是 Anthropic 的旗舰模型，但国内开发者更多使用国产模型接入 Claude Code，比如智谱的 <strong>glm-5</strong>、月之暗面的 <strong>kimi-k2.5</strong>。这些模型性价比高，中文理解能力也不错。</p>
+<h3 id="2-Context-使用率"><a href="#2-Context-使用率" class="headerlink" title="2. Context 使用率"></a>2. Context 使用率</h3><p>Context 就像 AI 的「短期记忆」，存着你之前的对话、代码片段。当 context 快满了（超过 60%），AI 的理解能力会明显下降——就像一个人记不住刚才说了什么，回答质量自然变差。</p>
+<h3 id="3-Token-成本"><a href="#3-Token-成本" class="headerlink" title="3. Token 成本"></a>3. Token 成本</h3><p>每次对话都要花钱。如果你不知道花了多少，月底收到账单可能会怀疑是不是被盗刷了。</p>
+<hr>
+<h2 id="statusLine：Claude-Code-的「仪表盘」接口"><a href="#statusLine：Claude-Code-的「仪表盘」接口" class="headerlink" title="statusLine：Claude Code 的「仪表盘」接口"></a>statusLine：Claude Code 的「仪表盘」接口</h2><p>Claude Code 从 v1.0.71 开始支持自定义状态栏（statusLine）。原理很简单：</p>
+<ol>
+<li>你写一个脚本（Windows 用 PowerShell，Mac 用 Bash）</li>
+<li>Claude Code 每隔几秒把当前状态数据以 JSON 形式传给脚本</li>
+<li>脚本解析 JSON，输出你想显示的内容</li>
+</ol>
+<h3 id="JSON-数据结构"><a href="#JSON-数据结构" class="headerlink" title="JSON 数据结构"></a>JSON 数据结构</h3><p>脚本会收到以下字段：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model.id</code></td>
+<td>当前模型 ID（如 <code>glm-5</code>、<code>claude-opus-4-6</code>）</td>
+</tr>
+<tr>
+<td><code>cost.total_cost_usd</code></td>
+<td>会话累计成本（美元）</td>
+</tr>
+<tr>
+<td><code>context_tokens_used</code></td>
+<td>已使用的 context tokens</td>
+</tr>
+<tr>
+<td><code>context_tokens_limit</code></td>
+<td>Context 上限（通常是 200000）</td>
+</tr>
+<tr>
+<td><code>usage.input_tokens</code></td>
+<td>输入 tokens</td>
+</tr>
+<tr>
+<td><code>usage.output_tokens</code></td>
+<td>输出 tokens</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="Windows-平台方案"><a href="#Windows-平台方案" class="headerlink" title="Windows 平台方案"></a>Windows 平台方案</h2><h3 id="第一步：创建-PowerShell-脚本"><a href="#第一步：创建-PowerShell-脚本" class="headerlink" title="第一步：创建 PowerShell 脚本"></a>第一步：创建 PowerShell 脚本</h3><p>在 <code>C:\Users\&lt;你的用户名&gt;\.claude\</code> 目录下创建 <code>statusline.ps1</code> 文件：</p>
+<figure class="highlight powershell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Claude Code Status Line Script</span></span><br><span class="line"><span class="comment"># 从 stdin 读取 JSON 数据并显示状态栏</span></span><br><span class="line"></span><br><span class="line"><span class="variable">$jsonInput</span> = [<span class="type">Console</span>]::In.ReadToEnd()</span><br><span class="line"></span><br><span class="line"><span class="keyword">try</span> &#123;</span><br><span class="line">    <span class="variable">$data</span> = <span class="variable">$jsonInput</span> | <span class="built_in">ConvertFrom-Json</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 提取模型（model 可能是对象或字符串）</span></span><br><span class="line">    <span class="variable">$modelRaw</span> = <span class="variable">$data</span>.model</span><br><span class="line">    <span class="variable">$model</span> = <span class="keyword">if</span> (<span class="variable">$modelRaw</span>.id) &#123; <span class="variable">$modelRaw</span>.id &#125; <span class="keyword">elseif</span> (<span class="variable">$modelRaw</span> <span class="operator">-is</span> [<span class="built_in">string</span>]) &#123; <span class="variable">$modelRaw</span> &#125; <span class="keyword">else</span> &#123; <span class="string">"unknown"</span> &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 提取成本</span></span><br><span class="line">    <span class="variable">$cost</span> = <span class="keyword">if</span> (<span class="variable">$data</span>.cost <span class="operator">-and</span> <span class="variable">$data</span>.cost.total_cost_usd) &#123; </span><br><span class="line">        [<span class="type">math</span>]::Round([<span class="built_in">double</span>]<span class="variable">$data</span>.cost.total_cost_usd, <span class="number">4</span>) </span><br><span class="line">    &#125; <span class="keyword">else</span> &#123; <span class="string">"0"</span> &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 提取 context</span></span><br><span class="line">    <span class="variable">$contextUsed</span> = <span class="keyword">if</span> (<span class="variable">$data</span>.context_tokens_used) &#123; [<span class="built_in">int</span>]<span class="variable">$data</span>.context_tokens_used &#125; <span class="keyword">else</span> &#123; <span class="number">0</span> &#125;</span><br><span class="line">    <span class="variable">$contextLimit</span> = <span class="keyword">if</span> (<span class="variable">$data</span>.context_tokens_limit) &#123; [<span class="built_in">int</span>]<span class="variable">$data</span>.context_tokens_limit &#125; <span class="keyword">else</span> &#123; <span class="number">200000</span> &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 计算百分比</span></span><br><span class="line">    <span class="variable">$percentage</span> = <span class="keyword">if</span> (<span class="variable">$contextLimit</span> <span class="operator">-gt</span> <span class="number">0</span>) &#123; </span><br><span class="line">        [<span class="type">math</span>]::Round((<span class="variable">$contextUsed</span> * <span class="number">100</span> / <span class="variable">$contextLimit</span>), <span class="number">1</span>) </span><br><span class="line">    &#125; <span class="keyword">else</span> &#123; <span class="number">0</span> &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 创建进度条（10 格）</span></span><br><span class="line">    <span class="variable">$filledBars</span> = [<span class="type">math</span>]::Floor(<span class="variable">$percentage</span> / <span class="number">10</span>)</span><br><span class="line">    <span class="variable">$bar</span> = <span class="string">""</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span> <span class="operator">-lt</span> <span class="number">10</span>; <span class="variable">$i</span>++) &#123;</span><br><span class="line">        <span class="keyword">if</span> (<span class="variable">$i</span> <span class="operator">-lt</span> <span class="variable">$filledBars</span>) &#123; <span class="variable">$bar</span> += <span class="string">"#"</span> &#125; <span class="keyword">else</span> &#123; <span class="variable">$bar</span> += <span class="string">"-"</span> &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 状态指示器</span></span><br><span class="line">    <span class="variable">$statusIcon</span> = <span class="keyword">if</span> (<span class="variable">$percentage</span> <span class="operator">-ge</span> <span class="number">80</span>) &#123; <span class="string">"[!!]"</span> &#125; <span class="keyword">elseif</span> (<span class="variable">$percentage</span> <span class="operator">-ge</span> <span class="number">60</span>) &#123; <span class="string">"[WARN]"</span> &#125; <span class="keyword">else</span> &#123; <span class="string">"[OK]"</span> &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 格式化 token 数字</span></span><br><span class="line">    <span class="function"><span class="keyword">function</span> <span class="title">Format-Tokens</span><span class="params">(<span class="variable">$tokens</span>)</span></span> &#123;</span><br><span class="line">        <span class="variable">$t</span> = [<span class="built_in">int</span>]<span class="variable">$tokens</span></span><br><span class="line">        <span class="keyword">if</span> (<span class="variable">$t</span> <span class="operator">-ge</span> <span class="number">1000000</span>) &#123; <span class="keyword">return</span> <span class="string">"&#123;0:N2&#125;M"</span> <span class="operator">-f</span> (<span class="variable">$t</span> / <span class="number">1000000</span>) &#125;</span><br><span class="line">        <span class="keyword">elseif</span> (<span class="variable">$t</span> <span class="operator">-ge</span> <span class="number">1000</span>) &#123; <span class="keyword">return</span> <span class="string">"&#123;0:N1&#125;K"</span> <span class="operator">-f</span> (<span class="variable">$t</span> / <span class="number">1000</span>) &#125;</span><br><span class="line">        <span class="keyword">else</span> &#123; <span class="keyword">return</span> <span class="variable">$t</span>.ToString() &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="variable">$usedFormatted</span> = <span class="built_in">Format-Tokens</span> <span class="variable">$contextUsed</span></span><br><span class="line">    <span class="variable">$limitFormatted</span> = <span class="built_in">Format-Tokens</span> <span class="variable">$contextLimit</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 输出状态栏</span></span><br><span class="line">    <span class="variable">$costDisplay</span> = <span class="string">"<span class="variable">$</span>"</span> + <span class="variable">$cost</span></span><br><span class="line">    <span class="built_in">Write-Output</span> <span class="string">"Model: <span class="variable">$model</span> | Cost: <span class="variable">$costDisplay</span> | Context: [<span class="variable">$bar</span>] <span class="variable">$percentage</span>% (<span class="variable">$usedFormatted</span>/<span class="variable">$limitFormatted</span>) <span class="variable">$statusIcon</span>"</span></span><br><span class="line"></span><br><span class="line">&#125; <span class="keyword">catch</span> &#123;</span><br><span class="line">    <span class="built_in">Write-Output</span> <span class="string">"Status: unavailable"</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="第二步：修改-settings-json"><a href="#第二步：修改-settings-json" class="headerlink" title="第二步：修改 settings.json"></a>第二步：修改 settings.json</h3><p>编辑 <code>C:\Users\&lt;你的用户名&gt;\.claude\settings.json</code>，添加 <code>statusLine</code> 配置：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"statusLine"</span>: &#123;</span><br><span class="line">    <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">    <span class="attr">"command"</span>: <span class="string">"powershell -ExecutionPolicy Bypass -File C:/Users/&lt;你的用户名&gt;/.claude/statusline.ps1"</span>,</span><br><span class="line">    <span class="attr">"refreshInterval"</span>: <span class="number">5000</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>refreshInterval: 5000</code> 表示每 5 秒刷新一次。</p>
+<h3 id="第三步：重启生效"><a href="#第三步：重启生效" class="headerlink" title="第三步：重启生效"></a>第三步：重启生效</h3><p>关闭 Claude Code，重新打开。终端底部会显示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Model: glm-5 | Cost: $0.1234 | Context: [##--------] 25% (50.0K&#x2F;200.0K) [OK]</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="Mac-平台方案"><a href="#Mac-平台方案" class="headerlink" title="Mac 平台方案"></a>Mac 平台方案</h2><h3 id="第一步：创建-Bash-脚本"><a href="#第一步：创建-Bash-脚本" class="headerlink" title="第一步：创建 Bash 脚本"></a>第一步：创建 Bash 脚本</h3><p>在 <code>~/.claude/</code> 目录下创建 <code>statusline.sh</code> 文件：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#!/bin/bash</span></span><br><span class="line"><span class="built_in">set</span> -euo pipefail</span><br><span class="line"></span><br><span class="line"><span class="comment"># 读取 JSON 输入</span></span><br><span class="line">input=$(cat)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 提取字段（model 可能是对象或字符串）</span></span><br><span class="line">model=$(<span class="built_in">echo</span> <span class="string">"<span class="variable">$input</span>"</span> | jq -r <span class="string">'.model.id // .model // "unknown"'</span>)</span><br><span class="line">cost=$(<span class="built_in">echo</span> <span class="string">"<span class="variable">$input</span>"</span> | jq -r <span class="string">'.cost.total_cost_usd // "0"'</span>)</span><br><span class="line">context_used=$(<span class="built_in">echo</span> <span class="string">"<span class="variable">$input</span>"</span> | jq -r <span class="string">'.context_tokens_used // 0'</span>)</span><br><span class="line">context_limit=$(<span class="built_in">echo</span> <span class="string">"<span class="variable">$input</span>"</span> | jq -r <span class="string">'.context_tokens_limit // 200000'</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 计算百分比</span></span><br><span class="line"><span class="keyword">if</span> [ <span class="string">"<span class="variable">$context_limit</span>"</span> -gt 0 ]; <span class="keyword">then</span></span><br><span class="line">    percentage=$(awk <span class="string">"BEGIN &#123;printf \"%.1f\", <span class="variable">$context_used</span> * 100 / <span class="variable">$context_limit</span>&#125;"</span>)</span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">    percentage=0</span><br><span class="line"><span class="keyword">fi</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建进度条（10 格）</span></span><br><span class="line">filled=$((percentage / 10))</span><br><span class="line">bar=<span class="string">""</span></span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> $(seq 1 10); <span class="keyword">do</span></span><br><span class="line">    <span class="keyword">if</span> [ <span class="variable">$i</span> -le <span class="variable">$filled</span> ]; <span class="keyword">then</span></span><br><span class="line">        bar=<span class="string">"<span class="variable">$&#123;bar&#125;</span>#"</span></span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        bar=<span class="string">"<span class="variable">$&#123;bar&#125;</span>-"</span></span><br><span class="line">    <span class="keyword">fi</span></span><br><span class="line"><span class="keyword">done</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 状态指示器</span></span><br><span class="line"><span class="keyword">if</span> [ $(awk <span class="string">"BEGIN &#123;print (<span class="variable">$percentage</span> &gt;= 80)&#125;"</span>) -eq 1 ]; <span class="keyword">then</span></span><br><span class="line">    status=<span class="string">"[!!]"</span></span><br><span class="line"><span class="keyword">elif</span> [ $(awk <span class="string">"BEGIN &#123;print (<span class="variable">$percentage</span> &gt;= 60)&#125;"</span>) -eq 1 ]; <span class="keyword">then</span></span><br><span class="line">    status=<span class="string">"[WARN]"</span></span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">    status=<span class="string">"[OK]"</span></span><br><span class="line"><span class="keyword">fi</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 格式化 token 数字</span></span><br><span class="line"><span class="function"><span class="title">format_tokens</span></span>() &#123;</span><br><span class="line">    <span class="built_in">local</span> tokens=<span class="variable">$1</span></span><br><span class="line">    <span class="keyword">if</span> [ <span class="variable">$tokens</span> -ge 1000000 ]; <span class="keyword">then</span></span><br><span class="line">        awk <span class="string">"BEGIN &#123;printf \"%.2fM\", <span class="variable">$tokens</span> / 1000000&#125;"</span></span><br><span class="line">    <span class="keyword">elif</span> [ <span class="variable">$tokens</span> -ge 1000 ]; <span class="keyword">then</span></span><br><span class="line">        awk <span class="string">"BEGIN &#123;printf \"%.1fK\", <span class="variable">$tokens</span> / 1000&#125;"</span></span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        <span class="built_in">echo</span> <span class="variable">$tokens</span></span><br><span class="line">    <span class="keyword">fi</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">used_formatted=$(format_tokens <span class="variable">$context_used</span>)</span><br><span class="line">limit_formatted=$(format_tokens <span class="variable">$context_limit</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 输出状态栏</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">"Model: <span class="variable">$model</span> | Cost: \$<span class="variable">$cost</span> | Context: [<span class="variable">$bar</span>] <span class="variable">$&#123;percentage&#125;</span>% (<span class="variable">$used_formatted</span>/<span class="variable">$limit_formatted</span>) <span class="variable">$status</span>"</span></span><br></pre></td></tr></table></figure>
+<h3 id="第二步：设置可执行权限"><a href="#第二步：设置可执行权限" class="headerlink" title="第二步：设置可执行权限"></a>第二步：设置可执行权限</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">chmod +x ~/.claude/statusline.sh</span><br></pre></td></tr></table></figure>
+<h3 id="第三步：修改-settings-json"><a href="#第三步：修改-settings-json" class="headerlink" title="第三步：修改 settings.json"></a>第三步：修改 settings.json</h3><p>编辑 <code>~/.claude/settings.json</code>，添加配置：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"statusLine"</span>: &#123;</span><br><span class="line">    <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">    <span class="attr">"command"</span>: <span class="string">"~/.claude/statusline.sh"</span>,</span><br><span class="line">    <span class="attr">"refreshInterval"</span>: <span class="number">5000</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="第四步：重启生效"><a href="#第四步：重启生效" class="headerlink" title="第四步：重启生效"></a>第四步：重启生效</h3><p>重启 Claude Code 后，终端底部会显示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Model: claude-sonnet-4-6 | Cost: $0.0567 | Context: [######----] 65% (130.0K&#x2F;200.0K) [WARN]</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="状态指示器说明"><a href="#状态指示器说明" class="headerlink" title="状态指示器说明"></a>状态指示器说明</h2><p>进度条和状态图标帮你一眼判断当前状态：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Context 使用</th>
+<th>进度条</th>
+<th>状态</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0-60%</td>
+<td><code>[####------]</code></td>
+<td><code>[OK]</code></td>
+<td>安全区，质量稳定</td>
+</tr>
+<tr>
+<td>60-80%</td>
+<td><code>[######----]</code></td>
+<td><code>[WARN]</code></td>
+<td>警告区，质量开始下降</td>
+</tr>
+<tr>
+<td>80-100%</td>
+<td><code>[#########-]</code></td>
+<td><code>[!!]</code></td>
+<td>危险区，建议精简对话或重启会话</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="进阶定制"><a href="#进阶定制" class="headerlink" title="进阶定制"></a>进阶定制</h2><h3 id="添加更多指标"><a href="#添加更多指标" class="headerlink" title="添加更多指标"></a>添加更多指标</h3><p>JSON 数据里还有很多字段可以挖掘：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"rate_limits"</span>: &#123;</span><br><span class="line">    <span class="attr">"five_hour"</span>: &#123; <span class="attr">"used_percentage"</span>: <span class="number">45</span>, <span class="attr">"resets_at"</span>: <span class="string">"2025-04-11T22:00:00Z"</span> &#125;,</span><br><span class="line">    <span class="attr">"seven_day"</span>: &#123; <span class="attr">"used_percentage"</span>: <span class="number">12</span>, <span class="attr">"resets_at"</span>: <span class="string">"2025-04-18T00:00:00Z"</span> &#125;</span><br><span class="line">  &#125;,</span><br><span class="line">  <span class="attr">"workspace"</span>: &#123;</span><br><span class="line">    <span class="attr">"git_branch"</span>: <span class="string">"feature/login"</span>,</span><br><span class="line">    <span class="attr">"git_worktree"</span>: <span class="literal">false</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>你可以把 Git 分支、Rate Limit 重置时间也加到状态栏。</p>
+<h3 id="使用-Unicode-字符（Mac）"><a href="#使用-Unicode-字符（Mac）" class="headerlink" title="使用 Unicode 字符（Mac）"></a>使用 Unicode 字符（Mac）</h3><p>Mac 终端支持 Unicode，可以用更美观的字符：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 进度条用方块字符</span></span><br><span class="line">bar=<span class="string">""</span></span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> $(seq 1 10); <span class="keyword">do</span></span><br><span class="line">    <span class="keyword">if</span> [ <span class="variable">$i</span> -le <span class="variable">$filled</span> ]; <span class="keyword">then</span></span><br><span class="line">        bar=<span class="string">"<span class="variable">$&#123;bar&#125;</span>█"</span></span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        bar=<span class="string">"<span class="variable">$&#123;bar&#125;</span>░"</span></span><br><span class="line">    <span class="keyword">fi</span></span><br><span class="line"><span class="keyword">done</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 状态用 emoji</span></span><br><span class="line"><span class="keyword">if</span> [ $(awk <span class="string">"BEGIN &#123;print (<span class="variable">$percentage</span> &gt;= 80)&#125;"</span>) -eq 1 ]; <span class="keyword">then</span></span><br><span class="line">    status=<span class="string">"🔴"</span></span><br><span class="line"><span class="keyword">elif</span> [ $(awk <span class="string">"BEGIN &#123;print (<span class="variable">$percentage</span> &gt;= 60)&#125;"</span>) -eq 1 ]; <span class="keyword">then</span></span><br><span class="line">    status=<span class="string">"🟠"</span></span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">    status=<span class="string">"🟢"</span></span><br><span class="line"><span class="keyword">fi</span></span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="社区资源"><a href="#社区资源" class="headerlink" title="社区资源"></a>社区资源</h2><p>已经有开发者分享了现成的 statusLine 脚本：</p>
+<ul>
+<li><strong><a href="https://github.com/AndyShaman/claude-statusline" target="_blank" rel="noopener">AndyShaman/claude-statusline</a></strong> - 显示模型、context 进度条、tokens</li>
+<li><strong><a href="https://github.com/shanraisshan/claude-code-status-line" target="_blank" rel="noopener">shanraisshan/claude-code-status-line</a></strong> - 显示 context 窗口使用率、Git 状态</li>
+</ul>
+<p>不想自己写脚本的，可以直接 clone 这些仓库使用。</p>
+<hr>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>Claude Code 的 statusLine 功能让你可以：</p>
+<ol>
+<li><strong>实时监控模型</strong> - 确保用的是预期的模型</li>
+<li><strong>跟踪 context 使用</strong> - 超过 60% 时提醒自己精简对话</li>
+<li><strong>控制成本</strong> - 知道花了多少钱，心中有数</li>
+</ol>
+<p>Windows 用 PowerShell，Mac 用 Bash，配置好脚本和 settings.json 就能生效。如果你有更复杂的需求，可以自行扩展脚本，把 Rate Limit、Git 状态等信息也加进去。</p>
+<p><strong>关键配置文件位置：</strong></p>
+<ul>
+<li>Windows: <code>C:\Users\&lt;用户名&gt;\.claude\settings.json</code></li>
+<li>Mac: <code>~/.claude/settings.json</code></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Claude-Code-DashBoard/" rel="tag"><i class="fa fa-tag"></i> Claude Code DashBoard</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/10/23/next-ai-drawio-guide/" rel="prev" title="Next Draw.IO：用自然语言画出专业图表">
+      <i class="fa fa-chevron-left"></i> Next Draw.IO：用自然语言画出专业图表
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2025/12/01/agency-agents-guide/" rel="next" title="如何使用 Agency-Agents 开好你的一人公司">
+      如何使用 Agency-Agents 开好你的一人公司 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#为什么要关注这三个指标？"><span class="nav-number">1.</span> <span class="nav-text">为什么要关注这三个指标？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-模型类型"><span class="nav-number">1.1.</span> <span class="nav-text">1. 模型类型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-Context-使用率"><span class="nav-number">1.2.</span> <span class="nav-text">2. Context 使用率</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-Token-成本"><span class="nav-number">1.3.</span> <span class="nav-text">3. Token 成本</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#statusLine：Claude-Code-的「仪表盘」接口"><span class="nav-number">2.</span> <span class="nav-text">statusLine：Claude Code 的「仪表盘」接口</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#JSON-数据结构"><span class="nav-number">2.1.</span> <span class="nav-text">JSON 数据结构</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Windows-平台方案"><span class="nav-number">3.</span> <span class="nav-text">Windows 平台方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#第一步：创建-PowerShell-脚本"><span class="nav-number">3.1.</span> <span class="nav-text">第一步：创建 PowerShell 脚本</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#第二步：修改-settings-json"><span class="nav-number">3.2.</span> <span class="nav-text">第二步：修改 settings.json</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#第三步：重启生效"><span class="nav-number">3.3.</span> <span class="nav-text">第三步：重启生效</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Mac-平台方案"><span class="nav-number">4.</span> <span class="nav-text">Mac 平台方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#第一步：创建-Bash-脚本"><span class="nav-number">4.1.</span> <span class="nav-text">第一步：创建 Bash 脚本</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#第二步：设置可执行权限"><span class="nav-number">4.2.</span> <span class="nav-text">第二步：设置可执行权限</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#第三步：修改-settings-json"><span class="nav-number">4.3.</span> <span class="nav-text">第三步：修改 settings.json</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#第四步：重启生效"><span class="nav-number">4.4.</span> <span class="nav-text">第四步：重启生效</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#状态指示器说明"><span class="nav-number">5.</span> <span class="nav-text">状态指示器说明</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#进阶定制"><span class="nav-number">6.</span> <span class="nav-text">进阶定制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#添加更多指标"><span class="nav-number">6.1.</span> <span class="nav-text">添加更多指标</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用-Unicode-字符（Mac）"><span class="nav-number">6.2.</span> <span class="nav-text">使用 Unicode 字符（Mac）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#社区资源"><span class="nav-number">7.</span> <span class="nav-text">社区资源</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#小结"><span class="nav-number">8.</span> <span class="nav-text">小结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">66</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">40</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>
