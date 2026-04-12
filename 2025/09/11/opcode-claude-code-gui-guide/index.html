@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="Claude Code 是 Anthropic 官方的命令行 AI 编程助手，强大的功能让它成为开发者的新宠。但命令行界面对于复杂任务管理仍有局限。opcode 作为一款基于 Tauri 2 的桌面应用，为 Claude Code 提供了可视化界面，支持自定义 Agent、会话管理、成本追踪等功能，让 AI 辅助编程更加直观高效。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="opcode - Claude Code 的桌面 GUI 工具">
+<meta property="og:url" content="https://donehub.github.io/2025/09/11/opcode-claude-code-gui-guide/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="Claude Code 是 Anthropic 官方的命令行 AI 编程助手，强大的功能让它成为开发者的新宠。但命令行界面对于复杂任务管理仍有局限。opcode 作为一款基于 Tauri 2 的桌面应用，为 Claude Code 提供了可视化界面，支持自定义 Agent、会话管理、成本追踪等功能，让 AI 辅助编程更加直观高效。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-09-10T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-12T14:51:31.495Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="GUI(Claude Code)">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2025/09/11/opcode-claude-code-gui-guide/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>opcode - Claude Code 的桌面 GUI 工具 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2025/09/11/opcode-claude-code-gui-guide/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          opcode - Claude Code 的桌面 GUI 工具
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-09-11 00:00:00" itemprop="dateCreated datePublished" datetime="2025-09-11T00:00:00+08:00">2025-09-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-12 22:51:31" itemprop="dateModified" datetime="2026-04-12T22:51:31+08:00">2026-04-12</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2025/09/11/opcode-claude-code-gui-guide/" class="post-meta-item leancloud_visitors" data-flag-title="opcode - Claude Code 的桌面 GUI 工具" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2025/09/11/opcode-claude-code-gui-guide/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2025/09/11/opcode-claude-code-gui-guide/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>Claude Code 是 Anthropic 官方的命令行 AI 编程助手，强大的功能让它成为开发者的新宠。但命令行界面对于复杂任务管理仍有局限。opcode 作为一款基于 Tauri 2 的桌面应用，为 Claude Code 提供了可视化界面，支持自定义 Agent、会话管理、成本追踪等功能，让 AI 辅助编程更加直观高效。</p>
+</blockquote>
+<a id="more"></a>
+<h2 id="一、项目简介"><a href="#一、项目简介" class="headerlink" title="一、项目简介"></a>一、项目简介</h2><p><strong>opcode</strong> 是由 Asterisk 团队开发的开源桌面应用，基于 Tauri 2 + React 构建，为 Claude Code CLI 提供完整的图形化管理界面。</p>
+<h3 id="核心定位"><a href="#核心定位" class="headerlink" title="核心定位"></a>核心定位</h3><ul>
+<li><strong>命令中心的可视化扩展</strong>：将 CLI 工具转变为直观的桌面体验</li>
+<li><strong>Agent 定制平台</strong>：创建专属 AI Agent，配置系统提示词和权限</li>
+<li><strong>使用分析仪表盘</strong>：实时追踪 API 成本和 Token 消耗</li>
+<li><strong>本地优先</strong>：所有数据存储在本地，无云端依赖</li>
+</ul>
+<h3 id="技术架构"><a href="#技术架构" class="headerlink" title="技术架构"></a>技术架构</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">opcode&#x2F;</span><br><span class="line">├── src&#x2F;                   # React 18 + TypeScript 前端</span><br><span class="line">│   ├── components&#x2F;        # UI 组件（shadcn&#x2F;ui + Tailwind CSS v4）</span><br><span class="line">│   ├── lib&#x2F;               # API 客户端与工具函数</span><br><span class="line">│   └── assets&#x2F;            # 静态资源</span><br><span class="line">├── src-tauri&#x2F;             # Rust 后端</span><br><span class="line">│   ├── src&#x2F;</span><br><span class="line">│   │   ├── commands&#x2F;      # Tauri 命令处理器</span><br><span class="line">│   │   ├── checkpoint&#x2F;    # 时间线管理</span><br><span class="line">│   │   └── process&#x2F;       # 进程管理</span><br><span class="line">│   └── tests&#x2F;             # Rust 测试套件</span><br><span class="line">└── cc_agents&#x2F;             # 预置 Agent 配置</span><br></pre></td></tr></table></figure>
+<p><strong>技术栈明细</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>技术</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>前端框架</td>
+<td>React 18 + TypeScript + Vite 6</td>
+</tr>
+<tr>
+<td>UI 框架</td>
+<td>Tailwind CSS v4 + shadcn/ui + Radix UI</td>
+</tr>
+<tr>
+<td>状态管理</td>
+<td>Zustand 5</td>
+</tr>
+<tr>
+<td>后端框架</td>
+<td>Rust + Tauri 2</td>
+</tr>
+<tr>
+<td>数据存储</td>
+<td>SQLite (rusqlite)</td>
+</tr>
+<tr>
+<td>包管理</td>
+<td>Bun</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="二、核心功能详解"><a href="#二、核心功能详解" class="headerlink" title="二、核心功能详解"></a>二、核心功能详解</h2><h3 id="1-项目与会话管理"><a href="#1-项目与会话管理" class="headerlink" title="1. 项目与会话管理"></a>1. 项目与会话管理</h3><h4 id="项目浏览器"><a href="#项目浏览器" class="headerlink" title="项目浏览器"></a>项目浏览器</h4><p>opcode 自动扫描 <code>~/.claude/projects/</code> 目录，可视化展示所有 Claude Code 项目：</p>
+<ul>
+<li><strong>项目列表</strong>：显示项目名称、路径、最近活动时间</li>
+<li><strong>智能搜索</strong>：快速定位特定项目</li>
+<li><strong>一键导航</strong>：点击项目即可进入会话管理</li>
+</ul>
+<h4 id="会话历史"><a href="#会话历史" class="headerlink" title="会话历史"></a>会话历史</h4><p>每个项目下的会话完整保留：</p>
+<ul>
+<li><strong>会话概览</strong>：首条消息、时间戳、模型信息</li>
+<li><strong>会话恢复</strong>：随时继续之前的对话，保留完整上下文</li>
+<li><strong>元数据展示</strong>：Token 使用量、成本、状态一目了然</li>
+</ul>
+<h3 id="2-CC-Agents（自定义-Agent）"><a href="#2-CC-Agents（自定义-Agent）" class="headerlink" title="2. CC Agents（自定义 Agent）"></a>2. CC Agents（自定义 Agent）</h3><p>这是 opcode 最强大的功能——创建专属 AI Agent。</p>
+<h4 id="Agent-配置结构"><a href="#Agent-配置结构" class="headerlink" title="Agent 配置结构"></a>Agent 配置结构</h4><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"version"</span>: <span class="number">1</span>,</span><br><span class="line">  <span class="attr">"exported_at"</span>: <span class="string">"2025-04-12T10:00:00Z"</span>,</span><br><span class="line">  <span class="attr">"agent"</span>: &#123;</span><br><span class="line">    <span class="attr">"name"</span>: <span class="string">"My Custom Agent"</span>,</span><br><span class="line">    <span class="attr">"icon"</span>: <span class="string">"bot"</span>,</span><br><span class="line">    <span class="attr">"model"</span>: <span class="string">"sonnet"</span>,</span><br><span class="line">    <span class="attr">"system_prompt"</span>: <span class="string">"你的 Agent 指令..."</span>,</span><br><span class="line">    <span class="attr">"default_task"</span>: <span class="string">"默认执行任务"</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="配置参数说明"><a href="#配置参数说明" class="headerlink" title="配置参数说明"></a>配置参数说明</h4><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>可选值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>自定义字符串</td>
+<td>Agent 名称</td>
+</tr>
+<tr>
+<td><code>icon</code></td>
+<td><code>bot</code>, <code>shield</code>, <code>code</code>, <code>terminal</code>, <code>database</code>, <code>globe</code>, <code>file-text</code>, <code>git-branch</code></td>
+<td>图标类型</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>opus</code>, <code>sonnet</code>, <code>haiku</code></td>
+<td>使用的 Claude 模型</td>
+</tr>
+<tr>
+<td><code>system_prompt</code></td>
+<td>自定义文本</td>
+<td>Agent 的行为指令</td>
+</tr>
+<tr>
+<td><code>default_task</code></td>
+<td>自定义文本</td>
+<td>默认执行的任务描述</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h4 id="Agent-运行模式"><a href="#Agent-运行模式" class="headerlink" title="Agent 运行模式"></a>Agent 运行模式</h4><ul>
+<li><strong>前台执行</strong>：阻塞式运行，实时查看进度</li>
+<li><strong>后台执行</strong>：独立进程运行，不阻塞主界面</li>
+<li><strong>权限控制</strong>：配置文件读写、网络访问权限</li>
+</ul>
+<h3 id="3-预置-Agent-示例"><a href="#3-预置-Agent-示例" class="headerlink" title="3. 预置 Agent 示例"></a>3. 预置 Agent 示例</h3><p>opcode 提供三个开箱即用的 Agent：</p>
+<h4 id="Git-Commit-Bot（自动提交）"><a href="#Git-Commit-Bot（自动提交）" class="headerlink" title="Git Commit Bot（自动提交）"></a>Git Commit Bot（自动提交）</h4><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"name"</span>: <span class="string">"Git Commit Bot"</span>,</span><br><span class="line">  <span class="attr">"icon"</span>: <span class="string">"bot"</span>,</span><br><span class="line">  <span class="attr">"model"</span>: <span class="string">"sonnet"</span>,</span><br><span class="line">  <span class="attr">"default_task"</span>: <span class="string">"Push all changes."</span>,</span><br><span class="line">  <span class="attr">"system_prompt"</span>: <span class="string">"分析 Git 变更，生成符合 Conventional Commits 规范的提交信息并推送..."</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>使用场景</strong>：日常开发中自动化 Git 提交，生成规范的 commit message。</p>
+<h4 id="Security-Scanner（安全扫描）"><a href="#Security-Scanner（安全扫描）" class="headerlink" title="Security Scanner（安全扫描）"></a>Security Scanner（安全扫描）</h4><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"name"</span>: <span class="string">"Security Scanner"</span>,</span><br><span class="line">  <span class="attr">"icon"</span>: <span class="string">"shield"</span>,</span><br><span class="line">  <span class="attr">"model"</span>: <span class="string">"opus"</span>,</span><br><span class="line">  <span class="attr">"default_task"</span>: <span class="string">"Review the codebase for security issues."</span>,</span><br><span class="line">  <span class="attr">"system_prompt"</span>: <span class="string">"执行全面安全审计：STRIDE 威胁建模、OWASP Top 10 漏洞扫描、生成专业报告..."</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>使用场景</strong>：项目上线前的安全检查，生成详细的安全报告。</p>
+<h4 id="Unit-Tests-Bot（单元测试）"><a href="#Unit-Tests-Bot（单元测试）" class="headerlink" title="Unit Tests Bot（单元测试）"></a>Unit Tests Bot（单元测试）</h4><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"name"</span>: <span class="string">"Unit Tests Bot"</span>,</span><br><span class="line">  <span class="attr">"icon"</span>: <span class="string">"code"</span>,</span><br><span class="line">  <span class="attr">"model"</span>: <span class="string">"opus"</span>,</span><br><span class="line">  <span class="attr">"default_task"</span>: <span class="string">"Generate unit tests for this codebase."</span>,</span><br><span class="line">  <span class="attr">"system_prompt"</span>: <span class="string">"分析代码结构，生成单元测试，覆盖率目标 &gt;80%..."</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>使用场景</strong>：为新模块快速补充测试覆盖。</p>
+<h3 id="4-使用分析仪表盘"><a href="#4-使用分析仪表盘" class="headerlink" title="4. 使用分析仪表盘"></a>4. 使用分析仪表盘</h3><h4 id="成本追踪"><a href="#成本追踪" class="headerlink" title="成本追踪"></a>成本追踪</h4><p>实时监控 Claude API 使用情况：</p>
+<ul>
+<li><strong>总成本</strong>：会话累计花费</li>
+<li><strong>模型分布</strong>：按模型类型细分成本</li>
+<li><strong>时间趋势</strong>：每日/每周使用图表</li>
+</ul>
+<h4 id="Token-分析"><a href="#Token-分析" class="headerlink" title="Token 分析"></a>Token 分析</h4><p>详细的 Token 使用明细：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Input Tokens</td>
+<td>输入消耗</td>
+</tr>
+<tr>
+<td>Output Tokens</td>
+<td>输出消耗</td>
+</tr>
+<tr>
+<td>Context Usage</td>
+<td>上下文利用率</td>
+</tr>
+<tr>
+<td>Cache Hit Rate</td>
+<td>缓存命中率</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h4 id="数据导出"><a href="#数据导出" class="headerlink" title="数据导出"></a>数据导出</h4><p>支持导出使用数据用于财务分析或团队核算。</p>
+<h3 id="5-MCP-Server-管理"><a href="#5-MCP-Server-管理" class="headerlink" title="5. MCP Server 管理"></a>5. MCP Server 管理</h3><p>Model Context Protocol（MCP）服务器统一管理：</p>
+<ul>
+<li><strong>服务器注册表</strong>：集中管理所有 MCP 服务器</li>
+<li><strong>配置导入</strong>：从 Claude Desktop 导入现有配置</li>
+<li><strong>连接测试</strong>：验证服务器可用性</li>
+<li><strong>动态启用</strong>：按会话选择性启用服务器</li>
+</ul>
+<h3 id="6-时间线与检查点"><a href="#6-时间线与检查点" class="headerlink" title="6. 时间线与检查点"></a>6. 时间线与检查点</h3><p>这是 opcode 独有的版本控制功能：</p>
+<h4 id="检查点创建"><a href="#检查点创建" class="headerlink" title="检查点创建"></a>检查点创建</h4><p>在会话任意节点创建快照：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Session → Create Checkpoint → 记录当前状态</span><br></pre></td></tr></table></figure>
+<h4 id="时间线导航"><a href="#时间线导航" class="headerlink" title="时间线导航"></a>时间线导航</h4><p>可视化展示会话历史：</p>
+<ul>
+<li><strong>分支展示</strong>：显示会话的演进路径</li>
+<li><strong>差异对比</strong>：查看检查点之间的代码变化</li>
+<li><strong>一键回滚</strong>：恢复到任意历史状态</li>
+<li><strong>分支派生</strong>：从检查点创建新的会话分支</li>
+</ul>
+<h3 id="7-CLAUDE-md-编辑器"><a href="#7-CLAUDE-md-编辑器" class="headerlink" title="7. CLAUDE.md 编辑器"></a>7. CLAUDE.md 编辑器</h3><p>内置 Markdown 编辑器管理项目配置：</p>
+<ul>
+<li><strong>实时预览</strong>：左侧编辑，右侧渲染</li>
+<li><strong>语法高亮</strong>：完整 Markdown 支持</li>
+<li><strong>项目扫描</strong>：自动发现所有 CLAUDE.md 文件</li>
+<li><strong>即时生效</strong>：修改后立即应用于会话</li>
+</ul>
+<hr>
+<h2 id="三、安装指南"><a href="#三、安装指南" class="headerlink" title="三、安装指南"></a>三、安装指南</h2><h3 id="系统要求"><a href="#系统要求" class="headerlink" title="系统要求"></a>系统要求</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>操作系统</td>
+<td>Windows 10/11, macOS 11+, Linux (Ubuntu 20.04+)</td>
+</tr>
+<tr>
+<td>内存</td>
+<td>最小 4GB，推荐 8GB</td>
+</tr>
+<tr>
+<td>存储</td>
+<td>至少 1GB 可用空间</td>
+</tr>
+<tr>
+<td>Claude Code</td>
+<td>必须已安装 Claude Code CLI</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="前置依赖安装"><a href="#前置依赖安装" class="headerlink" title="前置依赖安装"></a>前置依赖安装</h3><h4 id="1-Rust-环境"><a href="#1-Rust-环境" class="headerlink" title="1. Rust 环境"></a>1. Rust 环境</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># macOS/Linux</span></span><br><span class="line">curl --proto <span class="string">'=https'</span> --tlsv1.2 -sSf https://sh.rustup.rs | sh</span><br><span class="line"></span><br><span class="line"><span class="comment"># Windows: 下载 rustup-init.exe</span></span><br><span class="line"><span class="comment"># https://rustup.rs/</span></span><br></pre></td></tr></table></figure>
+<p>验证安装：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">rustc --version</span><br><span class="line">cargo --version</span><br></pre></td></tr></table></figure>
+<h4 id="2-Bun-运行时"><a href="#2-Bun-运行时" class="headerlink" title="2. Bun 运行时"></a>2. Bun 运行时</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># macOS/Linux</span></span><br><span class="line">curl -fsSL https://bun.sh/install | bash</span><br><span class="line"></span><br><span class="line"><span class="comment"># Windows</span></span><br><span class="line">powershell -c <span class="string">"irm bun.sh/install.ps1 | iex"</span></span><br></pre></td></tr></table></figure>
+<p>验证安装：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bun --version</span><br></pre></td></tr></table></figure>
+<h4 id="3-Claude-Code-CLI"><a href="#3-Claude-Code-CLI" class="headerlink" title="3. Claude Code CLI"></a>3. Claude Code CLI</h4><p>从 <a href="https://claude.ai/code" target="_blank" rel="noopener">Claude 官网</a> 下载安装，确保 <code>claude</code> 命令在 PATH 中：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">claude --version</span><br></pre></td></tr></table></figure>
+<h4 id="4-平台特定依赖"><a href="#4-平台特定依赖" class="headerlink" title="4. 平台特定依赖"></a>4. 平台特定依赖</h4><p><strong>Linux (Ubuntu/Debian)</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">sudo apt update</span><br><span class="line">sudo apt install -y \</span><br><span class="line">  libwebkit2gtk-4.1-dev \</span><br><span class="line">  libgtk-3-dev \</span><br><span class="line">  libayatana-appindicator3-dev \</span><br><span class="line">  librsvg2-dev \</span><br><span class="line">  patchelf \</span><br><span class="line">  build-essential \</span><br><span class="line">  curl \</span><br><span class="line">  wget \</span><br><span class="line">  file \</span><br><span class="line">  libssl-dev \</span><br><span class="line">  libxdo-dev \</span><br><span class="line">  libsoup-3.0-dev \</span><br><span class="line">  libjavascriptcoregtk-4.1-dev</span><br></pre></td></tr></table></figure>
+<p><strong>macOS</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 安装 Xcode 命令行工具</span></span><br><span class="line">xcode-select --install</span><br><span class="line"></span><br><span class="line"><span class="comment"># 可选：安装 pkg-config</span></span><br><span class="line">brew install pkg-config</span><br></pre></td></tr></table></figure>
+<p><strong>Windows</strong>：</p>
+<ul>
+<li>安装 <a href="https://visualstudio.microsoft.com/visual-cpp-build-tools/" target="_blank" rel="noopener">Microsoft C++ Build Tools</a></li>
+<li>确认已安装 WebView2（Windows 11 已预装）</li>
+</ul>
+<h3 id="构建步骤"><a href="#构建步骤" class="headerlink" title="构建步骤"></a>构建步骤</h3><h4 id="1-克隆仓库"><a href="#1-克隆仓库" class="headerlink" title="1. 克隆仓库"></a>1. 克隆仓库</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git <span class="built_in">clone</span> https://github.com/winfunc/opcode.git</span><br><span class="line"><span class="built_in">cd</span> opcode</span><br></pre></td></tr></table></figure>
+<h4 id="2-安装前端依赖"><a href="#2-安装前端依赖" class="headerlink" title="2. 安装前端依赖"></a>2. 安装前端依赖</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bun install</span><br></pre></td></tr></table></figure>
+<h4 id="3-开发模式运行"><a href="#3-开发模式运行" class="headerlink" title="3. 开发模式运行"></a>3. 开发模式运行</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bun run tauri dev</span><br></pre></td></tr></table></figure>
+<p>这会启动开发服务器并打开应用窗口，支持热重载。</p>
+<h4 id="4-生产构建"><a href="#4-生产构建" class="headerlink" title="4. 生产构建"></a>4. 生产构建</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bun run tauri build</span><br></pre></td></tr></table></figure>
+<p>构建产物位置：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>平台</th>
+<th>输出路径</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Linux</td>
+<td><code>src-tauri/target/release/opcode</code></td>
+</tr>
+<tr>
+<td>macOS</td>
+<td><code>src-tauri/target/release/opcode.app</code></td>
+</tr>
+<tr>
+<td>Windows</td>
+<td><code>src-tauri/target/release/opcode.exe</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<h4 id="5-特殊构建选项"><a href="#5-特殊构建选项" class="headerlink" title="5. 特殊构建选项"></a>5. 特殊构建选项</h4><p><strong>Debug 构建（更快编译，更大体积）</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bun run tauri build --debug</span><br></pre></td></tr></table></figure>
+<p><strong>macOS Universal Binary（Intel + Apple Silicon）</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bun run tauri build --target universal-apple-darwin</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="四、使用指南"><a href="#四、使用指南" class="headerlink" title="四、使用指南"></a>四、使用指南</h2><h3 id="启动与初次配置"><a href="#启动与初次配置" class="headerlink" title="启动与初次配置"></a>启动与初次配置</h3><ol>
+<li><strong>启动应用</strong>：双击 <code>opcode.exe</code>（Windows）或运行 <code>./opcode</code>（Linux/macOS）</li>
+<li><strong>自动检测</strong>：opcode 会自动扫描 <code>~/.claude</code> 目录</li>
+<li><strong>欢迎界面</strong>：选择进入「CC Agents」或「Projects」</li>
+</ol>
+<h3 id="管理项目与会话"><a href="#管理项目与会话" class="headerlink" title="管理项目与会话"></a>管理项目与会话</h3><h4 id="查看项目"><a href="#查看项目" class="headerlink" title="查看项目"></a>查看项目</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Projects → 项目列表 → 点击项目查看会话</span><br></pre></td></tr></table></figure>
+<p>每个项目卡片显示：</p>
+<ul>
+<li>项目名称</li>
+<li>最近活动时间</li>
+<li>会话数量</li>
+</ul>
+<h4 id="恢复会话"><a href="#恢复会话" class="headerlink" title="恢复会话"></a>恢复会话</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">项目详情 → 会话列表 → 点击会话 → Resume</span><br></pre></td></tr></table></figure>
+<p>会话恢复后保持完整上下文，可直接继续对话。</p>
+<h3 id="创建自定义-Agent"><a href="#创建自定义-Agent" class="headerlink" title="创建自定义 Agent"></a>创建自定义 Agent</h3><h4 id="步骤详解"><a href="#步骤详解" class="headerlink" title="步骤详解"></a>步骤详解</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CC Agents → Create Agent → 配置参数 → 保存</span><br></pre></td></tr></table></figure>
+<ol>
+<li><p><strong>基本信息</strong>：</p>
+<ul>
+<li>输入 Agent 名称</li>
+<li>选择图标类型</li>
+<li>选择模型（Opus/Sonnet/Haiku）</li>
+</ul>
+</li>
+<li><p><strong>系统提示词</strong>：</p>
+<ul>
+<li>编写 Agent 的行为指令</li>
+<li>定义任务处理流程</li>
+<li>设置输出格式要求</li>
+</ul>
+</li>
+<li><p><strong>权限配置</strong>：</p>
+<ul>
+<li>文件读权限</li>
+<li>文件写权限</li>
+<li>网络访问权限</li>
+</ul>
+</li>
+<li><p><strong>保存并测试</strong>：点击「Create」保存 Agent</p>
+</li>
+</ol>
+<h4 id="Agent-最佳实践"><a href="#Agent-最佳实践" class="headerlink" title="Agent 最佳实践"></a>Agent 最佳实践</h4><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>推荐模型</th>
+<th>提示词要点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>简单任务</td>
+<td>Haiku</td>
+<td>简洁明确的指令</td>
+</tr>
+<tr>
+<td>通用任务</td>
+<td>Sonnet</td>
+<td>结构化的步骤说明</td>
+</tr>
+<tr>
+<td>复杂推理</td>
+<td>Opus</td>
+<td>详细的上下文和示例</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="导入预置-Agent"><a href="#导入预置-Agent" class="headerlink" title="导入预置 Agent"></a>导入预置 Agent</h3><h4 id="从-GitHub-导入"><a href="#从-GitHub-导入" class="headerlink" title="从 GitHub 导入"></a>从 GitHub 导入</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CC Agents → Import → From GitHub → 浏览 Agent → Import Agent</span><br></pre></td></tr></table></figure>
+<p>官方仓库提供三个预置 Agent，可直接导入使用。</p>
+<h4 id="从文件导入"><a href="#从文件导入" class="headerlink" title="从文件导入"></a>从文件导入</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CC Agents → Import → From File → 选择 .opcode.json 文件</span><br></pre></td></tr></table></figure>
+<p>下载 Agent 配置文件后本地导入。</p>
+<h3 id="执行-Agent-任务"><a href="#执行-Agent-任务" class="headerlink" title="执行 Agent 任务"></a>执行 Agent 任务</h3><h4 id="前台执行"><a href="#前台执行" class="headerlink" title="前台执行"></a>前台执行</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">选择 Agent → 设置任务描述 → Execute (Foreground)</span><br></pre></td></tr></table></figure>
+<p>实时查看执行进度，适合短任务。</p>
+<h4 id="后台执行"><a href="#后台执行" class="headerlink" title="后台执行"></a>后台执行</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">选择 Agent → 设置任务描述 → Execute (Background)</span><br></pre></td></tr></table></figure>
+<p>Agent 在独立进程运行，适合长时间任务。</p>
+<h4 id="查看执行历史"><a href="#查看执行历史" class="headerlink" title="查看执行历史"></a>查看执行历史</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CC Agents → Agent 详情 → Execution History</span><br></pre></td></tr></table></figure>
+<p>显示每次执行的：</p>
+<ul>
+<li>开始/结束时间</li>
+<li>任务描述</li>
+<li>执行结果</li>
+<li>Token 使用量</li>
+</ul>
+<h3 id="使用时间线功能"><a href="#使用时间线功能" class="headerlink" title="使用时间线功能"></a>使用时间线功能</h3><h4 id="创建检查点"><a href="#创建检查点" class="headerlink" title="创建检查点"></a>创建检查点</h4><p>在会话过程中随时创建：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Session → Timeline → Create Checkpoint</span><br></pre></td></tr></table></figure>
+<h4 id="回滚到检查点"><a href="#回滚到检查点" class="headerlink" title="回滚到检查点"></a>回滚到检查点</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Timeline → 选择检查点 → Restore</span><br></pre></td></tr></table></figure>
+<h4 id="查看差异"><a href="#查看差异" class="headerlink" title="查看差异"></a>查看差异</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Timeline → 选择两个检查点 → View Diff</span><br></pre></td></tr></table></figure>
+<h3 id="配置-MCP-Server"><a href="#配置-MCP-Server" class="headerlink" title="配置 MCP Server"></a>配置 MCP Server</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Menu → MCP Manager → Add Server</span><br></pre></td></tr></table></figure>
+<h4 id="手动添加"><a href="#手动添加" class="headerlink" title="手动添加"></a>手动添加</h4><p>输入服务器配置 JSON：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"name"</span>: <span class="string">"my-server"</span>,</span><br><span class="line">  <span class="attr">"command"</span>: <span class="string">"node"</span>,</span><br><span class="line">  <span class="attr">"args"</span>: [<span class="string">"server.js"</span>],</span><br><span class="line">  <span class="attr">"env"</span>: &#123;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="从-Claude-Desktop-导入"><a href="#从-Claude-Desktop-导入" class="headerlink" title="从 Claude Desktop 导入"></a>从 Claude Desktop 导入</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">MCP Manager → Import from Claude Desktop</span><br></pre></td></tr></table></figure>
+<p>自动读取 Claude Desktop 的 MCP 配置。</p>
+<h3 id="查看使用分析"><a href="#查看使用分析" class="headerlink" title="查看使用分析"></a>查看使用分析</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Menu → Usage Dashboard</span><br></pre></td></tr></table></figure>
+<p>仪表盘显示：</p>
+<ul>
+<li><strong>实时成本</strong>：当前会话花费</li>
+<li><strong>Token 分布</strong>：饼图展示输入/输出比例</li>
+<li><strong>趋势图表</strong>：折线图展示使用趋势</li>
+<li><strong>导出功能</strong>：下载 CSV/JSON 数据</li>
+</ul>
+<hr>
+<h2 id="五、进阶技巧"><a href="#五、进阶技巧" class="headerlink" title="五、进阶技巧"></a>五、进阶技巧</h2><h3 id="Agent-提示词模板"><a href="#Agent-提示词模板" class="headerlink" title="Agent 提示词模板"></a>Agent 提示词模板</h3><h4 id="代码审查-Agent"><a href="#代码审查-Agent" class="headerlink" title="代码审查 Agent"></a>代码审查 Agent</h4><figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="xml"><span class="tag">&lt;<span class="name">role</span>&gt;</span></span></span><br><span class="line">你是一位资深代码审查专家，专注于发现代码质量问题。</span><br><span class="line"><span class="xml"><span class="tag">&lt;/<span class="name">role</span>&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="xml"><span class="tag">&lt;<span class="name">task</span>&gt;</span></span></span><br><span class="line">审查提交的代码变更，关注：</span><br><span class="line"><span class="bullet">1. </span>代码风格一致性</span><br><span class="line"><span class="bullet">2. </span>潜在的 Bug</span><br><span class="line"><span class="bullet">3. </span>性能问题</span><br><span class="line"><span class="bullet">4. </span>安全漏洞</span><br><span class="line"><span class="xml"><span class="tag">&lt;/<span class="name">task</span>&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="xml"><span class="tag">&lt;<span class="name">output_format</span>&gt;</span></span></span><br><span class="line">按以下格式输出审查报告：</span><br><span class="line"><span class="section">## 问题清单</span></span><br><span class="line">| 文件 | 行号 | 问题类型 | 描述 | 建议 |</span><br><span class="line"><span class="section">## 总体评价</span></span><br><span class="line">评分：A/B/C/D</span><br><span class="line">总结：...</span><br><span class="line"><span class="xml"><span class="tag">&lt;/<span class="name">output_format</span>&gt;</span></span></span><br></pre></td></tr></table></figure>
+<h4 id="文档生成-Agent"><a href="#文档生成-Agent" class="headerlink" title="文档生成 Agent"></a>文档生成 Agent</h4><figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="xml"><span class="tag">&lt;<span class="name">role</span>&gt;</span></span></span><br><span class="line">你是一位技术文档撰写专家。</span><br><span class="line"><span class="xml"><span class="tag">&lt;/<span class="name">role</span>&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="xml"><span class="tag">&lt;<span class="name">task</span>&gt;</span></span></span><br><span class="line">为代码模块生成 API 文档：</span><br><span class="line"><span class="bullet">1. </span>分析函数签名和注释</span><br><span class="line"><span class="bullet">2. </span>生成参数说明</span><br><span class="line"><span class="bullet">3. </span>编写使用示例</span><br><span class="line"><span class="bullet">4. </span>补充注意事项</span><br><span class="line"><span class="xml"><span class="tag">&lt;/<span class="name">task</span>&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="xml"><span class="tag">&lt;<span class="name">output_format</span>&gt;</span></span></span><br><span class="line">使用 Markdown 格式，包含：</span><br><span class="line"><span class="bullet">- </span>函数名称和描述</span><br><span class="line"><span class="bullet">- </span>参数表格</span><br><span class="line"><span class="bullet">- </span>返回值说明</span><br><span class="line"><span class="bullet">- </span>使用示例代码块</span><br><span class="line"><span class="bullet">- </span>注意事项列表</span><br><span class="line"><span class="xml"><span class="tag">&lt;/<span class="name">output_format</span>&gt;</span></span></span><br></pre></td></tr></table></figure>
+<h3 id="进程隔离原理"><a href="#进程隔离原理" class="headerlink" title="进程隔离原理"></a>进程隔离原理</h3><p>opcode 的 Agent 运行在独立进程：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">主进程 (Tauri)</span><br><span class="line">    ├── UI 进程 (React)</span><br><span class="line">    ├── Agent 进程 1 (Claude Code subprocess)</span><br><span class="line">    ├── Agent 进程 2</span><br><span class="line">    └── ...</span><br></pre></td></tr></table></figure>
+<p><strong>优势</strong>：</p>
+<ul>
+<li>Agent 崩溃不影响主界面</li>
+<li>并行执行多个任务</li>
+<li>资源占用可控</li>
+</ul>
+<h3 id="数据存储位置"><a href="#数据存储位置" class="headerlink" title="数据存储位置"></a>数据存储位置</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>数据类型</th>
+<th>存储路径</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Agent 配置</td>
+<td><code>~/.opcode/agents/</code></td>
+</tr>
+<tr>
+<td>检查点数据</td>
+<td><code>~/.opcode/checkpoints/</code></td>
+</tr>
+<tr>
+<td>使用记录</td>
+<td><code>~/.opcode/analytics.db</code></td>
+</tr>
+<tr>
+<td>MCP 配置</td>
+<td><code>~/.claude/mcp_servers.json</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="六、常见问题"><a href="#六、常见问题" class="headerlink" title="六、常见问题"></a>六、常见问题</h2><h3 id="1-构建失败-“cargo-not-found”"><a href="#1-构建失败-“cargo-not-found”" class="headerlink" title="1. 构建失败 “cargo not found”"></a>1. 构建失败 “cargo not found”</h3><p><strong>解决方案</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 确保 Rust 已安装</span></span><br><span class="line"><span class="built_in">source</span> ~/.cargo/env  <span class="comment"># 或重启终端</span></span><br><span class="line">cargo --version</span><br></pre></td></tr></table></figure>
+<h3 id="2-Linux-“webkit2gtk-not-found”"><a href="#2-Linux-“webkit2gtk-not-found”" class="headerlink" title="2. Linux “webkit2gtk not found”"></a>2. Linux “webkit2gtk not found”</h3><p><strong>解决方案</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo apt install libwebkit2gtk-4.1-dev</span><br></pre></td></tr></table></figure>
+<h3 id="3-Windows-“MSVC-not-found”"><a href="#3-Windows-“MSVC-not-found”" class="headerlink" title="3. Windows “MSVC not found”"></a>3. Windows “MSVC not found”</h3><p><strong>解决方案</strong>：</p>
+<ul>
+<li>安装 Visual Studio Build Tools</li>
+<li>选择「C++ 构建工具」工作负载</li>
+<li>重启终端</li>
+</ul>
+<h3 id="4-“claude-command-not-found”"><a href="#4-“claude-command-not-found”" class="headerlink" title="4. “claude command not found”"></a>4. “claude command not found”</h3><p><strong>解决方案</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 确保 Claude Code CLI 已安装</span></span><br><span class="line">claude --version</span><br><span class="line"></span><br><span class="line"><span class="comment"># Windows: 添加到 PATH</span></span><br><span class="line"><span class="comment"># macOS/Linux: 确认 /usr/local/bin 在 PATH</span></span><br></pre></td></tr></table></figure>
+<h3 id="5-构建内存不足"><a href="#5-构建内存不足" class="headerlink" title="5. 构建内存不足"></a>5. 构建内存不足</h3><p><strong>解决方案</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 减少并行编译</span></span><br><span class="line">cargo build -j 2</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、项目资源"><a href="#七、项目资源" class="headerlink" title="七、项目资源"></a>七、项目资源</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>资源</th>
+<th>链接</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GitHub 仓库</td>
+<td><a href="https://github.com/winfunc/opcode" target="_blank" rel="noopener">winfunc/opcode</a></td>
+</tr>
+<tr>
+<td>Discord 社区</td>
+<td><a href="https://discord.com/invite/KYwhHVzUsY" target="_blank" rel="noopener">Join Discord</a></td>
+</tr>
+<tr>
+<td>许可证</td>
+<td>AGPL-3.0</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="八、总结"><a href="#八、总结" class="headerlink" title="八、总结"></a>八、总结</h2><p>opcode 为 Claude Code 提供了完整的桌面 GUI 体验：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>功能</th>
+<th>价值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>自定义 Agent</td>
+<td>定制专属 AI 工作流</td>
+</tr>
+<tr>
+<td>会话管理</td>
+<td>可视化管理所有对话</td>
+</tr>
+<tr>
+<td>成本追踪</td>
+<td>实时监控 API 开销</td>
+</tr>
+<tr>
+<td>时间线回滚</td>
+<td>版本控制式的会话管理</td>
+</tr>
+<tr>
+<td>MCP 管理</td>
+<td>统一配置扩展服务</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/GUI-Claude-Code/" rel="tag"><i class="fa fa-tag"></i> GUI(Claude Code)</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/08/22/ai-concepts-guide/" rel="prev" title="AI 概念指南：从 LLM 到 Agent，一文理清人工智能的迷宫">
+      <i class="fa fa-chevron-left"></i> AI 概念指南：从 LLM 到 Agent，一文理清人工智能的迷宫
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2025/09/11/cloudcli-ui-guide/" rel="next" title="CloudCLI UI - Claude Code 的 Web GUI 与云端方案">
+      CloudCLI UI - Claude Code 的 Web GUI 与云端方案 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#一、项目简介"><span class="nav-number">1.</span> <span class="nav-text">一、项目简介</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#核心定位"><span class="nav-number">1.1.</span> <span class="nav-text">核心定位</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#技术架构"><span class="nav-number">1.2.</span> <span class="nav-text">技术架构</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、核心功能详解"><span class="nav-number">2.</span> <span class="nav-text">二、核心功能详解</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-项目与会话管理"><span class="nav-number">2.1.</span> <span class="nav-text">1. 项目与会话管理</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#项目浏览器"><span class="nav-number">2.1.1.</span> <span class="nav-text">项目浏览器</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#会话历史"><span class="nav-number">2.1.2.</span> <span class="nav-text">会话历史</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-CC-Agents（自定义-Agent）"><span class="nav-number">2.2.</span> <span class="nav-text">2. CC Agents（自定义 Agent）</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Agent-配置结构"><span class="nav-number">2.2.1.</span> <span class="nav-text">Agent 配置结构</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#配置参数说明"><span class="nav-number">2.2.2.</span> <span class="nav-text">配置参数说明</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Agent-运行模式"><span class="nav-number">2.2.3.</span> <span class="nav-text">Agent 运行模式</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-预置-Agent-示例"><span class="nav-number">2.3.</span> <span class="nav-text">3. 预置 Agent 示例</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Git-Commit-Bot（自动提交）"><span class="nav-number">2.3.1.</span> <span class="nav-text">Git Commit Bot（自动提交）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Security-Scanner（安全扫描）"><span class="nav-number">2.3.2.</span> <span class="nav-text">Security Scanner（安全扫描）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Unit-Tests-Bot（单元测试）"><span class="nav-number">2.3.3.</span> <span class="nav-text">Unit Tests Bot（单元测试）</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-使用分析仪表盘"><span class="nav-number">2.4.</span> <span class="nav-text">4. 使用分析仪表盘</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#成本追踪"><span class="nav-number">2.4.1.</span> <span class="nav-text">成本追踪</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Token-分析"><span class="nav-number">2.4.2.</span> <span class="nav-text">Token 分析</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#数据导出"><span class="nav-number">2.4.3.</span> <span class="nav-text">数据导出</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-MCP-Server-管理"><span class="nav-number">2.5.</span> <span class="nav-text">5. MCP Server 管理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-时间线与检查点"><span class="nav-number">2.6.</span> <span class="nav-text">6. 时间线与检查点</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#检查点创建"><span class="nav-number">2.6.1.</span> <span class="nav-text">检查点创建</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#时间线导航"><span class="nav-number">2.6.2.</span> <span class="nav-text">时间线导航</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-CLAUDE-md-编辑器"><span class="nav-number">2.7.</span> <span class="nav-text">7. CLAUDE.md 编辑器</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、安装指南"><span class="nav-number">3.</span> <span class="nav-text">三、安装指南</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#系统要求"><span class="nav-number">3.1.</span> <span class="nav-text">系统要求</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#前置依赖安装"><span class="nav-number">3.2.</span> <span class="nav-text">前置依赖安装</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-Rust-环境"><span class="nav-number">3.2.1.</span> <span class="nav-text">1. Rust 环境</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-Bun-运行时"><span class="nav-number">3.2.2.</span> <span class="nav-text">2. Bun 运行时</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-Claude-Code-CLI"><span class="nav-number">3.2.3.</span> <span class="nav-text">3. Claude Code CLI</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#4-平台特定依赖"><span class="nav-number">3.2.4.</span> <span class="nav-text">4. 平台特定依赖</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#构建步骤"><span class="nav-number">3.3.</span> <span class="nav-text">构建步骤</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-克隆仓库"><span class="nav-number">3.3.1.</span> <span class="nav-text">1. 克隆仓库</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-安装前端依赖"><span class="nav-number">3.3.2.</span> <span class="nav-text">2. 安装前端依赖</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-开发模式运行"><span class="nav-number">3.3.3.</span> <span class="nav-text">3. 开发模式运行</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#4-生产构建"><span class="nav-number">3.3.4.</span> <span class="nav-text">4. 生产构建</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#5-特殊构建选项"><span class="nav-number">3.3.5.</span> <span class="nav-text">5. 特殊构建选项</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、使用指南"><span class="nav-number">4.</span> <span class="nav-text">四、使用指南</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#启动与初次配置"><span class="nav-number">4.1.</span> <span class="nav-text">启动与初次配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#管理项目与会话"><span class="nav-number">4.2.</span> <span class="nav-text">管理项目与会话</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#查看项目"><span class="nav-number">4.2.1.</span> <span class="nav-text">查看项目</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#恢复会话"><span class="nav-number">4.2.2.</span> <span class="nav-text">恢复会话</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#创建自定义-Agent"><span class="nav-number">4.3.</span> <span class="nav-text">创建自定义 Agent</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#步骤详解"><span class="nav-number">4.3.1.</span> <span class="nav-text">步骤详解</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Agent-最佳实践"><span class="nav-number">4.3.2.</span> <span class="nav-text">Agent 最佳实践</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#导入预置-Agent"><span class="nav-number">4.4.</span> <span class="nav-text">导入预置 Agent</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#从-GitHub-导入"><span class="nav-number">4.4.1.</span> <span class="nav-text">从 GitHub 导入</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#从文件导入"><span class="nav-number">4.4.2.</span> <span class="nav-text">从文件导入</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#执行-Agent-任务"><span class="nav-number">4.5.</span> <span class="nav-text">执行 Agent 任务</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#前台执行"><span class="nav-number">4.5.1.</span> <span class="nav-text">前台执行</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#后台执行"><span class="nav-number">4.5.2.</span> <span class="nav-text">后台执行</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#查看执行历史"><span class="nav-number">4.5.3.</span> <span class="nav-text">查看执行历史</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用时间线功能"><span class="nav-number">4.6.</span> <span class="nav-text">使用时间线功能</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#创建检查点"><span class="nav-number">4.6.1.</span> <span class="nav-text">创建检查点</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#回滚到检查点"><span class="nav-number">4.6.2.</span> <span class="nav-text">回滚到检查点</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#查看差异"><span class="nav-number">4.6.3.</span> <span class="nav-text">查看差异</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#配置-MCP-Server"><span class="nav-number">4.7.</span> <span class="nav-text">配置 MCP Server</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#手动添加"><span class="nav-number">4.7.1.</span> <span class="nav-text">手动添加</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#从-Claude-Desktop-导入"><span class="nav-number">4.7.2.</span> <span class="nav-text">从 Claude Desktop 导入</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#查看使用分析"><span class="nav-number">4.8.</span> <span class="nav-text">查看使用分析</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、进阶技巧"><span class="nav-number">5.</span> <span class="nav-text">五、进阶技巧</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Agent-提示词模板"><span class="nav-number">5.1.</span> <span class="nav-text">Agent 提示词模板</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#代码审查-Agent"><span class="nav-number">5.1.1.</span> <span class="nav-text">代码审查 Agent</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#文档生成-Agent"><span class="nav-number">5.1.2.</span> <span class="nav-text">文档生成 Agent</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#进程隔离原理"><span class="nav-number">5.2.</span> <span class="nav-text">进程隔离原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#数据存储位置"><span class="nav-number">5.3.</span> <span class="nav-text">数据存储位置</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、常见问题"><span class="nav-number">6.</span> <span class="nav-text">六、常见问题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-构建失败-“cargo-not-found”"><span class="nav-number">6.1.</span> <span class="nav-text">1. 构建失败 “cargo not found”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-Linux-“webkit2gtk-not-found”"><span class="nav-number">6.2.</span> <span class="nav-text">2. Linux “webkit2gtk not found”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-Windows-“MSVC-not-found”"><span class="nav-number">6.3.</span> <span class="nav-text">3. Windows “MSVC not found”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-“claude-command-not-found”"><span class="nav-number">6.4.</span> <span class="nav-text">4. “claude command not found”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-构建内存不足"><span class="nav-number">6.5.</span> <span class="nav-text">5. 构建内存不足</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、项目资源"><span class="nav-number">7.</span> <span class="nav-text">七、项目资源</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、总结"><span class="nav-number">8.</span> <span class="nav-text">八、总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">68</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">41</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>

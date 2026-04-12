@@ -190,6 +190,231 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/12/14/async_thread_local/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/12/14/async_thread_local/" class="post-title-link" itemprop="url">在异步线程或线程池中传输 ThreadLocal 上下文</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-12-14 01:45:12" itemprop="dateCreated datePublished" datetime="2020-12-14T01:45:12+08:00">2020-12-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2020/12/14/async_thread_local/" class="post-meta-item leancloud_visitors" data-flag-title="在异步线程或线程池中传输 ThreadLocal 上下文" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2020/12/14/async_thread_local/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2020/12/14/async_thread_local/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h4 id="一、背景介绍"><a href="#一、背景介绍" class="headerlink" title="一、背景介绍"></a>一、背景介绍</h4><p><code>ThreadLocal</code>是线程提供的本地变量，因其线程特殊属性，被经常用于存储与线程相关的信息，如保存登录用户信息、数据库连接配置等。但我们忽略了一个关键点：<code>ThreadLocal</code> 只能用在同步线程中，而在异步线程或线程池中则不起作用。因此，本博文主要探讨如何在异步线程和线程池中传递 <code>ThreadLocal</code> 上下文。</p>
+<h4 id="二、问题描述"><a href="#二、问题描述" class="headerlink" title="二、问题描述"></a>二、问题描述</h4><p>发版之后，爆出线上问题：“用户信息获取失败”。为了更好地解释这个问题，先介绍下公司的系统架构：用户登录时，后台系统通过用户 <code>key</code> 获取个人信息并保存在 <code>ThreadLocal</code> 静态对象中，以供后续使用。简要实现如下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* 拦截器</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">HandlerAccessInterceptor</span> <span class="keyword">implements</span> <span class="title">HandlerInterceptor</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">preHandle</span><span class="params">(HttpServletRequest httpServletRequest,</span></span></span><br><span class="line"><span class="function"><span class="params">                             HttpServletResponse httpServletResponse, Object o)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">        <span class="comment">// 增加允许跨域的返回信息</span></span><br><span class="line">        httpServletResponse.setHeader(<span class="string">"Access-Control-Allow-Origin"</span>, <span class="string">"*"</span>);</span><br><span class="line">        httpServletResponse.setHeader(<span class="string">"Access-Control-Allow-Headers"</span>, <span class="string">"Content-Type,Content-Length, Authorization, Accept,X-Requested-With"</span>);</span><br><span class="line">        httpServletResponse.setHeader(<span class="string">"Access-Control-Allow-Methods"</span>, <span class="string">"PUT,POST,GET,DELETE,OPTIONS"</span>);</span><br><span class="line">        </span><br><span class="line">        <span class="comment">// 获取并保存用户信息</span></span><br><span class="line">        <span class="keyword">if</span> (httpServletRequest.getCookies() != <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">for</span> (Cookie cookie : httpServletRequest.getCookies()) &#123;</span><br><span class="line">                <span class="keyword">if</span> (<span class="string">"vkey"</span>.equals(cookie.getName())) &#123;</span><br><span class="line">                    UserContextUtil.setUser(cookie.getValue());</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">postHandle</span><span class="params">(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o, ModelAndView modelAndView)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 清除用户信息</span></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">afterCompletion</span><span class="params">(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o, Exception e)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">        UserContextUtil.remove();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* 用户信息工具</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">UserContextUtil</span> </span>&#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> ThreadLocal&lt;SyUser&gt; threadLocal = <span class="keyword">new</span> ThreadLocal&lt;&gt;();</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String TOKEN_BEARER = <span class="string">"Bearer "</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 获取当前线程用户信息</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 前线程用户信息</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">static</span> SyUser <span class="title">getUser</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        SyUser syUser = threadLocal.get();</span><br><span class="line">        <span class="keyword">return</span> syUser;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">    * 直接保存用户信息</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">static</span> <span class="keyword">boolean</span> <span class="title">setSyUser</span><span class="params">(SyUser syUser)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (syUser == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        threadLocal.set(syUser);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 转换登录用户信息为当期系统用户信息</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> cookies</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">static</span> <span class="keyword">boolean</span> <span class="title">setUser</span><span class="params">(Cookie[] cookies)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (cookies == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">for</span> (Cookie cookie : cookies) &#123;</span><br><span class="line">            String name = cookie.getName().toLowerCase();</span><br><span class="line">            <span class="keyword">if</span> (<span class="string">"vkey"</span>.equals(name)) &#123;</span><br><span class="line">                String value = cookie.getValue();</span><br><span class="line">                <span class="keyword">if</span> (StrUtil.isEmpty(value)) &#123;</span><br><span class="line">                    <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                LoginUser loginUser = <span class="keyword">new</span> LoginUser(value);</span><br><span class="line">                <span class="keyword">if</span> (loginUser.getId() == <span class="keyword">null</span>) &#123;</span><br><span class="line">                    <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                SyUser syUser = <span class="keyword">new</span> SyUser();</span><br><span class="line">                syUser.setId(loginUser.getId().intValue());</span><br><span class="line">                syUser.setUserName(loginUser.getMobile());</span><br><span class="line">                syUser.setTrueName(loginUser.getName());</span><br><span class="line">                <span class="keyword">return</span> setSyUser(syUser);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 转换登录用户信息为当期系统用户信息</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> headerValue 头部 vkey 值</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">static</span> <span class="keyword">boolean</span> <span class="title">setUser</span><span class="params">(String headerValue)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (StrUtil.isEmpty(headerValue)) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (headerValue.startsWith(TOKEN_BEARER)) &#123;</span><br><span class="line">            headerValue = headerValue.substring(TOKEN_BEARER.length());</span><br><span class="line">        &#125;</span><br><span class="line">        LoginUser loginUser = <span class="keyword">new</span> LoginUser(headerValue);</span><br><span class="line">        <span class="keyword">if</span> (loginUser.getId() == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        SyUser syUser = <span class="keyword">new</span> SyUser();</span><br><span class="line">        syUser.setId(loginUser.getId().intValue());</span><br><span class="line">        syUser.setUserName(loginUser.getMobile());</span><br><span class="line">        syUser.setTrueName(loginUser.getName());</span><br><span class="line">        syUser.setPhone(loginUser.getMobile());</span><br><span class="line">        <span class="keyword">return</span> setSyUser(syUser);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 获取登录用户姓名</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">static</span> String <span class="title">getUserName</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        SyUser syUser = threadLocal.get();</span><br><span class="line">        <span class="keyword">if</span> (syUser == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> syUser.getTrueName();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 移除线程中用户信息</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">remove</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        threadLocal.remove();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>问题代码定位：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@RestController</span></span><br><span class="line"><span class="meta">@RequestMapping</span>(<span class="string">"/web/file"</span>)</span><br><span class="line"><span class="meta">@Slf</span>4j</span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ManageFileController</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Resource</span></span><br><span class="line">    <span class="keyword">private</span> ManageFileService manageFileService;</span><br><span class="line">    </span><br><span class="line">	<span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 【加载文件】</span></span><br><span class="line"><span class="comment">     * 下载文件的数据准备阶段可能非常长, 前台操作人员无法得知进度, 且无法做其他操作</span></span><br><span class="line"><span class="comment">     * 故将数据准备与文件下载解耦, 解决交互上不舒服的问题</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> loadFileReqDTO 加载文件请求</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 调用是否成功</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="meta">@PostMapping</span>(<span class="string">"/loadFile"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> RespDTO&lt;String&gt; <span class="title">loadFile</span><span class="params">(@Valid @RequestBody LoadFileReqDTO loadFileReqDTO)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 初始化加载文件信息</span></span><br><span class="line">        AsyncLoadFile asyncLoadFile = manageFileService.initLoadFileInfo(loadFileReqDTO);</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 执行文件加载</span></span><br><span class="line">        manageFileService manageFileService.loadFile(loadFileReqDTO, inheritedSyUser);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> RespDTO.success();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@author</span> zourongsheng</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@version</span> 1.0</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@date</span> 2020/10/21 13:55</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="meta">@Slf</span>4j</span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ManageFileService</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Resource</span></span><br><span class="line">    <span class="keyword">private</span> ManageFileHelper manageFileHelper;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Resource</span></span><br><span class="line">    <span class="keyword">private</span> AsyncLoadFileMapper asyncLoadFileMapper;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 【加载文件】</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> loadFileReqDTO 加载文件请求</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> asyncLoadFile  初始化加载文件信息</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> syUser         用户信息</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="meta">@Async</span>(TASK_EXECUTOR)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">loadFile</span><span class="params">(LoadFileReqDTO loadFileReqDTO, AsyncLoadFile asyncLoadFile, SyUser syUser)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line"></span><br><span class="line">            log.info(<span class="string">"异步加载文件开始; userName: &#123;&#125;"</span>, UserContextUtil.getUserName());</span><br><span class="line"></span><br><span class="line">            <span class="comment">// 路由加载服务</span></span><br><span class="line">            LoadFileService loadFileService = manageFileHelper.router(loadFileReqDTO.getLoadFileType());</span><br><span class="line"></span><br><span class="line">            <span class="comment">// 开启文件加载过程</span></span><br><span class="line">            LoadFileReqBO loadFileReqBO = <span class="keyword">new</span> LoadFileReqBO();</span><br><span class="line">            BeanUtils.copyProperties(loadFileReqDTO, loadFileReqBO);</span><br><span class="line"></span><br><span class="line">            LoadFileRespBO loadFileRespBO = loadFileService.executeLoadFile(loadFileReqBO);</span><br><span class="line"></span><br><span class="line">            <span class="comment">// 备份文件至影像件系统</span></span><br><span class="line">            String fileKey = FileUtil.uploadFile(loadFileRespBO.getFilePathUrl(), FileTypeEnum.XLSX, STORE_FILE_KEY);</span><br><span class="line"></span><br><span class="line">            CuiShouAssert.notEmpty(fileKey, <span class="string">"调用影像件系统异常!"</span>);</span><br><span class="line"></span><br><span class="line">            asyncLoadFile.setFileName(loadFileRespBO.getFileName());</span><br><span class="line">            asyncLoadFile.setFileKey(fileKey);</span><br><span class="line">            asyncLoadFile.setLoadStatus(LoadStatusEnum.SUCCESS.name());</span><br><span class="line">        &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">            log.info(<span class="string">"加载文件异常; errMsg: &#123;&#125;"</span>, e.getMessage(), e);</span><br><span class="line">            asyncLoadFile.setLoadStatus(LoadStatusEnum.FAILURE.name());</span><br><span class="line">            asyncLoadFile.setRemark(e.getMessage());</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        asyncLoadFileMapper.update(asyncLoadFile);</span><br><span class="line">        </span><br><span class="line">        log.info(<span class="string">"异步加载文件结束; userName: &#123;&#125;"</span>, UserContextUtil.getUserName());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">运行结果...</span><br><span class="line"><span class="number">2020</span>-<span class="number">12</span>-<span class="number">14</span> <span class="number">17</span>:<span class="number">51</span>:<span class="number">15.235</span>  INFO [-,d11235d6f6eda8d0,<span class="number">8</span>c023b1e45855f97,<span class="keyword">false</span>] <span class="number">19444</span> --- [common-async-executor-<span class="number">1</span>] c.v.c.o.service.file.ManageFileService   : 异步加载文件开始; userName: <span class="keyword">null</span></span><br></pre></td></tr></table></figure>
+<p>问题很好定位，<code>@Async</code> 异步线程池开启子线程处理任务后，父线程提供的本地线程变量就销毁了。</p>
+<h4 id="三、解决方法"><a href="#三、解决方法" class="headerlink" title="三、解决方法"></a>三、解决方法</h4><ul>
+<li>将用户信息当作参数传入异步方法，再在异步方法中重新设置本地变量；</li>
+<li>采用 <code>InheritedThreadLocal</code> 实现子线程上下文的传递。</li>
+</ul>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 【加载文件-方法一】</span></span><br><span class="line"><span class="comment"> * 下载文件的数据准备阶段可能非常长, 前台操作人员无法得知进度, 且无法做其他操作</span></span><br><span class="line"><span class="comment"> * 故将数据准备与文件下载解耦, 解决交互上不舒服的问题</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@param</span> loadFileReqDTO 加载文件请求</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@return</span> 调用是否成功</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@PostMapping</span>(<span class="string">"/loadFile"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> RespDTO&lt;String&gt; <span class="title">loadFile</span><span class="params">(@Valid @RequestBody LoadFileReqDTO loadFileReqDTO)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 初始化加载文件信息</span></span><br><span class="line">    AsyncLoadFile asyncLoadFile = manageFileService.initLoadFileInfo(loadFileReqDTO);</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// #loadFile 为异步方法, 这里将操作人信息继承到子线程中</span></span><br><span class="line">    SyUser syUser = UserContextUtil.getUser();</span><br><span class="line"></span><br><span class="line">    SyUser inheritedSyUser = <span class="keyword">new</span> SyUser();</span><br><span class="line"></span><br><span class="line">    BeanUtils.copyProperties(syUser, inheritedSyUser);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 执行文件加载</span></span><br><span class="line">    manageFileService manageFileService.loadFile(loadFileReqDTO, inheritedSyUser);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> RespDTO.success();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* 【加载文件】</span></span><br><span class="line"><span class="comment">* 下载文件的数据准备阶段可能非常长, 前台操作人员无法得知进度, 且无法做其他操作</span></span><br><span class="line"><span class="comment">* 故将数据准备与文件下载解耦, 解决交互上不舒服的问题</span></span><br><span class="line"><span class="comment">*</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> loadFileReqDTO 加载文件请求</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> asyncLoadFile  初始化加载文件信息</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> syUser         用户信息</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="meta">@Async</span>(TASK_EXECUTOR)</span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">loadFile</span><span class="params">(LoadFileReqDTO loadFileReqDTO, AsyncLoadFile asyncLoadFile, SyUser syUser)</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    UserContextUtil.setSyUser(syUser);</span><br><span class="line">    log.info(<span class="string">"异步加载文件开始; UserName: &#123;&#125;"</span>, UserContextUtil.getRealName());</span><br><span class="line">    UserContextUtil.remove();</span><br><span class="line">    log.info(<span class="string">"异步加载文件结束; UserName: &#123;&#125;"</span>, UserContextUtil.getRealName());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">方法一运行结果...</span><br><span class="line"><span class="number">2020</span>-<span class="number">12</span>-<span class="number">14</span> <span class="number">18</span>:<span class="number">03</span>:<span class="number">34.947</span>  INFO [-,<span class="number">480f</span>9c55e785ec6f,c8de532979871193,<span class="keyword">false</span>] <span class="number">19444</span> --- [common-async-executor-<span class="number">2</span>] c.v.c.o.service.file.ManageFileService   : 异步加载文件开始; UserName: 邹荣升</span><br><span class="line"><span class="number">2020</span>-<span class="number">12</span>-<span class="number">14</span> <span class="number">18</span>:<span class="number">03</span>:<span class="number">35.235</span>  INFO [-,<span class="number">480f</span>9c55e785ec6f,c8de532979871193,<span class="keyword">false</span>] <span class="number">19444</span> --- [common-async-executor-<span class="number">2</span>] c.v.c.o.service.file.ManageFileService   : 异步加载文件结束; UserName: <span class="keyword">null</span></span><br></pre></td></tr></table></figure>
+<p>方法一可以说是傻瓜操作，治标不治本，后来的同事稍不注意还会掉进坑里。我们来实现方法二：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> ThreadLocal&lt;SyUser&gt; threadLocal = <span class="keyword">new</span> InheritableThreadLocal&lt;&gt;();</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* 【加载文件-异步线程】</span></span><br><span class="line"><span class="comment">* 下载文件的数据准备阶段可能非常长, 前台操作人员无法得知进度, 且无法做其他操作</span></span><br><span class="line"><span class="comment">* 故将数据准备与文件下载解耦, 解决交互上不舒服的问题</span></span><br><span class="line"><span class="comment">*</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> loadFileReqDTO 加载文件请求</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> asyncLoadFile  初始化加载文件信息</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> syUser         用户信息</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="meta">@Async</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">loadFile</span><span class="params">(LoadFileReqDTO loadFileReqDTO, AsyncLoadFile asyncLoadFile, SyUser syUser)</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    UserContextUtil.setSyUser(syUser);</span><br><span class="line">    log.info(<span class="string">"异步加载文件开始; UserName: &#123;&#125;"</span>, UserContextUtil.getRealName());</span><br><span class="line">    UserContextUtil.remove();</span><br><span class="line">    log.info(<span class="string">"异步加载文件结束; UserName: &#123;&#125;"</span>, UserContextUtil.getRealName());</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">* 【加载文件-异步线程池】</span></span><br><span class="line"><span class="comment">* 下载文件的数据准备阶段可能非常长, 前台操作人员无法得知进度, 且无法做其他操作</span></span><br><span class="line"><span class="comment">* 故将数据准备与文件下载解耦, 解决交互上不舒服的问题</span></span><br><span class="line"><span class="comment">*</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> loadFileReqDTO 加载文件请求</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> asyncLoadFile  初始化加载文件信息</span></span><br><span class="line"><span class="comment">* <span class="doctag">@param</span> syUser         用户信息</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="meta">@Async</span>(TASK_EXECUTOR)</span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">loadFile</span><span class="params">(LoadFileReqDTO loadFileReqDTO, AsyncLoadFile asyncLoadFile, SyUser syUser)</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    UserContextUtil.setSyUser(syUser);</span><br><span class="line">    log.info(<span class="string">"异步加载文件开始; UserName: &#123;&#125;"</span>, UserContextUtil.getRealName());</span><br><span class="line">    UserContextUtil.remove();</span><br><span class="line">    log.info(<span class="string">"异步加载文件结束; UserName: &#123;&#125;"</span>, UserContextUtil.getRealName());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>异步线程和异步线程池两种情况下的运行结果：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">运行结果...</span><br><span class="line"><span class="number">2020</span>-<span class="number">12</span>-<span class="number">14</span> <span class="number">18</span>:<span class="number">36</span>:<span class="number">41.560</span>  INFO [-,<span class="number">8658</span>c694de3e9b7a,ccc7a782204c91b0,<span class="keyword">false</span>] <span class="number">19876</span> --- [common-async-executor-<span class="number">1</span>] c.v.c.o.service.file.ManageFileService   : 异步加载文件开始; UserName: 邹荣升</span><br><span class="line"></span><br><span class="line"><span class="number">2020</span>-<span class="number">12</span>-<span class="number">14</span> <span class="number">18</span>:<span class="number">41</span>:<span class="number">17.735</span>  INFO [-,<span class="number">67</span>b4725bcaacfc64,<span class="number">36</span>ee2acec232be32,<span class="keyword">false</span>] <span class="number">21600</span> --- [common-async-executor-<span class="number">1</span>] c.v.c.o.service.file.ManageFileService   : 异步加载文件开始; UserName: 邹荣升</span><br></pre></td></tr></table></figure>
+<h4 id="三、总结"><a href="#三、总结" class="headerlink" title="三、总结"></a>三、总结</h4><p>虽然 <code>ThreadLocal</code> 的线程相关属性提供了很多便利性，但在高并发系统中，直接使用原生静态对象并不合适。因此，如使用 <code>Redis</code>、<code>MQ</code> 一样，深入了解常用工具的特性，是系统设计的必备要素。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/12/05/ball/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/12/05/ball/" class="post-title-link" itemprop="url">萝卜丸子</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-12-05 14:57:01" itemprop="dateCreated datePublished" datetime="2020-12-05T14:57:01+08:00">2020-12-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%83%E8%B4%A7/" itemprop="url" rel="index"><span itemprop="name">吃货</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2020/12/05/ball/" class="post-meta-item leancloud_visitors" data-flag-title="萝卜丸子" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2020/12/05/ball/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2020/12/05/ball/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <hr>
+<p>最近在忙很多事，工作和生活都乱糟糟的，博客也停更了。写技术还是美食呢，当然是美食啦。</p>
+<p>今天做萝卜丸子。边做边吃，忽然想起读初二的一天，同学们凑钱买了五斤萝卜丸子，然后在英语课上偷吃的故事。十五年过去了，但历历在目。</p>
+<h5 id="一、食材准备"><a href="#一、食材准备" class="headerlink" title="一、食材准备"></a>一、食材准备</h5><p>青萝卜、胡萝卜、红薯淀粉、面粉、鸡蛋、辣椒、胡椒、葱姜蒜、生抽、老抽、蚝油、冰糖。</p>
+<p><a href="https://imgchr.com/i/DOPsrd" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOPsrd.jpg" alt="DOPsrd.jpg"></a></p>
+<h5 id="二、调料子"><a href="#二、调料子" class="headerlink" title="二、调料子"></a>二、调料子</h5><p>首先将萝卜刨丝。</p>
+<p><a href="https://imgchr.com/i/DOPjRU" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOPjRU.jpg" alt="DOPjRU.jpg"></a></p>
+<p>然后要杀掉萝卜的水气和臭味。比较喜欢看老饭骨，大伯给的方子是在沸水中放入冰糖，再倒入萝卜丝。今天试了下，效果确实很棒，建议民间推广。</p>
+<p><a href="https://imgchr.com/i/DOPgat" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOPgat.jpg" alt="DOPgat.jpg"></a></p>
+<p>接下来调糊糊。用筷子顺着一个方向搅拌，直到可以用筷子提起来。这步也叫上劲，是关键一环。</p>
+<p><a href="https://imgchr.com/i/DOiNLj" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOiNLj.jpg" alt="DOiNLj.jpg"></a></p>
+<p>调糊糊前，可以先把油热上。</p>
+<p><a href="https://imgchr.com/i/DOiXTI" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOiXTI.jpg" alt="DOiXTI.jpg"></a></p>
+<p>待油七分热，将糊糊团成丸子，依次放入。油温太高会让丸子糊掉，太低又会导致丸子吸油太多。七分热怎么看呢？可以先放一小块糊糊进去，剧烈翻滚但短时间内又不会泛黄就可以了。</p>
+<p><a href="https://imgchr.com/i/DOFTNq" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOFTNq.jpg" alt="DOFTNq.jpg"></a></p>
+<p>文火慢炸20分钟，表面金黄时捞出。</p>
+<p><a href="https://imgchr.com/i/DOFxb9" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOFxb9.jpg" alt="DOFxb9.jpg"></a></p>
+<p>丸子放入次序不一样，可能炸出来的颜色也不一样。强迫症患者可以将丸子下入油中复炸一次，让颜色均匀。</p>
+<p>萝卜丸子可以当零食吃，也可以做汤。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/11/13/normal_unique_index/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1154,232 +1379,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/05/03/next_search_service/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/05/03/next_search_service/" class="post-title-link" itemprop="url">NexT 主题集成搜索功能</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-05-03 16:28:21" itemprop="dateCreated datePublished" datetime="2020-05-03T16:28:21+08:00">2020-05-03</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E4%B8%AD%E9%97%B4%E4%BB%B6/" itemprop="url" rel="index"><span itemprop="name">中间件</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2020/05/03/next_search_service/" class="post-meta-item leancloud_visitors" data-flag-title="NexT 主题集成搜索功能" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2020/05/03/next_search_service/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2020/05/03/next_search_service/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <hr>
-<h4 id="一、-NexT-集成第三方搜索服务"><a href="#一、-NexT-集成第三方搜索服务" class="headerlink" title="一、 NexT 集成第三方搜索服务"></a>一、 NexT 集成第三方搜索服务</h4><p>根据<a href="http://theme-next.iissnan.com/third-party-services.html#search-system" target="_blank" rel="noopener">官方文档</a>， NexT 主题框架集成的搜索方式有四种：</p>
-<ul>
-<li>SwiftType</li>
-<li>微搜索</li>
-<li>Local Search</li>
-<li>Algolia</li>
-</ul>
-<p>其中，Local Search 最为简单方便，本文将进一步介绍其配置与使用。</p>
-<h4 id="二、配置-Local-Search"><a href="#二、配置-Local-Search" class="headerlink" title="二、配置 Local Search"></a>二、配置 Local Search</h4><ul>
-<li><p>安装插件 <code>hexo-generator-searchdb</code>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install hexo-generator-searchdb --save</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>编辑站点配置文件，新增以下配置：</p>
-<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">search:</span><br><span class="line">  path: search.xml</span><br><span class="line">  field: post</span><br><span class="line">  format: html</span><br><span class="line">  limit: 10000</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>编辑主题配置文件，启用本地搜索功能：</p>
-<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"># Local Search</span><br><span class="line"># Dependencies: https://github.com/theme-next/hexo-generator-searchdb</span><br><span class="line">local_search:</span><br><span class="line">  enable: true</span><br></pre></td></tr></table></figure>
-</li>
-</ul>
-<h4 id="三、使用-Local-Search"><a href="#三、使用-Local-Search" class="headerlink" title="三、使用 Local Search"></a>三、使用 Local Search</h4><p>部署博客，访问首页，可以看到新增一个搜索控件：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/06/18_20_56_47_NexT-Search-Button.png" alt=""></p>
-<p>使用搜索功能，查看所有跟 Spring 相关的博客：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/06/18_20_58_23_NexT-Search-Demo.png" alt=""></p>
-<p>可以看到，Local Search 不仅支持标题检索，还支持内容检索，十分好用。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/04/12/braise_fish/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/04/12/braise_fish/" class="post-title-link" itemprop="url">红烧鱼</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-04-12 15:57:01" itemprop="dateCreated datePublished" datetime="2020-04-12T15:57:01+08:00">2020-04-12</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%90%83%E8%B4%A7/" itemprop="url" rel="index"><span itemprop="name">吃货</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2020/04/12/braise_fish/" class="post-meta-item leancloud_visitors" data-flag-title="红烧鱼" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2020/04/12/braise_fish/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2020/04/12/braise_fish/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h5 id="食材准备"><a href="#食材准备" class="headerlink" title="食材准备"></a>食材准备</h5><p>鱼，玉米油，佐料（大葱、姜、蒜头、生抽、老抽、醋、料酒、蚝油、豉油、花椒、八角、桂树皮、黄豆酱）</p>
-<p><img src="https://s1.ax1x.com/2020/04/12/GO4pTK.jpg" alt="GO4pTK.jpg"></p>
-<h5 id="1-煎鱼"><a href="#1-煎鱼" class="headerlink" title="1. 煎鱼"></a>1. 煎鱼</h5><p><img src="https://s1.ax1x.com/2020/04/12/GO4kSH.jpg" alt="GO4kSH.jpg"></p>
-<p>为了不糊锅，建议事先在鱼的身上糊上一层面粉。入锅之前，需要提起鱼来，把多余的面粉抖掉，防止热油变苦。煎鱼的目的有两个：高油温可以锁住水分，使鱼肉外焦里嫩；鱼本身的腥味主要来自于表皮和腹腔，高油温可以迅速使鱼皮和腹腔角质化，起到去腥的作用。</p>
-<p><img src="https://s1.ax1x.com/2020/04/12/GO4MtS.jpg" alt="GO4MtS.jpg"></p>
-<p>待鱼炸至两面金黄后捞出，放凉备用。</p>
-<p><img src="https://s1.ax1x.com/2020/04/12/GO4t00.jpg" alt="GO4t00.jpg"></p>
-<h5 id="2-烧鱼"><a href="#2-烧鱼" class="headerlink" title="2. 烧鱼"></a>2. 烧鱼</h5><p><img src="https://s1.ax1x.com/2020/04/12/GO4g76.jpg" alt="GO4g76.jpg"></p>
-<p>热油锅将佐料翻炒出味，兑水至 2/3 满锅。</p>
-<p><img src="https://s1.ax1x.com/2020/04/12/GO4ojA.jpg" alt="GO4ojA.jpg"></p>
-<p>大火烧开，约 10 分钟后转至文火慢炖。约 1 小时后，大火收汁，出锅。</p>
-<p><img src="https://s1.ax1x.com/2020/04/12/GO5VCF.jpg" alt="GO5VCF.jpg"></p>
-<h5 id="3-心得"><a href="#3-心得" class="headerlink" title="3. 心得"></a>3. 心得</h5><p>红烧鱼是我最常做的荤菜，我也试过很多做法，有的味道很好，有的就做砸了。综合实操经验来看，我觉得做鱼的关键，并不是那盘佐料，也不是热油锅炸至两面金黄，而是时间———煮鱼的时间。我试过将一条鲜鱼直接放入一锅水中，然后只加入油盐酱醋，慢煮 2 小时后，别是一番风味———鱼的原味。所以，以上很多步骤可能只是花拳绣腿，关键还是在 2/3 满锅的水和 1 小时的文火慢炖。大家都可以尝试下，感受下那 1 小时内到底发生了什么。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1452,7 +1451,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">66</span>
+          <span class="site-state-item-count">68</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1465,7 +1464,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">40</span>
+        <span class="site-state-item-count">41</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
