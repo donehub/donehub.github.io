@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="这篇文章不讲废话，只讲干货：LangChain 和 LangGraph 分别是什么、为什么 LangChain 团队要造 LangGraph、两者的技术本质差异、以及你该选哪个。   一、先说结论LangChain 是”零件库”，LangGraph 是”组装图纸”。  LangChain：给你各种组件——LLM 连接器、工具定义、记忆系统、向量检索器。你用它来”组装”一个 LLM 应用。 Lan">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LangChain vs LangGraph：从链式调用到图状态机的 Agent 演进之路">
+<meta property="og:url" content="https://donehub.github.io/2024/12/13/langchain-vs-langgraph/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="这篇文章不讲废话，只讲干货：LangChain 和 LangGraph 分别是什么、为什么 LangChain 团队要造 LangGraph、两者的技术本质差异、以及你该选哪个。   一、先说结论LangChain 是”零件库”，LangGraph 是”组装图纸”。  LangChain：给你各种组件——LLM 连接器、工具定义、记忆系统、向量检索器。你用它来”组装”一个 LLM 应用。 Lan">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2024-12-12T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-13T01:14:02.691Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="AI Agent">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2024/12/13/langchain-vs-langgraph/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>LangChain vs LangGraph：从链式调用到图状态机的 Agent 演进之路 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2024/12/13/langchain-vs-langgraph/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          LangChain vs LangGraph：从链式调用到图状态机的 Agent 演进之路
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-12-13 00:00:00" itemprop="dateCreated datePublished" datetime="2024-12-13T00:00:00+08:00">2024-12-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-13 09:14:02" itemprop="dateModified" datetime="2026-04-13T09:14:02+08:00">2026-04-13</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2024/12/13/langchain-vs-langgraph/" class="post-meta-item leancloud_visitors" data-flag-title="LangChain vs LangGraph：从链式调用到图状态机的 Agent 演进之路" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2024/12/13/langchain-vs-langgraph/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2024/12/13/langchain-vs-langgraph/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>这篇文章不讲废话，只讲干货：LangChain 和 LangGraph 分别是什么、为什么 LangChain 团队要造 LangGraph、两者的技术本质差异、以及你该选哪个。</p>
+</blockquote>
+<hr>
+<h2 id="一、先说结论"><a href="#一、先说结论" class="headerlink" title="一、先说结论"></a>一、先说结论</h2><p><strong>LangChain 是”零件库”，LangGraph 是”组装图纸”。</strong></p>
+<ul>
+<li><strong>LangChain</strong>：给你各种组件——LLM 连接器、工具定义、记忆系统、向量检索器。你用它来”组装”一个 LLM 应用。</li>
+<li><strong>LangGraph</strong>：帮你定义组件之间的”组装方式”——怎么循环、怎么分支、怎么传递状态、什么时候结束。</li>
+</ul>
+<p>两者不是竞争关系，而是<strong>互补关系</strong>。LangChain 团队自己造了 LangGraph，用来解决 LangChain 原生 Agent 能力不足的问题。</p>
+<hr>
+<h2 id="二、LangChain：起源与发展"><a href="#二、LangChain：起源与发展" class="headerlink" title="二、LangChain：起源与发展"></a>二、LangChain：起源与发展</h2><h3 id="2-1-创始人与背景"><a href="#2-1-创始人与背景" class="headerlink" title="2.1 创始人与背景"></a>2.1 创始人与背景</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>创始人</strong></td>
+<td>Harrison Chase</td>
+</tr>
+<tr>
+<td><strong>背景</strong></td>
+<td>曾在 Robust Intelligence（AI 安全公司）和 McKinsey 工作</td>
+</tr>
+<tr>
+<td><strong>创立时间</strong></td>
+<td>2022 年 10 月，作为开源项目发布在 GitHub</td>
+</tr>
+<tr>
+<td><strong>公司成立</strong></td>
+<td>2023 年初，LangChain Inc. 成立，获得风险投资</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="2-2-为什么能火"><a href="#2-2-为什么能火" class="headerlink" title="2.2 为什么能火"></a>2.2 为什么能火</h3><p>2022 年 10 月，ChatGPT 还没发布（11 月才发布）。Harrison Chase 做了一件关键的事：<strong>把 LLM 应用开发的”碎片化经验”变成”标准化组件”</strong>。</p>
+<p>当时开发者面临的问题：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">每个 LLM 应用都要自己解决：</span><br><span class="line">- 怎么调用不同模型的 API（OpenAI、Anthropic、 Cohere...）</span><br><span class="line">- 怎么记住用户之前说了什么</span><br><span class="line">- 怎么让 LLM 调用外部工具</span><br><span class="line">- 怎么把长文档切成小块让 LLM 能读</span><br><span class="line">- 怎么把检索结果喂给 LLM</span><br></pre></td></tr></table></figure>
+<p>LangChain 把这些问题<strong>抽象成统一的组件</strong>，你只需要配置参数，不用自己造轮子。</p>
+<h3 id="2-3-发展时间线"><a href="#2-3-发展时间线" class="headerlink" title="2.3 发展时间线"></a>2.3 发展时间线</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>时间</th>
+<th>事件</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>2022.10</strong></td>
+<td>LangChain 开源发布</td>
+<td>GitHub 迅速获得数千 Star</td>
+</tr>
+<tr>
+<td><strong>2022.12</strong></td>
+<td>ChatGPT 发布，LLM 应用需求爆发</td>
+<td>LangChain 成为首选框架</td>
+</tr>
+<tr>
+<td><strong>2023.01</strong></td>
+<td>LangChain Inc. 成立，获风险投资</td>
+<td>商业化运营</td>
+</tr>
+<tr>
+<td><strong>2023.03</strong></td>
+<td>推出 LCEL（LangChain Expression Language）</td>
+<td>链式调用更简洁</td>
+</tr>
+<tr>
+<td><strong>2023.06</strong></td>
+<td>LangSmith 发布</td>
+<td>可观测性平台</td>
+</tr>
+<tr>
+<td><strong>2023.10</strong></td>
+<td>LangServe 发布</td>
+<td>快速部署 API</td>
+</tr>
+<tr>
+<td><strong>2024.01</strong></td>
+<td>LangGraph 发布</td>
+<td>解决 Agent 循环问题</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="2-4-核心组件一览"><a href="#2-4-核心组件一览" class="headerlink" title="2.4 核心组件一览"></a>2.4 核心组件一览</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">LangChain &#x3D; 以下组件的集合</span><br><span class="line"></span><br><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    LangChain 组件体系                         │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │</span><br><span class="line">│  │   Models    │  │   Prompts   │  │   Memory    │        │</span><br><span class="line">│  │  (LLM连接)  │  │ (模板管理)  │  │ (对话记忆)  │        │</span><br><span class="line">│  └─────────────┘  └─────────────┘  └─────────────┘        │</span><br><span class="line">│                                                             │</span><br><span class="line">│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │</span><br><span class="line">│  │   Tools     │  │   Chains    │  │   Agents    │        │</span><br><span class="line">│  │ (外部工具)  │  │ (调用链)    │  │ (决策执行)  │        │</span><br><span class="line">│  └─────────────┘  └─────────────┘  └─────────────┘        │</span><br><span class="line">│                                                             │</span><br><span class="line">│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │</span><br><span class="line">│  │  Retrieval  │  │   Output    │  │   Document  │        │</span><br><span class="line">│  │  (RAG检索)  │  │   Parser    │  │   Loaders   │        │</span><br><span class="line">│  └─────────────┘  └─────────────┘  └─────────────┘        │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<h3 id="2-5-LangChain-的技术本质"><a href="#2-5-LangChain-的技术本质" class="headerlink" title="2.5 LangChain 的技术本质"></a>2.5 LangChain 的技术本质</h3><p><strong>LangChain 的核心抽象是 “Chain”（链）</strong>——把多个步骤串起来，线性执行：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LangChain LCEL 语法（链式调用）</span></span><br><span class="line">chain = (</span><br><span class="line">    &#123;<span class="string">"context"</span>: retriever, <span class="string">"question"</span>: RunnablePassthrough()&#125;</span><br><span class="line">    | prompt</span><br><span class="line">    | llm</span><br><span class="line">    | output_parser</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">result = chain.invoke(<span class="string">"什么是 Agent？"</span>)</span><br></pre></td></tr></table></figure>
+<p><strong>优点</strong>：</p>
+<ul>
+<li>简单直观，上手快</li>
+<li>组件丰富，生态完善</li>
+<li>适合 RAG、简单问答、固定流程的场景</li>
+</ul>
+<p><strong>缺点</strong>（这也是 LangGraph 存在的原因）：</p>
+<ul>
+<li>无法循环执行（Agent 需要 ReAct 循环）</li>
+<li>无法根据中间结果动态选择路径</li>
+<li>状态管理能力弱</li>
+</ul>
+<hr>
+<h2 id="三、LangGraph：为什么-LangChain-团队要造它"><a href="#三、LangGraph：为什么-LangChain-团队要造它" class="headerlink" title="三、LangGraph：为什么 LangChain 团队要造它"></a>三、LangGraph：为什么 LangChain 团队要造它</h2><h3 id="3-1-核心问题：LangChain-的-Agent-不够用"><a href="#3-1-核心问题：LangChain-的-Agent-不够用" class="headerlink" title="3.1 核心问题：LangChain 的 Agent 不够用"></a>3.1 核心问题：LangChain 的 Agent 不够用</h3><p>LangChain 有 <code>AgentExecutor</code>，理论上可以做 Agent。但实际使用中发现：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">问题 1：AgentExecutor 无法真正循环</span><br><span class="line">- LangChain 的链是线性的：A → B → C → 结束</span><br><span class="line">- Agent 需要 ReAct 循环：思考 → 执行 → 观察 → 再思考 → 再执行...</span><br><span class="line">- 用 LangChain 做 Agent，只能&quot;模拟&quot;循环，很别扭</span><br><span class="line"></span><br><span class="line">问题 2：无法控制流程分支</span><br><span class="line">- Agent 执行到某一步，可能需要：</span><br><span class="line">  - 成功了 → 结束</span><br><span class="line">  - 失败了 → 重试</span><br><span class="line">  - 信息不够 → 再搜索</span><br><span class="line">- LangChain 的链无法根据条件选择不同路径</span><br><span class="line"></span><br><span class="line">问题 3：状态管理混乱</span><br><span class="line">- Agent 需要记住&quot;我刚才做了什么&quot;、&quot;我现在的进度&quot;</span><br><span class="line">- LangChain 的记忆系统是独立的，无法和执行流程绑定</span><br></pre></td></tr></table></figure>
+<h3 id="3-2-LangGraph-的诞生"><a href="#3-2-LangGraph-的诞生" class="headerlink" title="3.2 LangGraph 的诞生"></a>3.2 LangGraph 的诞生</h3><p>2024 年第一季度，LangChain 团队推出 LangGraph，<strong>专门解决 Agent 工作流问题</strong>。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>发布时间</strong></td>
+<td>2024 年第一季度</td>
+</tr>
+<tr>
+<td><strong>创始人</strong></td>
+<td>LangChain 团队（Harrison Chase 领导）</td>
+</tr>
+<tr>
+<td><strong>核心目的</strong></td>
+<td>让 Agent 能真正循环执行、状态管理、流程分支</td>
+</tr>
+<tr>
+<td><strong>技术本质</strong></td>
+<td>状态机（State Machine） + 图结构（Graph）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="3-3-LangGraph-的核心创新"><a href="#3-3-LangGraph-的核心创新" class="headerlink" title="3.3 LangGraph 的核心创新"></a>3.3 LangGraph 的核心创新</h3><p><strong>LangGraph 的核心抽象是 “StateGraph”（状态图）</strong>——用图结构定义执行流程：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> StateGraph, END</span><br><span class="line"></span><br><span class="line"><span class="comment"># 定义状态</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">AgentState</span><span class="params">(TypedDict)</span>:</span></span><br><span class="line">    messages: list</span><br><span class="line">    next_step: str</span><br><span class="line"></span><br><span class="line"><span class="comment"># 构建图</span></span><br><span class="line">graph = StateGraph(AgentState)</span><br><span class="line">graph.add_node(<span class="string">"agent"</span>, agent_node)      <span class="comment"># Agent 思考节点</span></span><br><span class="line">graph.add_node(<span class="string">"tool"</span>, tool_node)        <span class="comment"># 工具执行节点</span></span><br><span class="line">graph.add_node(<span class="string">"check"</span>, check_node)      <span class="comment"># 结果检查节点</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 定义边（流转关系）</span></span><br><span class="line">graph.add_edge(<span class="string">"agent"</span>, <span class="string">"tool"</span>)</span><br><span class="line">graph.add_edge(<span class="string">"tool"</span>, <span class="string">"check"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 条件分支：根据检查结果决定下一步</span></span><br><span class="line">graph.add_conditional_edges(<span class="string">"check"</span>, </span><br><span class="line">    <span class="keyword">lambda</span> state: state[<span class="string">"next_step"</span>],</span><br><span class="line">    &#123;<span class="string">"continue"</span>: <span class="string">"agent"</span>, <span class="string">"end"</span>: END&#125;  <span class="comment"># 循环回去或结束</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 编译执行</span></span><br><span class="line">app = graph.compile()</span><br></pre></td></tr></table></figure>
+<p><strong>LangGraph 解决的三大问题</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>LangChain 方案</th>
+<th>LangGraph 方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>循环执行</strong></td>
+<td>用 AgentExecutor 模拟，很别扭</td>
+<td>用图的边连接回去，原生支持循环</td>
+</tr>
+<tr>
+<td><strong>流程分支</strong></td>
+<td>无法根据条件选择路径</td>
+<td><code>add_conditional_edges</code> 原生支持</td>
+</tr>
+<tr>
+<td><strong>状态管理</strong></td>
+<td>Memory 独立，不绑定流程</td>
+<td>State 在节点间传递，自动管理</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="3-4-LangGraph-发展时间线"><a href="#3-4-LangGraph-发展时间线" class="headerlink" title="3.4 LangGraph 发展时间线"></a>3.4 LangGraph 发展时间线</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>时间</th>
+<th>事件</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>2024.Q1</strong></td>
+<td>LangGraph 发布</td>
+<td>解决 Agent 循环问题</td>
+</tr>
+<tr>
+<td><strong>2024.06</strong></td>
+<td>LangGraph Studio 发布</td>
+<td>可视化调试工具</td>
+</tr>
+<tr>
+<td><strong>2024.08</strong></td>
+<td>支持多 Agent 协作</td>
+<td>复杂系统必备</td>
+</tr>
+<tr>
+<td><strong>2025.01</strong></td>
+<td>LangGraph 0.3 发布</td>
+<td>流式输出、多租户、改进调试</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="四、技术对比：本质差异"><a href="#四、技术对比：本质差异" class="headerlink" title="四、技术对比：本质差异"></a>四、技术对比：本质差异</h2><h3 id="4-1-抽象模型对比"><a href="#4-1-抽象模型对比" class="headerlink" title="4.1 抽象模型对比"></a>4.1 抽象模型对比</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>LangChain</th>
+<th>LangGraph</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>核心抽象</strong></td>
+<td>Chain（链）</td>
+<td>StateGraph（状态图）</td>
+</tr>
+<tr>
+<td><strong>执行模式</strong></td>
+<td>线性执行</td>
+<td>循环 + 分支执行</td>
+</tr>
+<tr>
+<td><strong>状态管理</strong></td>
+<td>独立 Memory 组件</td>
+<td>State 在节点间传递</td>
+</tr>
+<tr>
+<td><strong>流程控制</strong></td>
+<td>固定顺序</td>
+<td>条件分支、并行、循环</td>
+</tr>
+<tr>
+<td><strong>适用场景</strong></td>
+<td>RAG、问答、固定流程</td>
+<td>Agent、多步骤决策</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="4-2-架构图对比"><a href="#4-2-架构图对比" class="headerlink" title="4.2 架构图对比"></a>4.2 架构图对比</h3><p><strong>LangChain：线性链</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">Input → [Prompt] → [LLM] → [Parser] → Output</span><br><span class="line"></span><br><span class="line">特点：</span><br><span class="line">- 单向流动</span><br><span class="line">- 固定顺序</span><br><span class="line">- 无法回头</span><br></pre></td></tr></table></figure>
+<p><strong>LangGraph：状态图</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">              ┌─────────┐</span><br><span class="line">              │  Start  │</span><br><span class="line">              └────┬────┘</span><br><span class="line">                   │</span><br><span class="line">              ┌────▼────┐</span><br><span class="line">              │ Agent   │ ←─────┐</span><br><span class="line">              │(思考)   │       │</span><br><span class="line">              └────┬────┘       │</span><br><span class="line">                   │            │ 循环</span><br><span class="line">         ┌─────────┼─────────┐  │</span><br><span class="line">         │                   │  │</span><br><span class="line">    ┌────▼────┐         ┌────▼────┤</span><br><span class="line">    │ Tool A  │         │ Tool B  │</span><br><span class="line">    │(执行)   │         │(执行)   │</span><br><span class="line">    └────┬────┘         └────┬────┤</span><br><span class="line">         │                   │  │</span><br><span class="line">         └───────┬───────────┘  │</span><br><span class="line">                 │              │</span><br><span class="line">            ┌────▼────┐         │</span><br><span class="line">            │  Check  │─────────┘</span><br><span class="line">            │(检查)   │</span><br><span class="line">            └────┬────┘</span><br><span class="line">                 │</span><br><span class="line">         ┌───────┴───────┐</span><br><span class="line">         │               │</span><br><span class="line">    ┌────▼────┐     ┌────▼────┐</span><br><span class="line">    │ Continue│     │   End   │</span><br><span class="line">    │ (继续)  │     │  (结束) │</span><br><span class="line">    └─────────┘     └─────────┘</span><br><span class="line"></span><br><span class="line">特点：</span><br><span class="line">- 可以循环（边可以指向之前的节点）</span><br><span class="line">- 可以分支（条件判断选择路径）</span><br><span class="line">- State 在节点间自动传递</span><br></pre></td></tr></table></figure>
+<h3 id="4-3-代码对比：同一功能的不同实现"><a href="#4-3-代码对比：同一功能的不同实现" class="headerlink" title="4.3 代码对比：同一功能的不同实现"></a>4.3 代码对比：同一功能的不同实现</h3><p><strong>任务：让 Agent 搜索信息，如果不够就再搜索</strong></p>
+<p><strong>LangChain 方案（别扭）</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 只能模拟循环，用 max_iterations 限制</span></span><br><span class="line"><span class="keyword">from</span> langchain.agents <span class="keyword">import</span> AgentExecutor</span><br><span class="line"></span><br><span class="line">agent_executor = AgentExecutor(</span><br><span class="line">    agent=agent,</span><br><span class="line">    tools=[search_tool],</span><br><span class="line">    max_iterations=<span class="number">5</span>,  <span class="comment"># 强制限制循环次数</span></span><br><span class="line">    verbose=<span class="literal">True</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 问题：无法精确控制"什么时候结束"</span></span><br><span class="line"><span class="comment"># 只能靠 iterations 数量硬限制</span></span><br></pre></td></tr></table></figure>
+<p><strong>LangGraph 方案（原生支持）</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> StateGraph, END</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">check_result</span><span class="params">(state)</span>:</span></span><br><span class="line">    <span class="comment"># 精确判断：信息是否足够</span></span><br><span class="line">    <span class="keyword">if</span> state[<span class="string">"info_complete"</span>]:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"end"</span></span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"continue"</span></span><br><span class="line"></span><br><span class="line">graph = StateGraph(AgentState)</span><br><span class="line">graph.add_node(<span class="string">"agent"</span>, agent_node)</span><br><span class="line">graph.add_node(<span class="string">"search"</span>, search_node)</span><br><span class="line">graph.add_node(<span class="string">"check"</span>, check_node)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 精确控制：根据 check 结果决定循环或结束</span></span><br><span class="line">graph.add_edge(<span class="string">"agent"</span>, <span class="string">"search"</span>)</span><br><span class="line">graph.add_edge(<span class="string">"search"</span>, <span class="string">"check"</span>)</span><br><span class="line">graph.add_conditional_edges(<span class="string">"check"</span>, check_result,</span><br><span class="line">    &#123;<span class="string">"continue"</span>: <span class="string">"agent"</span>, <span class="string">"end"</span>: END&#125;)</span><br><span class="line"></span><br><span class="line">app = graph.compile()</span><br><span class="line"><span class="comment"># 优点：循环条件精确可控，不是硬限制</span></span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="五、应用场景对比：该选哪个"><a href="#五、应用场景对比：该选哪个" class="headerlink" title="五、应用场景对比：该选哪个"></a>五、应用场景对比：该选哪个</h2><h3 id="5-1-选-LangChain-的场景"><a href="#5-1-选-LangChain-的场景" class="headerlink" title="5.1 选 LangChain 的场景"></a>5.1 选 LangChain 的场景</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>RAG 应用</strong></td>
+<td>检索 → 生成，固定流程，不需要循环</td>
+</tr>
+<tr>
+<td><strong>问答机器人</strong></td>
+<td>用户问 → LLM 答，简单线性</td>
+</tr>
+<tr>
+<td><strong>文档处理</strong></td>
+<td>读文档 → 提取 → 输出，固定步骤</td>
+</tr>
+<tr>
+<td><strong>快速原型</strong></td>
+<td>上手快，组件多，适合验证想法</td>
+</tr>
+<tr>
+<td><strong>单轮任务</strong></td>
+<td>一次调用就完成，不需要多步骤决策</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>典型 LangChain 代码（RAG）</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langchain_openai <span class="keyword">import</span> ChatOpenAI</span><br><span class="line"><span class="keyword">from</span> langchain_community.vectorstores <span class="keyword">import</span> Chroma</span><br><span class="line"><span class="keyword">from</span> langchain.chains <span class="keyword">import</span> RetrievalQA</span><br><span class="line"></span><br><span class="line"><span class="comment"># 用 LangChain 做 RAG，三行搞定</span></span><br><span class="line">llm = ChatOpenAI(model=<span class="string">"gpt-4o"</span>)</span><br><span class="line">vectorstore = Chroma.from_documents(docs, embeddings)</span><br><span class="line">qa = RetrievalQA.from_chain_type(llm, retriever=vectorstore.as_retriever())</span><br><span class="line"></span><br><span class="line">answer = qa.run(<span class="string">"什么是 Agent？"</span>)</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-选-LangGraph-的场景"><a href="#5-2-选-LangGraph-的场景" class="headerlink" title="5.2 选 LangGraph 的场景"></a>5.2 选 LangGraph 的场景</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>真正的 Agent</strong></td>
+<td>需要 ReAct 循环（思考→执行→观察→再思考）</td>
+</tr>
+<tr>
+<td><strong>多步骤决策</strong></td>
+<td>执行到某一步后，需要判断下一步做什么</td>
+</tr>
+<tr>
+<td><strong>复杂工作流</strong></td>
+<td>有分支、有并行、有循环</td>
+</tr>
+<tr>
+<td><strong>多 Agent 协作</strong></td>
+<td>多个 Agent 互相配合</td>
+</tr>
+<tr>
+<td><strong>需要状态管理</strong></td>
+<td>要追踪”做了什么”、”进度如何”</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>典型 LangGraph 代码（Agent）</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> StateGraph, END</span><br><span class="line"><span class="keyword">from</span> langgraph.prebuilt <span class="keyword">import</span> create_react_agent</span><br><span class="line"></span><br><span class="line"><span class="comment"># 用 LangGraph 做真正的 Agent</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">AgentState</span><span class="params">(TypedDict)</span>:</span></span><br><span class="line">    messages: list</span><br><span class="line">    tools_result: dict</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">should_continue</span><span class="params">(state)</span>:</span></span><br><span class="line">    <span class="comment"># 精确判断：任务是否完成</span></span><br><span class="line">    <span class="keyword">if</span> state[<span class="string">"tools_result"</span>][<span class="string">"complete"</span>]:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"end"</span></span><br><span class="line">    <span class="keyword">return</span> <span class="string">"continue"</span></span><br><span class="line"></span><br><span class="line">graph = StateGraph(AgentState)</span><br><span class="line">graph.add_node(<span class="string">"agent"</span>, agent_node)</span><br><span class="line">graph.add_node(<span class="string">"tools"</span>, tools_node)</span><br><span class="line"></span><br><span class="line">graph.add_edge(<span class="string">"agent"</span>, <span class="string">"tools"</span>)</span><br><span class="line">graph.add_conditional_edges(<span class="string">"tools"</span>, should_continue,</span><br><span class="line">    &#123;<span class="string">"continue"</span>: <span class="string">"agent"</span>, <span class="string">"end"</span>: END&#125;)</span><br><span class="line"></span><br><span class="line">app = graph.compile()</span><br></pre></td></tr></table></figure>
+<h3 id="5-3-选型决策树"><a href="#5-3-选型决策树" class="headerlink" title="5.3 选型决策树"></a>5.3 选型决策树</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">你的需求是什么？</span><br><span class="line">│</span><br><span class="line">├─ 固定流程、单次调用（如 RAG、问答）</span><br><span class="line">│   → 选 LangChain</span><br><span class="line">│</span><br><span class="line">├─ 需要循环执行（如 Agent 多轮决策）</span><br><span class="line">│   → 选 LangGraph</span><br><span class="line">│</span><br><span class="line">├─ 需要根据结果选择不同路径</span><br><span class="line">│   → 选 LangGraph</span><br><span class="line">│</span><br><span class="line">├─ 需要多个 Agent 协作</span><br><span class="line">│   → 选 LangGraph 或 CrewAI</span><br><span class="line">│</span><br><span class="line">├─ 快速验证想法</span><br><span class="line">│   → 先用 LangChain，复杂了再迁移到 LangGraph</span><br><span class="line">│</span><br><span class="line">└─ 生产级复杂系统</span><br><span class="line">    → LangGraph + LangChain 组件配合使用</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="六、最佳实践：两者配合使用"><a href="#六、最佳实践：两者配合使用" class="headerlink" title="六、最佳实践：两者配合使用"></a>六、最佳实践：两者配合使用</h2><p>LangGraph 和 LangChain 不是竞争关系，而是<strong>配合关系</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">LangChain 提供&quot;零件&quot;：</span><br><span class="line">- LLM 连接器（ChatOpenAI、ChatAnthropic）</span><br><span class="line">- 工具定义（@tool 装饰器）</span><br><span class="line">- 向量检索器</span><br><span class="line">- 文档加载器</span><br><span class="line"></span><br><span class="line">LangGraph 定义&quot;组装方式&quot;：</span><br><span class="line">- 怎么让 Agent 循环执行</span><br><span class="line">- 怎么根据结果选择路径</span><br><span class="line">- 怎么管理状态</span><br></pre></td></tr></table></figure>
+<p><strong>配合使用的典型代码</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langchain_openai <span class="keyword">import</span> ChatOpenAI          <span class="comment"># LangChain 组件</span></span><br><span class="line"><span class="keyword">from</span> langchain_community.tools <span class="keyword">import</span> Tool       <span class="comment"># LangChain 组件</span></span><br><span class="line"><span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> StateGraph, END      <span class="comment"># LangGraph 编排</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 用 LangChain 定义零件</span></span><br><span class="line">llm = ChatOpenAI(model=<span class="string">"gpt-4o"</span>)</span><br><span class="line">search_tool = Tool(name=<span class="string">"search"</span>, func=search, description=<span class="string">"搜索"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 用 LangGraph 定义流程</span></span><br><span class="line">graph = StateGraph(AgentState)</span><br><span class="line">graph.add_node(<span class="string">"agent"</span>, <span class="keyword">lambda</span> s: llm.invoke(s[<span class="string">"messages"</span>]))</span><br><span class="line">graph.add_node(<span class="string">"tool"</span>, <span class="keyword">lambda</span> s: search_tool.invoke(s[<span class="string">"tool_input"</span>]))</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、生态对比"><a href="#七、生态对比" class="headerlink" title="七、生态对比"></a>七、生态对比</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>生态组件</th>
+<th>LangChain</th>
+<th>LangGraph</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>文档</strong></td>
+<td>python.langchain.com/docs</td>
+<td>langchain-ai.github.io/langgraph</td>
+</tr>
+<tr>
+<td><strong>调试工具</strong></td>
+<td>LangSmith</td>
+<td>LangGraph Studio</td>
+</tr>
+<tr>
+<td><strong>部署</strong></td>
+<td>LangServe</td>
+<td>LangGraph Platform</td>
+</tr>
+<tr>
+<td><strong>社区</strong></td>
+<td>GitHub 90k+ Star</td>
+<td>GitHub 50k+ Star</td>
+</tr>
+<tr>
+<td><strong>教程</strong></td>
+<td>官方教程丰富</td>
+<td>官方教程 + LangGraph Mastery Course</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="八、总结：一句话记住两者的区别"><a href="#八、总结：一句话记住两者的区别" class="headerlink" title="八、总结：一句话记住两者的区别"></a>八、总结：一句话记住两者的区别</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>框架</th>
+<th>一句话定义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LangChain</strong></td>
+<td>给你砖块、水泥、门窗——各种 LLM 应用组件</td>
+</tr>
+<tr>
+<td><strong>LangGraph</strong></td>
+<td>教你怎么画房子的结构图——定义组件的组装流程</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>什么时候用 LangChain</strong>：固定流程、单次调用、快速原型。</p>
+<p><strong>什么时候用 LangGraph</strong>：需要循环、需要分支、需要状态管理、真正的 Agent。</p>
+<p><strong>最佳方案</strong>：两者配合使用——LangChain 提供组件，LangGraph 定义流程。</p>
+<hr>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://python.langchain.com/docs/" target="_blank" rel="noopener">LangChain 官方文档</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/" target="_blank" rel="noopener">LangGraph 官方文档</a></li>
+<li><a href="https://www.youtube.com/watch?v=Hilp4F9dtRw" target="_blank" rel="noopener">LangGraph Origins - Harrison Chase 演讲</a></li>
+<li><a href="https://medium.com/@ankushksinghal/langgraph-0-3-released-7bc72a5b86a2" target="_blank" rel="noopener">LangGraph 0.3 Released</a></li>
+<li><a href="https://www.codecademy.com/resources/blog/langgraph-vs-langchain/" target="_blank" rel="noopener">LangGraph vs LangChain: 6 Key Differences</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/AI-Agent/" rel="tag"><i class="fa fa-tag"></i> AI Agent</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/09/09/oracle_sqlloader/" rel="prev" title="介绍 Oracle SQL*Loader 及其应用">
+      <i class="fa fa-chevron-left"></i> 介绍 Oracle SQL*Loader 及其应用
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2025/01/12/agent-concepts-dictionary/" rel="next" title="Agent 编程名词词典：产品视角与技术视角的双面解读">
+      Agent 编程名词词典：产品视角与技术视角的双面解读 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#一、先说结论"><span class="nav-number">1.</span> <span class="nav-text">一、先说结论</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、LangChain：起源与发展"><span class="nav-number">2.</span> <span class="nav-text">二、LangChain：起源与发展</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-创始人与背景"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 创始人与背景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-为什么能火"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 为什么能火</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-发展时间线"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 发展时间线</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-核心组件一览"><span class="nav-number">2.4.</span> <span class="nav-text">2.4 核心组件一览</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-5-LangChain-的技术本质"><span class="nav-number">2.5.</span> <span class="nav-text">2.5 LangChain 的技术本质</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、LangGraph：为什么-LangChain-团队要造它"><span class="nav-number">3.</span> <span class="nav-text">三、LangGraph：为什么 LangChain 团队要造它</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-核心问题：LangChain-的-Agent-不够用"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 核心问题：LangChain 的 Agent 不够用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-LangGraph-的诞生"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 LangGraph 的诞生</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-LangGraph-的核心创新"><span class="nav-number">3.3.</span> <span class="nav-text">3.3 LangGraph 的核心创新</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-LangGraph-发展时间线"><span class="nav-number">3.4.</span> <span class="nav-text">3.4 LangGraph 发展时间线</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、技术对比：本质差异"><span class="nav-number">4.</span> <span class="nav-text">四、技术对比：本质差异</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-抽象模型对比"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 抽象模型对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-架构图对比"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 架构图对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-代码对比：同一功能的不同实现"><span class="nav-number">4.3.</span> <span class="nav-text">4.3 代码对比：同一功能的不同实现</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、应用场景对比：该选哪个"><span class="nav-number">5.</span> <span class="nav-text">五、应用场景对比：该选哪个</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-选-LangChain-的场景"><span class="nav-number">5.1.</span> <span class="nav-text">5.1 选 LangChain 的场景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-选-LangGraph-的场景"><span class="nav-number">5.2.</span> <span class="nav-text">5.2 选 LangGraph 的场景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-选型决策树"><span class="nav-number">5.3.</span> <span class="nav-text">5.3 选型决策树</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、最佳实践：两者配合使用"><span class="nav-number">6.</span> <span class="nav-text">六、最佳实践：两者配合使用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、生态对比"><span class="nav-number">7.</span> <span class="nav-text">七、生态对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、总结：一句话记住两者的区别"><span class="nav-number">8.</span> <span class="nav-text">八、总结：一句话记住两者的区别</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考资料"><span class="nav-number">9.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">71</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">42</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+</body>
+</html>
