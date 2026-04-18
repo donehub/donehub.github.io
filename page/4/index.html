@@ -190,6 +190,548 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2025/05/19/vector-database-deep-analysis/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/05/19/vector-database-deep-analysis/" class="post-title-link" itemprop="url">向量数据库深度解析</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-05-19 00:00:00" itemprop="dateCreated datePublished" datetime="2025-05-19T00:00:00+08:00">2025-05-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-04 18:02:49" itemprop="dateModified" datetime="2026-04-04T18:02:49+08:00">2026-04-04</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2025/05/19/vector-database-deep-analysis/" class="post-meta-item leancloud_visitors" data-flag-title="向量数据库深度解析" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2025/05/19/vector-database-deep-analysis/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2025/05/19/vector-database-deep-analysis/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h2><p>做 RAG（检索增强生成）应用，向量数据库是绕不开的核心组件。市面上产品不少——Milvus、Qdrant、Weaviate、Chroma、Pinecone……每个都说自己最强。到底怎么选？</p>
+<p>这篇文章不讲虚的，从<strong>底层原理</strong>到<strong>实际选型</strong>，重点分析 Chroma 和 Milvus 两款代表产品，让你看完就能做决策。</p>
+<hr>
+<h2 id="一、向量数据库解决什么问题"><a href="#一、向量数据库解决什么问题" class="headerlink" title="一、向量数据库解决什么问题"></a>一、向量数据库解决什么问题</h2><p>传统数据库擅长精确匹配：<code>WHERE name = &#39;张三&#39;</code>。但语义搜索不一样——用户问”如何提高团队协作效率”，你得找出意思相近的文档，哪怕文档里压根没有这几个词。</p>
+<p><strong>向量数据库的核心价值</strong>：把文本、图像、音频等非结构化数据转换成向量（一串数字），然后用数学方法计算”相似度”，找出语义最接近的内容。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">文本 → Embedding模型 → 向量 [0.12, -0.34, 0.56, ...] → 向量数据库</span><br><span class="line">查询 → Embedding模型 → 向量 [0.15, -0.30, 0.52, ...] → 相似度计算 → Top-K结果</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="二、核心技术指标：怎么评判一个向量数据库"><a href="#二、核心技术指标：怎么评判一个向量数据库" class="headerlink" title="二、核心技术指标：怎么评判一个向量数据库"></a>二、核心技术指标：怎么评判一个向量数据库</h2><h3 id="1-索引算法决定性能上限"><a href="#1-索引算法决定性能上限" class="headerlink" title="1. 索引算法决定性能上限"></a>1. 索引算法决定性能上限</h3><p>向量数据库的索引算法直接决定查询速度和召回率。主流索引类型：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>索引类型</th>
+<th>原理</th>
+<th>查询速度</th>
+<th>内存占用</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>FLAT</strong></td>
+<td>暴力遍历，精确计算</td>
+<td>最慢</td>
+<td>最高</td>
+<td>小数据量，要求100%召回</td>
+</tr>
+<tr>
+<td><strong>IVF-FLAT</strong></td>
+<td>clustering + 倒排</td>
+<td>中等</td>
+<td>中等</td>
+<td>百万级，平衡方案</td>
+</tr>
+<tr>
+<td><strong>IVF-PQ</strong></td>
+<td>聚类 + 乘积量化压缩</td>
+<td>快</td>
+<td>低</td>
+<td>内存受限，牺牲精度</td>
+</tr>
+<tr>
+<td><strong>HNSW</strong></td>
+<td>分层可导航小世界图</td>
+<td>最快</td>
+<td>较高</td>
+<td>高性能实时查询</td>
+</tr>
+<tr>
+<td><strong>DISKANN</strong></td>
+<td>磁盘索引 + SSD优化</td>
+<td>较慢</td>
+<td>极低</td>
+<td>超大规模，成本敏感</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>HNSW 是当前主流选择</strong>，它的核心思想是构建一个多层图结构，搜索时从顶层快速跳转，逐层缩小范围，像”跳表”一样高效。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">HNSW 结构示意：</span><br><span class="line"></span><br><span class="line">Layer 2:    ●────────────●           (稀疏，快速跳转)</span><br><span class="line">            │            │</span><br><span class="line">Layer 1:    ●────●───────●           (中等密度)</span><br><span class="line">            │    │       │</span><br><span class="line">Layer 0:  ●─●─●─●─●─●─●─●─●         (全量节点，精确搜索)</span><br><span class="line"></span><br><span class="line">关键参数：</span><br><span class="line">- M: 每节点最大连接数（默认16），越大越精确但内存越高</span><br><span class="line">- efConstruction: 构建时搜索宽度（默认200）</span><br><span class="line">- efSearch: 查询时搜索宽度，动态调整召回率</span><br></pre></td></tr></table></figure>
+<h3 id="2-分布式架构决定扩展能力"><a href="#2-分布式架构决定扩展能力" class="headerlink" title="2. 分布式架构决定扩展能力"></a>2. 分布式架构决定扩展能力</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>架构类型</th>
+<th>代表产品</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单机嵌入式</td>
+<td>Chroma、Faiss</td>
+<td>无部署成本，数据量受限</td>
+</tr>
+<tr>
+<td>单机服务化</td>
+<td>Qdrant 单机版</td>
+<td>独立进程，支持持久化</td>
+</tr>
+<tr>
+<td>分布式集群</td>
+<td>Milvus、Qdrant 集群</td>
+<td>水平扩展，高可用</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="3-元数据过滤能力"><a href="#3-元数据过滤能力" class="headerlink" title="3. 元数据过滤能力"></a>3. 元数据过滤能力</h3><p>实际业务中，向量搜索往往要结合条件过滤：找出”价格在100-500元之间且类别是电子产品”的相似商品。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>数据库</th>
+<th>过滤能力</th>
+<th>实现方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Qdrant</strong></td>
+<td>最强</td>
+<td>原生支持复杂过滤，性能最优</td>
+</tr>
+<tr>
+<td><strong>Milvus</strong></td>
+<td>强</td>
+<td>支持标量字段过滤</td>
+</tr>
+<tr>
+<td><strong>Chroma</strong></td>
+<td>基础</td>
+<td>简单 where 条件</td>
+</tr>
+<tr>
+<td><strong>Pinecone</strong></td>
+<td>强</td>
+<td>元数据命名空间</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="三、主流向量数据库横向对比"><a href="#三、主流向量数据库横向对比" class="headerlink" title="三、主流向量数据库横向对比"></a>三、主流向量数据库横向对比</h2><h3 id="1-开源产品对比"><a href="#1-开源产品对比" class="headerlink" title="1. 开源产品对比"></a>1. 开源产品对比</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>数据库</th>
+<th>语言</th>
+<th>架构</th>
+<th>索引支持</th>
+<th>过滤能力</th>
+<th>社区活跃度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Milvus</strong></td>
+<td>Go</td>
+<td>分布式</td>
+<td>HNSW/IVF/DISKANN</td>
+<td>强</td>
+<td>活跃（CNCF项目）</td>
+</tr>
+<tr>
+<td><strong>Qdrant</strong></td>
+<td>Rust</td>
+<td>单机/分布式</td>
+<td>HNSW</td>
+<td>最强</td>
+<td>活跃</td>
+</tr>
+<tr>
+<td><strong>Weaviate</strong></td>
+<td>Go</td>
+<td>单机/分布式</td>
+<td>HNSW</td>
+<td>强</td>
+<td>活跃</td>
+</tr>
+<tr>
+<td><strong>Chroma</strong></td>
+<td>Python</td>
+<td>嵌入式</td>
+<td>HNSW</td>
+<td>基础</td>
+<td>活跃</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="2-云服务对比"><a href="#2-云服务对比" class="headerlink" title="2. 云服务对比"></a>2. 云服务对比</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>产品</th>
+<th>定位</th>
+<th>优势</th>
+<th>劣势</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pinecone</strong></td>
+<td>全托管 Serverless</td>
+<td>零运维，自动扩展</td>
+<td>供应商锁定，成本不可控</td>
+</tr>
+<tr>
+<td><strong>Zilliz Cloud</strong></td>
+<td>Milvus 托管版</td>
+<td>企业级支持，兼容 Milvus API</td>
+<td>价格较高</td>
+</tr>
+<tr>
+<td><strong>MongoDB Atlas Vector</strong></td>
+<td>MongoDB 生态</td>
+<td>复用现有基础设施</td>
+<td>向量能力有限</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="3-性能基准（百万级向量，HNSW索引）"><a href="#3-性能基准（百万级向量，HNSW索引）" class="headerlink" title="3. 性能基准（百万级向量，HNSW索引）"></a>3. 性能基准（百万级向量，HNSW索引）</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>数据库</th>
+<th>QPS</th>
+<th>P99延迟</th>
+<th>内存占用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Milvus</td>
+<td>~15000</td>
+<td>~10ms</td>
+<td>高</td>
+</tr>
+<tr>
+<td>Qdrant</td>
+<td>~12000</td>
+<td>~8ms</td>
+<td>中</td>
+</tr>
+<tr>
+<td>Weaviate</td>
+<td>~8000</td>
+<td>~15ms</td>
+<td>中</td>
+</tr>
+<tr>
+<td>Chroma</td>
+<td>~3000</td>
+<td>~30ms</td>
+<td>低</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="四、Chroma：轻量级入门首选"><a href="#四、Chroma：轻量级入门首选" class="headerlink" title="四、Chroma：轻量级入门首选"></a>四、Chroma：轻量级入门首选</h2><h3 id="1-为什么选-Chroma"><a href="#1-为什么选-Chroma" class="headerlink" title="1. 为什么选 Chroma"></a>1. 为什么选 Chroma</h3><p>Chroma 的设计哲学是<strong>极简</strong>：Python 原生、嵌入式运行、API 设计友好。适合以下场景：</p>
+<ul>
+<li><strong>原型验证</strong>：快速搭建 RAG Demo，几行代码就能跑</li>
+<li><strong>小规模应用</strong>：文档量 &lt; 10万，单机部署</li>
+<li><strong>本地开发</strong>：数据不想出本机，隐私可控</li>
+<li><strong>学习研究</strong>：理解向量数据库基本概念</li>
+</ul>
+<h3 id="2-Chroma-核心特性"><a href="#2-Chroma-核心特性" class="headerlink" title="2. Chroma 核心特性"></a>2. Chroma 核心特性</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Chroma 的极简 API 设计</span></span><br><span class="line"><span class="keyword">import</span> chromadb</span><br><span class="line"></span><br><span class="line"><span class="comment"># 初始化：嵌入式，无需启动服务</span></span><br><span class="line">client = chromadb.PersistentClient(path=<span class="string">"./chroma_db"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建集合</span></span><br><span class="line">collection = client.create_collection(</span><br><span class="line">    name=<span class="string">"documents"</span>,</span><br><span class="line">    metadata=&#123;<span class="string">"hnsw:space"</span>: <span class="string">"cosine"</span>&#125;  <span class="comment"># 支持 l2、ip、cosine</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 添加文档：自动调用 Embedding（内置默认模型）</span></span><br><span class="line">collection.add(</span><br><span class="line">    documents=[<span class="string">"文档内容1"</span>, <span class="string">"文档内容2"</span>],</span><br><span class="line">    ids=[<span class="string">"doc1"</span>, <span class="string">"doc2"</span>]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 查询：一步到位</span></span><br><span class="line">results = collection.query(</span><br><span class="line">    query_texts=[<span class="string">"查询内容"</span>],</span><br><span class="line">    n_results=<span class="number">5</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p><strong>Chroma 内置 Embedding</strong>：默认使用 <code>all-MiniLM-L6-v2</code> 模型，也可以替换为 OpenAI、Cohere 等：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> chromadb.utils <span class="keyword">import</span> embedding_functions</span><br><span class="line"></span><br><span class="line"><span class="comment"># 使用 OpenAI Embedding</span></span><br><span class="line">openai_ef = embedding_functions.OpenAIEmbeddingFunction(</span><br><span class="line">    api_key=<span class="string">"your-key"</span>,</span><br><span class="line">    model_name=<span class="string">"text-embedding-3-small"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">collection = client.create_collection(</span><br><span class="line">    name=<span class="string">"docs"</span>,</span><br><span class="line">    embedding_function=openai_ef</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<h3 id="3-Chroma-的元数据过滤"><a href="#3-Chroma-的元数据过滤" class="headerlink" title="3. Chroma 的元数据过滤"></a>3. Chroma 的元数据过滤</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 添加带元数据的文档</span></span><br><span class="line">collection.add(</span><br><span class="line">    documents=[<span class="string">"技术文档"</span>, <span class="string">"产品文档"</span>],</span><br><span class="line">    ids=[<span class="string">"d1"</span>, <span class="string">"d2"</span>],</span><br><span class="line">    metadatas=[</span><br><span class="line">        &#123;<span class="string">"category"</span>: <span class="string">"tech"</span>, <span class="string">"author"</span>: <span class="string">"张三"</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"category"</span>: <span class="string">"product"</span>, <span class="string">"author"</span>: <span class="string">"李四"</span>&#125;</span><br><span class="line">    ]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 查询时过滤</span></span><br><span class="line">results = collection.query(</span><br><span class="line">    query_texts=[<span class="string">"如何部署"</span>],</span><br><span class="line">    n_results=<span class="number">5</span>,</span><br><span class="line">    where=&#123;<span class="string">"category"</span>: <span class="string">"tech"</span>&#125;  <span class="comment"># 只在技术文档中搜索</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<h3 id="4-Chroma-的局限性"><a href="#4-Chroma-的局限性" class="headerlink" title="4. Chroma 的局限性"></a>4. Chroma 的局限性</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>限制</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单机架构</td>
+<td>无法水平扩展，数据量上限约百万级</td>
+</tr>
+<tr>
+<td>索引单一</td>
+<td>仅支持 HNSW，无法根据场景切换</td>
+</tr>
+<tr>
+<td>过滤简单</td>
+<td>不支持复杂布尔组合，性能一般</td>
+</tr>
+<tr>
+<td>无分布式</td>
+<td>没有副本、分片机制，单点故障风险</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>一句话总结</strong>：Chroma 是向量数据库界的 SQLite——简单好用，但别指望它扛生产级大流量。</p>
+<hr>
+<h2 id="五、Milvus：生产级大规模首选"><a href="#五、Milvus：生产级大规模首选" class="headerlink" title="五、Milvus：生产级大规模首选"></a>五、Milvus：生产级大规模首选</h2><h3 id="1-为什么选-Milvus"><a href="#1-为什么选-Milvus" class="headerlink" title="1. 为什么选 Milvus"></a>1. 为什么选 Milvus</h3><p>Milvus 定位是<strong>云原生分布式向量数据库</strong>，CNCF 沙箱项目。适合以下场景：</p>
+<ul>
+<li><strong>大规模生产应用</strong>：向量数 &gt; 百万级，甚至亿级</li>
+<li><strong>高并发实时检索</strong>：要求低延迟、高吞吐</li>
+<li><strong>复杂过滤需求</strong>：需要结合标量字段过滤</li>
+<li><strong>多云部署</strong>：支持 Kubernetes、Docker、云服务</li>
+</ul>
+<h3 id="2-Milvus-架构解析"><a href="#2-Milvus-架构解析" class="headerlink" title="2. Milvus 架构解析"></a>2. Milvus 架构解析</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                        SDK Layer                            │</span><br><span class="line">│          Python &#x2F; Go &#x2F; Java &#x2F; Node.js &#x2F; REST               │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                      Proxy (接入层)                          │</span><br><span class="line">│              负责请求解析、路由、负载均衡                      │</span><br><span class="line">├───────────────┬───────────────┬─────────────────────────────┤</span><br><span class="line">│  Query Coord  │  Data Coord   │  Index Coord  │ Root Coord │</span><br><span class="line">│  (查询协调)    │  (数据协调)    │  (索引协调)    │ (总协调)   │</span><br><span class="line">├───────────────┴───────────────┴─────────────────────────────┤</span><br><span class="line">│           Query Node        Data Node       Index Node       │</span><br><span class="line">│           (查询执行)         (数据写入)       (索引构建)       │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                  etcd (元数据) + MinIO (存储)                 │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br><span class="line"></span><br><span class="line">核心组件职责：</span><br><span class="line">- Root Coord：全局协调者，处理 DDL（创建集合、索引等）</span><br><span class="line">- Query Coord：查询节点调度，负载均衡</span><br><span class="line">- Data Coord：数据节点调度，segment 管理</span><br><span class="line">- Index Coord：索引构建任务调度</span><br></pre></td></tr></table></figure>
+<h3 id="3-Milvus-索引选型实战"><a href="#3-Milvus-索引选型实战" class="headerlink" title="3. Milvus 索引选型实战"></a>3. Milvus 索引选型实战</h3><p>不同规模和场景，索引选择策略不同：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>数据规模</th>
+<th>内存预算</th>
+<th>推荐索引</th>
+<th>参数建议</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&lt; 100万</td>
+<td>充足</td>
+<td>FLAT</td>
+<td>精确搜索，召回率100%</td>
+</tr>
+<tr>
+<td>100万-1000万</td>
+<td>充足</td>
+<td>HNSW</td>
+<td>M=16, efConstruction=256</td>
+</tr>
+<tr>
+<td>100万-1000万</td>
+<td>紧张</td>
+<td>IVF-FLAT</td>
+<td>nlist=1024</td>
+</tr>
+<tr>
+<td>&gt; 1000万</td>
+<td>紧张</td>
+<td>IVF-PQ</td>
+<td>nlist=1024, m=8, nbits=8</td>
+</tr>
+<tr>
+<td>&gt; 1亿</td>
+<td>极紧张</td>
+<td>DISKANN</td>
+<td>磁盘索引，SSD必备</td>
+</tr>
+</tbody>
+</table>
+</div>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pymilvus <span class="keyword">import</span> MilvusClient, IndexType, MetricType</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建 HNSW 索引</span></span><br><span class="line">index_params = MilvusClient.prepare_index_params()</span><br><span class="line">index_params.add_index(</span><br><span class="line">    field_name=<span class="string">"vector"</span>,</span><br><span class="line">    index_type=IndexType.HNSW,</span><br><span class="line">    metric_type=MetricType.COSINE,</span><br><span class="line">    params=&#123;<span class="string">"M"</span>: <span class="number">16</span>, <span class="string">"efConstruction"</span>: <span class="number">256</span>&#125;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 查询参数：动态调整 ef 提高召回率</span></span><br><span class="line">search_params = &#123;<span class="string">"params"</span>: &#123;<span class="string">"ef"</span>: <span class="number">64</span>&#125;&#125;  <span class="comment"># ef越大，召回率越高，延迟越长</span></span><br></pre></td></tr></table></figure>
+<h3 id="4-Milvus-集合设计最佳实践"><a href="#4-Milvus-集合设计最佳实践" class="headerlink" title="4. Milvus 集合设计最佳实践"></a>4. Milvus 集合设计最佳实践</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pymilvus <span class="keyword">import</span> MilvusClient</span><br><span class="line"></span><br><span class="line">client = MilvusClient(<span class="string">"http://localhost:19530"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建集合：向量字段 + 标量字段</span></span><br><span class="line">client.create_collection(</span><br><span class="line">    collection_name=<span class="string">"products"</span>,</span><br><span class="line">    dimension=<span class="number">1536</span>,  <span class="comment"># OpenAI text-embedding-3-small 维度</span></span><br><span class="line">    metric_type=<span class="string">"COSINE"</span>,</span><br><span class="line">    auto_id=<span class="literal">False</span>,</span><br><span class="line">    fields=[</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"id"</span>, <span class="string">"dtype"</span>: <span class="string">"VARCHAR"</span>, <span class="string">"max_length"</span>: <span class="number">64</span>, <span class="string">"is_primary"</span>: <span class="literal">True</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"vector"</span>, <span class="string">"dtype"</span>: <span class="string">"FLOAT_VECTOR"</span>, <span class="string">"dim"</span>: <span class="number">1536</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"title"</span>, <span class="string">"dtype"</span>: <span class="string">"VARCHAR"</span>, <span class="string">"max_length"</span>: <span class="number">256</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"category"</span>, <span class="string">"dtype"</span>: <span class="string">"VARCHAR"</span>, <span class="string">"max_length"</span>: <span class="number">64</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"price"</span>, <span class="string">"dtype"</span>: <span class="string">"FLOAT"</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"created_at"</span>, <span class="string">"dtype"</span>: <span class="string">"INT64"</span>&#125;  <span class="comment"># 时间戳</span></span><br><span class="line">    ]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建标量字段索引（加速过滤）</span></span><br><span class="line">client.create_index(</span><br><span class="line">    collection_name=<span class="string">"products"</span>,</span><br><span class="line">    field_name=<span class="string">"category"</span>,</span><br><span class="line">    index_type=<span class="string">"Trie"</span>  <span class="comment"># 字符串用 Trie，数值用 STL_SORT</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<h3 id="5-Milvus-过滤查询实战"><a href="#5-Milvus-过滤查询实战" class="headerlink" title="5. Milvus 过滤查询实战"></a>5. Milvus 过滤查询实战</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 过滤表达式语法</span></span><br><span class="line">results = client.search(</span><br><span class="line">    collection_name=<span class="string">"products"</span>,</span><br><span class="line">    data=[[<span class="number">0.1</span>, <span class="number">0.2</span>, ...]],  <span class="comment"># 查询向量</span></span><br><span class="line">    filter=<span class="string">'category == "electronics" and price &gt;= 100 and price &lt;= 500'</span>,</span><br><span class="line">    limit=<span class="number">10</span>,</span><br><span class="line">    output_fields=[<span class="string">"title"</span>, <span class="string">"category"</span>, <span class="string">"price"</span>]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 复杂过滤：支持 AND、OR、NOT、IN、LIKE</span></span><br><span class="line">filter_expr = <span class="string">'''</span></span><br><span class="line"><span class="string">    (category in ["electronics", "books"]) </span></span><br><span class="line"><span class="string">    and price &gt; 50 </span></span><br><span class="line"><span class="string">    and created_at &gt; 1700000000</span></span><br><span class="line"><span class="string">'''</span></span><br></pre></td></tr></table></figure>
+<h3 id="6-Milvus-部署方案"><a href="#6-Milvus-部署方案" class="headerlink" title="6. Milvus 部署方案"></a>6. Milvus 部署方案</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>部署方式</th>
+<th>适用场景</th>
+<th>复杂度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Milvus Lite</td>
+<td>开发测试，pip 安装</td>
+<td>最低</td>
+</tr>
+<tr>
+<td>Docker Compose</td>
+<td>单机生产，快速部署</td>
+<td>低</td>
+</tr>
+<tr>
+<td>Docker + Kubernetes</td>
+<td>集群部署，高可用</td>
+<td>中</td>
+</tr>
+<tr>
+<td>Zilliz Cloud</td>
+<td>全托管，零运维</td>
+<td>无</td>
+</tr>
+</tbody>
+</table>
+</div>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Docker Compose 快速部署（适合单机生产）</span></span><br><span class="line">wget https://github.com/milvus-io/milvus/releases/download/v2.4.0/milvus-compose.yml</span><br><span class="line">docker-compose -f milvus-compose.yml up -d</span><br><span class="line"></span><br><span class="line"><span class="comment"># Milvus Lite 开发测试（Python 直接使用）</span></span><br><span class="line">pip install milvus</span><br><span class="line"><span class="comment"># 自动启动嵌入式 Milvus，无需额外部署</span></span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="六、选型决策树"><a href="#六、选型决策树" class="headerlink" title="六、选型决策树"></a>六、选型决策树</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">开始选型</span><br><span class="line">    │</span><br><span class="line">    ├─ 数据规模多大？</span><br><span class="line">    │   ├─ &lt; 10万向量 → Chroma 足够</span><br><span class="line">    │   ├─ 10万-100万 → Chroma 单机 &#x2F; Milvus Lite</span><br><span class="line">    │   ├─ 100万-1000万 → Milvus 单机 &#x2F; Qdrant</span><br><span class="line">    │   └─ &gt; 1000万 → Milvus 集群 &#x2F; Pinecone Serverless</span><br><span class="line">    │</span><br><span class="line">    ├─ 是否需要强过滤？</span><br><span class="line">    │   ├─ 简单过滤 → Chroma &#x2F; Milvus</span><br><span class="line">    │   └─ 复杂过滤 → Qdrant（性能最优）</span><br><span class="line">    │</span><br><span class="line">    ├─ 是否接受云服务？</span><br><span class="line">    │   ├─ 必须本地 → Milvus &#x2F; Qdrant &#x2F; Chroma</span><br><span class="line">    │   └─ 可以云端 → Pinecone &#x2F; Zilliz Cloud</span><br><span class="line">    │</span><br><span class="line">    ├─ 团队技术栈？</span><br><span class="line">    │   ├─ Python 主导 → Chroma（最友好）</span><br><span class="line">    │   ├─ Go&#x2F;Rust 主导 → Milvus &#x2F; Qdrant</span><br><span class="line">    │   └─ 已有 MongoDB → Atlas Vector Search</span><br><span class="line">    │</span><br><span class="line">    └─ 运维能力？</span><br><span class="line">        ├─ 无运维团队 → Chroma &#x2F; Pinecone</span><br><span class="line">        ├─ 有运维团队 → Milvus &#x2F; Qdrant</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、实战建议"><a href="#七、实战建议" class="headerlink" title="七、实战建议"></a>七、实战建议</h2><h3 id="1-RAG-应用架构"><a href="#1-RAG-应用架构" class="headerlink" title="1. RAG 应用架构"></a>1. RAG 应用架构</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">用户查询</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">Embedding 模型（text-embedding-3-small &#x2F; bge-large-zh）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">向量数据库（Chroma &#x2F; Milvus）</span><br><span class="line">    │  ┌──────────────────────────────────┐</span><br><span class="line">    │  │ Collection: documents            │</span><br><span class="line">    │  │ ├─ vector: [1536 dimensions]    │</span><br><span class="line">    │  │ ├─ content: 原始文本              │</span><br><span class="line">    │  │ ├─ metadata: &#123;source, page, ...&#125; │</span><br><span class="line">    │  │ └─ index: HNSW (M&#x3D;16)           │</span><br><span class="line">    │  └──────────────────────────────────┘</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">Top-K 相关文档（K&#x3D;5~10）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">LLM 生成回答（GPT-4 &#x2F; Claude &#x2F; DeepSeek）</span><br></pre></td></tr></table></figure>
+<h3 id="2-向量维度选择"><a href="#2-向量维度选择" class="headerlink" title="2. 向量维度选择"></a>2. 向量维度选择</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Embedding 模型</th>
+<th>维度</th>
+<th>特点</th>
+<th>推荐场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>text-embedding-3-small</td>
+<td>1536</td>
+<td>OpenAI，通用</td>
+<td>英文为主</td>
+</tr>
+<tr>
+<td>text-embedding-3-large</td>
+<td>3072</td>
+<td>OpenAI，更精准</td>
+<td>高精度需求</td>
+</tr>
+<tr>
+<td>bge-large-zh</td>
+<td>1024</td>
+<td>中文优化</td>
+<td>中文场景</td>
+</tr>
+<tr>
+<td>bge-m3</td>
+<td>1024</td>
+<td>多语言</td>
+<td>跨语言场景</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>注意</strong>：维度越高，精度越高，但存储和计算成本也越高。1536维是性价比平衡点。</p>
+<h3 id="3-内存估算"><a href="#3-内存估算" class="headerlink" title="3. 内存估算"></a>3. 内存估算</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">单向量存储开销 &#x3D; 维度 × 4字节 + 元数据开销</span><br><span class="line">索引额外开销 ≈ 基础存储 × 索引系数</span><br><span class="line"></span><br><span class="line">示例：100万向量，1536维，HNSW索引</span><br><span class="line">基础存储：1,000,000 × 1536 × 4 &#x3D; 6.14 GB</span><br><span class="line">索引开销：6.14 × 1.5 ≈ 9.2 GB</span><br><span class="line">总内存需求：约 10 GB</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>向量数据库选型的核心逻辑：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>推荐方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>原型验证</td>
+<td>Chroma，几行代码搞定</td>
+</tr>
+<tr>
+<td>小规模生产</td>
+<td>Chroma 单机 / Milvus Lite</td>
+</tr>
+<tr>
+<td>大规模生产</td>
+<td>Milvus 集群 / Qdrant</td>
+</tr>
+<tr>
+<td>零运维需求</td>
+<td>Pinecone / Zilliz Cloud</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Chroma</strong> 是入门首选，简单好用，适合快速验证想法。<br><strong>Milvus</strong> 是生产首选，架构成熟，生态完善，能扛大流量。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2025/03/13/agent-opensource-learning-guide/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -3872,139 +4414,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2022/02/03/spring_batch_item_writers/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/02/03/spring_batch_item_writers/" class="post-title-link" itemprop="url">Spring Batch 数据输出器</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-02-03 23:21:35" itemprop="dateCreated datePublished" datetime="2022-02-03T23:21:35+08:00">2022-02-03</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2022/02/03/spring_batch_item_writers/" class="post-meta-item leancloud_visitors" data-flag-title="Spring Batch 数据输出器" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2022/02/03/spring_batch_item_writers/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2022/02/03/spring_batch_item_writers/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <hr>
-<h4 id="一、Spring-Batch-数据输出器"><a href="#一、Spring-Batch-数据输出器" class="headerlink" title="一、Spring Batch 数据输出器"></a>一、Spring Batch 数据输出器</h4><p>Spring Batch 的数据输出器，是通过接口 <code>ItemWriter</code> 来实现的。针对常用的数据输出场景，Spring Batch 提供了丰富的组件支持（<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/appendix.html#itemWritersAppendix" target="_blank" rel="noopener">查看所有组件</a>），本文介绍最常用的五个组件：</p>
-<ul>
-<li><code>FlatFileItemWriter</code>：输出文本数据；</li>
-<li><code>JdbcBatchItemWriter</code>：输出数据到数据库；</li>
-<li><code>StaxEventItemWriter</code>：输出 <code>XML</code> 文件数据；</li>
-<li><code>JsonFileItemWriter</code>：输出 <code>JSON</code> 文件数据；</li>
-<li><code>ClassifierCompositeItemWriter</code>：输出多文本数据；</li>
-</ul>
-<h4 id="二、简单使用"><a href="#二、简单使用" class="headerlink" title="二、简单使用"></a>二、简单使用</h4><p>实体类 <code>Ticket.class</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> lombok.Data;</span><br><span class="line"><span class="keyword">import</span> java.math.BigDecimal;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Data</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Ticket</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 始发站</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> String departureStation;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 到达站</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> String arrivalStation;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 票价</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> BigDecimal price;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">toString</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> String.format(<span class="string">"始发站: %s; 到达站: %s; 票价: %s"</span>, departureStation, arrivalStation, price);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>文件 <code>ticket.csv</code>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">合肥,蚌埠,60.00</span><br><span class="line">南京,蚌埠,70.00</span><br><span class="line">上海,蚌埠,220.00</span><br><span class="line">上海,杭州,75.20</span><br><span class="line">上海,昆山,19.00</span><br></pre></td></tr></table></figure>
-<h5 id="2-1-FlatFileItemWriter-文本数据输出"><a href="#2-1-FlatFileItemWriter-文本数据输出" class="headerlink" title="2.1 FlatFileItemWriter-文本数据输出"></a>2.1 FlatFileItemWriter-文本数据输出</h5><p>将 <code>ticket.csv</code> 中的信息，转换为 JSON 字符串，输出到文件 <code>ticket_output.txt</code> 中：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testFlatFileItemWriterJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testFlatFileItemWriterJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testFlatFileItemWriterStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testFlatFileItemWriterStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testFlatFileItemWriterStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testFlatFileItemWriterStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .reader(ticketFileItemReader)</span><br><span class="line">        .writer(ticketFileItemWriter)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Ticket&gt; <span class="title">ticketFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"ticket.csv"</span>))</span><br><span class="line">        .delimited()</span><br><span class="line">        .names(<span class="keyword">new</span> String[]&#123;<span class="string">"departureStation"</span>, <span class="string">"arrivalStation"</span>, <span class="string">"price"</span>&#125;)</span><br><span class="line">        .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Ticket&gt;() &#123;&#123;</span><br><span class="line">            setTargetType(Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        &#125;&#125;)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketFileItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemWriter&lt;Ticket&gt; <span class="title">ticketFileItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 聚合器; JSON 序列化</span></span><br><span class="line">    LineAggregator&lt;Ticket&gt; aggregator = item -&gt; &#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            ObjectMapper mapper = <span class="keyword">new</span> ObjectMapper();</span><br><span class="line">            <span class="keyword">return</span> mapper.writeValueAsString(item);</span><br><span class="line">        &#125; <span class="keyword">catch</span> (JsonProcessingException e) &#123;</span><br><span class="line">            LOGGER.error(<span class="string">"parse object to json error: &#123;&#125;"</span>, e.getMessage(), e);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="string">""</span>;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemWriterBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemWriter"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> FileSystemResource(<span class="string">"ticket_output.txt"</span>))</span><br><span class="line">        .lineAggregator(aggregator)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>输出文本数据，要求目标数据的格式为字符串，因此需要将 <code>POJO</code> 按照一定规则聚合成字符串。Spring Batch 已实现聚合器 <code>LineAggregator</code> ：<code>PassThroughLineAggregator</code>（打印 <code>POJO</code>）、<code>RecursiveCollectionLineAggregator</code>（打印 <code>POJO</code> 列表）、<code>DelimitedLineAggregator</code>（分隔符拼接 <code>POJO</code> 字段值）、<code>FormatterLineAggregator</code>（格式化 <code>POJO</code> 字段值）。当然，我们也可以手动实现聚合器，例如示例代码中，将 <code>POJO</code> 转换为 JSON 格式。</p>
-<p>启动应用，生成文件 <code>ticket_output.txt</code>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&#123;&quot;departureStation&quot;:&quot;合肥&quot;,&quot;arrivalStation&quot;:&quot;蚌埠&quot;,&quot;price&quot;:60.00&#125;</span><br><span class="line">&#123;&quot;departureStation&quot;:&quot;南京&quot;,&quot;arrivalStation&quot;:&quot;蚌埠&quot;,&quot;price&quot;:70.00&#125;</span><br><span class="line">&#123;&quot;departureStation&quot;:&quot;上海&quot;,&quot;arrivalStation&quot;:&quot;蚌埠&quot;,&quot;price&quot;:220.00&#125;</span><br><span class="line">&#123;&quot;departureStation&quot;:&quot;上海&quot;,&quot;arrivalStation&quot;:&quot;杭州&quot;,&quot;price&quot;:75.20&#125;</span><br><span class="line">&#123;&quot;departureStation&quot;:&quot;上海&quot;,&quot;arrivalStation&quot;:&quot;昆山&quot;,&quot;price&quot;:19.00&#125;</span><br></pre></td></tr></table></figure>
-<h5 id="2-2-JdbcBatchItemWriter-数据库数据输出"><a href="#2-2-JdbcBatchItemWriter-数据库数据输出" class="headerlink" title="2.2 JdbcBatchItemWriter-数据库数据输出"></a>2.2 JdbcBatchItemWriter-数据库数据输出</h5><p>将文件 <code>student.cvs</code> 中的信息（内容如下），导入到 MySQL 数据表 <code>student</code> 中：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1,张三,合肥</span><br><span class="line">2,李四,蚌埠</span><br><span class="line">3,王二,南京</span><br></pre></td></tr></table></figure>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testDatabaseItemWriterJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testDatabaseItemWriterJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testDatabaseItemWriterStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testDatabaseItemWriterStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testDatabaseItemWriterStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testDatabaseItemWriterStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Student, Student&gt;chunk(<span class="number">10</span>)</span><br><span class="line">        .reader(studentFileItemReader)</span><br><span class="line">        .writer(studentItemWriter)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"studentFileItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Student&gt; <span class="title">studentFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Student&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"student.csv"</span>))</span><br><span class="line">        .delimited()</span><br><span class="line">        .names(<span class="keyword">new</span> String[]&#123;<span class="string">"studentId"</span>, <span class="string">"name"</span>, <span class="string">"address"</span>&#125;)</span><br><span class="line">        .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Student&gt;() &#123;&#123;</span><br><span class="line">            setTargetType(Student<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        &#125;&#125;)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"studentItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> JdbcBatchItemWriter&lt;Student&gt; <span class="title">studentItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> JdbcBatchItemWriterBuilder&lt;Student&gt;()</span><br><span class="line">        .itemSqlParameterSourceProvider(<span class="keyword">new</span> BeanPropertyItemSqlParameterSourceProvider&lt;&gt;())</span><br><span class="line">        .sql(<span class="string">"INSERT INTO student_target (student_id, name, address) VALUES (:studentId, :name, :address)"</span>)</span><br><span class="line">        .dataSource(batchDemoDB)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * MySQL 数据源配置</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Primary</span></span><br><span class="line"><span class="meta">@Bean</span>(name = <span class="string">"batchDemoDB"</span>)</span><br><span class="line"><span class="meta">@ConfigurationProperties</span>(prefix = <span class="string">"spring.datasource.batch-demo"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> DataSource <span class="title">druidDataSource</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> DataSourceBuilder.create().type(HikariDataSource<span class="class">.<span class="keyword">class</span>).<span class="title">build</span>()</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>启动应用，文件中的数据已导入表 <code>student</code>：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/06/3_18_46_44_database_writer_result.png" alt=""></p>
-<h5 id="2-3-StaxEventItemWriter-XML-文件数据输出"><a href="#2-3-StaxEventItemWriter-XML-文件数据输出" class="headerlink" title="2.3 StaxEventItemWriter-XML 文件数据输出"></a>2.3 StaxEventItemWriter-XML 文件数据输出</h5><p>将 <code>ticket.csv</code> 中的信息，输出到文件 <code>ticket_output.xml</code> 中：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testXmlItemWriterJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testXmlItemWriterJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testXmlItemWriterStep)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testXmlItemWriterStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testXmlItemWriterStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testXmlItemWriterStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Ticket, Ticket&gt;chunk(<span class="number">10</span>)</span><br><span class="line">        .reader(ticketFileItemReader)</span><br><span class="line">        .writer(ticketXmlItemWriter)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Ticket&gt; <span class="title">ticketFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"ticket.csv"</span>))</span><br><span class="line">        .delimited()</span><br><span class="line">        .names(<span class="keyword">new</span> String[]&#123;<span class="string">"departureStation"</span>, <span class="string">"arrivalStation"</span>, <span class="string">"price"</span>&#125;)</span><br><span class="line">        .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Ticket&gt;() &#123;&#123;</span><br><span class="line">            setTargetType(Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        &#125;&#125;)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketXmlItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> StaxEventItemWriter&lt;Ticket&gt; <span class="title">ticketXmlItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> StaxEventItemWriterBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketXmlItemWriter"</span>)</span><br><span class="line">        .marshaller(ticketMarshaller)</span><br><span class="line">        .resource(<span class="keyword">new</span> FileSystemResource(<span class="string">"ticket_output.xml"</span>))</span><br><span class="line">        .rootTagName(<span class="string">"tickets"</span>)</span><br><span class="line">        .overwriteOutput(<span class="keyword">true</span>)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 映射器</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketMarshaller"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> XStreamMarshaller <span class="title">ticketMarshaller</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    Map&lt;String, Class&lt;Ticket&gt;&gt; aliases = <span class="keyword">new</span> HashMap&lt;&gt;(<span class="number">1</span>);</span><br><span class="line">    aliases.put(<span class="string">"ticket"</span>, Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    XStreamMarshaller marshaller = <span class="keyword">new</span> XStreamMarshaller();</span><br><span class="line">    marshaller.setAliases(aliases);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> marshaller;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>启动应用，生成文件 <code>ticket_output.xml</code>：</p>
-<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span><span class="tag">&lt;<span class="name">tickets</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>合肥<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>蚌埠<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>60.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>南京<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>蚌埠<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>70.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>上海<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>蚌埠<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>220.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>上海<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>杭州<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>75.20<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>上海<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>昆山<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>19.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;/<span class="name">tickets</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<h5 id="2-4-JsonFileItemWriter-JSON文件数据输出"><a href="#2-4-JsonFileItemWriter-JSON文件数据输出" class="headerlink" title="2.4 JsonFileItemWriter-JSON文件数据输出"></a>2.4 JsonFileItemWriter-JSON文件数据输出</h5><p>将 <code>ticket.csv</code> 中的信息，输出到文件 <code>ticket_output.json</code> 中：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testJsonItemWriterJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testJsonItemWriterJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testJsonItemWriterStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testJsonItemWriterStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testJsonItemWriterStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testJsonItemWriterStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Ticket, Ticket&gt;chunk(<span class="number">10</span>)</span><br><span class="line">        .reader(ticketFileItemReader)</span><br><span class="line">        .writer(ticketJsonItemWriter)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Ticket&gt; <span class="title">ticketFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"ticket.csv"</span>))</span><br><span class="line">        .delimited()</span><br><span class="line">        .names(<span class="keyword">new</span> String[]&#123;<span class="string">"departureStation"</span>, <span class="string">"arrivalStation"</span>, <span class="string">"price"</span>&#125;)</span><br><span class="line">        .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Ticket&gt;() &#123;&#123;</span><br><span class="line">            setTargetType(Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        &#125;&#125;)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketJsonItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> JsonFileItemWriter&lt;Ticket&gt; <span class="title">ticketJsonItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> JsonFileItemWriterBuilder&lt;Ticket&gt;()</span><br><span class="line">        .jsonObjectMarshaller(<span class="keyword">new</span> JacksonJsonObjectMarshaller&lt;&gt;())</span><br><span class="line">        .resource(<span class="keyword">new</span> FileSystemResource(<span class="string">"ticket_output.json"</span>))</span><br><span class="line">        .name(<span class="string">"ticketJsonItemWriter"</span>)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>启动应用，生成文件 <code>ticket_output.json</code>：</p>
-<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">[</span><br><span class="line"> &#123;<span class="attr">"departureStation"</span>:<span class="string">"合肥"</span>,<span class="attr">"arrivalStation"</span>:<span class="string">"蚌埠"</span>,<span class="attr">"price"</span>:<span class="number">60.00</span>&#125;,</span><br><span class="line"> &#123;<span class="attr">"departureStation"</span>:<span class="string">"南京"</span>,<span class="attr">"arrivalStation"</span>:<span class="string">"蚌埠"</span>,<span class="attr">"price"</span>:<span class="number">70.00</span>&#125;,</span><br><span class="line"> &#123;<span class="attr">"departureStation"</span>:<span class="string">"上海"</span>,<span class="attr">"arrivalStation"</span>:<span class="string">"蚌埠"</span>,<span class="attr">"price"</span>:<span class="number">220.00</span>&#125;,</span><br><span class="line"> &#123;<span class="attr">"departureStation"</span>:<span class="string">"上海"</span>,<span class="attr">"arrivalStation"</span>:<span class="string">"杭州"</span>,<span class="attr">"price"</span>:<span class="number">75.20</span>&#125;,</span><br><span class="line"> &#123;<span class="attr">"departureStation"</span>:<span class="string">"上海"</span>,<span class="attr">"arrivalStation"</span>:<span class="string">"昆山"</span>,<span class="attr">"price"</span>:<span class="number">19.00</span>&#125;</span><br><span class="line">]</span><br></pre></td></tr></table></figure>
-<h5 id="2-5-ClassifierCompositeItemWriter-输出多文本数据"><a href="#2-5-ClassifierCompositeItemWriter-输出多文本数据" class="headerlink" title="2.5 ClassifierCompositeItemWriter-输出多文本数据"></a>2.5 ClassifierCompositeItemWriter-输出多文本数据</h5><p>将文件 <code>ticket.csv</code> 中始发站为<strong>上海</strong>的车票信息输出到文本中，其余的输出到 XML 文件中：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testMultiFileItemWriterJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testMultiFileItemWriterJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testMultiFileItemWriterStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testMultiFileItemWriterStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testMultiFileItemWriterStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testMultiFileItemWriterStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Ticket, Ticket&gt;chunk(<span class="number">10</span>)</span><br><span class="line">        .reader(ticketFileItemReader)</span><br><span class="line">        .writer(ticketClassifierMultiFileItemWriter)</span><br><span class="line">        .stream(ticketFileItemWriter)</span><br><span class="line">        .stream(ticketXmlItemWriter)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Ticket&gt; <span class="title">ticketFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"ticket.csv"</span>))</span><br><span class="line">        .delimited()</span><br><span class="line">        .names(<span class="keyword">new</span> String[]&#123;<span class="string">"departureStation"</span>, <span class="string">"arrivalStation"</span>, <span class="string">"price"</span>&#125;)</span><br><span class="line">        .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Ticket&gt;() &#123;&#123;</span><br><span class="line">            setTargetType(Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        &#125;&#125;)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Classifier Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketClassifierMultiFileItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> ClassifierCompositeItemWriter&lt;Ticket&gt; <span class="title">ticketClassifierMultiFileItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    ClassifierCompositeItemWriter&lt;Ticket&gt; writer = <span class="keyword">new</span> ClassifierCompositeItemWriter&lt;&gt;();</span><br><span class="line">    writer.setClassifier((Classifier&lt;Ticket, ItemWriter&lt;? <span class="keyword">super</span> Ticket&gt;&gt;) ticket -&gt; &#123;</span><br><span class="line">        <span class="comment">// 始发站是上海的, 输出到文本中, 否则输出到 XML 文件中</span></span><br><span class="line">        <span class="keyword">return</span> <span class="string">"上海"</span>.equals(ticket.getDepartureStation()) ? ticketFileItemWriter() : ticketXmlItemWriter();</span><br><span class="line">    &#125;);</span><br><span class="line">    <span class="keyword">return</span> writer;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 文本-Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketFileItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemWriter&lt;Ticket&gt; <span class="title">ticketFileItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 聚合器; JSON 序列化</span></span><br><span class="line">    LineAggregator&lt;Ticket&gt; aggregator = item -&gt; &#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            ObjectMapper mapper = <span class="keyword">new</span> ObjectMapper();</span><br><span class="line">            <span class="keyword">return</span> mapper.writeValueAsString(item);</span><br><span class="line">        &#125; <span class="keyword">catch</span> (JsonProcessingException e) &#123;</span><br><span class="line">            LOGGER.error(<span class="string">"parse object to json error: &#123;&#125;"</span>, e.getMessage(), e);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="string">""</span>;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemWriterBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemWriter"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> FileSystemResource(<span class="string">"ticket_output.txt"</span>))</span><br><span class="line">        .lineAggregator(aggregator)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * XML-Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketXmlItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> StaxEventItemWriter&lt;Ticket&gt; <span class="title">ticketXmlItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> StaxEventItemWriterBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketXmlItemWriter"</span>)</span><br><span class="line">        .marshaller(ticketMarshaller)</span><br><span class="line">        .resource(<span class="keyword">new</span> FileSystemResource(<span class="string">"ticket_output.xml"</span>))</span><br><span class="line">        .rootTagName(<span class="string">"tickets"</span>)</span><br><span class="line">        .overwriteOutput(<span class="keyword">true</span>)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 映射器</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketMarshaller"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> XStreamMarshaller <span class="title">ticketMarshaller</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    Map&lt;String, Class&lt;Ticket&gt;&gt; aliases = <span class="keyword">new</span> HashMap&lt;&gt;(<span class="number">1</span>);</span><br><span class="line">    aliases.put(<span class="string">"ticket"</span>, Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    XStreamMarshaller marshaller = <span class="keyword">new</span> XStreamMarshaller();</span><br><span class="line">    marshaller.setAliases(aliases);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> marshaller;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>启动应用，生成文件如下：</p>
-<p><code>ticket_output.txt</code>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#123;&quot;departureStation&quot;:&quot;上海&quot;,&quot;arrivalStation&quot;:&quot;蚌埠&quot;,&quot;price&quot;:220.00&#125;</span><br><span class="line">&#123;&quot;departureStation&quot;:&quot;上海&quot;,&quot;arrivalStation&quot;:&quot;杭州&quot;,&quot;price&quot;:75.20&#125;</span><br><span class="line">&#123;&quot;departureStation&quot;:&quot;上海&quot;,&quot;arrivalStation&quot;:&quot;昆山&quot;,&quot;price&quot;:19.00&#125;</span><br></pre></td></tr></table></figure>
-<p><code>ticket_output.xml</code>：</p>
-<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span><span class="tag">&lt;<span class="name">tickets</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>合肥<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>蚌埠<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>60.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>南京<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>蚌埠<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>70.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;/<span class="name">tickets</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>示例代码：<a href="https://github.com/donehub/spring-batch-demo" target="_blank" rel="noopener">spring-batch-demo</a></p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -4077,7 +4486,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">75</span>
+          <span class="site-state-item-count">76</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
