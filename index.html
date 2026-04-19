@@ -190,6 +190,243 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/19/bailian_coding_plan_usage_java_or_python/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/04/19/bailian_coding_plan_usage_java_or_python/" class="post-title-link" itemprop="url">奇技淫巧：Java / Python 应用调用阿里百炼 Coding Plan 服务</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-19 00:00:00 / 修改时间：09:37:15" itemprop="dateCreated datePublished" datetime="2026-04-19T00:00:00+08:00">2026-04-19</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/04/19/bailian_coding_plan_usage_java_or_python/" class="post-meta-item leancloud_visitors" data-flag-title="奇技淫巧：Java / Python 应用调用阿里百炼 Coding Plan 服务" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/19/bailian_coding_plan_usage_java_or_python/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/19/bailian_coding_plan_usage_java_or_python/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>阿里云百炼 Coding Plan 官方宣称”仅限编程工具使用”，但实际上其 endpoint 基于 OpenAI 兼容协议，Java/Python 应用完全可以调用。本文分享如何用 LangChain4j 和 OpenAI SDK 突破这一限制，直接消耗 Coding Plan 额度。</p>
+</blockquote>
+<hr>
+<h2 id="一、背景：一个被”误解”的服务"><a href="#一、背景：一个被”误解”的服务" class="headerlink" title="一、背景：一个被”误解”的服务"></a>一、背景：一个被”误解”的服务</h2><p>阿里云百炼的 <strong>Coding Plan</strong> 是一项面向 AI 编程助手的服务套餐，提供专门的模型调用额度。官方客服的说法是：</p>
+<blockquote>
+<p>“Coding Plan 的专属 API Key（格式为 <code>sk-sp-xxxxx</code>）仅限在支持的编程工具（如 Claude Code、OpenClaw 等）中使用，不能用于 Java 应用直接调用大模型。若您的 Java 应用需要调用百炼大模型，请使用百炼通用 API Key（格式为 <code>sk-xxxxx</code>），该 Key 支持调用包括 Coding 模型在内的所有百炼模型，并按量计费。”</p>
+</blockquote>
+<p>这意味着如果你想在 Java 应用中使用百炼大模型，需要：</p>
+<ol>
+<li>额外开通百炼通用 API Key（格式为 <code>sk-xxxxx</code>）</li>
+<li>按量付费，产生额外费用</li>
+</ol>
+<p><strong>但实际上，Coding Plan 的额度完全可以在 Java/Python 应用中使用！</strong> 本文将分享这个”奇技淫巧”。</p>
+<hr>
+<h2 id="二、问题发现：为什么-Coding-Plan-Key-在-Java-中”失效”？"><a href="#二、问题发现：为什么-Coding-Plan-Key-在-Java-中”失效”？" class="headerlink" title="二、问题发现：为什么 Coding Plan Key 在 Java 中”失效”？"></a>二、问题发现：为什么 Coding Plan Key 在 Java 中”失效”？</h2><h3 id="2-1-错误的调用方式"><a href="#2-1-错误的调用方式" class="headerlink" title="2.1 错误的调用方式"></a>2.1 错误的调用方式</h3><p>很多开发者（包括我）最初使用阿里云官方的 <code>dashscope-sdk-java</code> 调用百炼：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// pom.xml</span></span><br><span class="line">&lt;dependency&gt;</span><br><span class="line">    &lt;groupId&gt;com.alibaba&lt;/groupId&gt;</span><br><span class="line">    &lt;artifactId&gt;dashscope-sdk-java&lt;/artifactId&gt;</span><br><span class="line">    &lt;version&gt;2.22.15&lt;/version&gt;</span><br><span class="line">&lt;/dependency&gt;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Java 代码</span></span><br><span class="line">Generation gen = <span class="keyword">new</span> Generation();</span><br><span class="line">GenerationParam param = GenerationParam.builder()</span><br><span class="line">    .apiKey(<span class="string">"sk-sp-xxxxx"</span>)  <span class="comment">// Coding Plan API Key</span></span><br><span class="line">    .model(<span class="string">"qwen-plus"</span>)</span><br><span class="line">    .messages(messages)</span><br><span class="line">    .build();</span><br><span class="line">GenerationResult result = gen.call(param);</span><br></pre></td></tr></table></figure>
+<p><strong>结果：API 返回 InvalidApiKey 错误，或者即使调通了，消耗的是通用额度而非 Coding Plan 额度！</strong></p>
+<h3 id="2-2-根本原因分析"><a href="#2-2-根本原因分析" class="headerlink" title="2.2 根本原因分析"></a>2.2 根本原因分析</h3><p>Coding Plan 的 API Key 使用的是 <strong>OpenAI 兼容协议</strong>，endpoint 地址不同于通用百炼服务：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>服务类型</th>
+<th>API Key 格式</th>
+<th>Endpoint</th>
+<th>模型名称</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>通用百炼</strong></td>
+<td><code>sk-xxxxx</code></td>
+<td><code>https://dashscope.aliyuncs.com/compatible-mode/v1</code></td>
+<td><code>qwen-plus</code>, <code>qwen-max</code></td>
+</tr>
+<tr>
+<td><strong>Coding Plan</strong></td>
+<td><code>sk-sp-xxxxx</code></td>
+<td><code>https://coding.dashscope.aliyuncs.com/v1</code></td>
+<td><code>多个模型</code> 等</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>官方的 <code>dashscope-sdk-java</code> 只支持通用百炼 endpoint，无法连接 Coding Plan 的 endpoint！</p>
+<hr>
+<h2 id="三、解决方案：使用-OpenAI-兼容模式"><a href="#三、解决方案：使用-OpenAI-兼容模式" class="headerlink" title="三、解决方案：使用 OpenAI 兼容模式"></a>三、解决方案：使用 OpenAI 兼容模式</h2><h3 id="3-1-技术原理"><a href="#3-1-技术原理" class="headerlink" title="3.1 技术原理"></a>3.1 技术原理</h3><p>Coding Plan 的 endpoint 基于 <strong>OpenAI API 兼容协议</strong>，任何支持 OpenAI API 的客户端都可以调用：</p>
+<ol>
+<li><strong>Python</strong>: 使用 <code>openai</code> SDK</li>
+<li><strong>Java</strong>: 使用 LangChain4j 的 <code>langchain4j-open-ai</code> 模块</li>
+</ol>
+<p>只要将 <code>base_url</code> 指向 Coding Plan 的 endpoint，API Key 就能正常工作！</p>
+<hr>
+<h2 id="四、Java-实现：LangChain4j-Coding-Plan"><a href="#四、Java-实现：LangChain4j-Coding-Plan" class="headerlink" title="四、Java 实现：LangChain4j + Coding Plan"></a>四、Java 实现：LangChain4j + Coding Plan</h2><h3 id="4-1-添加依赖"><a href="#4-1-添加依赖" class="headerlink" title="4.1 添加依赖"></a>4.1 添加依赖</h3><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">&lt;!-- pom.xml --&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">properties</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">langchain4j.version</span>&gt;</span>0.35.0<span class="tag">&lt;/<span class="name">langchain4j.version</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">properties</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">dependencies</span>&gt;</span></span><br><span class="line">    <span class="comment">&lt;!-- LangChain4j OpenAI 兼容模块 --&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>dev.langchain4j<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>langchain4j<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">version</span>&gt;</span>$&#123;langchain4j.version&#125;<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>dev.langchain4j<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>langchain4j-open-ai<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">version</span>&gt;</span>$&#123;langchain4j.version&#125;<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependencies</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<h3 id="4-2-配置文件"><a href="#4-2-配置文件" class="headerlink" title="4.2 配置文件"></a>4.2 配置文件</h3><figure class="highlight properties"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># application.properties - Coding Plan 配置</span></span><br><span class="line"><span class="meta">langchain4j.open-ai.chat-model.base-url</span>=<span class="string">https://coding.dashscope.aliyuncs.com/v1</span></span><br><span class="line"><span class="meta">langchain4j.open-ai.chat-model.api-key</span>=<span class="string">sk-sp-xxxxx</span></span><br><span class="line"><span class="meta">langchain4j.open-ai.chat-model.model-name</span>=<span class="string">kimi-k2.5</span></span><br><span class="line"><span class="meta">langchain4j.open-ai.chat-model.temperature</span>=<span class="string">0.3</span></span><br><span class="line"><span class="meta">langchain4j.open-ai.chat-model.max-tokens</span>=<span class="string">4096</span></span><br></pre></td></tr></table></figure>
+<p><strong>关键点：<code>base-url</code> 必须是 <code>coding.dashscope.aliyuncs.com/v1</code>，不是通用的 <code>dashscope.aliyuncs.com</code>！</strong></p>
+<h3 id="4-3-Java-代码实现"><a href="#4-3-Java-代码实现" class="headerlink" title="4.3 Java 代码实现"></a>4.3 Java 代码实现</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> dev.langchain4j.data.message.AiMessage;</span><br><span class="line"><span class="keyword">import</span> dev.langchain4j.data.message.ChatMessage;</span><br><span class="line"><span class="keyword">import</span> dev.langchain4j.data.message.SystemMessage;</span><br><span class="line"><span class="keyword">import</span> dev.langchain4j.data.message.UserMessage;</span><br><span class="line"><span class="keyword">import</span> dev.langchain4j.model.chat.ChatLanguageModel;</span><br><span class="line"><span class="keyword">import</span> dev.langchain4j.model.openai.OpenAiChatModel;</span><br><span class="line"><span class="keyword">import</span> dev.langchain4j.model.output.Response;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.time.Duration;</span><br><span class="line"><span class="keyword">import</span> java.util.Arrays;</span><br><span class="line"><span class="keyword">import</span> java.util.List;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">CodingPlanExample</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> ChatLanguageModel chatModel;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">CodingPlanExample</span><span class="params">(String baseUrl, String apiKey, String modelName)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 使用 OpenAI 兼容模式构建 ChatModel</span></span><br><span class="line">        <span class="keyword">this</span>.chatModel = OpenAiChatModel.builder()</span><br><span class="line">                .baseUrl(baseUrl)  <span class="comment">// Coding Plan endpoint</span></span><br><span class="line">                .apiKey(apiKey)    <span class="comment">// Coding Plan API Key</span></span><br><span class="line">                .modelName(modelName)</span><br><span class="line">                .temperature(<span class="number">0.3</span>)</span><br><span class="line">                .maxTokens(<span class="number">4096</span>)</span><br><span class="line">                .timeout(Duration.ofSeconds(<span class="number">60</span>))</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">chat</span><span class="params">(String systemPrompt, String userMessage)</span> </span>&#123;</span><br><span class="line">        List&lt;ChatMessage&gt; messages = Arrays.asList(</span><br><span class="line">                SystemMessage.from(systemPrompt),</span><br><span class="line">                UserMessage.from(userMessage)</span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        Response&lt;AiMessage&gt; response = chatModel.generate(messages);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (response == <span class="keyword">null</span> || response.content() == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> RuntimeException(<span class="string">"模型返回结果为空"</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> response.content().text();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        CodingPlanExample example = <span class="keyword">new</span> CodingPlanExample(</span><br><span class="line">                <span class="string">"https://coding.dashscope.aliyuncs.com/v1"</span>,</span><br><span class="line">                <span class="string">"sk-sp-xxxxx"</span>,</span><br><span class="line">                <span class="string">"kimi-k2.5"</span></span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        String result = example.chat(</span><br><span class="line">                <span class="string">"你是一位专业的翻译助手"</span>,</span><br><span class="line">                <span class="string">"将以下内容翻译为英文：你好世界"</span></span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        System.out.println(result);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="4-4-Spring-Boot-集成示例"><a href="#4-4-Spring-Boot-集成示例" class="headerlink" title="4.4 Spring Boot 集成示例"></a>4.4 Spring Boot 集成示例</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">LangChain4jConfig</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Value</span>(<span class="string">"$&#123;langchain4j.open-ai.chat-model.base-url&#125;"</span>)</span><br><span class="line">    <span class="keyword">private</span> String baseUrl;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Value</span>(<span class="string">"$&#123;langchain4j.open-ai.chat-model.api-key&#125;"</span>)</span><br><span class="line">    <span class="keyword">private</span> String apiKey;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Value</span>(<span class="string">"$&#123;langchain4j.open-ai.chat-model.model-name&#125;"</span>)</span><br><span class="line">    <span class="keyword">private</span> String modelName;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> ChatLanguageModel <span class="title">chatLanguageModel</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> OpenAiChatModel.builder()</span><br><span class="line">                .baseUrl(baseUrl)</span><br><span class="line">                .apiKey(apiKey)</span><br><span class="line">                .modelName(modelName)</span><br><span class="line">                .timeout(Duration.ofSeconds(<span class="number">60</span>))</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">TranslationService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> ChatLanguageModel chatModel;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">TranslationService</span><span class="params">(ChatLanguageModel chatModel)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">this</span>.chatModel = chatModel;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">translate</span><span class="params">(String content, String sourceLang, String targetLang)</span> </span>&#123;</span><br><span class="line">        String systemPrompt = String.format(</span><br><span class="line">                <span class="string">"你是翻译专家，将内容从%s翻译为%s，直接输出结果"</span>,</span><br><span class="line">                sourceLang, targetLang</span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        List&lt;ChatMessage&gt; messages = Arrays.asList(</span><br><span class="line">                SystemMessage.from(systemPrompt),</span><br><span class="line">                UserMessage.from(content)</span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> chatModel.generate(messages).content().text();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="五、Python-实现：OpenAI-SDK-Coding-Plan"><a href="#五、Python-实现：OpenAI-SDK-Coding-Plan" class="headerlink" title="五、Python 实现：OpenAI SDK + Coding Plan"></a>五、Python 实现：OpenAI SDK + Coding Plan</h2><h3 id="5-1-安装依赖"><a href="#5-1-安装依赖" class="headerlink" title="5.1 安装依赖"></a>5.1 安装依赖</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pip install openai</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-Python-代码"><a href="#5-2-Python-代码" class="headerlink" title="5.2 Python 代码"></a>5.2 Python 代码</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> openai <span class="keyword">import</span> OpenAI</span><br><span class="line"></span><br><span class="line"><span class="comment"># 使用 Coding Plan endpoint</span></span><br><span class="line">client = OpenAI(</span><br><span class="line">    base_url=<span class="string">"https://coding.dashscope.aliyuncs.com/v1"</span>,</span><br><span class="line">    api_key=<span class="string">"sk-sp-xxxxx"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">response = client.chat.completions.create(</span><br><span class="line">    model=<span class="string">"kimi-k2.5"</span>,</span><br><span class="line">    messages=[</span><br><span class="line">        &#123;<span class="string">"role"</span>: <span class="string">"system"</span>, <span class="string">"content"</span>: <span class="string">"你是一位专业的翻译助手"</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"将以下内容翻译为英文：你好世界"</span>&#125;</span><br><span class="line">    ],</span><br><span class="line">    temperature=<span class="number">0.3</span>,</span><br><span class="line">    max_tokens=<span class="number">4096</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">print(response.choices[<span class="number">0</span>].message.content)</span><br></pre></td></tr></table></figure>
+<h3 id="5-3-异步调用示例"><a href="#5-3-异步调用示例" class="headerlink" title="5.3 异步调用示例"></a>5.3 异步调用示例</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> openai <span class="keyword">import</span> AsyncOpenAI</span><br><span class="line"><span class="keyword">import</span> asyncio</span><br><span class="line"></span><br><span class="line">async_client = AsyncOpenAI(</span><br><span class="line">    base_url=<span class="string">"https://coding.dashscope.aliyuncs.com/v1"</span>,</span><br><span class="line">    api_key=<span class="string">"sk-sp-xxxxx"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">def</span> <span class="title">translate_async</span><span class="params">(content: str)</span> -&gt; str:</span></span><br><span class="line">    response = <span class="keyword">await</span> async_client.chat.completions.create(</span><br><span class="line">        model=<span class="string">"kimi-k2.5"</span>,</span><br><span class="line">        messages=[</span><br><span class="line">            &#123;<span class="string">"role"</span>: <span class="string">"system"</span>, <span class="string">"content"</span>: <span class="string">"你是翻译专家"</span>&#125;,</span><br><span class="line">            &#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: content&#125;</span><br><span class="line">        ]</span><br><span class="line">    )</span><br><span class="line">    <span class="keyword">return</span> response.choices[<span class="number">0</span>].message.content</span><br><span class="line"></span><br><span class="line"><span class="comment"># 批量翻译</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">def</span> <span class="title">batch_translate</span><span class="params">(contents: list[str])</span> -&gt; list[str]:</span></span><br><span class="line">    tasks = [translate_async(c) <span class="keyword">for</span> c <span class="keyword">in</span> contents]</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">await</span> asyncio.gather(*tasks)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 运行示例</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">def</span> <span class="title">main</span><span class="params">()</span>:</span></span><br><span class="line">    results = <span class="keyword">await</span> batch_translate([<span class="string">"你好世界"</span>, <span class="string">"人工智能"</span>])</span><br><span class="line">    print(results)</span><br><span class="line"></span><br><span class="line">asyncio.run(main())</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="六、实际应用场景"><a href="#六、实际应用场景" class="headerlink" title="六、实际应用场景"></a>六、实际应用场景</h2><h3 id="6-1-职位内容翻译"><a href="#6-1-职位内容翻译" class="headerlink" title="6.1 职位内容翻译"></a>6.1 职位内容翻译</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">JobTranslationService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> ChatLanguageModel chatModel;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">translateJobDescription</span><span class="params">(String content, String sourceLang, String targetLang)</span> </span>&#123;</span><br><span class="line">        String systemPrompt = buildTranslationPrompt(sourceLang, targetLang);</span><br><span class="line"></span><br><span class="line">        List&lt;ChatMessage&gt; messages = Arrays.asList(</span><br><span class="line">                SystemMessage.from(systemPrompt),</span><br><span class="line">                UserMessage.from(content)</span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> chatModel.generate(messages).content().text();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> String <span class="title">buildTranslationPrompt</span><span class="params">(String sourceLang, String targetLang)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> String.format(<span class="string">""</span><span class="string">"</span></span><br><span class="line"><span class="string">            你是一位专业的职位内容翻译专家。</span></span><br><span class="line"><span class="string">            请将用户输入的职位描述从%s翻译为%s。</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">            翻译要求：</span></span><br><span class="line"><span class="string">            1. 保持原文的段落结构和格式</span></span><br><span class="line"><span class="string">            2. 专业术语使用行业标准翻译</span></span><br><span class="line"><span class="string">            3. 直接输出翻译结果</span></span><br><span class="line"><span class="string">            "</span><span class="string">""</span>, sourceLang, targetLang);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="6-2-文档内容生成"><a href="#6-2-文档内容生成" class="headerlink" title="6.2 文档内容生成"></a>6.2 文档内容生成</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> String <span class="title">generateDocumentOutline</span><span class="params">(String topic)</span> </span>&#123;</span><br><span class="line">    String prompt = <span class="string">""</span><span class="string">"</span></span><br><span class="line"><span class="string">        根据以下主题，生成一份技术文档大纲：</span></span><br><span class="line"><span class="string">        主题：%s</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">        要求：</span></span><br><span class="line"><span class="string">        1. 结构清晰，层次分明</span></span><br><span class="line"><span class="string">        2. 每个章节要有简要说明</span></span><br><span class="line"><span class="string">        3. 使用 Markdown 格式输出</span></span><br><span class="line"><span class="string">        "</span><span class="string">""</span>.formatted(topic);</span><br><span class="line"></span><br><span class="line">    List&lt;ChatMessage&gt; messages = Arrays.asList(</span><br><span class="line">        SystemMessage.from(<span class="string">"你是技术文档撰写专家"</span>),</span><br><span class="line">        UserMessage.from(prompt)</span><br><span class="line">    );</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> chatModel.generate(messages).content().text();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="6-3-智能客服对话"><a href="#6-3-智能客服对话" class="headerlink" title="6.3 智能客服对话"></a>6.3 智能客服对话</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">CustomerServiceBot</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> ChatLanguageModel chatModel;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">handleUserMessage</span><span class="params">(String userMessage, List&lt;String&gt; history)</span> </span>&#123;</span><br><span class="line">        List&lt;ChatMessage&gt; messages = <span class="keyword">new</span> ArrayList&lt;&gt;();</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 系统提示词</span></span><br><span class="line">        messages.add(SystemMessage.from(<span class="string">""</span><span class="string">"</span></span><br><span class="line"><span class="string">            你是专业的客服助手，帮助用户解答产品相关问题。</span></span><br><span class="line"><span class="string">            回答要求：</span></span><br><span class="line"><span class="string">            1. 语气友好专业</span></span><br><span class="line"><span class="string">            2. 回答简洁明了</span></span><br><span class="line"><span class="string">            3. 如果无法回答，引导用户联系人工客服</span></span><br><span class="line"><span class="string">            "</span><span class="string">""</span>));</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 添加历史对话</span></span><br><span class="line">        <span class="keyword">for</span> (String h : history) &#123;</span><br><span class="line">            messages.add(UserMessage.from(h));</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 当前消息</span></span><br><span class="line">        messages.add(UserMessage.from(userMessage));</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> chatModel.generate(messages).content().text();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、关键注意事项"><a href="#七、关键注意事项" class="headerlink" title="七、关键注意事项"></a>七、关键注意事项</h2><h3 id="7-1-Endpoint-不要混用"><a href="#7-1-Endpoint-不要混用" class="headerlink" title="7.1 Endpoint 不要混用"></a>7.1 Endpoint 不要混用</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Key 类型</th>
+<th>正确 Endpoint</th>
+<th>错误 Endpoint</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sk-sp-xxxxx</code> (Coding Plan)</td>
+<td><code>coding.dashscope.aliyuncs.com/v1</code></td>
+<td><code>dashscope.aliyuncs.com</code></td>
+</tr>
+<tr>
+<td><code>sk-xxxxx</code> (通用)</td>
+<td><code>dashscope.aliyuncs.com/compatible-mode/v1</code></td>
+<td><code>coding.dashscope.aliyuncs.com</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>混用会导致 <code>InvalidApiKey</code> 错误或消耗错误的额度！</p>
+<h3 id="7-2-模型名称差异"><a href="#7-2-模型名称差异" class="headerlink" title="7.2 模型名称差异"></a>7.2 模型名称差异</h3><p>Coding Plan 支持的模型可能与通用百炼不同：</p>
+<ul>
+<li>Coding Plan: <code>kimi-k2.5</code> 等</li>
+<li>通用百炼: <code>qwen-plus</code>, <code>qwen-max</code>, <code>qwen-turbo</code></li>
+</ul>
+<p>请根据实际账号支持的模型选择。</p>
+<h3 id="7-3-Token-消耗监控"><a href="#7-3-Token-消耗监控" class="headerlink" title="7.3 Token 消耗监控"></a>7.3 Token 消耗监控</h3><p>虽然使用了 Coding Plan 额度，但仍需关注：</p>
+<ul>
+<li>单次调用 Token 数量</li>
+<li>Coding Plan 额度剩余</li>
+<li>设置合理的 <code>max_tokens</code> 防止超限</li>
+</ul>
+<h3 id="7-4-超时设置"><a href="#7-4-超时设置" class="headerlink" title="7.4 超时设置"></a>7.4 超时设置</h3><p>Coding Plan 响应时间可能与通用服务不同，建议设置较长超时：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">.timeout(Duration.ofSeconds(<span class="number">60</span>))  <span class="comment">// 或更长</span></span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="八、总结"><a href="#八、总结" class="headerlink" title="八、总结"></a>八、总结</h2><h3 id="8-1-官方说法-vs-实际实践"><a href="#8-1-官方说法-vs-实际实践" class="headerlink" title="8.1 官方说法 vs 实际实践"></a>8.1 官方说法 vs 实际实践</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>官方说法</th>
+<th>实际实践</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Coding Plan Key 仅限编程工具使用</td>
+<td>Java/Python 应用可正常使用</td>
+</tr>
+<tr>
+<td>需要额外开通通用 Key</td>
+<td>无需额外开通</td>
+</tr>
+<tr>
+<td>按量付费产生额外费用</td>
+<td>直接消耗 Coding Plan 额度</td>
+</tr>
+<tr>
+<td>dashscope-sdk-java 不支持</td>
+<td>LangChain4j/OpenAI SDK 完美支持</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="8-2-核心原理"><a href="#8-2-核心原理" class="headerlink" title="8.2 核心原理"></a>8.2 核心原理</h3><p>Coding Plan 的 endpoint 基于 <strong>OpenAI API 兼容协议</strong>，这是业界通用的 LLM API 标准。任何支持 OpenAI 协议的客户端都可以调用，不受编程工具限制。</p>
+<h3 id="8-3-适用场景"><a href="#8-3-适用场景" class="headerlink" title="8.3 适用场景"></a>8.3 适用场景</h3><ul>
+<li>✅ Java 后端服务调用 LLM</li>
+<li>✅ Python 应用调用 LLM</li>
+<li>✅ Spring Boot / LangChain4j 集成</li>
+<li>✅ 翻译、生成、对话等各类 NLP 任务</li>
+<li>❌ 直接使用 dashscope-sdk-java（不支持 Coding Plan endpoint）</li>
+</ul>
+<hr>
+<h2 id="九、参考资料"><a href="#九、参考资料" class="headerlink" title="九、参考资料"></a>九、参考资料</h2><ul>
+<li><a href="https://docs.langchain4j.dev/" target="_blank" rel="noopener">LangChain4j 官方文档</a></li>
+<li><a href="https://platform.openai.com/docs/api-reference" target="_blank" rel="noopener">OpenAI API 兼容协议</a></li>
+<li><a href="https://bailian.console.aliyun.com/" target="_blank" rel="noopener">阿里百炼 Coding Plan</a></li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/17/hermes-agent-introduction/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1512,104 +1749,6 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-multi-agent/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/04/06/claude-code-multi-agent/" class="post-title-link" itemprop="url">多 Agent 编排：四种代理类型与协作机制</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:23" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2026/04/06/claude-code-multi-agent/" class="post-meta-item leancloud_visitors" data-flag-title="多 Agent 编排：四种代理类型与协作机制" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2026/04/06/claude-code-multi-agent/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-multi-agent/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>Claude Code 的多 Agent 系统可能是其最被低估的设计之一。它不是简单的”子代理调用”，而是一个完整的协作框架：四种 Agent 类型（Subagent、Fork、Teammate、Remote）、Teams 邮箱通信、权限同步、Worktree 隔离。这个设计让 Claude Code 能够处理单 Agent 无法完成的复杂任务。</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2026/04/06/claude-code-multi-agent/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-memory-system/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1708,7 +1847,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-skills-system/">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-permission-security/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -1722,7 +1861,7 @@
       <header class="post-header">
         <h2 class="post-title" itemprop="name headline">
           
-            <a href="/2026/04/06/claude-code-skills-system/" class="post-title-link" itemprop="url">Skills 系统：条件激活与动态发现</a>
+            <a href="/2026/04/06/claude-code-permission-security/" class="post-title-link" itemprop="url">权限与安全：分层模型与人机协作</a>
         </h2>
 
         <div class="post-meta">
@@ -1733,7 +1872,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:35" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:36" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -1746,7 +1885,7 @@
             </span>
 
           
-            <span id="/2026/04/06/claude-code-skills-system/" class="post-meta-item leancloud_visitors" data-flag-title="Skills 系统：条件激活与动态发现" title="阅读次数">
+            <span id="/2026/04/06/claude-code-permission-security/" class="post-meta-item leancloud_visitors" data-flag-title="权限与安全：分层模型与人机协作" title="阅读次数">
               <span class="post-meta-item-icon">
                 <i class="fa fa-eye"></i>
               </span>
@@ -1761,8 +1900,8 @@
       </span>
       <span class="post-meta-item-text">Valine：</span>
     
-    <a title="valine" href="/2026/04/06/claude-code-skills-system/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-skills-system/" itemprop="commentCount"></span>
+    <a title="valine" href="/2026/04/06/claude-code-permission-security/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-permission-security/" itemprop="commentCount"></span>
     </a>
   </span>
   
@@ -1778,11 +1917,11 @@
 
       
           <blockquote>
-<p>Skills 是 Claude Code 最强大的扩展机制之一。它不是简单的”命令别名”，而是完整的 AI 行为定义：可以限制工具池、覆盖模型、注入 Hook、选择执行上下文（inline 或 fork）。更令人惊叹的是，Skills 支持条件激活——只有当你操作特定文件时才被发现。</p>
+<p>AI Agent 执行命令、修改文件、访问网络——这些都是高风险操作。Claude Code 的权限系统设计了一个分层的决策模型：规则 → 模式 → 钩子 → 分类器 → 用户确认。每一层都可以独立中断工具调用，确保安全性。</p>
 </blockquote>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2026/04/06/claude-code-skills-system/#more" rel="contents">
+              <a class="btn" href="/2026/04/06/claude-code-permission-security/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -1874,7 +2013,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">76</span>
+          <span class="site-state-item-count">77</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1887,7 +2026,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">44</span>
+        <span class="site-state-item-count">45</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

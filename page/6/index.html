@@ -190,6 +190,117 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/10/07/spring_retry_app/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/10/07/spring_retry_app/" class="post-title-link" itemprop="url">Spring Retry 在对接第三方API中的使用</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-10-07 15:57:01" itemprop="dateCreated datePublished" datetime="2021-10-07T15:57:01+08:00">2021-10-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2021/10/07/spring_retry_app/" class="post-meta-item leancloud_visitors" data-flag-title="Spring Retry 在对接第三方API中的使用" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2021/10/07/spring_retry_app/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2021/10/07/spring_retry_app/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <hr>
+<h4 id="一、Spring-Retry-使用场景之调用第三方服务"><a href="#一、Spring-Retry-使用场景之调用第三方服务" class="headerlink" title="一、Spring Retry 使用场景之调用第三方服务"></a>一、Spring Retry 使用场景之调用第三方服务</h4><p>在很多应用中，都需要对接第三方平台，如调用支付平台、调用外部企业平台等。出于对接口通信的安全性考虑，第三方服务往往都会下发一个 token 给调用方，调用方只有通过这个 token 才能完成业务处理。但这个 token 是存在有效期的，因此调用方也会把 token 缓存一定的时间，在有效期内直接读取缓存，缓存过期便再次请求第三方平台下发一个新的 token，缓存起来。这样既可以减少对第三方服务的调用次数，也可以缩短接口的处理时间。</p>
+<p>这样就存在一个问题：如果这个 token 因为种种原因在第三方是已过期的状态，而调用方的缓存未过期，那么调用方的所有业务操作都会出错。从接口逻辑上来说，报错是正确的，也是有必要的，但在系统设计层面上来看，因为 token 过期导致的所有接口报错，是不合理的。好的设计应该是在接口层重新获取 token，继续完成业务逻辑，对顶层调用无感。</p>
+<p>因此，spring retry 在对接第三方服务的场景中，可以有效提升接口的容错性。</p>
+<h4 id="二、Spring-Retry-在实际应用中的关注点"><a href="#二、Spring-Retry-在实际应用中的关注点" class="headerlink" title="二、Spring Retry 在实际应用中的关注点"></a>二、Spring Retry 在实际应用中的关注点</h4><p>spring retry 本质上是代理逻辑的重复处理，每次处理的代码逻辑都是一样的，那么重复处理的意义何在？</p>
+<p>我们以调用支付服务为例，当服务端告诉我们：“token 已过期，查询支付结果失败”，我们首先要做的事，就是把token已过期这个异常抛出去，让 spring retry 监听到这个异常，进行重试。重试的结果，必然还是“token 已过期，查询支付结果失败”，因为重试过程中使用的 token 还是已过期的 token。因此，不仅需要重试，还需要在重试之前清除 token 缓存。也就是说，spring retry 至少需要关注两点：</p>
+<ul>
+<li>监听异常：对于指定的异常，按照配置的策略，开启重试；</li>
+<li>清除缓存：对于指定的异常，清除缓存；</li>
+</ul>
+<h4 id="三、代码实现"><a href="#三、代码实现" class="headerlink" title="三、代码实现"></a>三、代码实现</h4><p>在底层方法上，使用 @Retryable 和 @TokenExpiredExceptionCatch 两个注解。前者的作用是发起业务重试，后者的作用是清除 token 缓存。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Retryable</span>(value = &#123;TokenExpiredException<span class="class">.<span class="keyword">class</span>&#125;, <span class="title">maxAttempts</span> </span>= <span class="number">3</span>, backoff = <span class="meta">@Backoff</span>(delay = <span class="number">100L</span>, multiplier = <span class="number">1</span>))</span><br><span class="line"><span class="meta">@TokenExpiredExceptionCatch</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Response <span class="title">invoke</span><span class="params">(Request request)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 从缓存中获取 token </span></span><br><span class="line">    String token = cache.getToken();</span><br><span class="line">    <span class="comment">// 缓存不存在，则调用接口请求再次下发 token</span></span><br><span class="line">    <span class="keyword">if</span> (StringUtils.isEmpty(token)) &#123;</span><br><span class="line">        <span class="comment">// 调用第三方平台，获取新的token，并缓存</span></span><br><span class="line">        token = newToken;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 调用第三方服务</span></span><br><span class="line">    ResponseInfo responseInfo= Server.queryPayResult(token, request);</span><br><span class="line">    <span class="keyword">if</span> (responseInfo.getCode == <span class="number">1002</span>) &#123;</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> TokenExpiredException(responseInfo.getMessage());</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> responseInfo.getData();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>自定义注解 @TokenExpiredExceptionCatch</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Target</span>(ElementType.METHOD)</span><br><span class="line"><span class="meta">@Retention</span>(RetentionPolicy.RUNTIME)</span><br><span class="line"><span class="keyword">public</span> <span class="meta">@interface</span> TokenExpiredExceptionCatch &#123;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>切面监听注解 @TokenExpiredExceptionCatch</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Around</span>(<span class="string">"@annotation(com.aspects.TokenExpiredExceptionCatch)"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Object <span class="title">handler</span><span class="params">(ProceedingJoinPoint joinPoint)</span> <span class="keyword">throws</span> Throwable </span>&#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> joinPoint.proceed();</span><br><span class="line">    &#125; <span class="keyword">catch</span> (AbstractCustomException e) &#123;</span><br><span class="line">        <span class="comment">// 解析异常码值</span></span><br><span class="line">        ErrorCodeEnum ErrorCodeEnum = ErrorCodeEnum.getByCode(String.valueOf(e.getCode()));</span><br><span class="line">        <span class="comment">// --------------处理 token 已过期异常--------------</span></span><br><span class="line">        <span class="keyword">if</span> (ErrorCodeEnum.TOKEN_EXPIRED.equals(ErrorCodeEnum)) &#123;</span><br><span class="line">            <span class="comment">// 清除缓存 token</span></span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">throw</span> e;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="四、Spring-Retry-注意事项"><a href="#四、Spring-Retry-注意事项" class="headerlink" title="四、Spring Retry 注意事项"></a>四、Spring Retry 注意事项</h4><p>spring retry 是一个很好用的重试工具，配置简单，对 Spring 项目兼容良好，但也不可无脑使用，让所有接口都在底层无感重试。如果支付/退款业务发生重试，极有可能引来客诉或发生资损。因此，在引入重试机制的接口上，一定要判断接口的幂等性。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/09/30/java_switch/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1503,119 +1614,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/12/05/ball/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/12/05/ball/" class="post-title-link" itemprop="url">萝卜丸子</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-12-05 14:57:01" itemprop="dateCreated datePublished" datetime="2020-12-05T14:57:01+08:00">2020-12-05</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%90%83%E8%B4%A7/" itemprop="url" rel="index"><span itemprop="name">吃货</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2020/12/05/ball/" class="post-meta-item leancloud_visitors" data-flag-title="萝卜丸子" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2020/12/05/ball/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2020/12/05/ball/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <hr>
-<p>最近在忙很多事，工作和生活都乱糟糟的，博客也停更了。写技术还是美食呢，当然是美食啦。</p>
-<p>今天做萝卜丸子。边做边吃，忽然想起读初二的一天，同学们凑钱买了五斤萝卜丸子，然后在英语课上偷吃的故事。十五年过去了，但历历在目。</p>
-<h5 id="一、食材准备"><a href="#一、食材准备" class="headerlink" title="一、食材准备"></a>一、食材准备</h5><p>青萝卜、胡萝卜、红薯淀粉、面粉、鸡蛋、辣椒、胡椒、葱姜蒜、生抽、老抽、蚝油、冰糖。</p>
-<p><a href="https://imgchr.com/i/DOPsrd" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOPsrd.jpg" alt="DOPsrd.jpg"></a></p>
-<h5 id="二、调料子"><a href="#二、调料子" class="headerlink" title="二、调料子"></a>二、调料子</h5><p>首先将萝卜刨丝。</p>
-<p><a href="https://imgchr.com/i/DOPjRU" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOPjRU.jpg" alt="DOPjRU.jpg"></a></p>
-<p>然后要杀掉萝卜的水气和臭味。比较喜欢看老饭骨，大伯给的方子是在沸水中放入冰糖，再倒入萝卜丝。今天试了下，效果确实很棒，建议民间推广。</p>
-<p><a href="https://imgchr.com/i/DOPgat" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOPgat.jpg" alt="DOPgat.jpg"></a></p>
-<p>接下来调糊糊。用筷子顺着一个方向搅拌，直到可以用筷子提起来。这步也叫上劲，是关键一环。</p>
-<p><a href="https://imgchr.com/i/DOiNLj" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOiNLj.jpg" alt="DOiNLj.jpg"></a></p>
-<p>调糊糊前，可以先把油热上。</p>
-<p><a href="https://imgchr.com/i/DOiXTI" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOiXTI.jpg" alt="DOiXTI.jpg"></a></p>
-<p>待油七分热，将糊糊团成丸子，依次放入。油温太高会让丸子糊掉，太低又会导致丸子吸油太多。七分热怎么看呢？可以先放一小块糊糊进去，剧烈翻滚但短时间内又不会泛黄就可以了。</p>
-<p><a href="https://imgchr.com/i/DOFTNq" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOFTNq.jpg" alt="DOFTNq.jpg"></a></p>
-<p>文火慢炸20分钟，表面金黄时捞出。</p>
-<p><a href="https://imgchr.com/i/DOFxb9" target="_blank" rel="noopener"><img src="https://s3.ax1x.com/2020/12/05/DOFxb9.jpg" alt="DOFxb9.jpg"></a></p>
-<p>丸子放入次序不一样，可能炸出来的颜色也不一样。强迫症患者可以将丸子下入油中复炸一次，让颜色均匀。</p>
-<p>萝卜丸子可以当零食吃，也可以做汤。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1688,7 +1686,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">76</span>
+          <span class="site-state-item-count">77</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1701,7 +1699,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">44</span>
+        <span class="site-state-item-count">45</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
