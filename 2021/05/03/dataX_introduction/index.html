@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
   </script>
 
   <meta name="description" content="写在前面的话最近在做数据迁移工具。经过多方调研，最后选择阿里巴巴开源工具 DataX。为了兼容携程 Dal 组件，对 DataX 连接源库和目标库的部分做了改造，以便通过 TitanKey 实现数据的同步。因此，关于数据同步的内容，计划分为三个章节：DataX 工具研究介绍、携程 Dal 组件研究介绍、DataX 整合 Dal。本篇介绍 DataX 的作用机制与使用。 一、DataX 介绍Dat">
@@ -184,6 +184,7 @@
     <i class="fa fa-arrow-up"></i>
     <span>0%</span>
   </div>
+  <div class="reading-progress-bar"></div>
 
 
     <main class="main">
@@ -276,7 +277,7 @@
         <hr>
 <h3 id="写在前面的话"><a href="#写在前面的话" class="headerlink" title="写在前面的话"></a>写在前面的话</h3><p>最近在做数据迁移工具。经过多方调研，最后选择阿里巴巴开源工具 <code>DataX</code>。为了兼容携程 <code>Dal</code> 组件，对 <code>DataX</code> 连接源库和目标库的部分做了改造，以便通过 <code>TitanKey</code> 实现数据的同步。因此，关于数据同步的内容，计划分为三个章节：<code>DataX</code> 工具研究介绍、携程 <code>Dal</code> 组件研究介绍、<code>DataX</code> 整合 <code>Dal</code>。本篇介绍 <code>DataX</code> 的作用机制与使用。</p>
 <h5 id="一、DataX-介绍"><a href="#一、DataX-介绍" class="headerlink" title="一、DataX 介绍"></a>一、<code>DataX</code> 介绍</h5><p><code>DataX</code> 是阿里巴巴开源出来的数据同步工具，主要解决解决各种异构数据源之间的同步难题。目前已经拥有比较完善的插件体系，包括常用的 <code>RDBMS</code> 数据库、<code>NOSQL</code>、大数据计算系统。良好的架构设计，方便开发者引入新插件，一步步构建起数据同步的生态圈。</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_6_29_DataX_introduction.png" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_6_29_DataX_introduction.png" alt=""></p>
 <h5 id="二、目前支持的插件"><a href="#二、目前支持的插件" class="headerlink" title="二、目前支持的插件"></a>二、目前支持的插件</h5><div class="table-container">
 <table>
 <thead>
@@ -436,9 +437,9 @@
 </table>
 </div>
 <h5 id="三、DataX-同步机制"><a href="#三、DataX-同步机制" class="headerlink" title="三、DataX 同步机制"></a>三、<code>DataX</code> 同步机制</h5><p><code>DataX</code> 将数据同步过程中的读取和写入分别抽象为 <code>Reader</code>/<code>Writer</code>插件，并且以框架作为媒介，实现读取数据源和同步数据源的灵活组合。</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_6_59_datax3.0.png" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_6_59_datax3.0.png" alt=""></p>
 <p> 简单来说，<code>DataX</code> 的设计愿景，是建立一个万能数据池（图中的 <code>FrameWork</code>）：有无限根管道通往池子，负责导入数据；同时又有无限根管道负责向外导出数据。向池子里导入数据，依赖 <code>Reader</code> 插件；从池子向外导出数据，依赖 <code>Writer</code> 插件。这种设计的精妙之处，在于这个数据池子是万能的，就是说可以从任何一根管道导入数据，也可以将数据导出到任何一根管道。因此，我们只需要关心导入数据和导出数据的管道建设，也就是开发新的 <code>Reader</code>/<code>Writer</code>插件，便可实现多种数据源之间的同步。</p>
-<h5 id="四、DataX数据同步过程"><a href="#四、DataX数据同步过程" class="headerlink" title="四、DataX数据同步过程"></a>四、<code>DataX</code>数据同步过程</h5><p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_7_23_datax_sync_flow.png" alt=""></p>
+<h5 id="四、DataX数据同步过程"><a href="#四、DataX数据同步过程" class="headerlink" title="四、DataX数据同步过程"></a>四、<code>DataX</code>数据同步过程</h5><p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_20_7_23_datax_sync_flow.png" alt=""></p>
 <p>名词解释：</p>
 <p><code>Job</code>：<code>DataX</code> 执行数据同步任务的最小业务单元；</p>
 <p><code>Task</code>：<code>DataX</code> 执行数据同步任务的最小执行单元，由 <code>Job</code> 拆分而来，为实现最大的同步效率；</p>
@@ -621,7 +622,7 @@
 
 
 
-<script>
+<script pjax>
   (function() {
     function leancloudSelector(url) {
       url = encodeURI(url);
@@ -720,6 +721,8 @@
 
   
   <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
   <script src="/lib/velocity/velocity.min.js"></script>
   <script src="/lib/velocity/velocity.ui.min.js"></script>
 
@@ -732,6 +735,65 @@
 
 
 <script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
 
 
 
@@ -756,6 +818,7 @@
 
 
 
+    <div id="pjax">
   
 
   
@@ -791,5 +854,6 @@ NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
 });
 </script>
 
+    </div>
 </body>
 </html>

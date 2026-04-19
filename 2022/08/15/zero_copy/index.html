@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
   </script>
 
   <meta name="description" content="一、零拷贝技术零拷贝技术，是相对于传统 IO 的一种技术思想。传统 IO ：读写数据是在用户空间和内核空间来回复制，而内核空间的数据是通过操作系统层面的 IO 接口从磁盘读取或写入的，中间也需要多次拷贝，因此效率较低。零拷贝技术，目的是尽可能地减少上下文切换和拷贝次数，提升操作性能。 二、传统 IO 实现原理当应用服务接收客户端的请求时，传统 IO 通常需要两种系统调用： 1234&#x2F;&#x2F; 读取re">
@@ -186,6 +186,7 @@
     <i class="fa fa-arrow-up"></i>
     <span>0%</span>
   </div>
+  <div class="reading-progress-bar"></div>
 
 
     <main class="main">
@@ -279,7 +280,7 @@
 <h4 id="一、零拷贝技术"><a href="#一、零拷贝技术" class="headerlink" title="一、零拷贝技术"></a>一、零拷贝技术</h4><p>零拷贝技术，是相对于传统 IO 的一种技术思想。传统 IO ：读写数据是在用户空间和内核空间来回复制，而内核空间的数据是通过操作系统层面的 IO 接口从磁盘读取或写入的，中间也需要多次拷贝，因此效率较低。零拷贝技术，目的是尽可能地减少上下文切换和拷贝次数，提升操作性能。</p>
 <h4 id="二、传统-IO-实现原理"><a href="#二、传统-IO-实现原理" class="headerlink" title="二、传统 IO 实现原理"></a>二、传统 IO 实现原理</h4><p>当应用服务接收客户端的请求时，传统 IO 通常需要两种系统调用：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 读取</span></span><br><span class="line">read(file, tmp_buf, len);</span><br><span class="line"><span class="comment">// 写入</span></span><br><span class="line">write(socket, tmp_buf, len);</span><br></pre></td></tr></table></figure>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/16_19_22_10_%E4%BC%A0%E7%BB%9F%20IO.png" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/16_19_22_10_%E4%BC%A0%E7%BB%9F%20IO.png" alt=""></p>
 <p>从细分图中可知，虽然只是简单的读写操作，但内部的流程还是比较复杂的。</p>
 <p><strong>一次读写将发生 4 次上下文切换：</strong></p>
 <ul>
@@ -315,7 +316,7 @@
 <li><p>DMA 把内核 socket 缓冲区的数据拷贝到网卡缓冲区；</p>
 </li>
 </ul>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/16_19_24_29_mmap%20%20%20writer.png" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/16_19_24_29_mmap%20%20%20writer.png" alt=""></p>
 <p>从调用过程可知，与传统 IO 相比，mmap() + write 只减少了 1 次 CPU 拷贝，仍然要发生 4 次上下文切换和 3 次数据拷贝。</p>
 <h5 id="3-2-sendfile-实现零拷贝"><a href="#3-2-sendfile-实现零拷贝" class="headerlink" title="3.2 sendfile() 实现零拷贝"></a>3.2 sendfile() 实现零拷贝</h5><p>senfile() 是 Linux 提供的，专门用于发送文件的系统调用函数。sendfile() 可以替代传统 IO 的 read()、write() 函数，这意味着将省去 2 次上下文切换。此外，数据拷贝路径也有所优化，具体的优化方案与 Linux 内核版本有关，因为在 2.4 版本之后，Linux 提供了 SG-DMA 技术，它将提供比 DMA 技术更进一步的优化策略。</p>
 <p>在 2.4 版本之前，CPU 可以直接把内核缓冲区的数据拷贝到内核 socket 缓冲区，省去拷贝到用户缓冲区这一步，因此还存在 2 次上下文切换和 3 次数据拷贝。</p>
@@ -325,7 +326,7 @@
 <li>CPU 把内核缓冲区的数据拷贝到内核 socket 缓冲区；</li>
 <li>DMA 把内核 socket 缓冲区的数据拷贝到网卡缓冲区；</li>
 </ul>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/16_19_25_16_sendfile_dma.png" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/16_19_25_16_sendfile_dma.png" alt=""></p>
 <p>在 2.4 版本之后，引入了 SG_DMA 技术，如果相应的网卡支持该技术，那么就可以把内核缓冲区的数据直接拷贝到网卡缓冲区，也就是说还存在 2 次上下文切换和 2 次数据拷贝。</p>
 <p>具体执行步骤：</p>
 <ul>
@@ -333,14 +334,14 @@
 <li>把内核缓冲区描述符和数据长度传到内核 socket 缓冲区；</li>
 <li>SG-DMA 直接把内核缓冲区的数据拷贝到网卡缓冲区；</li>
 </ul>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/16_19_25_39_sendfile_sg_dma.png" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/16_19_25_39_sendfile_sg_dma.png" alt=""></p>
 <h5 id="3-3-direct-IO"><a href="#3-3-direct-IO" class="headerlink" title="3.3 direct IO"></a>3.3 direct IO</h5><p>直接 IO 是在用户缓冲区和磁盘、网卡之间建立直接通道的技术设计。直接 IO 在读写数据时，可以绕开内核，减少上下文切换和数据拷贝的次数，从而提高效率。</p>
 <p>具体执行步骤：</p>
 <ul>
 <li>DMA 把磁盘文件数据直接拷贝到用户缓冲区；</li>
 <li>DMA 把用户缓冲区的数据直接拷贝到网卡缓冲区；</li>
 </ul>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/16_19_26_8_direct_io.png" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/16_19_26_8_direct_io.png" alt=""></p>
 <p>直接 IO 使用直接通道操作数据，由应用层完全管理数据，其优缺点也是很明显的。</p>
 <p>优点：</p>
 <ul>
@@ -519,7 +520,7 @@
 
 
 
-<script>
+<script pjax>
   (function() {
     function leancloudSelector(url) {
       url = encodeURI(url);
@@ -618,6 +619,8 @@
 
   
   <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
   <script src="/lib/velocity/velocity.min.js"></script>
   <script src="/lib/velocity/velocity.ui.min.js"></script>
 
@@ -630,6 +633,65 @@
 
 
 <script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
 
 
 
@@ -654,6 +716,7 @@
 
 
 
+    <div id="pjax">
   
 
   
@@ -689,5 +752,6 @@ NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
 });
 </script>
 
+    </div>
 </body>
 </html>

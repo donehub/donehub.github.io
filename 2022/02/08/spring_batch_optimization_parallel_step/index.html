@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
   </script>
 
   <meta name="description" content="一、Spring Batch 性能优化指标Spring Batch 是一款伸缩性非常好的批处理工具，既可以处理简单的任务，也可以处理复杂的、高容量的任务。在性能调优方面，Spring Batch 提供了丰富的接口支持，各项优化指标可归纳如下：  多线程 Step：由独立线程执行提交块（a chunk of items）的输入、处理和输出过程； 并行化 Step：对于可并行处理的 Step，交由不">
@@ -184,6 +184,7 @@
     <i class="fa fa-arrow-up"></i>
     <span>0%</span>
   </div>
+  <div class="reading-progress-bar"></div>
 
 
     <main class="main">
@@ -291,7 +292,7 @@
 <li><code>step4</code>：迁移所有学生信息；</li>
 </ul>
 <p>我们发现，修改学生姓名的任务与修改学生住址的任务，互不干扰，并不需要有先后之分。因此，我们可以将 <code>step1</code>、<code>step2</code> 与 <code>step3</code> 并行执行。串行 <code>Step</code> 与并行 <code>Step</code> 流程如下：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/5_21_33_37_parallel_step_2.png" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/5_21_33_37_parallel_step_2.png" alt=""></p>
 <h4 id="三、批处理配置"><a href="#三、批处理配置" class="headerlink" title="三、批处理配置"></a>三、批处理配置</h4><h5 id="3-1-Job-配置"><a href="#3-1-Job-配置" class="headerlink" title="3.1 Job 配置"></a>3.1 Job 配置</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Job;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.Step;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.configuration.annotation.JobBuilderFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.flow.Flow;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.launch.support.RunIdIncrementer;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="meta">@EnableBatchProcessing</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BatchManageStudentJob</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">public</span> JobBuilderFactory jobBuilderFactory;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchProcessStudentSplitFlow1"</span>)</span><br><span class="line">    <span class="keyword">private</span> Flow batchProcessStudentSplitFlow;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchTransferStudentStep1"</span>)</span><br><span class="line">    <span class="keyword">private</span> Step batchTransferStudentStep;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Job <span class="title">manageStudentJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"manageStudentJob1"</span>)</span><br><span class="line">                .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">            	<span class="comment">// 姓名追加1、姓名追加2、地址追加8</span></span><br><span class="line">                .start(batchProcessStudentSplitFlow)</span><br><span class="line">            	<span class="comment">// 迁移学生信息; student_source -&gt; student_target</span></span><br><span class="line">                .next(batchTransferStudentStep)</span><br><span class="line">                .end()</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <h5 id="3-2-Fow-配置"><a href="#3-2-Fow-配置" class="headerlink" title="3.2 Fow 配置"></a>3.2 Fow 配置</h5><p><code>batchProcessStudentSplitFlow</code>：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.builder.FlowBuilder;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.flow.Flow;</span><br><span class="line"><span class="keyword">import</span> org.springframework.batch.core.job.flow.support.SimpleFlow;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Qualifier;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;</span><br><span class="line"><span class="keyword">import</span> <span class="keyword">static</span> com.example.springbatchdemo.config.ExecutorConfig.TASK_EXECUTOR;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BatchProcessStudentSplitFlow</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = TASK_EXECUTOR)</span><br><span class="line">    <span class="keyword">private</span> ThreadPoolTaskExecutor taskExecutor;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchUpdateStudentNameOneAndTwoFlow"</span>)</span><br><span class="line">    <span class="keyword">private</span> Flow batchUpdateStudentNameOneAndTwoFlow;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(value = <span class="string">"batchUpdateStudentAddressFlow1"</span>)</span><br><span class="line">    <span class="keyword">private</span> Flow batchUpdateStudentAddressFlow;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span>(<span class="string">"batchProcessStudentSplitFlow1"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Flow <span class="title">batchProcessStudentSplitFlow1</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> FlowBuilder&lt;SimpleFlow&gt;(<span class="string">"batchProcessStudentSplitFlow1"</span>)</span><br><span class="line">                .split(taskExecutor)</span><br><span class="line">                .add(batchUpdateStudentNameOneAndTwoFlow, batchUpdateStudentAddressFlow)</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
@@ -324,10 +325,10 @@
 <h4 id="四、性能测试"><a href="#四、性能测试" class="headerlink" title="四、性能测试"></a>四、性能测试</h4><p>测试数据量：100000</p>
 <p>测试环境：Windows 10，i7-8核，MySQL-8.0.28</p>
 <h5 id="4-1-串行-Step"><a href="#4-1-串行-Step" class="headerlink" title="4.1 串行 Step"></a>4.1 串行 Step</h5><p>串行 <code>Step</code> 批处理，只需要按照顺序配置 <code>Step</code>（省略代码示例）。测试结果：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/8_12_36_15_serial_step_performance.png" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/8_12_36_15_serial_step_performance.png" alt=""></p>
 <p>耗时：<strong>91s</strong></p>
 <h5 id="4-2-并行-Step"><a href="#4-2-并行-Step" class="headerlink" title="4.2 并行 Step"></a>4.2 并行 Step</h5><p>测试结果：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/8_12_41_53_parallel_step_performance.png" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/05/8_12_41_53_parallel_step_performance.png" alt=""></p>
 <p>耗时：<strong>68s</strong></p>
 <p>示例代码：<a href="https://github.com/donehub/spring-batch-demo" target="_blank" rel="noopener">spring-batch-demo</a></p>
 
@@ -497,7 +498,7 @@
 
 
 
-<script>
+<script pjax>
   (function() {
     function leancloudSelector(url) {
       url = encodeURI(url);
@@ -596,6 +597,8 @@
 
   
   <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
   <script src="/lib/velocity/velocity.min.js"></script>
   <script src="/lib/velocity/velocity.ui.min.js"></script>
 
@@ -608,6 +611,65 @@
 
 
 <script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
 
 
 
@@ -632,6 +694,7 @@
 
 
 
+    <div id="pjax">
   
 
   
@@ -667,5 +730,6 @@ NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
 });
 </script>
 
+    </div>
 </body>
 </html>

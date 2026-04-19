@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
   </script>
 
   <meta name="description" content="一、 Spring 对象拷贝的具体实现Spring 对象拷贝，基于反射和内省，将源对象字段值装填到目标对象字段上。主要分以下两步：  通过内省，获取源对象和目标对象的属性描述器； 通过反射，解析源属性值，赋值到目标属性中；  12345678910111213141516171819202122232425262728293031323334353637383940414243444546474">
@@ -183,6 +183,7 @@
     <i class="fa fa-arrow-up"></i>
     <span>0%</span>
   </div>
+  <div class="reading-progress-bar"></div>
 
 
     <main class="main">
@@ -280,10 +281,10 @@
 </ul>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Spring 对象拷贝基础方法</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@param</span> source           源对象</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@param</span> target           目标对象</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@param</span> editable         限制目标 Class</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@param</span> ignoreProperties 需要忽略的拷贝字段</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">copyProperties</span><span class="params">(Object source, Object target, Class&lt;?&gt; editable,</span></span></span><br><span class="line"><span class="function"><span class="params">                                   String... ignoreProperties)</span> <span class="keyword">throws</span> BeansException </span>&#123;</span><br><span class="line">    </span><br><span class="line">    Assert.notNull(source, <span class="string">"Source must not be null"</span>);</span><br><span class="line">    Assert.notNull(target, <span class="string">"Target must not be null"</span>);</span><br><span class="line">    </span><br><span class="line">    Class&lt;?&gt; actualEditable = target.getClass();</span><br><span class="line">    <span class="keyword">if</span> (editable != <span class="keyword">null</span>) &#123;</span><br><span class="line">        <span class="comment">// 如果 target 不是 editable 的实例, 则中断拷贝</span></span><br><span class="line">        <span class="keyword">if</span> (!editable.isInstance(target)) &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> IllegalArgumentException(<span class="string">"Target class ["</span> + target.getClass().getName() +<span class="string">"] not assignable to Editable class ["</span> + editable.getName() + <span class="string">"]"</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        actualEditable = editable;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 内省目标对象, 获取其属性描述器列表</span></span><br><span class="line">    PropertyDescriptor[] targetPds = getPropertyDescriptors(actualEditable);</span><br><span class="line">    <span class="comment">// 解析需要忽略拷贝的字段</span></span><br><span class="line">    List&lt;String&gt; ignoreList = (ignoreProperties != <span class="keyword">null</span> ? Arrays.asList(ignoreProperties) : <span class="keyword">null</span>);</span><br><span class="line">    <span class="comment">// 遍历目标对象的属性描述器, 依次进行属性值的拷贝</span></span><br><span class="line">    <span class="keyword">for</span> (PropertyDescriptor targetPd : targetPds) &#123;</span><br><span class="line">        <span class="comment">// 解析目标属性描述器的写入方法</span></span><br><span class="line">        Method writeMethod = targetPd.getWriteMethod();</span><br><span class="line">        <span class="comment">// 如果目标属性可以写入且需要拷贝, 则内省源对象, 获取对应的属性描述器, 读取属性值并拷贝到目标属性中</span></span><br><span class="line">        <span class="keyword">if</span> (writeMethod != <span class="keyword">null</span> &amp;&amp; (ignoreList == <span class="keyword">null</span> || !ignoreList.contains(targetPd.getName()))) &#123;</span><br><span class="line">            <span class="comment">// 内省源对象, 缓存属性描述器, 并根据目标属性名称取出对应的源属性的描述器</span></span><br><span class="line">            PropertyDescriptor sourcePd = getPropertyDescriptor(source.getClass(), targetPd.getName());</span><br><span class="line">            <span class="keyword">if</span> (sourcePd != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="comment">// 解析源属性值的读取方法</span></span><br><span class="line">                Method readMethod = sourcePd.getReadMethod();</span><br><span class="line">                <span class="keyword">if</span> (readMethod != <span class="keyword">null</span></span><br><span class="line">                    &amp;&amp; ClassUtils.isAssignable(writeMethod.getParameterTypes()[<span class="number">0</span>],</span><br><span class="line">                                              readMethod.getReturnType())) &#123;</span><br><span class="line">                    </span><br><span class="line">                    <span class="keyword">try</span> &#123;</span><br><span class="line">                        <span class="keyword">if</span> (!Modifier.isPublic(readMethod.getDeclaringClass().getModifiers())) &#123;</span><br><span class="line">                            readMethod.setAccessible(<span class="keyword">true</span>);</span><br><span class="line">                        &#125;</span><br><span class="line">                        <span class="comment">// 读取源属性值</span></span><br><span class="line">                        Object value = readMethod.invoke(source);</span><br><span class="line">                        <span class="keyword">if</span> (!Modifier.isPublic(writeMethod.getDeclaringClass().getModifiers())) &#123;</span><br><span class="line">                            writeMethod.setAccessible(<span class="keyword">true</span>);</span><br><span class="line">                        &#125;</span><br><span class="line">                        <span class="comment">// 写入目标属性</span></span><br><span class="line">                        writeMethod.invoke(target, value);</span><br><span class="line">                    &#125; <span class="keyword">catch</span> (Throwable ex) &#123;</span><br><span class="line">                        <span class="keyword">throw</span> <span class="keyword">new</span> FatalBeanException(<span class="string">"Could not copy property '"</span> + targetPd.getName() + <span class="string">"' from source to target"</span>, ex);</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <h4 id="二、-BeanUtils-copyProperties实现原理"><a href="#二、-BeanUtils-copyProperties实现原理" class="headerlink" title="二、 BeanUtils.copyProperties实现原理"></a>二、 <code>BeanUtils.copyProperties</code>实现原理</h4><p>根据以上分析，整合出 <code>Spring</code> 对象拷贝的实现原理：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_39_5_introspector.jpg" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_39_5_introspector.jpg" alt=""></p>
 <p>通过内省机制，对 <code>Bean</code> 进行拆分，得到每个属性的描述器，缓存在 <code>Map</code> 中，<code>Key</code>为变量名，<code>Value</code>为属性描述器。属性描述器主要包括：属性名称、读取属性值的方法、设置属性值的方法。拷贝过程中，先获取目标属性的写入方法，再获取对应源属性的读取方法，最后通过反射拷贝属性值。</p>
 <h4 id="三、JavaBean内省机制"><a href="#三、JavaBean内省机制" class="headerlink" title="三、JavaBean内省机制"></a>三、<code>JavaBean</code>内省机制</h4><p><code>JavaBean</code> 内省，是建立在反射基础上的，通过解析 <code>Bean</code>各个属性的描述器，以便通过属性描述器来操作 <code>Bean</code> 的一种机制。反射是将 <code>Java</code> 类中的各种成分映射成相应的 <code>Java</code> 类，可以获取所有属性以及调用任何方法。与反射不同的是，内省是通过属性描述器来暴露一个 <code>Bean</code> 的属性、方法和时间的，而且只有符合 <code>JavaBean</code> 规则的类的成员才可以调用内生 <code>API</code> 进行操作。</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_37_1_refect_instropection.png" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/2_19_37_1_refect_instropection.png" alt=""></p>
 <p>内省在 <code>java.beans.Introspector</code>中的具体实现：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 获取所有的 public 方法</span></span><br><span class="line">Method methodList[] = getPublicDeclaredMethods(beanClass);</span><br><span class="line"><span class="comment">// 循环遍历处理每一个 public 方法, 为方便讲解, 此处我们以第一个方法为例...</span></span><br><span class="line"></span><br><span class="line">Method method = methodList[<span class="number">0</span>];</span><br><span class="line"><span class="keyword">if</span> (method == <span class="keyword">null</span>) &#123;</span><br><span class="line">    <span class="keyword">continue</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 跳过 static 方法</span></span><br><span class="line"><span class="keyword">int</span> mods = method.getModifiers();</span><br><span class="line"><span class="keyword">if</span> (Modifier.isStatic(mods)) &#123;</span><br><span class="line">    <span class="keyword">continue</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 获取该方法的名称, 如setAge、getAge</span></span><br><span class="line">String name = method.getName();</span><br><span class="line"><span class="comment">// 获取该方法的入参和返参</span></span><br><span class="line">Class&lt;?&gt;[] argTypes = method.getParameterTypes();</span><br><span class="line">Class&lt;?&gt; resultType = method.getReturnType();</span><br><span class="line"><span class="comment">// 获取该方法的入参个数</span></span><br><span class="line"><span class="keyword">int</span> argCount = argTypes.length;</span><br><span class="line">PropertyDescriptor pd = <span class="keyword">null</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (argCount == <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="comment">// 1. 没有入参: 说明是获取属性值的方法</span></span><br><span class="line">    <span class="keyword">if</span> (name.startsWith(GET_PREFIX)) &#123;</span><br><span class="line">        <span class="comment">// 1.1 该方法名称以 get 开头, 如 getAge</span></span><br><span class="line">        pd = <span class="keyword">new</span> PropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">3</span>), method, <span class="keyword">null</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (resultType == <span class="keyword">boolean</span><span class="class">.<span class="keyword">class</span> &amp;&amp; <span class="title">name</span>.<span class="title">startsWith</span>(<span class="title">IS_PREFIX</span>)) </span>&#123;</span><br><span class="line">        <span class="comment">// 1.2 该方法名称以 is 开头, 如 isMale, 只处理基本类型的布尔值</span></span><br><span class="line">        pd = <span class="keyword">new</span> PropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">2</span>), method, <span class="keyword">null</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (argCount == <span class="number">1</span>) &#123;</span><br><span class="line">    <span class="comment">// 2. 有一个入参</span></span><br><span class="line">    if (int.class.equals(argTypes[0]) &amp;&amp; name.startsWith(GET_PREFIX)) &#123;</span><br><span class="line">        <span class="comment">// 2.1 获取属性值的方法, 如 getChild(Integer index), 则封装成索引属性器</span></span><br><span class="line">        pd = <span class="keyword">new</span> IndexedPropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">3</span>), <span class="keyword">null</span>, <span class="keyword">null</span>, method, <span class="keyword">null</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (<span class="keyword">void</span><span class="class">.<span class="keyword">class</span>.<span class="title">equals</span>(<span class="title">resultType</span>) &amp;&amp; <span class="title">name</span>.<span class="title">startsWith</span>(<span class="title">SET_PREFIX</span>)) </span>&#123;</span><br><span class="line">        <span class="comment">// 2.2 设置属性值的方法</span></span><br><span class="line">        pd = <span class="keyword">new</span> PropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">3</span>), <span class="keyword">null</span>, method);</span><br><span class="line">        <span class="keyword">if</span> (throwsException(method, PropertyVetoException<span class="class">.<span class="keyword">class</span>)) </span>&#123;</span><br><span class="line">            pd.setConstrained(<span class="keyword">true</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (argCount == <span class="number">2</span>) &#123;</span><br><span class="line">    <span class="comment">// 3. 有两个入参</span></span><br><span class="line">    if (void.class.equals(resultType) &amp;&amp; int.class.equals(argTypes[0]) &amp;&amp; name.startsWith(SET_PREFIX)) &#123;</span><br><span class="line">        <span class="comment">// 3.1 只处理设置属性值的方法, 如 setChild(Integer index, Child child), 则封装成索引属性器</span></span><br><span class="line">        pd = <span class="keyword">new</span> IndexedPropertyDescriptor(<span class="keyword">this</span>.beanClass, name.substring(<span class="number">3</span>), <span class="keyword">null</span>, <span class="keyword">null</span>, <span class="keyword">null</span>, method);</span><br><span class="line">        <span class="keyword">if</span> (throwsException(method, PropertyVetoException<span class="class">.<span class="keyword">class</span>)) </span>&#123;</span><br><span class="line">            pd.setConstrained(<span class="keyword">true</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">return</span> PropertyDescriptor;</span><br></pre></td></tr></table></figure>
 <p>由此可以看出，一个类的方法名称、入参个数、反参类型是<code>JavaBean</code> 内省的主要要素，可以总结为：</p>
@@ -463,7 +464,7 @@
 
 
 
-<script>
+<script pjax>
   (function() {
     function leancloudSelector(url) {
       url = encodeURI(url);
@@ -562,6 +563,8 @@
 
   
   <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
   <script src="/lib/velocity/velocity.min.js"></script>
   <script src="/lib/velocity/velocity.ui.min.js"></script>
 
@@ -574,6 +577,65 @@
 
 
 <script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
 
 
 
@@ -598,6 +660,7 @@
 
 
 
+    <div id="pjax">
   
 
   
@@ -633,5 +696,6 @@ NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
 });
 </script>
 
+    </div>
 </body>
 </html>

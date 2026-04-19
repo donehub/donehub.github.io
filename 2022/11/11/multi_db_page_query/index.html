@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
   </script>
 
   <meta name="description" content="一、跨库分页查询对于一定数量级的表，如订单表，通常采用分库分表的方式保存数据。根据指定字段，如果用户ID，散列数据到不同的库中。那么，如果需要按照下单时间分页查询订单信息，就涉及到跨库查询。 假设有45笔订单，存于三个库中，散列算法是 OrderID % 3，则数据分布为：  如果以每页五个订单，查询第二页的所有订单，则单库查询 sql 为： 1select * from order_info">
@@ -187,6 +187,7 @@
     <i class="fa fa-arrow-up"></i>
     <span>0%</span>
   </div>
+  <div class="reading-progress-bar"></div>
 
 
     <main class="main">
@@ -279,7 +280,7 @@
         <hr>
 <h4 id="一、跨库分页查询"><a href="#一、跨库分页查询" class="headerlink" title="一、跨库分页查询"></a>一、跨库分页查询</h4><p>对于一定数量级的表，如订单表，通常采用分库分表的方式保存数据。根据指定字段，如果用户ID，散列数据到不同的库中。那么，如果需要按照下单时间分页查询订单信息，就涉及到跨库查询。</p>
 <p>假设有45笔订单，存于三个库中，散列算法是 OrderID % 3，则数据分布为：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_21_32_38_origin.png" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_21_32_38_origin.png" alt=""></p>
 <p>如果以每页五个订单，查询第二页的所有订单，则单库查询 sql 为：</p>
 <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> order_info <span class="keyword">order</span> <span class="keyword">by</span> <span class="keyword">id</span> <span class="keyword">limit</span> <span class="number">5</span> <span class="keyword">offset</span> <span class="number">5</span>;</span><br></pre></td></tr></table></figure>
 <p>但跨库查询就行不通了。下面，主要有三种方案可以用于跨库分页查询：</p>
@@ -291,21 +292,21 @@
 <h4 id="二、全局查询法"><a href="#二、全局查询法" class="headerlink" title="二、全局查询法"></a>二、全局查询法</h4><p>全局查询法，需要在每个分库中执行查询语句，然后再程序中排序，再定位切割到指定的数据段。</p>
 <p>如果需要查询第二页订单，需要查询每个库的前二页数据：</p>
 <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> order_info_1 <span class="keyword">order</span> <span class="keyword">by</span> <span class="keyword">id</span> <span class="keyword">limit</span> <span class="number">10</span>;</span><br><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> order_info_2 <span class="keyword">order</span> <span class="keyword">by</span> <span class="keyword">id</span> <span class="keyword">limit</span> <span class="number">10</span>;</span><br><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> order_info_3 <span class="keyword">order</span> <span class="keyword">by</span> <span class="keyword">id</span> <span class="keyword">limit</span> <span class="number">10</span>;</span><br></pre></td></tr></table></figure>
-<p>结果为：<img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_21_33_7_quanjuchaxunfa.png" alt=""></p>
+<p>结果为：<img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_21_33_7_quanjuchaxunfa.png" alt=""></p>
 <p>将以上三个库的查询结果排序：</p>
 <p>1，2，3，4，5，6，7，8，9，10，11，12，13，14，15，16，17，18，19，20，21，22，23，24，25，26，27，28，29，30</p>
 <p>那么第二页的订单列表为：</p>
 <p>6，7，8，9，10</p>
 <p><strong>小结：</strong>对于低页码查询，全局查询法是可以应付的，但是，当页码越来越大，查出来的数据也就越来越多，需要排序的数据也越来越多，查询效率也就会越来越慢。</p>
 <h4 id="三、禁止跳页查询法"><a href="#三、禁止跳页查询法" class="headerlink" title="三、禁止跳页查询法"></a>三、禁止跳页查询法</h4><p>全局查询法的一个显著缺陷，就是随着页码越来越大，查询的数据量也越来越大。那么，如果禁止跳页查询，且每次查询都以上次查询的最大ID为基点，就可以保证每次查询的数据量都是相同的。</p>
-<p><strong>查询第一页数据：</strong><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_21_40_36_firstpage.png" alt=""></p>
+<p><strong>查询第一页数据：</strong><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_21_40_36_firstpage.png" alt=""></p>
 <p>将以上三个库的查询结果排序：</p>
 <p>1，2，3，4，5，6，7，8，9，10，11，12，13，14，15</p>
 <p>那么第一页的订单列表为：</p>
 <p>1，2，3，4，5</p>
 <p><strong>查询第二页数据：</strong></p>
 <p>第一页的订单ID最大值为5，因此第二页的订单ID起始值应大于5，查询得到：</p>
-<p><img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_21_44_37_secondpage.png" alt=""></p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_21_44_37_secondpage.png" alt=""></p>
 <p>将以上三个库的查询结果排序：</p>
 <p>6，7，8，9，10，11，12，13，14，15，16，17，18，19，20</p>
 <p>那么第二页的订单列表为：</p>
@@ -315,7 +316,7 @@
 <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> order_info <span class="keyword">order</span> <span class="keyword">by</span> <span class="keyword">id</span> <span class="keyword">limit</span> <span class="number">5</span> <span class="keyword">offset</span> <span class="number">10</span>;</span><br></pre></td></tr></table></figure>
 <p>之所以叫二次查询法，当然需要查询两次。这两次查询有什么不同，希望通过以下四个步骤说清楚：</p>
 <p><strong>第一步：语句改写</strong></p>
-<p>将 <code>select * from order_info order by id limit 5 offset 10</code> 改写成 <code>select * from order_info order by id limit 5 offset 3</code>。偏移量10变成3，是基于10/3计算得出的。将语句在三个库分别执行，得到数据：<img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_22_14_21_first_rewrite_1.png" alt=""></p>
+<p>将 <code>select * from order_info order by id limit 5 offset 10</code> 改写成 <code>select * from order_info order by id limit 5 offset 3</code>。偏移量10变成3，是基于10/3计算得出的。将语句在三个库分别执行，得到数据：<img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_22_14_21_first_rewrite_1.png" alt=""></p>
 <p><strong>第二步：找最小值</strong></p>
 <ul>
 <li>第一个库：最小数据为8</li>
@@ -330,7 +331,7 @@
 <li>第二个分库改写为: select * from order_info order by id where id between id_min and 23</li>
 <li>第三个分库改写为: select * from order_info order by id where id between id_min and 24</li>
 </ul>
-<p>查询结果如下：<img src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_22_20_40_sencond_rewrite.png" alt=""></p>
+<p>查询结果如下：<img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_22_20_40_sencond_rewrite.png" alt=""></p>
 <p><strong>第四步：找到id_min的全局偏移量</strong></p>
 <p>第一次查询的偏移量为3，那么每一个库的第一个目标数据的偏移量应该都是4。因此可知每个库的id_min的偏移量：</p>
 <ul>
@@ -517,7 +518,7 @@
 
 
 
-<script>
+<script pjax>
   (function() {
     function leancloudSelector(url) {
       url = encodeURI(url);
@@ -616,6 +617,8 @@
 
   
   <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
   <script src="/lib/velocity/velocity.min.js"></script>
   <script src="/lib/velocity/velocity.ui.min.js"></script>
 
@@ -628,6 +631,65 @@
 
 
 <script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
 
 
 
@@ -652,6 +714,7 @@
 
 
 
+    <div id="pjax">
   
 
   
@@ -687,5 +750,6 @@ NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
 });
 </script>
 
+    </div>
 </body>
 </html>
