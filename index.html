@@ -191,6 +191,535 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/24/deepseek-v4-technical-review/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/04/24/deepseek-v4-technical-review/" class="post-title-link" itemprop="url">DeepSeek V4 技术解读</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-04-24 16:30:00" itemprop="dateCreated datePublished" datetime="2026-04-24T16:30:00+08:00">2026-04-24</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/DeepSeek/" itemprop="url" rel="index"><span itemprop="name">DeepSeek</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/04/24/deepseek-v4-technical-review/" class="post-meta-item leancloud_visitors" data-flag-title="DeepSeek V4 技术解读" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/24/deepseek-v4-technical-review/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/24/deepseek-v4-technical-review/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>2026年4月24日，DeepSeek 正式发布了 V4 系列模型。这不是一次普通的版本迭代——它解决了一个困扰 AI 行业多年的根本问题：<strong>长上下文的效率瓶颈</strong>。</p>
+<p>本文将深入解读 DeepSeek V4 的核心技术创新，帮助你理解这次发布为何值得关注。</p>
+<hr>
+<h2 id="一、模型规格：更大但不更贵"><a href="#一、模型规格：更大但不更贵" class="headerlink" title="一、模型规格：更大但不更贵"></a>一、模型规格：更大但不更贵</h2><p>DeepSeek V4 发布了两个版本：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>总参数量</th>
+<th>激活参数量</th>
+<th>上下文长度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>DeepSeek-V4-Pro</strong></td>
+<td>1.6T</td>
+<td>49B</td>
+<td>100万 tokens</td>
+</tr>
+<tr>
+<td><strong>DeepSeek-V4-Flash</strong></td>
+<td>284B</td>
+<td>13B</td>
+<td>100万 tokens</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>对比上一代 V3.2（671B 总参数，37B 激活），V4-Pro 参数量翻了 2.4 倍，但激活参数仅增加 32%。更重要的是，<strong>两者都原生支持 100万 token 上下文</strong>——这是之前任何开源模型都做不到的。</p>
+<h3 id="为什么”更大但不更贵”？"><a href="#为什么”更大但不更贵”？" class="headerlink" title="为什么”更大但不更贵”？"></a>为什么”更大但不更贵”？</h3><p>得益于 MoE（Mixture-of-Experts）架构，每次推理只激活一小部分参数。V4-Pro 的激活率仅为 <strong>3%</strong>（49B/1.6T），这意味着：</p>
+<ul>
+<li>推理成本接近一个 50B 参数的稠密模型</li>
+<li>但拥有 1.6T 参数的知识容量和表达能力</li>
+</ul>
+<p>这是 DeepSeek 从 V2 开始就坚持的技术路线，V4 把这个策略推向了新高度。</p>
+<hr>
+<h2 id="二、核心架构创新：打破-O-n²-的魔咒"><a href="#二、核心架构创新：打破-O-n²-的魔咒" class="headerlink" title="二、核心架构创新：打破 O(n²) 的魔咒"></a>二、核心架构创新：打破 O(n²) 的魔咒</h2><p>Transformer 的标准注意力机制计算复杂度是 O(n²)——序列长度翻倍，计算量翻四倍。当上下文达到百万级别时，这变成了不可承受之重。</p>
+<p>DeepSeek V4 用<strong>混合注意力架构</strong>彻底解决了这个问题。</p>
+<h3 id="2-1-CSA（Compressed-Sparse-Attention）"><a href="#2-1-CSA（Compressed-Sparse-Attention）" class="headerlink" title="2.1 CSA（Compressed Sparse Attention）"></a>2.1 CSA（Compressed Sparse Attention）</h3><p>CSA 的核心思路是：<strong>压缩 + 稀疏选择</strong>。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">原始序列：n 个 token</span><br><span class="line">     ↓ 压缩（每 m 个 token 合成一个 KV entry）</span><br><span class="line">压缩序列：n&#x2F;m 个 compressed KV entry</span><br><span class="line">     ↓ 稀疏选择（Lightning Indexer 选 top-k）</span><br><span class="line">参与计算的：k 个 compressed KV entry</span><br></pre></td></tr></table></figure>
+<p>具体流程：</p>
+<ol>
+<li><strong>KV Cache 压缩</strong>：将每 m 个 token 的 KV entry 通过加权聚合压缩成一个条目，序列长度降到 1/m</li>
+<li><strong>Lightning Indexer</strong>：为每个 query token 生成 indexer queries，与压缩后的 KV 偂相似度计算，选出 top-k 个最相关的压缩块</li>
+<li><strong>Core Attention</strong>：只在选出的 k 个压缩块上做完整的 attention 计算</li>
+</ol>
+<p>关键参数（V4-Pro）：</p>
+<ul>
+<li>压缩率 m = 4（每 4 个 token 压缩成 1 个）</li>
+<li>Indexer head 数 = 64，head 维度 = 128</li>
+<li>Top-k = 1024（每个 query 只关注 1024 个压缩块）</li>
+</ul>
+<h3 id="2-2-HCA（Heavily-Compressed-Attention）"><a href="#2-2-HCA（Heavily-Compressed-Attention）" class="headerlink" title="2.2 HCA（Heavily Compressed Attention）"></a>2.2 HCA（Heavily Compressed Attention）</h3><p>HCA 是更激进的压缩策略，用于处理”不需要精细关注的历史信息”：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">压缩率 m&#39; &#x3D; 128（每 128 个 token 合成一个 KV entry）</span><br><span class="line">     ↓</span><br><span class="line">直接对压缩后的 KV 做完整 attention（不做稀疏选择）</span><br></pre></td></tr></table></figure>
+<p>HCA 的哲学是：<strong>远处的信息可以”模糊处理”，近处的信息才需要精细关注</strong>。</p>
+<h3 id="2-3-混合架构设计"><a href="#2-3-混合架构设计" class="headerlink" title="2.3 混合架构设计"></a>2.3 混合架构设计</h3><p>V4 不是全用 CSA 或全用 HCA，而是<strong>交替使用</strong>：</p>
+<ul>
+<li><strong>前 2 层</strong>：纯滑动窗口 attention（保留近期信息的精细度）</li>
+<li><strong>后续层</strong>：CSA 和 HCA 交替，形成”粗细结合”的信息处理</li>
+</ul>
+<p>这种设计让模型既能高效处理长上下文，又能保持对关键信息的精确检索能力。</p>
+<h3 id="2-4-效率提升有多夸张？"><a href="#2-4-效率提升有多夸张？" class="headerlink" title="2.4 效率提升有多夸张？"></a>2.4 效率提升有多夸张？</h3><p>官方给出了硬核数据（100万 token 上下文场景）：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>V4-Pro vs V3.2</th>
+<th>V4-Flash vs V3.2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单 token FLOPs</td>
+<td><strong>27%</strong>（节省 3.7×）</td>
+<td><strong>10%</strong>（节省 10×）</td>
+</tr>
+<tr>
+<td>KV Cache 大小</td>
+<td><strong>10%</strong>（节省 9.5×）</td>
+<td><strong>7%</strong>（节省 13.7×）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>这意味着：以前跑不起的百万级上下文任务，现在<strong>可以在单卡上跑了</strong>。</p>
+<hr>
+<h2 id="三、mHC：残差连接的”数学升级版”"><a href="#三、mHC：残差连接的”数学升级版”" class="headerlink" title="三、mHC：残差连接的”数学升级版”"></a>三、mHC：残差连接的”数学升级版”</h2><p>残差连接 <code>x + F(x)</code> 是 Transformer 的基石，但深层堆叠时会遇到问题：</p>
+<ul>
+<li>信号可能逐层放大 → 数值爆炸</li>
+<li>信号可能逐层衰减 →梯度消失</li>
+</ul>
+<p>DeepSeek V4 引入了 <strong>Manifold-Constrained Hyper-Connections (mHC)</strong>，用数学约束解决这个问题。</p>
+<h3 id="核心思路"><a href="#核心思路" class="headerlink" title="核心思路"></a>核心思路</h3><p>传统残差连接：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">X_next &#x3D; X + F(X)  &#x2F;&#x2F; 简单加法</span><br></pre></td></tr></table></figure></p>
+<p>mHC：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">X_next &#x3D; B·X + C·F(A·X)  &#x2F;&#x2F; A、B、C 是线性映射矩阵</span><br><span class="line">         ↑</span><br><span class="line">      B 约束在双随机矩阵流形上（行和&#x3D;1，列和&#x3D;1，元素≥0）</span><br></pre></td></tr></table></figure></p>
+<p>关键约束：<strong>B 的谱范数 ≤ 1</strong>，这意味着信号传播是”非膨胀的”，不会爆炸。</p>
+<h3 id="为什么叫”流形约束”？"><a href="#为什么叫”流形约束”？" class="headerlink" title="为什么叫”流形约束”？"></a>为什么叫”流形约束”？</h3><p>双随机矩阵构成的空间是一个<strong>流形（Manifold）</strong>——Birkhoff Polytope。mHC 通过 Sinkhorn-Knopp 算法，把矩阵 B 投影到这个流形上：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1. 对 B 取 exponential（保证正元素）</span><br><span class="line">2. 迭代做行归一化、列归一化</span><br><span class="line">3. 收敛到一个双随机矩阵</span><br></pre></td></tr></table></figure>
+<p>这套数学确保了深层堆叠时的稳定性，同时保留了模型的表达能力。</p>
+<hr>
+<h2 id="四、Muon-优化器：万亿参数训练的新配方"><a href="#四、Muon-优化器：万亿参数训练的新配方" class="headerlink" title="四、Muon 优化器：万亿参数训练的新配方"></a>四、Muon 优化器：万亿参数训练的新配方</h2><p>训练万亿参数模型，AdamW 已经不够稳了。V4 引入了 <strong>Muon</strong> 优化器。</p>
+<h3 id="核心算法"><a href="#核心算法" class="headerlink" title="核心算法"></a>核心算法</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">G &#x3D; gradient</span><br><span class="line">M &#x3D; momentum_buffer</span><br><span class="line">M &#x3D; μ·M + G  &#x2F;&#x2F; 动量累积</span><br><span class="line">O &#x3D; HybridNewtonSchulz(μ·M + G)  &#x2F;&#x2F; Nesterov trick + 正交化</span><br><span class="line">W &#x3D; W·(1 - ηλ) - η·O  &#x2F;&#x2F; weight decay + update</span><br></pre></td></tr></table></figure>
+<p>关键步骤是 <strong>Hybrid Newton-Schulz 迭代</strong>，把梯度矩阵正交化：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 10 步迭代，分两阶段</span></span><br><span class="line"><span class="comment"># Stage 1（前 8 步）：快速收敛</span></span><br><span class="line">M_k = <span class="number">3.4445</span>·M_&#123;k<span class="number">-1</span>&#125; - <span class="number">4.7750</span>·(M·M^T)·M + <span class="number">2.0315</span>·(M·M^T)^<span class="number">2</span>·M</span><br><span class="line"></span><br><span class="line"><span class="comment"># Stage 2（后 2 步）：精确定位到正交矩阵</span></span><br><span class="line">M_k = <span class="number">2</span>·M_&#123;k<span class="number">-1</span>&#125; - <span class="number">1.5</span>·(M·M^T)·M + <span class="number">0.5</span>·(M·M^T)^<span class="number">2</span>·M</span><br></pre></td></tr></table></figure>
+<p>正交化的好处：</p>
+<ul>
+<li>避免”跑偏”——梯度方向更明确</li>
+<li>避免”数值爆炸”——矩阵谱范数被约束</li>
+<li>收敛更快——不需要 Adam 的二阶矩估计</li>
+</ul>
+<h3 id="配合稳定性技术"><a href="#配合稳定性技术" class="headerlink" title="配合稳定性技术"></a>配合稳定性技术</h3><p>V4 还用了两招来防止 loss spike：</p>
+<ol>
+<li><strong>Anticipatory Routing</strong>：路由决策用”历史参数”而非”当前参数”，打破 MoE 路由的恶性循环</li>
+<li><strong>SwiGLU Clamping</strong>：把 SwiGLU 的线性分量 clamp 到 [-10, 10]，直接压制异常值</li>
+</ol>
+<hr>
+<h2 id="五、FP4-量化感知训练：天生适应低精度"><a href="#五、FP4-量化感知训练：天生适应低精度" class="headerlink" title="五、FP4 量化感知训练：天生适应低精度"></a>五、FP4 量化感知训练：天生适应低精度</h2><p>以往的量化是”训练后补救”——模型在高精度下训练，推理时强行降精度，性能必然下降。</p>
+<p>V4 的创新：<strong>训练时就让模型适应 FP4</strong>。</p>
+<h3 id="应用范围"><a href="#应用范围" class="headerlink" title="应用范围"></a>应用范围</h3><ul>
+<li><strong>MoE 专家权重</strong>：占模型大部分参数，FP4 压缩节省大量显存</li>
+<li><strong>QK 路径</strong>（Lightning Indexer 的 indexer 部分）：长上下文检索的核心计算，FP4 加速</li>
+</ul>
+<h3 id="关键技术点"><a href="#关键技术点" class="headerlink" title="关键技术点"></a>关键技术点</h3><p><strong>FP4 → FP8 的无损反量化</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">FP4 (E2M1) → FP8 (E4M3)</span><br><span class="line">          ↑</span><br><span class="line">FP8 多 2 个 exponent bit，动态范围更大</span><br><span class="line">只要 block 内的 scale factor 差异不超过阈值，信息完全保留</span><br></pre></td></tr></table></figure>
+<p>这意味着：</p>
+<ul>
+<li>训练时用 FP8 做计算（模拟 FP4）</li>
+<li>推理时直接用 FP4 权重，零性能损失</li>
+<li>整个 pipeline 可以复用现有的 FP8 训练框架</li>
+</ul>
+<hr>
+<h2 id="六、训练基础设施：工程硬核"><a href="#六、训练基础设施：工程硬核" class="headerlink" title="六、训练基础设施：工程硬核"></a>六、训练基础设施：工程硬核</h2><p>V4 的基础设施投入展现了”长期主义”的工程思维。</p>
+<h3 id="6-1-TileLang：Kernel-开发的-DSL"><a href="#6-1-TileLang：Kernel-开发的-DSL" class="headerlink" title="6.1 TileLang：Kernel 开发的 DSL"></a>6.1 TileLang：Kernel 开发的 DSL</h3><p>传统 CUDA Kernel 开发效率低、难迭代。V4 用 <strong>TileLang</strong> 这个 DSL：</p>
+<ul>
+<li>用声明式语法描述 Kernel 逻辑</li>
+<li>Z3 SMT Solver 做形式化分析（证明正确性）</li>
+<li>自动生成高性能 CUDA 代码</li>
+</ul>
+<p>开发效率 + 运行效率，两者兼得。</p>
+<h3 id="6-2-确定性训练"><a href="#6-2-确定性训练" class="headerlink" title="6.2 确定性训练"></a>6.2 确定性训练</h3><p>V4 的 Kernel 全程<strong>批不变（Batch-Invariant）</strong>：</p>
+<ul>
+<li>同一 token 无论在 batch 哪个位置，输出 bitwise 一致</li>
+<li>用特殊设计避免了原子加法带来的不确定性</li>
+<li>训练过程可复现，调试有据可查</li>
+</ul>
+<p>这对大规模训练调试、定位问题至关重要。</p>
+<h3 id="6-3-MoE-EP-的细粒度重叠"><a href="#6-3-MoE-EP-的细粒度重叠" class="headerlink" title="6.3 MoE EP 的细粒度重叠"></a>6.3 MoE EP 的细粒度重叠</h3><p>Expert Parallelism 的通信开销大。V4 把 MoE 层拆成 <strong>4 个阶段</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Dispatch (通信) → Linear-1 (计算) → Activation → Linear-2 (计算) → Combine (通信)</span><br></pre></td></tr></table></figure>
+<p>关键洞察：<strong>计算时间 &gt; 通信时间</strong>，所以通信可以被计算掩盖。</p>
+<p>V4 把专家分成”wave”，每个 wave 的通信和计算流水线化，实现 <strong>1.5-1.96× 加速</strong>。</p>
+<hr>
+<h2 id="七、性能基准：开源模型的新标杆"><a href="#七、性能基准：开源模型的新标杆" class="headerlink" title="七、性能基准：开源模型的新标杆"></a>七、性能基准：开源模型的新标杆</h2><h3 id="知识任务"><a href="#知识任务" class="headerlink" title="知识任务"></a>知识任务</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Benchmark</th>
+<th>V4-Pro-Max</th>
+<th>K2.6</th>
+<th>GLM-5.1</th>
+<th>Gemini 3.1 Pro</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SimpleQA Verified</td>
+<td><strong>57.9</strong></td>
+<td>36.9</td>
+<td>38.1</td>
+<td>75.6</td>
+</tr>
+<tr>
+<td>Chinese-SimpleQA</td>
+<td><strong>84.4</strong></td>
+<td>75.9</td>
+<td>75.0</td>
+<td>85.9</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>V4-Pro-Max 在知识任务上<strong>领先开源对手 20+ 百分点</strong>，但距离 Gemini 3.1 Pro 还有一段差距。</p>
+<h3 id="Agent-能力：开源最佳"><a href="#Agent-能力：开源最佳" class="headerlink" title="Agent 能力：开源最佳"></a>Agent 能力：开源最佳</h3><p>这是 V4 最重要的能力跃升之一。官方披露：</p>
+<ul>
+<li><strong>Agentic Coding</strong>：V4-Pro 达到当前开源模型最佳水平</li>
+<li><strong>内部实测</strong>：已成为 DeepSeek 公司内部员工使用的 Agentic Coding 首选模型</li>
+<li><strong>体验对比</strong>：优于 Claude Sonnet 4.5，交付质量接近 Claude Opus 4.6 非思考模式</li>
+</ul>
+<p>V4 针对 <strong>Claude Code、OpenClaw、OpenCode、CodeBuddy</strong> 等主流 Agent 产品进行了专项适配优化，在代码任务、文档生成等场景表现显著提升。</p>
+<h3 id="推理与代码"><a href="#推理与代码" class="headerlink" title="推理与代码"></a>推理与代码</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Benchmark</th>
+<th>V4-Pro-Max</th>
+<th>GPT-5.4</th>
+<th>Gemini 3.1 Pro</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Codeforces Rating</td>
+<td><strong>3206</strong></td>
+<td>3168</td>
+<td>3052</td>
+</tr>
+<tr>
+<td>Apex Shortlist</td>
+<td><strong>90.2</strong></td>
+<td>78.1</td>
+<td>89.1</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>这是开源模型首次在代码竞赛上追平闭源模型</strong>。V4-Pro-Max 在 Codeforces 排名第 23 位（人类选手中）。</p>
+<h3 id="长上下文"><a href="#长上下文" class="headerlink" title="长上下文"></a>长上下文</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Benchmark</th>
+<th>V4-Pro-Max</th>
+<th>Claude Opus 4.6</th>
+<th>Gemini 3.1 Pro</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MRCR 1M (MMR)</td>
+<td>83.5</td>
+<td><strong>92.9</strong></td>
+<td>76.3</td>
+</tr>
+<tr>
+<td>CorpusQA 1M</td>
+<td><strong>62.0</strong></td>
+<td>71.7</td>
+<td>53.8</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>V4-Pro 在真实场景的 CorpusQA 上超越 Gemini 3.1 Pro，在 MRCR 上接近 Claude Opus 4.6。</p>
+<hr>
+<h2 id="八、V4-Flash：经济高效的选择"><a href="#八、V4-Flash：经济高效的选择" class="headerlink" title="八、V4-Flash：经济高效的选择"></a>八、V4-Flash：经济高效的选择</h2><p>V4-Flash 是一个重要的补充版本，让不同需求的用户都能找到合适的方案。</p>
+<h3 id="与-V4-Pro-的对比"><a href="#与-V4-Pro-的对比" class="headerlink" title="与 V4-Pro 的对比"></a>与 V4-Pro 的对比</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>V4-Flash</th>
+<th>V4-Pro</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>激活参数</td>
+<td>13B</td>
+<td>49B</td>
+</tr>
+<tr>
+<td>推理速度</td>
+<td>更快</td>
+<td>较慢</td>
+</tr>
+<tr>
+<td>API 成本</td>
+<td>更低</td>
+<td>较高</td>
+</tr>
+<tr>
+<td>世界知识</td>
+<td>稍逊</td>
+<td>大幅领先开源</td>
+</tr>
+<tr>
+<td>推理能力</td>
+<td>接近 Pro</td>
+<td>开源最佳</td>
+</tr>
+<tr>
+<td>Agent 简单任务</td>
+<td>旗鼓相当</td>
+<td>更优</td>
+</tr>
+<tr>
+<td>Agent 高难度任务</td>
+<td>有差距</td>
+<td>最佳</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>适用场景</strong>：</p>
+<ul>
+<li><strong>V4-Flash</strong>：日常对话、简单代码任务、成本敏感场景</li>
+<li><strong>V4-Pro</strong>：复杂 Agent 任务、深度推理、高质量输出需求</li>
+</ul>
+<hr>
+<h2 id="九、三种推理模式：灵活的推理成本"><a href="#九、三种推理模式：灵活的推理成本" class="headerlink" title="九、三种推理模式：灵活的推理成本"></a>九、三种推理模式：灵活的推理成本</h2><p>V4 支持三种推理模式，让用户按需求选择成本：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>特点</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Non-Think</strong></td>
+<td>快速直觉响应，无 thinking tokens</td>
+<td>日常对话、低风险决策</td>
+</tr>
+<tr>
+<td><strong>Think</strong></td>
+<td>逻辑分析，中等 thinking budget</td>
+<td>复杂问题、规划任务</td>
+</tr>
+<tr>
+<td><strong>Think Max</strong></td>
+<td>极限推理，长 thinking budget</td>
+<td>数学证明、高难度任务</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Think Max 模式会在系统 prompt 里注入特殊指令：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Reasoning Effort: Absolute maximum with no shortcuts permitted.</span><br><span class="line">You MUST be very thorough in your thinking...</span><br></pre></td></tr></table></figure>
+<p>这让模型”把推理推到极限”，在 HLE、IMO 等高难度任务上表现最优。</p>
+<hr>
+<h2 id="十、API-使用指南"><a href="#十、API-使用指南" class="headerlink" title="十、API 使用指南"></a>十、API 使用指南</h2><h3 id="模型调用"><a href="#模型调用" class="headerlink" title="模型调用"></a>模型调用</h3><p>DeepSeek API 已同步上线 V4-Pro 与 V4-Flash，支持 OpenAI ChatCompletions 接口与 Anthropic 接口：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># OpenAI 格式</span></span><br><span class="line"><span class="keyword">from</span> openai <span class="keyword">import</span> OpenAI</span><br><span class="line"></span><br><span class="line">client = OpenAI(</span><br><span class="line">    api_key=<span class="string">"your-api-key"</span>,</span><br><span class="line">    base_url=<span class="string">"https://api.deepseek.com"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">response = client.chat.completions.create(</span><br><span class="line">    model=<span class="string">"deepseek-v4-pro"</span>,  <span class="comment"># 或 deepseek-v4-flash</span></span><br><span class="line">    messages=[&#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"你好"</span>&#125;]</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<h3 id="关键参数"><a href="#关键参数" class="headerlink" title="关键参数"></a>关键参数</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td><code>deepseek-v4-pro</code> 或 <code>deepseek-v4-flash</code></td>
+</tr>
+<tr>
+<td><code>max_tokens</code></td>
+<td>最大输出长度，默认 8K</td>
+</tr>
+<tr>
+<td><code>reasoning_effort</code></td>
+<td>思考强度：<code>high</code> 或 <code>max</code>（仅思考模式）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="思考模式"><a href="#思考模式" class="headerlink" title="思考模式"></a>思考模式</h3><p>对于复杂的 Agent 场景，建议使用思考模式并设置强度为 <code>max</code>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">response = client.chat.completions.create(</span><br><span class="line">    model=<span class="string">"deepseek-v4-pro"</span>,</span><br><span class="line">    messages=[&#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"复杂任务..."</span>&#125;],</span><br><span class="line">    reasoning_effort=<span class="string">"max"</span>  <span class="comment"># 极限推理</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<h3 id="⚠️-重要提示"><a href="#⚠️-重要提示" class="headerlink" title="⚠️ 重要提示"></a>⚠️ 重要提示</h3><p>旧 API 模型名 <code>deepseek-chat</code> 和 <code>deepseek-reasoner</code> 将于 <strong>2026年7月24日</strong> 停止使用：</p>
+<ul>
+<li>当前阶段 <code>deepseek-chat</code> → 指向 V4-Flash 非思考模式</li>
+<li>当前阶段 <code>deepseek-reasoner</code> → 指向 V4-Flash 思考模式</li>
+</ul>
+<p>请尽快迁移到新的模型名称。</p>
+<hr>
+<h2 id="十一、开源与本地部署"><a href="#十一、开源与本地部署" class="headerlink" title="十一、开源与本地部署"></a>十一、开源与本地部署</h2><h3 id="权重下载"><a href="#权重下载" class="headerlink" title="权重下载"></a>权重下载</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>平台</th>
+<th>链接</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HuggingFace</td>
+<td><a href="https://huggingface.co/collections/deepseek-ai/deepseek-v4" target="_blank" rel="noopener">https://huggingface.co/collections/deepseek-ai/deepseek-v4</a></td>
+</tr>
+<tr>
+<td>ModelScope</td>
+<td><a href="https://modelscope.cn/collections/deepseek-ai/DeepSeek-V4" target="_blank" rel="noopener">https://modelscope.cn/collections/deepseek-ai/DeepSeek-V4</a></td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="本地部署建议"><a href="#本地部署建议" class="headerlink" title="本地部署建议"></a>本地部署建议</h3><p>由于 V4-Pro 参数量达 1.6T，本地部署需要：</p>
+<ul>
+<li><strong>多卡推理</strong>：至少 8× A100 80GB 或同等显存</li>
+<li><strong>量化推理</strong>：FP4 量化后可显著降低显存需求</li>
+<li><strong>V4-Flash</strong>：单卡 A100 80GB 可运行</li>
+</ul>
+<h3 id="技术报告"><a href="#技术报告" class="headerlink" title="技术报告"></a>技术报告</h3><p>完整技术细节请参考官方技术报告：</p>
+<ul>
+<li><a href="https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf" target="_blank" rel="noopener">DeepSeek V4 技术报告（PDF）</a></li>
+</ul>
+<hr>
+<h2 id="十二、行业启示：V4-带来的新范式"><a href="#十二、行业启示：V4-带来的新范式" class="headerlink" title="十二、行业启示：V4 带来的新范式"></a>十二、行业启示：V4 带来的新范式</h2><h3 id="12-1-长上下文不再是奢侈品"><a href="#12-1-长上下文不再是奢侈品" class="headerlink" title="12.1 长上下文不再是奢侈品"></a>12.1 长上下文不再是奢侈品</h3><p>以前，百万级上下文是”理论上可行但经济上不行”。V4 把成本降到 <strong>原来的 10-30%</strong>，让以下场景变得可行：</p>
+<ul>
+<li><strong>Test-time Scaling</strong>：推理阶段可以长时间思考，不受上下文限制</li>
+<li><strong>长 horizon Agent</strong>：复杂多轮任务（如软件工程流水线）有足够”记忆空间”</li>
+<li><strong>在线学习</strong>：持续吸收新信息，无需全量重训练</li>
+</ul>
+<h3 id="12-2-开源-vs-闭源的格局变化"><a href="#12-2-开源-vs-闭源的格局变化" class="headerlink" title="12.2 开源 vs 闭源的格局变化"></a>12.2 开源 vs 闭源的格局变化</h3><p>V4 是一个信号：<strong>开源模型不仅追上了能力，还追上了效率性价比</strong>。</p>
+<ul>
+<li>V4-Flash 用 13B 激活参数，就能达到接近 GPT-5.2 的推理水平</li>
+<li>在代码任务上，开源首次追平闭源</li>
+</ul>
+<p>这意味着闭源模型的”护城河”正在缩小。</p>
+<h3 id="12-3-架构创新的长期价值"><a href="#12-3-架构创新的长期价值" class="headerlink" title="12.3 架构创新的长期价值"></a>12.3 架构创新的长期价值</h3><p>V4 的创新不是”刷榜技巧”，而是<strong>架构层面的根本改进</strong>：</p>
+<ul>
+<li>CSA/HCA 解决了 Transformer 的 O(n²) 瓶颈</li>
+<li>mHC 让残差连接更稳定、可堆叠更深</li>
+<li>Muon 优化器可能成为万亿参数训练的新标配</li>
+</ul>
+<p>这些创新会启发更多研究，推动整个行业向前。</p>
+<hr>
+<h2 id="十三、局限与展望"><a href="#十三、局限与展望" class="headerlink" title="十三、局限与展望"></a>十三、局限与展望</h2><p>官方坦承了几个局限：</p>
+<ol>
+<li><strong>架构相对复杂</strong>：为了降低风险，保留了 V3 的很多验证过的组件，未来会精简</li>
+<li><strong>训练稳定性原理未完全理解</strong>：Anticipatory Routing 和 SwiGLU Clamping 有效，但数学原理还在探索</li>
+<li><strong>多模态尚未集成</strong>：未来版本会加入视觉能力</li>
+</ol>
+<p>展望方向：</p>
+<ul>
+<li>进一步的稀疏化探索（如稀疏 embedding）</li>
+<li>低延迟架构优化（让长上下文交互更流畅）</li>
+<li>长 horizon Agent 的深度优化</li>
+</ul>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>DeepSeek V4 的意义不在于某个具体指标的提升，而在于它<strong>解决了长上下文效率这个根本问题</strong>。</p>
+<p>通过 CSA/HCA 混合注意力、mHC 残差升级、Muon 优化器、FP4 量化训练等一系列创新，V4 让百万级上下文从”理论上可行”变成”经济上可行”。</p>
+<p>这为 AI 的下一阶段——更深的 test-time scaling、更长的 Agent 任务、更灵活的在线学习——铺好了基础设施。</p>
+<p>开源模型第一次在效率和能力的综合维度上，追上了闭源前沿。这是整个行业值得关注的里程碑。</p>
+<hr>
+<p><strong>参考资源</strong>：</p>
+<ul>
+<li><a href="https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf" target="_blank" rel="noopener">DeepSeek V4 技术报告（PDF）</a></li>
+<li><a href="https://huggingface.co/collections/deepseek-ai/deepseek-v4" target="_blank" rel="noopener">模型权重（HuggingFace）</a></li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/19/bailian_coding_plan_usage_java_or_python/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1554,202 +2083,6 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-computer-use/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/04/06/claude-code-computer-use/" class="post-title-link" itemprop="url">Computer Use：桌面控制的九层安全关卡</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:39" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2026/04/06/claude-code-computer-use/" class="post-meta-item leancloud_visitors" data-flag-title="Computer Use：桌面控制的九层安全关卡" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2026/04/06/claude-code-computer-use/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-computer-use/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>Computer Use 是 Claude Code 最具争议也最强大的能力——AI 可以直接操控你的桌面，点击按钮、输入文字、截图分析。这听起来像科幻电影，但 Claude Code 实现了一个九层安全关卡系统，确保每一步操作都在可控范围内。更关键的是，它通过 Python Bridge 实现跨语言通信，让 TypeScript 代理驱动 Python 执行器。</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2026/04/06/claude-code-computer-use/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-context-compression/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/04/06/claude-code-context-compression/" class="post-title-link" itemprop="url">Context 管理：四级压缩与无限对话的秘密</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:24" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2026/04/06/claude-code-context-compression/" class="post-meta-item leancloud_visitors" data-flag-title="Context 管理：四级压缩与无限对话的秘密" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2026/04/06/claude-code-context-compression/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-context-compression/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>“对话没有上下文限制”——这是 Claude Code 的一个核心承诺。但它真的能做到吗？答案是：通过四级压缩系统，实现”伪无限对话”。这背后的设计非常精妙：不是简单截断，而是智能地压缩和保留关键信息。</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2026/04/06/claude-code-context-compression/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-memory-system/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1825,6 +2158,104 @@
           <!--noindex-->
             <div class="post-button">
               <a class="btn" href="/2026/04/06/claude-code-memory-system/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-computer-use/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/04/06/claude-code-computer-use/" class="post-title-link" itemprop="url">Computer Use：桌面控制的九层安全关卡</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:39" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/04/06/claude-code-computer-use/" class="post-meta-item leancloud_visitors" data-flag-title="Computer Use：桌面控制的九层安全关卡" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/claude-code-computer-use/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-computer-use/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>Computer Use 是 Claude Code 最具争议也最强大的能力——AI 可以直接操控你的桌面，点击按钮、输入文字、截图分析。这听起来像科幻电影，但 Claude Code 实现了一个九层安全关卡系统，确保每一步操作都在可控范围内。更关键的是，它通过 Python Bridge 实现跨语言通信，让 TypeScript 代理驱动 Python 执行器。</p>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/06/claude-code-computer-use/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -2014,20 +2445,20 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">77</span>
+          <span class="site-state-item-count">78</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-count">11</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">45</span>
+        <span class="site-state-item-count">46</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
