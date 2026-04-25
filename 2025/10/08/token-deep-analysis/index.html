@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="背景很多刚开始接触大模型的朋友，经常会看到”消耗了 XXX tokens”、”超出 token 限制”这样的提示。但到底什么是 Token？为什么大模型要用 Token 而不是直接理解整段话？本文将深入浅出地解答这些问题。  一、Token 是什么？Token 是大模型处理文本的最小单位。可以把它理解为文本世界的”乐高积木块”——模型不是逐字逐句读取，而是先把文本拆成一块块 Token，再逐块处理">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Token 深度解析">
+<meta property="og:url" content="https://donehub.github.io/2025/10/08/token-deep-analysis/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="背景很多刚开始接触大模型的朋友，经常会看到”消耗了 XXX tokens”、”超出 token 限制”这样的提示。但到底什么是 Token？为什么大模型要用 Token 而不是直接理解整段话？本文将深入浅出地解答这些问题。  一、Token 是什么？Token 是大模型处理文本的最小单位。可以把它理解为文本世界的”乐高积木块”——模型不是逐字逐句读取，而是先把文本拆成一块块 Token，再逐块处理">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-10-07T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-25T03:20:32.195Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="AI">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2025/10/08/token-deep-analysis/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Token 深度解析 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2025/10/08/token-deep-analysis/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Token 深度解析
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-10-08 00:00:00" itemprop="dateCreated datePublished" datetime="2025-10-08T00:00:00+08:00">2025-10-08</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-25 11:20:32" itemprop="dateModified" datetime="2026-04-25T11:20:32+08:00">2026-04-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Token/" itemprop="url" rel="index"><span itemprop="name">Token</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2025/10/08/token-deep-analysis/" class="post-meta-item leancloud_visitors" data-flag-title="Token 深度解析" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2025/10/08/token-deep-analysis/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2025/10/08/token-deep-analysis/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>很多刚开始接触大模型的朋友，经常会看到”消耗了 XXX tokens”、”超出 token 限制”这样的提示。但到底什么是 Token？为什么大模型要用 Token 而不是直接理解整段话？本文将深入浅出地解答这些问题。</p>
+<hr>
+<h2 id="一、Token-是什么？"><a href="#一、Token-是什么？" class="headerlink" title="一、Token 是什么？"></a>一、Token 是什么？</h2><p><strong>Token 是大模型处理文本的最小单位</strong>。可以把它理解为文本世界的”乐高积木块”——模型不是逐字逐句读取，而是先把文本拆成一块块 Token，再逐块处理。</p>
+<h3 id="1-1-通俗理解"><a href="#1-1-通俗理解" class="headerlink" title="1.1 通俗理解"></a>1.1 通俗理解</h3><p>想象你在读一本书：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>阅读方式</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>字符级别</strong></td>
+<td>一个字母一个字母读 → 太慢，无法理解语义</td>
+</tr>
+<tr>
+<td><strong>单词级别</strong></td>
+<td>一个单词一个单词读 → 更合理，但词汇量太大</td>
+</tr>
+<tr>
+<td><strong>Token 级别</strong></td>
+<td>介于两者之间，灵活切分 → 效率与能力的平衡点</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="1-2-具体例子"><a href="#1-2-具体例子" class="headerlink" title="1.2 具体例子"></a>1.2 具体例子</h3><p>英文句子 <code>I love artificial intelligence</code>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">按字符：20 个字符（含空格）</span><br><span class="line">按单词：4 个单词</span><br><span class="line">按 Token：约 5-6 个 Token（取决于分词器）</span><br></pre></td></tr></table></figure>
+<p>中文句子 <code>我爱人工智能</code>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">按字符：6 个汉字</span><br><span class="line">按 Token：约 6-10 个 Token（每个汉字可能单独成 Token）</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="二、为什么使用-Token-而不是”理解整段话”？"><a href="#二、为什么使用-Token-而不是”理解整段话”？" class="headerlink" title="二、为什么使用 Token 而不是”理解整段话”？"></a>二、为什么使用 Token 而不是”理解整段话”？</h2><p>这个问题触及了大模型的核心原理。答案很简单：<strong>计算机只能处理数字，不能直接理解文字</strong>。</p>
+<h3 id="2-1-大模型的工作流程"><a href="#2-1-大模型的工作流程" class="headerlink" title="2.1 大模型的工作流程"></a>2.1 大模型的工作流程</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">文字 → Token → 数字（向量）→ 计算 → 预测 → Token → 文字</span><br></pre></td></tr></table></figure>
+<p>每一步都必须是<strong>有限、可枚举</strong>的。</p>
+<h3 id="2-2-如果是”整段话处理”"><a href="#2-2-如果是”整段话处理”" class="headerlink" title="2.2 如果是”整段话处理”"></a>2.2 如果是”整段话处理”</h3><p>假设模型要直接处理”整段话”，会遇到以下问题：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>无限组合</strong></td>
+<td>一段话可能有任意长度、任意组合，无法穷举</td>
+</tr>
+<tr>
+<td><strong>无法对齐</strong></td>
+<td>“我爱AI”和”我 爱 AI”算同一段话吗？</td>
+</tr>
+<tr>
+<td><strong>无法计算</strong></td>
+<td>神经网络本质是矩阵乘法，需要固定维度的输入</td>
+</tr>
+<tr>
+<td><strong>存储爆炸</strong></td>
+<td>要存储所有可能的句子组合，内存直接撑爆</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="2-3-Token-方案的优势"><a href="#2-3-Token-方案的优势" class="headerlink" title="2.3 Token 方案的优势"></a>2.3 Token 方案的优势</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>优势</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>有限词汇表</strong></td>
+<td>常用 Token 约 5-10 万个，可以穷举并编号</td>
+</tr>
+<tr>
+<td><strong>可数学化</strong></td>
+<td>每个 Token 对应一个向量（如 4096 维），可以计算</td>
+</tr>
+<tr>
+<td><strong>灵活组合</strong></td>
+<td>像乐高一样，有限积木块能拼出无限造型</td>
+</tr>
+<tr>
+<td><strong>长短皆可</strong></td>
+<td>Token 序列可以处理任意长度的文本</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="2-4-语言的组合性原理"><a href="#2-4-语言的组合性原理" class="headerlink" title="2.4 语言的组合性原理"></a>2.4 语言的组合性原理</h3><p>语言有一个核心特点：<strong>有限符号，无限组合</strong>。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">英语：26 个字母 → 无数句子</span><br><span class="line">中文：几千常用字 → 无数句子</span><br><span class="line">Token：几万个 Token → 无数句子</span><br></pre></td></tr></table></figure>
+<p>大模型的设计正是利用了这个特性：</p>
+<blockquote>
+<p>如果 Token 只有 5 万个，但能组合出无限句子，那么模型只需要学会这 5 万个 Token 的”表示”和”关系”，就能理解所有可能的句子。</p>
+</blockquote>
+<p>这比试图记忆所有可能的句子要高效得多。</p>
+<hr>
+<h2 id="三、Token-的产生背景与历史"><a href="#三、Token-的产生背景与历史" class="headerlink" title="三、Token 的产生背景与历史"></a>三、Token 的产生背景与历史</h2><h3 id="3-1-为什么不按”单词”处理？"><a href="#3-1-为什么不按”单词”处理？" class="headerlink" title="3.1 为什么不按”单词”处理？"></a>3.1 为什么不按”单词”处理？</h3><p>早期自然语言处理确实尝试过按单词处理，但遇到两个问题：</p>
+<p><strong>问题一：词汇量爆炸</strong></p>
+<p>英语有超过 100 万个单词，而且每天都在增加新词。要让模型记住所有单词，词汇表会无限膨胀。</p>
+<p><strong>问题二：罕见词无法处理</strong></p>
+<p>遇到没见过的单词（如 <code>unprecedented</code>），模型直接”不认识”。</p>
+<h3 id="3-2-子词分词的诞生"><a href="#3-2-子词分词的诞生" class="headerlink" title="3.2 子词分词的诞生"></a>3.2 子词分词的诞生</h3><p>研究者提出<strong>子词分词</strong>的概念：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">常见词 → 整体作为一个 Token</span><br><span class="line">罕见词 → 拆成多个子词 Token</span><br></pre></td></tr></table></figure>
+<p>例如：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>单词类型</th>
+<th>处理方式</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>常见词</td>
+<td>整体作为一个 Token</td>
+<td><code>the</code>, <code>is</code>, <code>hello</code>, <code>love</code></td>
+</tr>
+<tr>
+<td>罕见词</td>
+<td>拆成多个 Token</td>
+<td><code>unprecedented</code> → <code>un</code> + <code>pre</code> + <code>ced</code> + <code>ented</code></td>
+</tr>
+<tr>
+<td>新词</td>
+<td>用已知 Token 组合表示</td>
+<td><code>chatgpt</code> → <code>chat</code> + <code>g</code> + <code>pt</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="3-3-主流分词算法"><a href="#3-3-主流分词算法" class="headerlink" title="3.3 主流分词算法"></a>3.3 主流分词算法</h3><p>目前主流的分词算法有三类：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>算法</th>
+<th>全称</th>
+<th>特点</th>
+<th>代表模型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>BPE</strong></td>
+<td>Byte Pair Encoding</td>
+<td>合并频率最高的相邻符号</td>
+<td>GPT 系列</td>
+</tr>
+<tr>
+<td><strong>WordPiece</strong></td>
+<td>WordPiece</td>
+<td>基于概率的分词，用 <code>##</code> 标记子词</td>
+<td>BERT 系列</td>
+</tr>
+<tr>
+<td><strong>Unigram</strong></td>
+<td>Unigram Language Model</td>
+<td>基于统计概率，选择最优分词</td>
+<td>T5、XLNet</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="3-4-BPE-分词示例"><a href="#3-4-BPE-分词示例" class="headerlink" title="3.4 BPE 分词示例"></a>3.4 BPE 分词示例</h3><p>BPE 的核心思路是<strong>迭代合并</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">初始状态：每个字符都是一个 Token</span><br><span class="line">        [&quot;u&quot;, &quot;n&quot;, &quot;p&quot;, &quot;r&quot;, &quot;e&quot;, &quot;c&quot;, &quot;e&quot;, &quot;d&quot;, &quot;e&quot;, &quot;n&quot;, &quot;t&quot;, &quot;e&quot;, &quot;d&quot;]</span><br><span class="line"></span><br><span class="line">迭代 1：合并频率最高的字符组合 &quot;e&quot; + &quot;d&quot; → &quot;ed&quot;</span><br><span class="line">        [&quot;u&quot;, &quot;n&quot;, &quot;p&quot;, &quot;r&quot;, &quot;e&quot;, &quot;c&quot;, &quot;ed&quot;, &quot;e&quot;, &quot;n&quot;, &quot;t&quot;, &quot;ed&quot;]</span><br><span class="line"></span><br><span class="line">迭代 2：合并 &quot;un&quot;</span><br><span class="line">        [&quot;un&quot;, &quot;p&quot;, &quot;r&quot;, &quot;e&quot;, &quot;c&quot;, &quot;ed&quot;, &quot;e&quot;, &quot;n&quot;, &quot;t&quot;, &quot;ed&quot;]</span><br><span class="line"></span><br><span class="line">迭代 N：最终得到</span><br><span class="line">        [&quot;un&quot;, &quot;pre&quot;, &quot;ced&quot;, &quot;ented&quot;]</span><br></pre></td></tr></table></figure>
+<p>通过这种方式，模型既能高效处理常见词，又能”认识”从未见过的罕见词。</p>
+<hr>
+<h2 id="四、Token-计量规则"><a href="#四、Token-计量规则" class="headerlink" title="四、Token 计量规则"></a>四、Token 计量规则</h2><h3 id="4-1-不同语言的-Token-效率"><a href="#4-1-不同语言的-Token-效率" class="headerlink" title="4.1 不同语言的 Token 效率"></a>4.1 不同语言的 Token 效率</h3><p>这是很多中文用户最容易困惑的地方：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>语言</th>
+<th>Token 效率</th>
+<th>估算公式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>英文</strong></td>
+<td>1 Token ≈ 0.75 个单词 ≈ 4 个字符</td>
+<td>Token 数 ≈ 单词数 × 1.3</td>
+</tr>
+<tr>
+<td><strong>中文</strong></td>
+<td>1 Token ≈ 0.6-0.8 个汉字</td>
+<td>Token 数 ≈ 字数 × 1.5-2</td>
+</tr>
+<tr>
+<td><strong>代码</strong></td>
+<td>1 Token ≈ 4 个字符</td>
+<td>Token 数 ≈ 字符数 ÷ 4</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="4-2-为什么中文-Token-数更多？"><a href="#4-2-为什么中文-Token-数更多？" class="headerlink" title="4.2 为什么中文 Token 数更多？"></a>4.2 为什么中文 Token 数更多？</h3><p>原因在于分词器的训练数据。主流分词器（如 GPT 系列）主要基于英文语料训练：</p>
+<ul>
+<li><strong>英文</strong>：<code>artificial</code> 可能是 1 个 Token（常见词）</li>
+<li><strong>中文</strong>：每个汉字 <code>人</code>、<code>工</code>、<code>智</code>、<code>能</code> 可能各自成为 1 个 Token</li>
+</ul>
+<p>这导致<strong>同样内容，中文 Token 数通常是英文的 1.5-2 倍</strong>。</p>
+<h3 id="4-3-实例对比"><a href="#4-3-实例对比" class="headerlink" title="4.3 实例对比"></a>4.3 实例对比</h3><p>同样的内容用不同语言表达：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>内容</th>
+<th>语言</th>
+<th>Token 数估算</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The future of artificial intelligence is bright</td>
+<td>英文</td>
+<td>约 7-8 个</td>
+</tr>
+<tr>
+<td>人工智能的未来很光明</td>
+<td>中文</td>
+<td>约 10-12 个</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>这就是为什么用中文对话可能更快消耗 Token 配额。</p>
+<h3 id="4-4-不同模型的-Token-效率对比"><a href="#4-4-不同模型的-Token-效率对比" class="headerlink" title="4.4 不同模型的 Token 效率对比"></a>4.4 不同模型的 Token 效率对比</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>模型系列</th>
+<th>中文 Token 效率</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GPT-4</strong></td>
+<td>较低（约 2 字/Token）</td>
+<td>英文优化，中文拆字多</td>
+</tr>
+<tr>
+<td><strong>Claude</strong></td>
+<td>中等（约 1.5 字/Token）</td>
+<td>多语言平衡</td>
+</tr>
+<tr>
+<td><strong>DeepSeek</strong></td>
+<td>较高（约 1 字/Token）</td>
+<td>中文专项优化</td>
+</tr>
+<tr>
+<td><strong>Qwen</strong></td>
+<td>较高（约 1 字/Token）</td>
+<td>中文原生模型</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="五、Token-在大模型中的作用方式"><a href="#五、Token-在大模型中的作用方式" class="headerlink" title="五、Token 在大模型中的作用方式"></a>五、Token 在大模型中的作用方式</h2><h3 id="5-1-完整处理流程"><a href="#5-1-完整处理流程" class="headerlink" title="5.1 完整处理流程"></a>5.1 完整处理流程</h3><p>以句子 <code>&quot;人工智能很强大&quot;</code> 为例：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">步骤 1: 分词</span><br><span class="line">&quot;人工智能很强大&quot; → [&quot;人工&quot;, &quot;智能&quot;, &quot;很&quot;, &quot;强大&quot;]</span><br><span class="line"></span><br><span class="line">步骤 2: 编号（在词汇表中查找）</span><br><span class="line">[&quot;人工&quot;, &quot;智能&quot;, &quot;很&quot;, &quot;强大&quot;] → [3821, 567, 89, 4521]</span><br><span class="line"></span><br><span class="line">步骤 3: 向量化（每个编号对应一个向量）</span><br><span class="line">3821 → [0.12, -0.34, 0.56, 0.78, ...]（4096 维向量）</span><br><span class="line">567  → [0.23, 0.45, -0.11, 0.89, ...]</span><br><span class="line">89   → [0.67, -0.23, 0.34, 0.12, ...]</span><br><span class="line">4521 → [0.45, 0.67, 0.23, -0.45, ...]</span><br><span class="line"></span><br><span class="line">步骤 4: 神经网络计算</span><br><span class="line">向量输入 Transformer 模型，计算&quot;下一个 Token 是什么&quot;</span><br><span class="line">- 注意力机制：计算 Token 之间的关联关系</span><br><span class="line">- 前馈网络：提取和变换语义信息</span><br><span class="line"></span><br><span class="line">步骤 5: 预测输出</span><br><span class="line">模型输出概率分布 → &quot;的&quot;（概率最高）</span><br><span class="line"></span><br><span class="line">步骤 6: Token 转文字</span><br><span class="line">[&quot;的&quot;] → &quot;的&quot;</span><br><span class="line"></span><br><span class="line">完整输出：&quot;人工智能很强大&quot; + &quot;的&quot; → &quot;人工智能很强大的...&quot;</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-向量化是什么？"><a href="#5-2-向量化是什么？" class="headerlink" title="5.2 向量化是什么？"></a>5.2 向量化是什么？</h3><p>每个 Token 都有一个<strong>向量表示</strong>——可以理解为这个 Token 的”数学身份证”。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Token &quot;人工智能&quot; 的向量（简化示例）：</span><br><span class="line">[0.12, -0.34, 0.56, 0.78, 0.23, 0.45, -0.11, 0.89, ...]</span><br><span class="line"></span><br><span class="line">这个向量有 4096 个数值（或更多）</span><br><span class="line">每个数值代表这个 Token 在某个语义维度上的&quot;坐标&quot;</span><br></pre></td></tr></table></figure>
+<p><strong>向量的神奇之处</strong>：语义相似的 Token，向量也相似。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">Token &quot;狗&quot; 的向量：[0.8, 0.2, 0.1, ...]</span><br><span class="line">Token &quot;猫&quot; 的向量：[0.7, 0.3, 0.2, ...]</span><br><span class="line">Token &quot;汽车&quot; 的向量：[0.1, 0.9, 0.5, ...]</span><br><span class="line"></span><br><span class="line">计算相似度：</span><br><span class="line">&quot;狗&quot; vs &quot;猫&quot; → 高相似度（都是动物）</span><br><span class="line">&quot;狗&quot; vs &quot;汽车&quot; → 低相似度（语义差异大）</span><br></pre></td></tr></table></figure>
+<h3 id="5-3-为什么是-5-万个-Token-而不是-5-万个单词？"><a href="#5-3-为什么是-5-万个-Token-而不是-5-万个单词？" class="headerlink" title="5.3 为什么是 5 万个 Token 而不是 5 万个单词？"></a>5.3 为什么是 5 万个 Token 而不是 5 万个单词？</h3><p>关键区别在于<strong>覆盖能力</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">单词方案：</span><br><span class="line">- 词汇表：5 万个单词</span><br><span class="line">- 遇到新词：直接&quot;不认识&quot;</span><br><span class="line"></span><br><span class="line">Token 方案：</span><br><span class="line">- 词汇表：5 万个 Token（子词）</span><br><span class="line">- 遇到新词：用已知 Token 组合表示</span><br><span class="line">- 例：新词 &quot;deepseek&quot; → [&quot;deep&quot;, &quot;seek&quot;]（都是已知 Token）</span><br></pre></td></tr></table></figure>
+<p>这就是 Token 方案的核心优势：<strong>有限词汇表 + 无限组合能力</strong>。</p>
+<hr>
+<h2 id="六、Token-量化方法"><a href="#六、Token-量化方法" class="headerlink" title="六、Token 量化方法"></a>六、Token 量化方法</h2><h3 id="6-1-方法一：在线可视化工具"><a href="#6-1-方法一：在线可视化工具" class="headerlink" title="6.1 方法一：在线可视化工具"></a>6.1 方法一：在线可视化工具</h3><p>最直观的方式是使用官方提供的 Tokenizer 工具：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>链接</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OpenAI Tokenizer</td>
+<td><a href="https://platform.openai.com/tokenizer" target="_blank" rel="noopener">https://platform.openai.com/tokenizer</a></td>
+<td>GPT 模型分词可视化</td>
+</tr>
+<tr>
+<td>Anthropic Console</td>
+<td><a href="https://console.anthropic.com" target="_blank" rel="noopener">https://console.anthropic.com</a></td>
+<td>Claude 模型分词查看</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>这些工具可以让你直观看到文本是怎么被拆成 Token 的。</p>
+<h3 id="6-2-方法二：代码计算"><a href="#6-2-方法二：代码计算" class="headerlink" title="6.2 方法二：代码计算"></a>6.2 方法二：代码计算</h3><p>使用 Python 进行精确计算：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 方案 1：使用 tiktoken（OpenAI 官方库）</span></span><br><span class="line"><span class="keyword">import</span> tiktoken</span><br><span class="line"></span><br><span class="line">enc = tiktoken.encoding_for_model(<span class="string">"gpt-4"</span>)</span><br><span class="line">text = <span class="string">"我爱人工智能"</span></span><br><span class="line">tokens = enc.encode(text)</span><br><span class="line">print(<span class="string">f"Token 数量: <span class="subst">&#123;len(tokens)&#125;</span>"</span>)</span><br><span class="line">print(<span class="string">f"Token 列表: <span class="subst">&#123;tokens&#125;</span>"</span>)</span><br><span class="line">print(<span class="string">f"Token 文本: <span class="subst">&#123;[enc.decode([t]) <span class="keyword">for</span> t <span class="keyword">in</span> tokens]&#125;</span>"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 方案 2：使用 transformers（通用方案）</span></span><br><span class="line"><span class="keyword">from</span> transformers <span class="keyword">import</span> AutoTokenizer</span><br><span class="line"></span><br><span class="line">tokenizer = AutoTokenizer.from_pretrained(<span class="string">"gpt2"</span>)</span><br><span class="line">text = <span class="string">"我爱人工智能"</span></span><br><span class="line">tokens = tokenizer.encode(text)</span><br><span class="line">print(<span class="string">f"Token 数量: <span class="subst">&#123;len(tokens)&#125;</span>"</span>)</span><br></pre></td></tr></table></figure>
+<h3 id="6-3-方法三：API-返回值"><a href="#6-3-方法三：API-返回值" class="headerlink" title="6.3 方法三：API 返回值"></a>6.3 方法三：API 返回值</h3><p>调用大模型 API 时，返回结果通常包含 Token 使用量：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> openai <span class="keyword">import</span> OpenAI</span><br><span class="line"></span><br><span class="line">client = OpenAI(api_key=<span class="string">"your-key"</span>)</span><br><span class="line"></span><br><span class="line">response = client.chat.completions.create(</span><br><span class="line">    model=<span class="string">"gpt-4"</span>,</span><br><span class="line">    messages=[&#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"介绍一下人工智能"</span>&#125;]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Token 使用量</span></span><br><span class="line">print(<span class="string">f"输入 Token: <span class="subst">&#123;response.usage.prompt_tokens&#125;</span>"</span>)</span><br><span class="line">print(<span class="string">f"输出 Token: <span class="subst">&#123;response.usage.completion_tokens&#125;</span>"</span>)</span><br><span class="line">print(<span class="string">f"总 Token: <span class="subst">&#123;response.usage.total_tokens&#125;</span>"</span>)</span><br></pre></td></tr></table></figure>
+<h3 id="6-4-方法四：经验估算（快速估算）"><a href="#6-4-方法四：经验估算（快速估算）" class="headerlink" title="6.4 方法四：经验估算（快速估算）"></a>6.4 方法四：经验估算（快速估算）</h3><p>当你没有工具时，可以用经验公式：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>语言</th>
+<th>估算公式</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>英文</strong></td>
+<td>Token ≈ 单词数 × 1.3</td>
+<td>100 单词 ≈ 130 Token</td>
+</tr>
+<tr>
+<td><strong>中文</strong></td>
+<td>Token ≈ 字数 × 1.5-2</td>
+<td>100 字 ≈ 150-200 Token</td>
+</tr>
+<tr>
+<td><strong>代码</strong></td>
+<td>Token ≈ 字符数 ÷ 4</td>
+<td>400 字符 ≈ 100 Token</td>
+</tr>
+<tr>
+<td><strong>混合</strong></td>
+<td>各部分分别估算再相加</td>
+<td>英文 + 中文 + 代码</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="七、Token-限制与成本"><a href="#七、Token-限制与成本" class="headerlink" title="七、Token 限制与成本"></a>七、Token 限制与成本</h2><h3 id="7-1-各模型的-Token-限制"><a href="#7-1-各模型的-Token-限制" class="headerlink" title="7.1 各模型的 Token 限制"></a>7.1 各模型的 Token 限制</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>上下文窗口</th>
+<th>最大输出</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GPT-4o</td>
+<td>128K Token</td>
+<td>16K Token</td>
+</tr>
+<tr>
+<td>GPT-4 Turbo</td>
+<td>128K Token</td>
+<td>4K Token</td>
+</tr>
+<tr>
+<td>Claude 3.5 Sonnet</td>
+<td>200K Token</td>
+<td>8K Token</td>
+</tr>
+<tr>
+<td>Claude Opus 4.6</td>
+<td>200K Token</td>
+<td>32K Token</td>
+</tr>
+<tr>
+<td>DeepSeek V3</td>
+<td>200K Token</td>
+<td>8K Token</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="7-2-Token-与-API-成本"><a href="#7-2-Token-与-API-成本" class="headerlink" title="7.2 Token 与 API 成本"></a>7.2 Token 与 API 成本</h3><p>API 费用通常按 Token 计算：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">成本 &#x3D; 输入 Token × 输入单价 + 输出 Token × 输出单价</span><br><span class="line"></span><br><span class="line">例：GPT-4o</span><br><span class="line">- 输入：$2.5 &#x2F; 1M Token</span><br><span class="line">- 输出：$10 &#x2F; 1M Token</span><br><span class="line"></span><br><span class="line">对话消耗 1000 输入 Token + 500 输出 Token</span><br><span class="line">成本 &#x3D; 1000 × $2.5&#x2F;1M + 500 × $10&#x2F;1M &#x3D; $0.0075</span><br></pre></td></tr></table></figure>
+<h3 id="7-3-超出-Token-限制会怎样？"><a href="#7-3-超出-Token-限制会怎样？" class="headerlink" title="7.3 超出 Token 限制会怎样？"></a>7.3 超出 Token 限制会怎样？</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">情况 1：输入超出上下文窗口</span><br><span class="line">→ API 报错：context_length_exceeded</span><br><span class="line">→ 解决：截断历史消息或分段处理</span><br><span class="line"></span><br><span class="line">情况 2：输出超出最大输出限制</span><br><span class="line">→ 输出被截断，不完整</span><br><span class="line">→ 解决：设置合理的 max_tokens 或分段生成</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="八、实用技巧：如何节省-Token"><a href="#八、实用技巧：如何节省-Token" class="headerlink" title="八、实用技巧：如何节省 Token"></a>八、实用技巧：如何节省 Token</h2><h3 id="8-1-语言选择"><a href="#8-1-语言选择" class="headerlink" title="8.1 语言选择"></a>8.1 语言选择</h3><p>同样的内容，用英文表达 Token 数更少：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>内容</th>
+<th>中文 Token</th>
+<th>英文 Token</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>请帮我写一篇关于人工智能的文章</td>
+<td>约 15-20</td>
+<td>约 8-10</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>技巧</strong>：如果不需要输出中文，可以用英文提问和回答。</p>
+<h3 id="8-2-Prompt-精简"><a href="#8-2-Prompt-精简" class="headerlink" title="8.2 Prompt 精简"></a>8.2 Prompt 精简</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">❌ 冗长版本（约 50 Token）：</span><br><span class="line">&quot;请帮我写一篇非常详细的、包含多个方面的、内容丰富的关于人工智能发展历史的文章，要涵盖从早期研究到现在的发展历程&quot;</span><br><span class="line"></span><br><span class="line">✅ 精简版本（约 15 Token）：</span><br><span class="line">&quot;写一篇 AI 发展史，涵盖早期到现在的关键节点&quot;</span><br></pre></td></tr></table></figure>
+<h3 id="8-3-避免重复上下文"><a href="#8-3-避免重复上下文" class="headerlink" title="8.3 避免重复上下文"></a>8.3 避免重复上下文</h3><p>每次对话都会带上历史消息，Token 消耗会累积：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">第 1 轮：100 Token 输入</span><br><span class="line">第 2 轮：100 + 50（历史）&#x3D; 150 Token 输入</span><br><span class="line">第 3 轮：100 + 50 + 50 &#x3D; 200 Token 输入</span><br><span class="line">第 N 轮：线性增长...</span><br></pre></td></tr></table></figure>
+<p><strong>技巧</strong>：</p>
+<ul>
+<li>定期开启新对话，清除历史</li>
+<li>只保留必要的历史消息</li>
+<li>使用 System Prompt 存储固定指令</li>
+</ul>
+<h3 id="8-4-System-Prompt-的妙用"><a href="#8-4-System-Prompt-的妙用" class="headerlink" title="8.4 System Prompt 的妙用"></a>8.4 System Prompt 的妙用</h3><p>System Prompt 只计算一次，不会重复：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 每条消息都重复指令（浪费 Token）</span></span><br><span class="line">messages = [</span><br><span class="line">    &#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"请用简洁的语言回答：什么是 AI？"</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"role"</span>: <span class="string">"assistant"</span>, <span class="string">"content"</span>: <span class="string">"AI 是..."</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"请用简洁的语言回答：什么是机器学习？"</span>&#125;,  <span class="comment"># 重复了指令</span></span><br><span class="line">]</span><br><span class="line"></span><br><span class="line"><span class="comment"># 使用 System Prompt（高效）</span></span><br><span class="line">messages = [</span><br><span class="line">    &#123;<span class="string">"role"</span>: <span class="string">"system"</span>, <span class="string">"content"</span>: <span class="string">"请用简洁的语言回答所有问题"</span>&#125;,  <span class="comment"># 只算一次</span></span><br><span class="line">    &#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"什么是 AI？"</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"role"</span>: <span class="string">"assistant"</span>, <span class="string">"content"</span>: <span class="string">"AI 是..."</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"什么是机器学习？"</span>&#125;,</span><br><span class="line">]</span><br></pre></td></tr></table></figure>
+<h3 id="8-5-图片的-Token-消耗"><a href="#8-5-图片的-Token-消耗" class="headerlink" title="8.5 图片的 Token 消耗"></a>8.5 图片的 Token 消耗</h3><p>图片也会消耗 Token，计算方式较复杂：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">图片 Token ≈ (图片宽度 ÷ 512) × (图片高度 ÷ 512) × 基础 Token 数</span><br><span class="line"></span><br><span class="line">例：1024×1024 图片</span><br><span class="line">Token ≈ 2 × 2 × 85 &#x3D; 340 Token（大致估算）</span><br></pre></td></tr></table></figure>
+<p><strong>技巧</strong>：</p>
+<ul>
+<li>压缩图片尺寸</li>
+<li>只传必要的图片</li>
+<li>使用低分辨率版本</li>
+</ul>
+<hr>
+<h2 id="九、Token-与上下文窗口的关系"><a href="#九、Token-与上下文窗口的关系" class="headerlink" title="九、Token 与上下文窗口的关系"></a>九、Token 与上下文窗口的关系</h2><h3 id="9-1-上下文窗口是什么？"><a href="#9-1-上下文窗口是什么？" class="headerlink" title="9.1 上下文窗口是什么？"></a>9.1 上下文窗口是什么？</h3><p>上下文窗口是模型能”记住”的最大 Token 数：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">模型上下文窗口 &#x3D; 128K Token</span><br><span class="line">     ↓</span><br><span class="line">意味着：</span><br><span class="line">- 输入 + 历史对话 + 输出 的总 Token 数不能超过 128K</span><br><span class="line">- 超过部分会被截断或报错</span><br></pre></td></tr></table></figure>
+<h3 id="9-2-为什么需要长上下文？"><a href="#9-2-为什么需要长上下文？" class="headerlink" title="9.2 为什么需要长上下文？"></a>9.2 为什么需要长上下文？</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>Token 需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>简单问答</td>
+<td>100-500 Token</td>
+</tr>
+<tr>
+<td>代码分析</td>
+<td>5K-20K Token</td>
+</tr>
+<tr>
+<td>长文档总结</td>
+<td>50K-100K Token</td>
+</tr>
+<tr>
+<td>复杂 Agent 任务</td>
+<td>100K-1M Token</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="9-3-长上下文的代价"><a href="#9-3-长上下文的代价" class="headerlink" title="9.3 长上下文的代价"></a>9.3 长上下文的代价</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">上下文越长：</span><br><span class="line">- 计算成本越高（Transformer 是 O(n²) 复杂度）</span><br><span class="line">- 响应速度越慢</span><br><span class="line">- API 费用越高</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="十、总结"><a href="#十、总结" class="headerlink" title="十、总结"></a>十、总结</h2><h3 id="10-1-Token-的核心概念"><a href="#10-1-Token-的核心概念" class="headerlink" title="10.1 Token 的核心概念"></a>10.1 Token 的核心概念</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Token</strong></td>
+<td>大模型处理文本的最小单位，类似”积木块”</td>
+</tr>
+<tr>
+<td><strong>分词器</strong></td>
+<td>把文本拆成 Token 的工具，不同模型分词方式不同</td>
+</tr>
+<tr>
+<td><strong>词汇表</strong></td>
+<td>所有已知 Token 的集合，通常 5-10 万个</td>
+</tr>
+<tr>
+<td><strong>向量</strong></td>
+<td>每个 Token 的”数学身份证”，用于计算</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="10-2-为什么选择-Token"><a href="#10-2-为什么选择-Token" class="headerlink" title="10.2 为什么选择 Token"></a>10.2 为什么选择 Token</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>原因</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>计算机只认识数字</strong></td>
+<td>文字必须转换成数字才能计算</td>
+</tr>
+<tr>
+<td><strong>有限词汇表</strong></td>
+<td>5 万个 Token 可以穷举和编号</td>
+</tr>
+<tr>
+<td><strong>无限组合能力</strong></td>
+<td>有限积木块拼出无限造型</td>
+</tr>
+<tr>
+<td><strong>处理新词</strong></td>
+<td>用已知 Token 组合表示未见过的词</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="10-3-Token-计量要点"><a href="#10-3-Token-计量要点" class="headerlink" title="10.3 Token 计量要点"></a>10.3 Token 计量要点</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>语言</th>
+<th>估算公式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>英文</td>
+<td>Token ≈ 单词数 × 1.3</td>
+</tr>
+<tr>
+<td>中文</td>
+<td>Token ≈ 字数 × 1.5-2</td>
+</tr>
+<tr>
+<td>代码</td>
+<td>Token ≈ 字符数 ÷ 4</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="10-4-实用建议"><a href="#10-4-实用建议" class="headerlink" title="10.4 实用建议"></a>10.4 实用建议</h3><ul>
+<li>用英文对话可以节省 Token</li>
+<li>精简 Prompt，避免冗长描述</li>
+<li>使用 System Prompt 存储固定指令</li>
+<li>定期清理历史对话，避免累积</li>
+<li>压缩图片尺寸减少 Token 消耗</li>
+</ul>
+<hr>
+<h2 id="附录：Token-可视化体验"><a href="#附录：Token-可视化体验" class="headerlink" title="附录：Token 可视化体验"></a>附录：Token 可视化体验</h2><p>想直观感受 Token 是怎么”切”文本的？试试这些工具：</p>
+<ol>
+<li><p><strong>OpenAI Tokenizer</strong>：<a href="https://platform.openai.com/tokenizer" target="_blank" rel="noopener">https://platform.openai.com/tokenizer</a></p>
+<ul>
+<li>输入中英文混排的内容</li>
+<li>看看模型是怎么”切”的</li>
+<li>每个 Token 用不同颜色高亮显示</li>
+</ul>
+</li>
+<li><p><strong>Anthropic Console</strong>：<a href="https://console.anthropic.com" target="_blank" rel="noopener">https://console.anthropic.com</a></p>
+<ul>
+<li>Claude 模型的 Token 计数</li>
+<li>支持实时估算</li>
+</ul>
+</li>
+<li><p><strong>本地体验</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> tiktoken</span><br><span class="line">enc = tiktoken.encoding_for_model(<span class="string">"gpt-4"</span>)</span><br><span class="line">text = <span class="string">"你的测试文本"</span></span><br><span class="line">print(enc.encode(text))</span><br><span class="line">print([enc.decode([t]) <span class="keyword">for</span> t <span class="keyword">in</span> enc.encode(text)])</span><br></pre></td></tr></table></figure>
+</li>
+</ol>
+<hr>
+<p><strong>参考资源</strong>：</p>
+<ul>
+<li><a href="https://platform.openai.com/docs/concepts/tokens" target="_blank" rel="noopener">OpenAI Tokenizer 文档</a></li>
+<li><a href="https://github.com/openai/tiktoken" target="_blank" rel="noopener">tiktoken GitHub</a></li>
+<li><a href="https://arxiv.org/abs/1508.07909" target="_blank" rel="noopener">BPE 算法原论文</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/AI/" rel="tag"><i class="fa fa-tag"></i> AI</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/09/11/cloudcli-ui-guide/" rel="prev" title="CloudCLI UI - Claude Code 的 Web GUI 与云端方案">
+      <i class="fa fa-chevron-left"></i> CloudCLI UI - Claude Code 的 Web GUI 与云端方案
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2025/10/11/ai-model-vs-tool-guide/" rel="next" title="AI 模型与工具关系指南">
+      AI 模型与工具关系指南 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#背景"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、Token-是什么？"><span class="nav-number">2.</span> <span class="nav-text">一、Token 是什么？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-通俗理解"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 通俗理解</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-具体例子"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 具体例子</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、为什么使用-Token-而不是”理解整段话”？"><span class="nav-number">3.</span> <span class="nav-text">二、为什么使用 Token 而不是”理解整段话”？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-大模型的工作流程"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 大模型的工作流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-如果是”整段话处理”"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 如果是”整段话处理”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-Token-方案的优势"><span class="nav-number">3.3.</span> <span class="nav-text">2.3 Token 方案的优势</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-语言的组合性原理"><span class="nav-number">3.4.</span> <span class="nav-text">2.4 语言的组合性原理</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、Token-的产生背景与历史"><span class="nav-number">4.</span> <span class="nav-text">三、Token 的产生背景与历史</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-为什么不按”单词”处理？"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 为什么不按”单词”处理？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-子词分词的诞生"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 子词分词的诞生</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-主流分词算法"><span class="nav-number">4.3.</span> <span class="nav-text">3.3 主流分词算法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-BPE-分词示例"><span class="nav-number">4.4.</span> <span class="nav-text">3.4 BPE 分词示例</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、Token-计量规则"><span class="nav-number">5.</span> <span class="nav-text">四、Token 计量规则</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-不同语言的-Token-效率"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 不同语言的 Token 效率</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-为什么中文-Token-数更多？"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 为什么中文 Token 数更多？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-实例对比"><span class="nav-number">5.3.</span> <span class="nav-text">4.3 实例对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-不同模型的-Token-效率对比"><span class="nav-number">5.4.</span> <span class="nav-text">4.4 不同模型的 Token 效率对比</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、Token-在大模型中的作用方式"><span class="nav-number">6.</span> <span class="nav-text">五、Token 在大模型中的作用方式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-完整处理流程"><span class="nav-number">6.1.</span> <span class="nav-text">5.1 完整处理流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-向量化是什么？"><span class="nav-number">6.2.</span> <span class="nav-text">5.2 向量化是什么？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-为什么是-5-万个-Token-而不是-5-万个单词？"><span class="nav-number">6.3.</span> <span class="nav-text">5.3 为什么是 5 万个 Token 而不是 5 万个单词？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、Token-量化方法"><span class="nav-number">7.</span> <span class="nav-text">六、Token 量化方法</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-方法一：在线可视化工具"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 方法一：在线可视化工具</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-方法二：代码计算"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 方法二：代码计算</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-方法三：API-返回值"><span class="nav-number">7.3.</span> <span class="nav-text">6.3 方法三：API 返回值</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-4-方法四：经验估算（快速估算）"><span class="nav-number">7.4.</span> <span class="nav-text">6.4 方法四：经验估算（快速估算）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、Token-限制与成本"><span class="nav-number">8.</span> <span class="nav-text">七、Token 限制与成本</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-各模型的-Token-限制"><span class="nav-number">8.1.</span> <span class="nav-text">7.1 各模型的 Token 限制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-2-Token-与-API-成本"><span class="nav-number">8.2.</span> <span class="nav-text">7.2 Token 与 API 成本</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-3-超出-Token-限制会怎样？"><span class="nav-number">8.3.</span> <span class="nav-text">7.3 超出 Token 限制会怎样？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、实用技巧：如何节省-Token"><span class="nav-number">9.</span> <span class="nav-text">八、实用技巧：如何节省 Token</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#8-1-语言选择"><span class="nav-number">9.1.</span> <span class="nav-text">8.1 语言选择</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-2-Prompt-精简"><span class="nav-number">9.2.</span> <span class="nav-text">8.2 Prompt 精简</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-3-避免重复上下文"><span class="nav-number">9.3.</span> <span class="nav-text">8.3 避免重复上下文</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-4-System-Prompt-的妙用"><span class="nav-number">9.4.</span> <span class="nav-text">8.4 System Prompt 的妙用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-5-图片的-Token-消耗"><span class="nav-number">9.5.</span> <span class="nav-text">8.5 图片的 Token 消耗</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#九、Token-与上下文窗口的关系"><span class="nav-number">10.</span> <span class="nav-text">九、Token 与上下文窗口的关系</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#9-1-上下文窗口是什么？"><span class="nav-number">10.1.</span> <span class="nav-text">9.1 上下文窗口是什么？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#9-2-为什么需要长上下文？"><span class="nav-number">10.2.</span> <span class="nav-text">9.2 为什么需要长上下文？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#9-3-长上下文的代价"><span class="nav-number">10.3.</span> <span class="nav-text">9.3 长上下文的代价</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#十、总结"><span class="nav-number">11.</span> <span class="nav-text">十、总结</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#10-1-Token-的核心概念"><span class="nav-number">11.1.</span> <span class="nav-text">10.1 Token 的核心概念</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#10-2-为什么选择-Token"><span class="nav-number">11.2.</span> <span class="nav-text">10.2 为什么选择 Token</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#10-3-Token-计量要点"><span class="nav-number">11.3.</span> <span class="nav-text">10.3 Token 计量要点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#10-4-实用建议"><span class="nav-number">11.4.</span> <span class="nav-text">10.4 实用建议</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#附录：Token-可视化体验"><span class="nav-number">12.</span> <span class="nav-text">附录：Token 可视化体验</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">79</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">12</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">46</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+
+
+
+
+
+
+<script pjax>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
