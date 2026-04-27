@@ -191,6 +191,255 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/27/agent-memory-what-to-store/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/04/27/agent-memory-what-to-store/" class="post-title-link" itemprop="url">Agent 记忆系统设计规范</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-27 00:00:00 / 修改时间：17:56:03" itemprop="dateCreated datePublished" datetime="2026-04-27T00:00:00+08:00">2026-04-27</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/04/27/agent-memory-what-to-store/" class="post-meta-item leancloud_visitors" data-flag-title="Agent 记忆系统设计规范" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/27/agent-memory-what-to-store/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/27/agent-memory-what-to-store/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>如果你在构建 Agent，一定想过这个问题：怎么让 Agent 跨会话记住用户的偏好、项目的背景、之前犯过的错误？大部分人的做法是搞一个文件，把所有「需要记住的东西」往里塞。文件越来越大，token 成本越来越高，而且大部分内容跟当前对话根本没关系。Claude Code 的记忆系统给出了一个反直觉的设计原则：工程量最大的部分不是「怎么存」，也不是「怎么取」，而是「什么该存、什么不该存」。</p>
+</blockquote>
+<hr>
+<h2 id="一、核心哲学：记忆是代码的补集"><a href="#一、核心哲学：记忆是代码的补集" class="headerlink" title="一、核心哲学：记忆是代码的补集"></a>一、核心哲学：记忆是代码的补集</h2><p>这套记忆系统的设计哲学可以用一句话概括：</p>
+<blockquote>
+<p><strong>记忆是代码的补集。</strong></p>
+</blockquote>
+<p>听起来简单，但这是整个设计里最有启发性的原则。具体来说：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>代码/工具擅长</th>
+<th>记忆系统擅长</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>时效性</td>
+<td>实时查询、权威来源</td>
+<td>跨会话沉淀、经验积累</td>
+</tr>
+<tr>
+<td>可变性</td>
+<td>随代码更新自动失效</td>
+<td>需要主动维护、可能过时</td>
+</tr>
+<tr>
+<td>粒度</td>
+<td>精确到函数/文件</td>
+<td>模糊的意图、偏好、上下文</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>该存的</strong>：全部是「关于人和上下文」的信息——人的偏好、纠正、动机、外部资源指针。这些藏在代码之外，不查记忆就无从得知。</p>
+<p><strong>不该存的</strong>：全部是「关于代码和项目状态」的信息——代码是实时的、可查的、权威的。代码能回答的问题，不要让记忆来回答。</p>
+<p>这个分界线一旦清晰，你会发现很多之前觉得「应该记住」的东西，其实根本不该存。</p>
+<hr>
+<h2 id="二、四种该存的记忆"><a href="#二、四种该存的记忆" class="headerlink" title="二、四种该存的记忆"></a>二、四种该存的记忆</h2><h3 id="2-1-用户记忆：记用户是谁"><a href="#2-1-用户记忆：记用户是谁" class="headerlink" title="2.1 用户记忆：记用户是谁"></a>2.1 用户记忆：记用户是谁</h3><p>用户记忆记录的是用户的角色、技术背景、工作习惯、知识水平。</p>
+<p><strong>好的例子</strong>：</p>
+<blockquote>
+<p>「这个用户是数据科学家，目前在做日志系统的调研。」</p>
+<p>「这个用户写了十年 Go，但第一次碰 React。」</p>
+</blockquote>
+<p>这类记忆的设计意图是让 Agent 能调整沟通方式和工作策略。面对一个资深后端工程师，Agent 不需要解释基础概念，可以直接用技术术语；面对一个初学者，Agent 需要更耐心地铺垫背景。</p>
+<p><strong>关键约束</strong>：记忆的目的是「怎么更好地帮这个人」，不是「给这个人画像」。不要记录对用户的负面评价，也不要记录跟工作无关的个人信息。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">❌ 不要记：「这个用户脾气不好，经常发火」</span><br><span class="line">❌ 不要记：「这个用户喜欢喝咖啡」</span><br><span class="line">✅ 要记：「这个用户偏好简洁回复，不需要末尾总结」</span><br></pre></td></tr></table></figure>
+<h3 id="2-2-反馈记忆：记纠正和肯定"><a href="#2-2-反馈记忆：记纠正和肯定" class="headerlink" title="2.2 反馈记忆：记纠正和肯定"></a>2.2 反馈记忆：记纠正和肯定</h3><p>这是四种记忆里设计最精细的一种。源码里对它有三个关键要求。</p>
+<p><strong>要求一：规则 + 原因 + 适用场景</strong></p>
+<p>每条反馈记忆必须包含三个部分：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">规则是什么 → Why → 什么时候该应用</span><br></pre></td></tr></table></figure>
+<p>举个实际例子。用户说：</p>
+<blockquote>
+<p>「测试不要 mock 数据库，上个季度我们就是因为 mock 测试通过了但生产环境迁移失败才出的事故。」</p>
+</blockquote>
+<p>如果只记「不要 mock 数据库」，Agent 在所有测试里都不敢 mock，包括那些跟数据库迁移完全无关的单元测试。</p>
+<p>但如果它知道原因是「mock 和生产环境行为不一致导致迁移失败」，它就能判断：集成测试不该 mock，但纯逻辑的单元测试 mock 是没问题的。</p>
+<p><strong>记原因，是为了让 Agent 能在新场景下做判断，而不是机械地执行规则。</strong></p>
+<p><strong>要求二：不要只记纠正，也要记肯定</strong></p>
+<p>源码注释里说得很直白：</p>
+<blockquote>
+<p>如果你只记录用户说「不要这样做」的时刻，它只知道什么是错的，不知道什么是对的。时间长了，它会回避一切不确定的做法，变得畏手畏脚。</p>
+</blockquote>
+<p>但肯定信号比纠正信号更难捕捉。用户说「不要这样做」很明显，但用户说「对，就是这样」或者默默接受了一个不寻常的方案，需要主动注意这些肯定信号。</p>
+<p><strong>例子</strong>：</p>
+<blockquote>
+<p>用户说：「对，这次用一个大 PR 是对的，拆开反而是无意义的工作量。」</p>
+</blockquote>
+<p>这条记忆的价值是：下次遇到类似的重构场景，Agent 知道这个用户倾向于合并提交，而不是拆成很多小 PR。这不是纠正，是一个被验证过的判断。</p>
+<p><strong>要求三：区分个人偏好和项目规范</strong></p>
+<blockquote>
+<p>「不要在回复末尾加总结」→ 个人偏好，只对这个用户有效</p>
+<p>「集成测试必须用真实数据库」→ 项目规范，对所有协作者有效</p>
+</blockquote>
+<p>源码里用 scope 来区分这两种。个人偏好存在私有目录，项目规范存在团队共享目录。</p>
+<h3 id="2-3-项目记忆：记正在发生什么"><a href="#2-3-项目记忆：记正在发生什么" class="headerlink" title="2.3 项目记忆：记正在发生什么"></a>2.3 项目记忆：记正在发生什么</h3><p>项目记忆记录的是当前项目里正在发生的事：谁在做什么、为什么要做、截止日期是什么。</p>
+<p><strong>例子</strong>：</p>
+<blockquote>
+<p>「本周四之后冻结所有非关键合并，移动端团队要切发布分支。」</p>
+<p>「正在重写认证中间件，原因是法务团队指出旧的 token 存储方式不符合合规要求，所以做决策的时候要优先考虑合规性而不是技术优雅。」</p>
+</blockquote>
+<p><strong>关键规则：相对日期必须转换成绝对日期</strong></p>
+<p>用户说「周四冻结」，记忆里存的是具体的年月日，比如「2026-03-07」。</p>
+<p>为什么？因为记忆是跨会话的。如果存「周四」，下周再看这条记忆就不知道是哪个周四了。</p>
+<p><strong>另一个特点：衰减得很快</strong></p>
+<p>一个月前的项目状态大概率已经过时了。所以源码要求项目记忆必须记录「为什么」。即使事实过时了，背后的动机仍然有参考价值。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">事实过时：「正在重写认证中间件」→ 可能已经写完了</span><br><span class="line">动机仍有效：「合规要求优先于技术优雅」→ 这个决策原则长期有效</span><br></pre></td></tr></table></figure>
+<h3 id="2-4-引用记忆：记外部资源在哪里"><a href="#2-4-引用记忆：记外部资源在哪里" class="headerlink" title="2.4 引用记忆：记外部资源在哪里"></a>2.4 引用记忆：记外部资源在哪里</h3><p>引用记忆记录的是外部资源的位置：bug 在哪个系统里追踪、监控面板的地址是什么、设计文档在哪个平台。</p>
+<p><strong>例子</strong>：</p>
+<blockquote>
+<p>「流水线相关的 bug 都在 Linear 的 INGEST 项目里追踪。」</p>
+<p>「API 延迟的监控面板在 grafana.internal/d/api-latency，值班的时候看这个。」</p>
+</blockquote>
+<p>这是四种里最简单的，但也是最实用的。它本质上是一个「去哪里找信息」的索引。</p>
+<hr>
+<h2 id="三、五种不该存的东西"><a href="#三、五种不该存的东西" class="headerlink" title="三、五种不该存的东西"></a>三、五种不该存的东西</h2><p>这部分才是整个设计里最有启发性的。很多人做记忆系统的第一件事，就是把不该存的东西全存了。</p>
+<h3 id="3-1-代码模式、架构、文件路径、项目结构"><a href="#3-1-代码模式、架构、文件路径、项目结构" class="headerlink" title="3.1 代码模式、架构、文件路径、项目结构"></a>3.1 代码模式、架构、文件路径、项目结构</h3><p>这是最反直觉的。很多人觉得 Agent 应该记住「项目用了什么框架、目录怎么组织、哪个文件负责什么」。</p>
+<p><strong>Claude Code 说：不要存这些。</strong></p>
+<p>为什么？因为这些信息可以直接从代码里读出来。Agent 随时可以通过读代码和搜索来获取当前的项目结构。</p>
+<p>把这些存进记忆有两个问题：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">问题一：浪费空间</span><br><span class="line">每次对话都要加载一堆本来可以实时查的信息</span><br><span class="line"></span><br><span class="line">问题二：过时风险</span><br><span class="line">代码改了但记忆没更新 → Agent 基于过时信息决策 → 很难发现</span><br></pre></td></tr></table></figure>
+<p><strong>背后的原则</strong>：如果一个信息可以从当前项目状态推导出来，就不要存进记忆。记忆只存那些「看代码看不出来」的东西。</p>
+<h3 id="3-2-版本管理历史"><a href="#3-2-版本管理历史" class="headerlink" title="3.2 版本管理历史"></a>3.2 版本管理历史</h3><p>谁改了什么、最近的提交记录——这些用版本管理工具查就行了。</p>
+<p>Git 是实时的、权威的，不需要记忆来存一份可能过时的副本。</p>
+<h3 id="3-3-调试方案和修复方法"><a href="#3-3-调试方案和修复方法" class="headerlink" title="3.3 调试方案和修复方法"></a>3.3 调试方案和修复方法</h3><p>修复已经在代码里了，提交信息里有上下文。存「怎么修的」没有意义，因为代码本身就是最好的参考。</p>
+<h3 id="3-4-配置文件里已经写过的东西"><a href="#3-4-配置文件里已经写过的东西" class="headerlink" title="3.4 配置文件里已经写过的东西"></a>3.4 配置文件里已经写过的东西</h3><p>如果你的项目里有 CLAUDE.md 或其他配置文件已经定义了编码规范，记忆系统不需要再存一份。</p>
+<p>重复存储不仅浪费空间，还会在两份内容不一致的时候制造混乱。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">配置文件说：「使用 pnpm」</span><br><span class="line">记忆文件说：「使用 npm」</span><br><span class="line">→ Agent 该听谁的？</span><br></pre></td></tr></table></figure>
+<h3 id="3-5-临时性的任务细节"><a href="#3-5-临时性的任务细节" class="headerlink" title="3.5 临时性的任务细节"></a>3.5 临时性的任务细节</h3><p>当前正在做什么、对话里的中间状态——这些是短期的，属于当前会话的上下文，不该进入长期记忆。</p>
+<hr>
+<h2 id="四、一条特别重要的规则"><a href="#四、一条特别重要的规则" class="headerlink" title="四、一条特别重要的规则"></a>四、一条特别重要的规则</h2><p>即使用户明确要求你记住某些东西，如果它属于上面五类，也不该记。</p>
+<p><strong>例子</strong>：</p>
+<blockquote>
+<p>用户：「记住这周的 PR 列表」</p>
+</blockquote>
+<p>Agent 不应该直接存 PR 列表，而应该反问：</p>
+<blockquote>
+<p>「这些 PR 里有什么让你意外的或者不明显的？那个部分才值得记。」</p>
+</blockquote>
+<p><strong>活动日志不是记忆，从活动中提炼出的洞察才是。</strong></p>
+<p>用户要求存不该存的内容时，正确的做法是提炼价值点。PR 列表本身不该存，但如果某个 PR 的处理方式让用户觉得「这样做是对的」，那个判断才值得存成反馈记忆。</p>
+<hr>
+<h2 id="五、信息来源决策树"><a href="#五、信息来源决策树" class="headerlink" title="五、信息来源决策树"></a>五、信息来源决策树</h2><p>把上面的原则整理成一个判断流程：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">这条信息能从代码&#x2F;工具实时获取吗？</span><br><span class="line">         │</span><br><span class="line">         ├── 能 → 不存，实时查</span><br><span class="line">         │</span><br><span class="line">         └── 不能 → 属于哪种类型？</span><br><span class="line">                         │</span><br><span class="line">                         ├── 用户特征 → 用户记忆</span><br><span class="line">                         ├── 纠正&#x2F;肯定 → 反馈记忆</span><br><span class="line">                         ├── 项目动态 → 项目记忆</span><br><span class="line">                         └── 外部资源 → 引用记忆</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="六、实践中的常见错误"><a href="#六、实践中的常见错误" class="headerlink" title="六、实践中的常见错误"></a>六、实践中的常见错误</h2><h3 id="错误一：把记忆当成项目文档"><a href="#错误一：把记忆当成项目文档" class="headerlink" title="错误一：把记忆当成项目文档"></a>错误一：把记忆当成项目文档</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">❌ 存储：「src&#x2F;auth 目录负责认证逻辑，包含 middleware.ts 和 token.ts」</span><br><span class="line">✅ 实时查：Glob + Read 工具</span><br></pre></td></tr></table></figure>
+<h3 id="错误二：把记忆当成聊天记录"><a href="#错误二：把记忆当成聊天记录" class="headerlink" title="错误二：把记忆当成聊天记录"></a>错误二：把记忆当成聊天记录</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">❌ 存储：「用户昨天问怎么配置 Redis，我回答了...」</span><br><span class="line">✅ 不存：这是会话上下文，不是长期记忆</span><br></pre></td></tr></table></figure>
+<h3 id="错误三：记了规则但没记原因"><a href="#错误三：记了规则但没记原因" class="headerlink" title="错误三：记了规则但没记原因"></a>错误三：记了规则但没记原因</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">❌ 存储：「不要用 forEach」</span><br><span class="line">✅ 存储：「避免在 async 函数里用 forEach，原因是 forEach 不等待 Promise 完成，</span><br><span class="line">         曾导致批量写入只执行了一半，适用场景是异步批量操作」</span><br></pre></td></tr></table></figure>
+<h3 id="错误四：只记纠正不记肯定"><a href="#错误四：只记纠正不记肯定" class="headerlink" title="错误四：只记纠正不记肯定"></a>错误四：只记纠正不记肯定</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">❌ 只存：「不要在回复末尾加总结」</span><br><span class="line">✅ 也要存：「用户确认：重构时用一个大PR是对的，拆开反而增加工作量」</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、记忆系统的质量检验清单"><a href="#七、记忆系统的质量检验清单" class="headerlink" title="七、记忆系统的质量检验清单"></a>七、记忆系统的质量检验清单</h2><p>在写入一条记忆之前，问自己这些问题：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">□ 是否存了代码可查的内容？→ 删除或反问用户</span><br><span class="line">□ 是否包含「为什么」？→ 补充动机</span><br><span class="line">□ 是否指定适用范围？→ 补充项目&#x2F;模块边界</span><br><span class="line">□ 相对时间是否转绝对时间？→ 如「明天」→「2026-03-16」</span><br><span class="line">□ 是否存在相似记忆？→ 合并去重</span><br><span class="line">□ 敏感信息是否过滤？→ 拒绝存储密码、密钥、PII</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="八、总结"><a href="#八、总结" class="headerlink" title="八、总结"></a>八、总结</h2><p>Claude Code 记忆系统的核心设计可以概括为一句话：<strong>少而精</strong>。</p>
+<p>记忆的价值不在于数量，而在于每条记忆都能在关键时刻减少认知负担。</p>
+<p>如果你在给自己的 Agent 做记忆系统，这个分类框架可以直接拿来用：</p>
+<p><strong>四种该存</strong>：</p>
+<ul>
+<li>用户是谁（角色、背景、习惯）</li>
+<li>用户纠正和肯定过什么（含规则、原因、适用场景）</li>
+<li>项目背后的动机和时间线（相对日期→绝对日期）</li>
+<li>外部资源在哪里（索引而非内容）</li>
+</ul>
+<p><strong>五种不该存</strong>：</p>
+<ul>
+<li>代码能告诉你的一切</li>
+<li>版本历史能告诉你的一切</li>
+<li>提交记录能告诉你的一切</li>
+<li>配置文件已经说过的一切</li>
+<li>临时性的中间状态</li>
+</ul>
+<p>这样做的好处是：你的记忆文件会非常精简，每一条都是高价值的、代码里找不到的信息。模型每次加载记忆的时候，看到的全是有用的东西，没有噪声。</p>
+<hr>
+<p><strong>相关文章</strong>：</p>
+<ul>
+<li><a href="/claude-code-memory-system/">Memory 系统：跨会话持久化知识库</a> — Claude Code 记忆系统的技术实现细节</li>
+<li><a href="/categories/Claude-Code/">Claude Code 源码深度解析系列</a> — 更多 Claude Code 架构分析</li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/24/deepseek-v4-technical-review/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1985,7 +2234,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-channel-system/">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-memory-system/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -1999,7 +2248,7 @@
       <header class="post-header">
         <h2 class="post-title" itemprop="name headline">
           
-            <a href="/2026/04/06/claude-code-channel-system/" class="post-title-link" itemprop="url">Channel 系统：IM 远程控制 Agent</a>
+            <a href="/2026/04/06/claude-code-memory-system/" class="post-title-link" itemprop="url">Memory 系统：跨会话持久化知识库</a>
         </h2>
 
         <div class="post-meta">
@@ -2010,7 +2259,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:38" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:37" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -2023,7 +2272,7 @@
             </span>
 
           
-            <span id="/2026/04/06/claude-code-channel-system/" class="post-meta-item leancloud_visitors" data-flag-title="Channel 系统：IM 远程控制 Agent" title="阅读次数">
+            <span id="/2026/04/06/claude-code-memory-system/" class="post-meta-item leancloud_visitors" data-flag-title="Memory 系统：跨会话持久化知识库" title="阅读次数">
               <span class="post-meta-item-icon">
                 <i class="fa fa-eye"></i>
               </span>
@@ -2038,8 +2287,8 @@
       </span>
       <span class="post-meta-item-text">Valine：</span>
     
-    <a title="valine" href="/2026/04/06/claude-code-channel-system/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-channel-system/" itemprop="commentCount"></span>
+    <a title="valine" href="/2026/04/06/claude-code-memory-system/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-memory-system/" itemprop="commentCount"></span>
     </a>
   </span>
   
@@ -2055,11 +2304,11 @@
 
       
           <blockquote>
-<p>你在手机上打开 Telegram，给 Claude Code 发一条消息，它就开始在你的电脑上工作——这就是 Channel 系统。它打破了 AI 编程助手只能在终端中交互的限制，实现了真正的远程控制。更精妙的是，它有六层访问控制和权限中继机制，确保安全性。</p>
+<p>让 Claude Code 跨会话记住你是谁、你偏好什么、项目正在发生什么——这是 Memory 系统的核心目标。它不是简单的聊天记录持久化，而是一个结构化的知识管理系统，通过四种记忆类型、自动提取机制、团队同步等功能，让 AI 真正”理解”你。</p>
 </blockquote>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2026/04/06/claude-code-channel-system/#more" rel="contents">
+              <a class="btn" href="/2026/04/06/claude-code-memory-system/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -2181,7 +2430,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-context-compression/">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-multi-agent/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -2195,7 +2444,7 @@
       <header class="post-header">
         <h2 class="post-title" itemprop="name headline">
           
-            <a href="/2026/04/06/claude-code-context-compression/" class="post-title-link" itemprop="url">Context 管理：四级压缩与无限对话的秘密</a>
+            <a href="/2026/04/06/claude-code-multi-agent/" class="post-title-link" itemprop="url">多 Agent 编排：四种代理类型与协作机制</a>
         </h2>
 
         <div class="post-meta">
@@ -2206,7 +2455,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:24" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:23" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -2219,7 +2468,7 @@
             </span>
 
           
-            <span id="/2026/04/06/claude-code-context-compression/" class="post-meta-item leancloud_visitors" data-flag-title="Context 管理：四级压缩与无限对话的秘密" title="阅读次数">
+            <span id="/2026/04/06/claude-code-multi-agent/" class="post-meta-item leancloud_visitors" data-flag-title="多 Agent 编排：四种代理类型与协作机制" title="阅读次数">
               <span class="post-meta-item-icon">
                 <i class="fa fa-eye"></i>
               </span>
@@ -2234,8 +2483,8 @@
       </span>
       <span class="post-meta-item-text">Valine：</span>
     
-    <a title="valine" href="/2026/04/06/claude-code-context-compression/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-context-compression/" itemprop="commentCount"></span>
+    <a title="valine" href="/2026/04/06/claude-code-multi-agent/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-multi-agent/" itemprop="commentCount"></span>
     </a>
   </span>
   
@@ -2251,109 +2500,11 @@
 
       
           <blockquote>
-<p>“对话没有上下文限制”——这是 Claude Code 的一个核心承诺。但它真的能做到吗？答案是：通过四级压缩系统，实现”伪无限对话”。这背后的设计非常精妙：不是简单截断，而是智能地压缩和保留关键信息。</p>
+<p>Claude Code 的多 Agent 系统可能是其最被低估的设计之一。它不是简单的”子代理调用”，而是一个完整的协作框架：四种 Agent 类型（Subagent、Fork、Teammate、Remote）、Teams 邮箱通信、权限同步、Worktree 隔离。这个设计让 Claude Code 能够处理单 Agent 无法完成的复杂任务。</p>
 </blockquote>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2026/04/06/claude-code-context-compression/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-memory-system/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/04/06/claude-code-memory-system/" class="post-title-link" itemprop="url">Memory 系统：跨会话持久化知识库</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:37" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2026/04/06/claude-code-memory-system/" class="post-meta-item leancloud_visitors" data-flag-title="Memory 系统：跨会话持久化知识库" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2026/04/06/claude-code-memory-system/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-memory-system/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>让 Claude Code 跨会话记住你是谁、你偏好什么、项目正在发生什么——这是 Memory 系统的核心目标。它不是简单的聊天记录持久化，而是一个结构化的知识管理系统，通过四种记忆类型、自动提取机制、团队同步等功能，让 AI 真正”理解”你。</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2026/04/06/claude-code-memory-system/#more" rel="contents">
+              <a class="btn" href="/2026/04/06/claude-code-multi-agent/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -2445,7 +2596,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">79</span>
+          <span class="site-state-item-count">80</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2458,7 +2609,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">46</span>
+        <span class="site-state-item-count">47</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
