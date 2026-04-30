@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="“任务越复杂越该用多Agent”——听起来好像没毛病，但这句话背后藏着一个巨大的陷阱。很多人一拍脑袋就上多Agent，结果延迟爆表、成本失控、日志一团浆糊，最后发现单Agent加个工具调用就能搞定。上一篇我们聊了 Multi-Agent 系统的设计原理，今天换个角度：什么时候该用多Agent？用完之后，怎么评判这套设计到底好不好？   一、先破一个误区：复杂度不是决策标准很多人一听到”多Agen">
+<meta property="og:type" content="article">
+<meta property="og:title" content="多Agent系统的设计与评估">
+<meta property="og:url" content="https://donehub.github.io/2026/04/30/multi-agent-decision-and-evaluation/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="“任务越复杂越该用多Agent”——听起来好像没毛病，但这句话背后藏着一个巨大的陷阱。很多人一拍脑袋就上多Agent，结果延迟爆表、成本失控、日志一团浆糊，最后发现单Agent加个工具调用就能搞定。上一篇我们聊了 Multi-Agent 系统的设计原理，今天换个角度：什么时候该用多Agent？用完之后，怎么评判这套设计到底好不好？   一、先破一个误区：复杂度不是决策标准很多人一听到”多Agen">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-04-29T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-30T15:19:12.023Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Multi-Agent">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/04/30/multi-agent-decision-and-evaluation/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>多Agent系统的设计与评估 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/30/multi-agent-decision-and-evaluation/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          多Agent系统的设计与评估
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-30 00:00:00 / 修改时间：23:19:12" itemprop="dateCreated datePublished" datetime="2026-04-30T00:00:00+08:00">2026-04-30</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/04/30/multi-agent-decision-and-evaluation/" class="post-meta-item leancloud_visitors" data-flag-title="多Agent系统的设计与评估" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/30/multi-agent-decision-and-evaluation/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/30/multi-agent-decision-and-evaluation/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>“任务越复杂越该用多Agent”——听起来好像没毛病，但这句话背后藏着一个巨大的陷阱。很多人一拍脑袋就上多Agent，结果延迟爆表、成本失控、日志一团浆糊，最后发现单Agent加个工具调用就能搞定。上一篇我们聊了 Multi-Agent 系统的设计原理，今天换个角度：什么时候该用多Agent？用完之后，怎么评判这套设计到底好不好？</p>
+</blockquote>
+<hr>
+<h2 id="一、先破一个误区：复杂度不是决策标准"><a href="#一、先破一个误区：复杂度不是决策标准" class="headerlink" title="一、先破一个误区：复杂度不是决策标准"></a>一、先破一个误区：复杂度不是决策标准</h2><p>很多人一听到”多Agent”，脑子里的画面是这样的：一个主控 Agent 坐镇中央，下面挂着写代码的、做测试的、写文档的，各司其职，特别壮观。</p>
+<p>但壮观不等于好用。</p>
+<p><strong>复杂度从来不是选择多Agent的理由。</strong> 真正的决策标准只有两个维度：<strong>并发收益</strong>和<strong>上下文约束</strong>。</p>
+<p>用一张表说清楚：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>场景特征</th>
+<th>单Agent够用吗</th>
+<th>要不要上多Agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>步骤严格串行，后一步依赖前一步结果</td>
+<td>够用</td>
+<td>不要，纯浪费</td>
+</tr>
+<tr>
+<td>多个子任务互相独立，可以同时跑</td>
+<td>不够</td>
+<td>要，并行收益明显</td>
+</tr>
+<tr>
+<td>单个任务的上下文撑爆模型窗口</td>
+<td>不够</td>
+<td>要，必须切分</td>
+</tr>
+<tr>
+<td>子任务之间需要频繁交换中间状态</td>
+<td>勉强</td>
+<td>谨慎，通信开销可能吃掉收益</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>但这张表太粗了，真实决策远比这复杂。下面我们拆开来讲。</p>
+<hr>
+<h2 id="二、决策框架：四把尺子量出答案"><a href="#二、决策框架：四把尺子量出答案" class="headerlink" title="二、决策框架：四把尺子量出答案"></a>二、决策框架：四把尺子量出答案</h2><h3 id="2-1-第一把尺子：任务依赖图是线性的还是扇出的？"><a href="#2-1-第一把尺子：任务依赖图是线性的还是扇出的？" class="headerlink" title="2.1 第一把尺子：任务依赖图是线性的还是扇出的？"></a>2.1 第一把尺子：任务依赖图是线性的还是扇出的？</h3><p>这是最核心的判断依据。</p>
+<p><strong>线性依赖</strong>是指任务之间有严格的先后顺序：A 的输出是 B 的输入，B 的输出是 C 的输入。比如用户问”我的退款到哪一步了”——先识别意图，再查订单库，最后组织回复。这三步必须串行，中间插不进任何并行操作。</p>
+<p><strong>扇出依赖</strong>是指一个任务可以拆成多个互不相关的子任务同时执行。比如”帮我审查这个代码仓库的安全性”——注入漏洞扫描、内存泄漏检测、代码风格检查，这三件事之间没有任何数据依赖，完全可以同时开工。</p>
+<p>画成图就是这样的区别：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">线性依赖（单Agent）：</span><br><span class="line">意图识别 → 查数据库 → 组织回复</span><br><span class="line">  A    →    B     →    C</span><br><span class="line"></span><br><span class="line">扇出依赖（多Agent）：</span><br><span class="line">            ┌→ 安全检测 ──┐</span><br><span class="line">主控规划 ──→├→ 性能分析 ──├→ 汇总合并</span><br><span class="line">            └→ 规范检查 ──┘</span><br></pre></td></tr></table></figure>
+<p><strong>判断标准</strong>：如果你的任务依赖图画出来是一条直线，用单Agent。如果画出来像一把扇子，考虑多Agent。</p>
+<h3 id="2-2-第二把尺子：上下文窗口是不是硬瓶颈？"><a href="#2-2-第二把尺子：上下文窗口是不是硬瓶颈？" class="headerlink" title="2.2 第二把尺子：上下文窗口是不是硬瓶颈？"></a>2.2 第二把尺子：上下文窗口是不是硬瓶颈？</h3><p>有些任务看起来是线性的，但数据量大到单个模型根本吃不下。这时候即使任务是串行的，你也得想办法切分。</p>
+<p>举个例子：给你一个 50 万行的代码仓库，要求生成完整的 API 文档。这不是并行任务——你需要理解全局架构才能写好文档。但问题是，50 万行代码塞不进任何模型的上下文窗口。</p>
+<p>这时候多Agent的价值不是并行加速，而是<strong>上下文切片</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Agent-1：扫描 controller 层，提取接口定义</span><br><span class="line">Agent-2：扫描 service 层，提取业务逻辑</span><br><span class="line">Agent-3：扫描 entity 层，提取数据模型</span><br><span class="line">主控 Agent：拿到三份切片报告，合并生成文档</span><br></pre></td></tr></table></figure>
+<p>每个 Agent 只需要处理自己那一层的代码，上下文压力骤降。最后主控 Agent 拿到的是三份精炼过的报告，而不是几十万行原始代码。</p>
+<p><strong>判断标准</strong>：估算一下任务需要的上下文 token 量。如果超过模型窗口的 60%，就要考虑切分了。留 40% 的余量给系统 Prompt、工具调用和中间推理。</p>
+<h3 id="2-3-第三把尺子：延迟预算够不够？"><a href="#2-3-第三把尺子：延迟预算够不够？" class="headerlink" title="2.3 第三把尺子：延迟预算够不够？"></a>2.3 第三把尺子：延迟预算够不够？</h3><p>这是最容易被忽略的一把尺子。</p>
+<p>多Agent系统的延迟公式非常残酷：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">总延迟 &#x3D; max(各子Agent延迟) + 主控规划延迟 + 主控汇总延迟 + 通信开销</span><br></pre></td></tr></table></figure>
+<p>注意这里用的是 <code>max</code> 不是 <code>sum</code>——因为子 Agent 是并行的，总延迟取决于最慢的那个。听起来不错对吧？但别忘了后面还有三项固定开销。</p>
+<p>在真实的线上环境里，大模型的一次调用延迟通常在 2-8 秒。一个三层架构的多Agent系统，光是规划和汇总就要各调一次模型，加上子 Agent 的执行时间，端到端延迟很容易突破 15 秒。</p>
+<p>对比一下单Agent方案：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">单Agent：意图识别(2s) → 工具调用(1s) → 总结回复(2s) &#x3D; 5s</span><br><span class="line">多Agent：规划(3s) + max(子Agent×3)(4s) + 汇总(3s) + 通信(1s) &#x3D; 11s</span><br></pre></td></tr></table></figure>
+<p><strong>判断标准</strong>：如果你的场景是面向用户的实时交互（聊天机器人、客服系统），延迟预算通常在 5 秒以内。这种场景下多Agent几乎一定会超时，单Agent + 工具调用是更务实的选择。如果是后台批处理任务（代码审计、报告生成），延迟预算宽松，多Agent才有发挥空间。</p>
+<h3 id="2-4-第四把尺子：Token-预算能不能扛得住？"><a href="#2-4-第四把尺子：Token-预算能不能扛得住？" class="headerlink" title="2.4 第四把尺子：Token 预算能不能扛得住？"></a>2.4 第四把尺子：Token 预算能不能扛得住？</h3><p>多Agent系统的 Token 消耗不是线性增长，而是<strong>阶梯式跳涨</strong>。</p>
+<p>每一次 Agent 调用，你都要支付：</p>
+<ul>
+<li>系统 Prompt（每次都一样，但每次都要算钱）</li>
+<li>上下文注入（任务描述、历史信息）</li>
+<li>模型推理（输出 token）</li>
+</ul>
+<p>假设你有一个主控 Agent + 5 个子 Agent，每个 Agent 的系统 Prompt 是 2000 token，任务描述平均 1000 token，输出平均 1500 token。那么一轮完整执行的 Token 消耗大约是：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">主控：2000 + 1000 + 1500 &#x3D; 4500</span><br><span class="line">子Agent×5：(2000 + 1000 + 1500) × 5 &#x3D; 22500</span><br><span class="line">汇总：2000 + 3000(子Agent结果) + 2000 &#x3D; 7000</span><br><span class="line">总计：约 34000 token</span><br></pre></td></tr></table></figure>
+<p>而单Agent完成同样任务，可能只需要 5000-8000 token。</p>
+<p><strong>判断标准</strong>：如果你的系统要处理高并发请求（比如每秒几百个），Token 成本的差异会被放大几百倍。在做架构选型时，先算一笔账：多Agent方案的 Token 成本是单Agent的几倍？这个倍数你的预算扛不扛得住？</p>
+<hr>
+<h2 id="三、四个典型场景的决策推演"><a href="#三、四个典型场景的决策推演" class="headerlink" title="三、四个典型场景的决策推演"></a>三、四个典型场景的决策推演</h2><p>光讲理论不过瘾，我们拿四个真实场景来跑一遍决策流程。</p>
+<h3 id="3-1-场景一：智能客服（结论：单Agent）"><a href="#3-1-场景一：智能客服（结论：单Agent）" class="headerlink" title="3.1 场景一：智能客服（结论：单Agent）"></a>3.1 场景一：智能客服（结论：单Agent）</h3><p>用户问：”我的订单 #12345 退款到哪一步了？”</p>
+<p><strong>依赖图分析</strong>：识别意图 → 查订单 → 回复。严格线性，没有并行空间。</p>
+<p><strong>上下文分析</strong>：一次对话的上下文很小，远不到窗口极限。</p>
+<p><strong>延迟分析</strong>：用户在等回复，延迟预算 3 秒。</p>
+<p><strong>Token 分析</strong>：高并发场景（成千上万用户同时咨询），成本敏感。</p>
+<p>四把尺子量完，全部指向单Agent。上多Agent就是过度设计。</p>
+<h3 id="3-2-场景二：企业级代码安全审计（结论：多Agent）"><a href="#3-2-场景二：企业级代码安全审计（结论：多Agent）" class="headerlink" title="3.2 场景二：企业级代码安全审计（结论：多Agent）"></a>3.2 场景二：企业级代码安全审计（结论：多Agent）</h3><p>需求：扫描一个 10 万行代码仓库，输出安全漏洞报告。</p>
+<p><strong>依赖图分析</strong>：注入扫描、内存泄漏检测、依赖漏洞检查、代码规范审查——四个子任务完全独立。</p>
+<p><strong>上下文分析</strong>：10 万行代码远超单模型窗口，必须切片。</p>
+<p><strong>延迟分析</strong>：后台批处理，用户可以等几分钟，延迟预算宽松。</p>
+<p><strong>Token 分析</strong>：低并发（一天可能就跑几次），成本可控。</p>
+<p>四把尺子量完，全部指向多Agent。</p>
+<h3 id="3-3-场景三：长文档摘要生成（结论：伪多Agent-单Agent-分段策略）"><a href="#3-3-场景三：长文档摘要生成（结论：伪多Agent-单Agent-分段策略）" class="headerlink" title="3.3 场景三：长文档摘要生成（结论：伪多Agent / 单Agent + 分段策略）"></a>3.3 场景三：长文档摘要生成（结论：伪多Agent / 单Agent + 分段策略）</h3><p>需求：把一份 200 页的技术文档浓缩成 5 页摘要。</p>
+<p>乍一看，200 页文档肯定塞不进上下文，应该用多Agent切分对吧？</p>
+<p>但仔细想想：文档摘要是<strong>有全局连贯性要求</strong>的。你不能让 Agent-A 总结第 1-50 页、Agent-B 总结第 51-100 页，然后拼在一起——这样出来的摘要会有大量重复、遗漏和逻辑断裂。</p>
+<p>更好的方案是<strong>单Agent + 分段迭代策略</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">第一轮：单Agent处理第1-50页，产出中间摘要A</span><br><span class="line">第二轮：单Agent带着摘要A处理第51-100页，产出中间摘要B</span><br><span class="line">第三轮：单Agent带着摘要B处理第101-150页，产出中间摘要C</span><br><span class="line">第四轮：单Agent带着摘要C处理第151-200页，产出最终摘要</span><br></pre></td></tr></table></figure>
+<p>每一轮都保留了前序上下文的精华，保证了连贯性。这比多Agent并行切分效果好得多。</p>
+<p><strong>教训</strong>：上下文超限不等于必须上多Agent。有时候<strong>串行分段 + 状态传递</strong>比并行切分更适合有连贯性要求的任务。</p>
+<h3 id="3-4-场景四：多语言翻译流水线（结论：看情况）"><a href="#3-4-场景四：多语言翻译流水线（结论：看情况）" class="headerlink" title="3.4 场景四：多语言翻译流水线（结论：看情况）"></a>3.4 场景四：多语言翻译流水线（结论：看情况）</h3><p>需求：把一份技术文档翻译成英、日、韩三种语言。</p>
+<p><strong>表面分析</strong>：三种语言互不依赖，可以并行——看起来应该用多Agent。</p>
+<p><strong>深层分析</strong>：翻译的前置步骤（术语提取、风格统一）是共享的。如果三个 Agent 各自提取术语，出来的译文风格会不一致。</p>
+<p><strong>最优方案</strong>：混合架构。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">阶段一（单Agent）：提取术语表 + 定义翻译风格指南</span><br><span class="line">阶段二（多Agent并行）：三个Agent分别翻译三种语言，共享术语表</span><br><span class="line">阶段三（单Agent）：审校三份译文的一致性</span><br></pre></td></tr></table></figure>
+<p><strong>教训</strong>：很多任务不是纯粹的”该用”或”不该用”多Agent，而是<strong>在流水线的某些阶段用、某些阶段不用</strong>。混合架构才是最常见的生产形态。</p>
+<hr>
+<h2 id="四、怎么评估一个多Agent系统设计得好不好？"><a href="#四、怎么评估一个多Agent系统设计得好不好？" class="headerlink" title="四、怎么评估一个多Agent系统设计得好不好？"></a>四、怎么评估一个多Agent系统设计得好不好？</h2><p>选对了场景只是第一步。就算你决策正确，多Agent系统仍然可能设计得很烂。下面是一套评估框架，从五个维度给系统打分。</p>
+<h3 id="4-1-评估维度一：任务分解的合理性"><a href="#4-1-评估维度一：任务分解的合理性" class="headerlink" title="4.1 评估维度一：任务分解的合理性"></a>4.1 评估维度一：任务分解的合理性</h3><p>这是最基础也最关键的维度。分解不合理，后面的一切都是空中楼阁。</p>
+<p><strong>好的分解</strong>有三个特征：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>特征</th>
+<th>说明</th>
+<th>反例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>子任务之间低耦合</td>
+<td>每个子Agent能独立完成自己的工作，不需要等别人的结果</td>
+<td>Agent-A 需要 Agent-B 的输出才能开始</td>
+</tr>
+<tr>
+<td>子任务粒度适中</td>
+<td>不太粗（一个Agent干不完）也不太细（拆太碎通信开销吃掉收益）</td>
+<td>把”查数据库”拆成”建立连接””发送SQL””解析结果”三个Agent</td>
+</tr>
+<tr>
+<td>子任务边界清晰</td>
+<td>每个Agent的职责范围明确，不会出现两个Agent干同一件事</td>
+<td>安全Agent和性能Agent都在扫描同一段代码的同一个函数</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>快速检验法</strong>：拿一张纸，把每个子Agent的任务写下来。如果你发现两个子Agent的任务描述有超过 30% 的重叠，分解就有问题。</p>
+<h3 id="4-2-评估维度二：通信开销占比"><a href="#4-2-评估维度二：通信开销占比" class="headerlink" title="4.2 评估维度二：通信开销占比"></a>4.2 评估维度二：通信开销占比</h3><p>多Agent系统的总成本 = 计算成本 + 通信成本。</p>
+<p>通信成本包括：</p>
+<ul>
+<li>主控 Agent 向子 Agent 传递任务描述的 Token</li>
+<li>子 Agent 向主控 Agent 返回结果的 Token</li>
+<li>主控 Agent 汇总所有结果的 Token</li>
+<li>如果子 Agent 之间需要通信（不推荐），还有交叉通信的 Token</li>
+</ul>
+<p><strong>健康的系统</strong>：通信开销占总 Token 消耗的 20% 以内。</p>
+<p><strong>有问题的系统</strong>：通信开销超过 40%。这意味着你在花大量 Token 让 Agent 之间”传纸条”，而不是干实事。</p>
+<p>计算公式：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">通信开销占比 &#x3D; (任务传递Token + 结果回传Token + 汇总Token) &#x2F; 总Token消耗 × 100%</span><br></pre></td></tr></table></figure>
+<p>如果你算出来这个比例很高，说明要么子任务拆得太碎（太多小Agent在传话），要么结果压缩做得不好（子Agent带回来的信息太冗余）。</p>
+<h3 id="4-3-评估维度三：并行效率"><a href="#4-3-评估维度三：并行效率" class="headerlink" title="4.3 评估维度三：并行效率"></a>4.3 评估维度三：并行效率</h3><p>多Agent的核心价值是并行。如果并行效率低，用多Agent就没有意义。</p>
+<p><strong>并行效率</strong>的定义：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">并行效率 &#x3D; 单Agent串行完成时间 &#x2F; 多Agent并行完成时间</span><br></pre></td></tr></table></figure>
+<p>理论上，N 个 Agent 并行，效率应该接近 N。但实际上很难达到，因为：</p>
+<ul>
+<li>子 Agent 的任务量不均衡（最慢的那个决定了总时间）</li>
+<li>主控 Agent 的规划和汇总有固定延迟</li>
+<li>通信有网络开销</li>
+</ul>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>并行效率</th>
+<th>评价</th>
+<th>建议</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&gt; 2.0x</td>
+<td>优秀</td>
+<td>多Agent方案值得投入</td>
+</tr>
+<tr>
+<td>1.5x - 2.0x</td>
+<td>一般</td>
+<td>看场景，如果成本敏感可以考虑单Agent</td>
+</tr>
+<tr>
+<td>&lt; 1.5x</td>
+<td>差</td>
+<td>多Agent带来的收益不够覆盖额外开销，回退单Agent</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>提升并行效率的关键</strong>：让每个子 Agent 的工作量尽量均衡。如果一个子 Agent 1 秒就跑完了，另一个要跑 10 秒，那你的并行效率就被拖后腿了。</p>
+<h3 id="4-4-评估维度四：容错与可观测性"><a href="#4-4-评估维度四：容错与可观测性" class="headerlink" title="4.4 评估维度四：容错与可观测性"></a>4.4 评估维度四：容错与可观测性</h3><p>这是工程落地时最容易翻车的维度。</p>
+<p><strong>容错能力</strong>评估清单：</p>
+<ul>
+<li>一个子 Agent 超时或失败了，系统会怎样？是直接整体失败，还是能降级处理？</li>
+<li>子 Agent 返回了错误结果（幻觉），主控 Agent 能不能识别出来？</li>
+<li>有没有设置最大重试次数？重试的 Token 成本有没有上限？</li>
+</ul>
+<p><strong>可观测性</strong>评估清单：</p>
+<ul>
+<li>出了问题，你能在日志里定位到是哪个 Agent 在哪个环节出错的吗？</li>
+<li>每个 Agent 的输入输出有没有完整记录？</li>
+<li>你能不能回放一次完整的执行过程来做 Debug？</li>
+</ul>
+<p>一个残酷的现实：大部分多Agent系统的日志都是一团浆糊。主控 Agent 调了 5 个子 Agent，每个子 Agent 又调了若干工具，出了问题你只能看到一个笼统的”执行失败”，根本不知道是哪一步在胡说八道。</p>
+<p><strong>好的设计</strong>：给每个 Agent 执行分配一个唯一的 trace ID，所有日志都带上这个 ID，方便链路追踪。</p>
+<h3 id="4-5-评估维度五：边际收益递减点"><a href="#4-5-评估维度五：边际收益递减点" class="headerlink" title="4.5 评估维度五：边际收益递减点"></a>4.5 评估维度五：边际收益递减点</h3><p>这是最需要工程直觉的一个维度。</p>
+<p>多Agent系统的子 Agent 数量不是越多越好。存在一个<strong>边际收益递减点</strong>——超过这个点，增加 Agent 带来的并行收益小于增加的通信开销和协调成本。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">    收益</span><br><span class="line">     ↑</span><br><span class="line">     │        ╭───────── 收益曲线</span><br><span class="line">     │      ╱</span><br><span class="line">     │    ╱</span><br><span class="line">     │  ╱</span><br><span class="line">     │╱</span><br><span class="line">     ├──────────────────→ Agent数量</span><br><span class="line">     ↑</span><br><span class="line">边际收益递减点</span><br></pre></td></tr></table></figure>
+<p><strong>经验值</strong>：在大部分场景下，子 Agent 数量控制在 3-8 个是比较合理的区间。超过 10 个，协调成本会急剧上升。</p>
+<p><strong>怎么找到这个点？</strong> 最靠谱的方法是跑基准测试：</p>
+<ol>
+<li>从 2 个子 Agent 开始，记录执行时间和 Token 消耗</li>
+<li>逐步增加到 3、4、5… 个</li>
+<li>画出”Agent数量 vs 端到端延迟”和”Agent数量 vs Token成本”两条曲线</li>
+<li>找到延迟不再显著下降、但 Token 成本还在上升的那个拐点</li>
+</ol>
+<p>那个拐点就是你的最优 Agent 数量。</p>
+<hr>
+<h2 id="五、一个完整的评估-Checklist"><a href="#五、一个完整的评估-Checklist" class="headerlink" title="五、一个完整的评估 Checklist"></a>五、一个完整的评估 Checklist</h2><p>把上面五个维度浓缩成一份可执行的检查清单。拿到任何一套多Agent系统设计方案，对照这张表打分：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">任务分解合理性                          □ 通过  □ 不通过</span><br><span class="line">├─ 子任务之间是否低耦合？               □ 是    □ 否</span><br><span class="line">├─ 粒度是否适中？                       □ 是    □ 否</span><br><span class="line">└─ 边界是否清晰？                       □ 是    □ 否</span><br><span class="line"></span><br><span class="line">通信开销占比                            □ 通过  □ 不通过</span><br><span class="line">├─ 通信Token占比 &lt; 20%？               □ 是    □ 否</span><br><span class="line">└─ 子Agent结果是否经过压缩？            □ 是    □ 否</span><br><span class="line"></span><br><span class="line">并行效率                                □ 通过  □ 不通过</span><br><span class="line">├─ 并行加速比 &gt; 1.5x？                 □ 是    □ 否</span><br><span class="line">└─ 子Agent工作量是否均衡？              □ 是    □ 否</span><br><span class="line"></span><br><span class="line">容错与可观测性                          □ 通过  □ 不通过</span><br><span class="line">├─ 子Agent失败是否可降级？              □ 是    □ 否</span><br><span class="line">├─ 每个Agent是否有trace ID？            □ 是    □ 否</span><br><span class="line">└─ 能否回放完整执行过程？               □ 是    □ 否</span><br><span class="line"></span><br><span class="line">边际收益                                □ 通过  □ 不通过</span><br><span class="line">├─ 子Agent数量是否在合理区间(3-8)？     □ 是    □ 否</span><br><span class="line">└─ 是否做过基准测试找最优解？           □ 是    □ 否</span><br></pre></td></tr></table></figure>
+<p>5 个维度全部通过，这是一套合格的多Agent系统设计。有 1-2 个不通过，需要针对性优化。3 个以上不通过——回去重新考虑一下，这个场景是不是真的需要多Agent。</p>
+<hr>
+<h2 id="六、总结"><a href="#六、总结" class="headerlink" title="六、总结"></a>六、总结</h2><p>回到文章开头的问题：什么场景下用多Agent系统？</p>
+<p>答案不是”任务越复杂越好”，而是<strong>当你同时撞上了两个天花板时</strong>：</p>
+<ol>
+<li><strong>单一模型的上下文天花板</strong>——数据量大到一个模型吃不下</li>
+<li><strong>串行执行的延迟天花板</strong>——子任务之间没有依赖，串行跑太慢</li>
+</ol>
+<p>只撞上第一个天花板，用单Agent + 分段策略就能解决。只撞上第二个天花板，用单Agent + 异步并发工具调用也能凑合。两个同时撞上，才是多Agent真正不可替代的场景。</p>
+<p>而在评估一套多Agent系统设计时，不要只看架构图好不好看，要拿数据说话：通信开销占比多少？并行效率多少？边际收益递减点在哪？</p>
+<p><strong>用工程的刚性去约束架构的浪漫，这才是做系统设计的正确姿势。</strong></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Multi-Agent/" rel="tag"><i class="fa fa-tag"></i> Multi-Agent</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/04/27/agent-memory-what-to-store/" rel="prev" title="Agent 记忆系统设计规范">
+      <i class="fa fa-chevron-left"></i> Agent 记忆系统设计规范
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#一、先破一个误区：复杂度不是决策标准"><span class="nav-number">1.</span> <span class="nav-text">一、先破一个误区：复杂度不是决策标准</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、决策框架：四把尺子量出答案"><span class="nav-number">2.</span> <span class="nav-text">二、决策框架：四把尺子量出答案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-第一把尺子：任务依赖图是线性的还是扇出的？"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 第一把尺子：任务依赖图是线性的还是扇出的？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-第二把尺子：上下文窗口是不是硬瓶颈？"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 第二把尺子：上下文窗口是不是硬瓶颈？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-第三把尺子：延迟预算够不够？"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 第三把尺子：延迟预算够不够？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-第四把尺子：Token-预算能不能扛得住？"><span class="nav-number">2.4.</span> <span class="nav-text">2.4 第四把尺子：Token 预算能不能扛得住？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、四个典型场景的决策推演"><span class="nav-number">3.</span> <span class="nav-text">三、四个典型场景的决策推演</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-场景一：智能客服（结论：单Agent）"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 场景一：智能客服（结论：单Agent）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-场景二：企业级代码安全审计（结论：多Agent）"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 场景二：企业级代码安全审计（结论：多Agent）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-场景三：长文档摘要生成（结论：伪多Agent-单Agent-分段策略）"><span class="nav-number">3.3.</span> <span class="nav-text">3.3 场景三：长文档摘要生成（结论：伪多Agent &#x2F; 单Agent + 分段策略）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-场景四：多语言翻译流水线（结论：看情况）"><span class="nav-number">3.4.</span> <span class="nav-text">3.4 场景四：多语言翻译流水线（结论：看情况）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、怎么评估一个多Agent系统设计得好不好？"><span class="nav-number">4.</span> <span class="nav-text">四、怎么评估一个多Agent系统设计得好不好？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-评估维度一：任务分解的合理性"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 评估维度一：任务分解的合理性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-评估维度二：通信开销占比"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 评估维度二：通信开销占比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-评估维度三：并行效率"><span class="nav-number">4.3.</span> <span class="nav-text">4.3 评估维度三：并行效率</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-评估维度四：容错与可观测性"><span class="nav-number">4.4.</span> <span class="nav-text">4.4 评估维度四：容错与可观测性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-评估维度五：边际收益递减点"><span class="nav-number">4.5.</span> <span class="nav-text">4.5 评估维度五：边际收益递减点</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、一个完整的评估-Checklist"><span class="nav-number">5.</span> <span class="nav-text">五、一个完整的评估 Checklist</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、总结"><span class="nav-number">6.</span> <span class="nav-text">六、总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">85</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">47</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+<script pjax>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
