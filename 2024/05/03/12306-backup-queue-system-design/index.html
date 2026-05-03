@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="“我排队第 50 名，别人排队第 200 名，为什么他先候补成功？”——这个问题困扰了无数抢票人。答案藏在 12306 候补系统的底层设计里：席位复用、区间独立排队、事件驱动匹配。本文从五个维度拆解这套世界级高并发系统的技术架构，让你不仅”知其然”，更”知其所以然”。   一、为什么 12306 如此难做？在深入设计之前，先理解问题的规模。 1.1 业务复杂度铁路售票与普通电商秒杀有本质区别：">
+<meta property="og:type" content="article">
+<meta property="og:title" content="12306 候补排队系统技术设计深度解析">
+<meta property="og:url" content="https://donehub.github.io/2024/05/03/12306-backup-queue-system-design/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="“我排队第 50 名，别人排队第 200 名，为什么他先候补成功？”——这个问题困扰了无数抢票人。答案藏在 12306 候补系统的底层设计里：席位复用、区间独立排队、事件驱动匹配。本文从五个维度拆解这套世界级高并发系统的技术架构，让你不仅”知其然”，更”知其所以然”。   一、为什么 12306 如此难做？在深入设计之前，先理解问题的规模。 1.1 业务复杂度铁路售票与普通电商秒杀有本质区别：">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2024-05-02T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-05-03T11:47:51.697Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="高并发系统设计">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2024/05/03/12306-backup-queue-system-design/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>12306 候补排队系统技术设计深度解析 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2024/05/03/12306-backup-queue-system-design/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          12306 候补排队系统技术设计深度解析
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-05-03 00:00:00" itemprop="dateCreated datePublished" datetime="2024-05-03T00:00:00+08:00">2024-05-03</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-05-03 19:47:51" itemprop="dateModified" datetime="2026-05-03T19:47:51+08:00">2026-05-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">系统架构</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2024/05/03/12306-backup-queue-system-design/" class="post-meta-item leancloud_visitors" data-flag-title="12306 候补排队系统技术设计深度解析" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2024/05/03/12306-backup-queue-system-design/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2024/05/03/12306-backup-queue-system-design/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>“我排队第 50 名，别人排队第 200 名，为什么他先候补成功？”——这个问题困扰了无数抢票人。答案藏在 12306 候补系统的底层设计里：席位复用、区间独立排队、事件驱动匹配。本文从五个维度拆解这套世界级高并发系统的技术架构，让你不仅”知其然”，更”知其所以然”。</p>
+</blockquote>
+<hr>
+<h2 id="一、为什么-12306-如此难做？"><a href="#一、为什么-12306-如此难做？" class="headerlink" title="一、为什么 12306 如此难做？"></a>一、为什么 12306 如此难做？</h2><p>在深入设计之前，先理解问题的规模。</p>
+<h3 id="1-1-业务复杂度"><a href="#1-1-业务复杂度" class="headerlink" title="1.1 业务复杂度"></a>1.1 业务复杂度</h3><p>铁路售票与普通电商秒杀有本质区别：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>对比维度</th>
+<th>普通电商秒杀</th>
+<th>12306 售票</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>商品粒度</td>
+<td>SKU 级别（一部手机）</td>
+<td>区间级别（北京→济南，同一座位不同区间）</td>
+</tr>
+<tr>
+<td>库存管理</td>
+<td>扣减库存即可</td>
+<td>区间叠加、席位复用</td>
+</tr>
+<tr>
+<td>并发竞争</td>
+<td>单 SKU 多人竞争</td>
+<td>同一座位多个区间交叉竞争</td>
+</tr>
+<tr>
+<td>订单关联</td>
+<td>独立订单</td>
+<td>关联订单（联程票、往返票）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>核心差异</strong>：一趟北京到上海的高铁，途经 10 个站点，同一个座位可以拆分成 9 段区间分别售卖。这带来的是指数级的复杂度。</p>
+<h3 id="1-2-规模数据"><a href="#1-2-规模数据" class="headerlink" title="1.2 规模数据"></a>1.2 规模数据</h3><p>以 2024 年春运为例：</p>
+<ul>
+<li>日均访问量：<strong>100 亿次+</strong></li>
+<li>倰值 QPS：<strong>每秒 100 万+</strong></li>
+<li>候补订单：单日峰值 <strong>2000 万+</strong></li>
+<li>车次数据：<strong>5000+ 趟车次</strong>，每趟车 <strong>500-2000 个座位</strong></li>
+</ul>
+<p>在这种规模下，任何不当的设计都会被瞬间放大成系统崩溃。</p>
+<hr>
+<h2 id="二、核心设计基石：席位复用"><a href="#二、核心设计基石：席位复用" class="headerlink" title="二、核心设计基石：席位复用"></a>二、核心设计基石：席位复用</h2><h3 id="2-1-什么是席位复用？"><a href="#2-1-什么是席位复用？" class="headerlink" title="2.1 什么是席位复用？"></a>2.1 什么是席位复用？</h3><p><strong>席位复用</strong>是指同一个座位可以分段卖给不同乘客，只要乘车区间不重叠。</p>
+<p>举例说明：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">车次：G1 北京→青岛</span><br><span class="line">途经站点：北京 → 天津 → 济南 → 淄博 → 青岛</span><br><span class="line"></span><br><span class="line">座位 12A 的售卖情况：</span><br><span class="line">- 张三：北京 → 济南（占用 北京→天津、天津→济南 两段）</span><br><span class="line">- 李四：济南 → 青岛（占用 济南→淄博、淄博→青岛 两段）</span><br><span class="line">- 王五：天津 → 淄博（占用 天津→济南、济南→淄博 两段）</span><br><span class="line"></span><br><span class="line">结果：同一座位 12A，同时卖给 3 个人，互不冲突</span><br></pre></td></tr></table></figure>
+<p>这个设计极大提升了座位利用率，但技术实现难度陡增。</p>
+<h3 id="2-2-技术实现：Redis-Bitmap"><a href="#2-2-技术实现：Redis-Bitmap" class="headerlink" title="2.2 技术实现：Redis Bitmap"></a>2.2 技术实现：Redis Bitmap</h3><p>12306 使用 <strong>Redis Bitmap（位图）</strong> 存储每个座位的区间占用状态。</p>
+<p><strong>数据结构设计：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">Key:   train:&#123;train_id&#125;:&#123;date&#125;:&#123;seat_no&#125;</span><br><span class="line">Value: Bitmap，每一位代表一个站点区间的占用状态</span><br><span class="line"></span><br><span class="line">示例：</span><br><span class="line">车次 G1，日期 2024-01-20，座位 12A</span><br><span class="line">途经站点：北京(0) → 天津(1) → 济南(2) → 淄博(3) → 青岛(4)</span><br><span class="line"></span><br><span class="line">Bitmap: 1 1 0 0</span><br><span class="line">         ↑ ↑ ↑ ↑</span><br><span class="line">         │ │ │ └─ 淄博→青岛 (0&#x3D;空闲)</span><br><span class="line">         │ │ └─── 济南→淄博 (0&#x3D;空闲)  </span><br><span class="line">         │ └───── 天津→济南 (1&#x3D;占用)</span><br><span class="line">         └─────── 北京→天津 (1&#x3D;占用)</span><br><span class="line"></span><br><span class="line">表示：北京→济南 已售，济南→青岛 空闲</span><br></pre></td></tr></table></figure>
+<p><strong>为什么用 Bitmap？</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>Bitmap</th>
+<th>传统方案（如 Hash）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>空间占用</td>
+<td>N 个站点仅需 N bit（几字节）</td>
+<td>每区间存一个字段（几百字节）</td>
+</tr>
+<tr>
+<td>查询复杂度</td>
+<td>O(1)</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>区间判断</td>
+<td>位运算 <code>OR</code>，一次搞定</td>
+<td>需遍历所有区间</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td>固定长度、高频查询</td>
+<td>灵活但低效</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>区间可用性检查（伪代码）：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">check_interval_available</span><span class="params">(redis, train_id, date, seat_no, from_station, to_station)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    检查指定区间是否可用</span></span><br><span class="line"><span class="string">    from_station: 起始站点索引（如北京=0）</span></span><br><span class="line"><span class="string">    to_station: 终点站点索引（如济南=2）</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"train:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;seat_no&#125;</span>"</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 获取 from_station 到 to_station-1 的所有 bit 位</span></span><br><span class="line">    <span class="comment"># 即区间 [from_station, to_station)</span></span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> range(from_station, to_station):</span><br><span class="line">        bit = redis.getbit(key, i)</span><br><span class="line">        <span class="keyword">if</span> bit == <span class="number">1</span>:  <span class="comment"># 该区间已被占用</span></span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">allocate_interval</span><span class="params">(redis, train_id, date, seat_no, from_station, to_station)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    分配区间：将对应 bit 位设为 1</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"train:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;seat_no&#125;</span>"</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> range(from_station, to_station):</span><br><span class="line">        redis.setbit(key, i, <span class="number">1</span>)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> <span class="literal">True</span></span><br></pre></td></tr></table></figure>
+<p><strong>更高效的方式：使用位运算</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">check_and_allocate</span><span class="params">(redis, train_id, date, seat_no, from_station, to_station)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    使用位运算一次性检查并分配区间</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"train:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;seat_no&#125;</span>"</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 1. 获取当前 bitmap 值（假设用整数表示）</span></span><br><span class="line">    current = redis.get(key)</span><br><span class="line">    <span class="keyword">if</span> current <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        current = <span class="number">0</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 2. 构造区间掩码</span></span><br><span class="line">    <span class="comment"># 例如 from=0, to=2，掩码为 0b0011 (低位表示前面的区间)</span></span><br><span class="line">    mask = (<span class="number">1</span> &lt;&lt; to_station) - (<span class="number">1</span> &lt;&lt; from_station)  <span class="comment"># 0b0011</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 3. 检查区间是否已被占用</span></span><br><span class="line">    <span class="keyword">if</span> current &amp; mask != <span class="number">0</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">False</span>  <span class="comment"># 区间已被占用</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 4. 分配区间（原子操作，需用 Lua 脚本）</span></span><br><span class="line">    <span class="comment"># Lua 脚本保证检查+设置原子性</span></span><br><span class="line">    lua_script = <span class="string">"""</span></span><br><span class="line"><span class="string">        local current = tonumber(redis.call('GET', KEYS[1])) or 0</span></span><br><span class="line"><span class="string">        local mask = tonumber(ARGV[1])</span></span><br><span class="line"><span class="string">        if (current &amp; mask) == 0 then</span></span><br><span class="line"><span class="string">            redis.call('SET', KEYS[1], current | mask)</span></span><br><span class="line"><span class="string">            return 1</span></span><br><span class="line"><span class="string">        else</span></span><br><span class="line"><span class="string">            return 0</span></span><br><span class="line"><span class="string">        end</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    result = redis.eval(lua_script, <span class="number">1</span>, key, mask)</span><br><span class="line">    <span class="keyword">return</span> result == <span class="number">1</span></span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="三、分布式排队机制"><a href="#三、分布式排队机制" class="headerlink" title="三、分布式排队机制"></a>三、分布式排队机制</h2><h3 id="3-1-核心设计：按区间独立排队"><a href="#3-1-核心设计：按区间独立排队" class="headerlink" title="3.1 核心设计：按区间独立排队"></a>3.1 核心设计：按区间独立排队</h3><p>很多人以为候补是整趟车排一个大队列，其实不然。</p>
+<p><strong>12306 的设计：每个乘车区间独立排队。</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">车次 G1（北京→青岛）的候补队列：</span><br><span class="line"></span><br><span class="line">队列1：北京 → 天津（85 人排队）</span><br><span class="line">队列2：北京 → 济南（320 人排队）</span><br><span class="line">队列3：天津 → 济南（56 人排队）</span><br><span class="line">队列4：济南 → 青岛（198 人排队）</span><br><span class="line">队列5：北京 → 青岛（1275 人排队）</span><br><span class="line">...</span><br><span class="line"></span><br><span class="line">每个区间一个独立的 Sorted Set</span><br></pre></td></tr></table></figure>
+<p><strong>为什么要按区间独立排队？</strong></p>
+<ol>
+<li><strong>公平性</strong>：北京→天津 和 北京→青岛 根本不是同一批票，放一起排队没有意义</li>
+<li><strong>并行处理</strong>：不同区间队列可以并发处理，提升吞吐</li>
+<li><strong>精准匹配</strong>：释放席位时，直接定位对应队列，无需遍历</li>
+</ol>
+<p><strong>这解释了一个常见疑问</strong>：</p>
+<blockquote>
+<p>为什么我排队 50 名，别人排队 200 名，他却先候补成功？</p>
+</blockquote>
+<p>因为你们根本不在同一个队列。他排的是天津→济南，你排的是北京→济南。</p>
+<h3 id="3-2-技术实现：Redis-Sorted-Set"><a href="#3-2-技术实现：Redis-Sorted-Set" class="headerlink" title="3.2 技术实现：Redis Sorted Set"></a>3.2 技术实现：Redis Sorted Set</h3><p><strong>数据结构设计：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">Key:   backup:&#123;train_id&#125;:&#123;date&#125;:&#123;from_station&#125;:&#123;to_station&#125;</span><br><span class="line">Value: 有序集合，存储候补订单 ID</span><br><span class="line">Score: 用户提交候补的时间戳（越小越靠前）</span><br><span class="line"></span><br><span class="line">示例：</span><br><span class="line">backup:G1:20240120:beijing:jinan</span><br><span class="line">  ├─ order_001 (score: 1705678901) ← 第1名</span><br><span class="line">  ├─ order_002 (score: 1705678905) ← 第2名</span><br><span class="line">  ├─ order_003 (score: 1705678912) ← 第3名</span><br><span class="line">  └─ ...</span><br></pre></td></tr></table></figure>
+<p><strong>核心操作：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> time</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add_to_backup_queue</span><span class="params">(redis, train_id, date, from_station, to_station, order_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    加入候补队列（ZADD）</span></span><br><span class="line"><span class="string">    时间戳作为 Score，天然实现先到先得</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span></span><br><span class="line">    score = int(time.time() * <span class="number">1000</span>)  <span class="comment"># 毫秒时间戳，精确排队</span></span><br><span class="line">    </span><br><span class="line">    redis.zadd(key, &#123;order_id: score&#125;)</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_queue_position</span><span class="params">(redis, train_id, date, from_station, to_station, order_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    查询排队名次（ZRANK）</span></span><br><span class="line"><span class="string">    返回当前排队位置（从 0 开始，+1 后为实际名次）</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span></span><br><span class="line">    rank = redis.zrank(key, order_id)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> rank <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>  <span class="comment"># 未在队列中</span></span><br><span class="line">    <span class="keyword">return</span> rank + <span class="number">1</span>  <span class="comment"># 返回实际名次（从 1 开始）</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_top_n_from_queue</span><span class="params">(redis, train_id, date, from_station, to_station, n=<span class="number">10</span>)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    取出队列前 N 名（ZRANGE）</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span></span><br><span class="line">    <span class="keyword">return</span> redis.zrange(key, <span class="number">0</span>, n - <span class="number">1</span>)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">remove_from_queue</span><span class="params">(redis, train_id, date, from_station, to_station, order_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    候补成功或取消，移出队列（ZREM）</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span></span><br><span class="line">    redis.zrem(key, order_id)</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">True</span></span><br></pre></td></tr></table></figure>
+<p><strong>性能分析：</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>复杂度</th>
+<th>百万级队列耗时</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ZADD（加入队列）</td>
+<td>O(log N)</td>
+<td>~21 次比较，微秒级</td>
+</tr>
+<tr>
+<td>ZRANK（查询名次）</td>
+<td>O(log N)</td>
+<td>微秒级</td>
+</tr>
+<tr>
+<td>ZRANGE（取前 N 名）</td>
+<td>O(log N + M)</td>
+<td>M 为取出数量，毫秒级</td>
+</tr>
+<tr>
+<td>ZREM（移出队列）</td>
+<td>O(log N)</td>
+<td>微秒级</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>结论</strong>：Sorted Set 天然适合排队场景，百万级数据依然高效。</p>
+<h3 id="3-3-数据持久化：MySQL-分库分表"><a href="#3-3-数据持久化：MySQL-分库分表" class="headerlink" title="3.3 数据持久化：MySQL 分库分表"></a>3.3 数据持久化：MySQL 分库分表</h3><p>Redis 是内存数据库，一旦宕机可能丢失数据。候补订单必须持久化到 MySQL。</p>
+<p><strong>分库分表策略：</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">分库键：user_id % 16（按用户分 16 个库）</span><br><span class="line">分表键：order_id % 128（每个库 128 张表）</span><br><span class="line"></span><br><span class="line">表结构：</span><br><span class="line">CREATE TABLE backup_order_00 (</span><br><span class="line">    order_id BIGINT PRIMARY KEY,</span><br><span class="line">    user_id BIGINT NOT NULL,</span><br><span class="line">    train_id VARCHAR(20) NOT NULL,</span><br><span class="line">    travel_date DATE NOT NULL,</span><br><span class="line">    from_station VARCHAR(20) NOT NULL,</span><br><span class="line">    to_station VARCHAR(20) NOT NULL,</span><br><span class="line">    seat_type TINYINT NOT NULL,      -- 座位类型：商务&#x2F;一等&#x2F;二等</span><br><span class="line">    status TINYINT DEFAULT 0,         -- 状态：排队中&#x2F;已兑现&#x2F;已取消</span><br><span class="line">    queue_position INT,              -- 冗余存储排队名次</span><br><span class="line">    create_time DATETIME,</span><br><span class="line">    update_time DATETIME,</span><br><span class="line">    </span><br><span class="line">    INDEX idx_train_date (train_id, travel_date, from_station, to_station)</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+<p><strong>Redis 与 MySQL 如何保持一致？</strong></p>
+<p>这是一个典型的分布式一致性问题，后文技术难点部分详解。</p>
+<hr>
+<h2 id="四、事件驱动：候补车票从哪里来？"><a href="#四、事件驱动：候补车票从哪里来？" class="headerlink" title="四、事件驱动：候补车票从哪里来？"></a>四、事件驱动：候补车票从哪里来？</h2><p>候补的车票不是凭空产生的，全部来自系统事件触发。</p>
+<h3 id="4-1-四大票源"><a href="#4-1-四大票源" class="headerlink" title="4.1 四大票源"></a>4.1 四大票源</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>票源</th>
+<th>触发事件</th>
+<th>延迟</th>
+<th>占比（估算）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>用户退票</td>
+<td>用户主动退票</td>
+<td>秒级</td>
+<td>40%</td>
+</tr>
+<tr>
+<td>订单超时</td>
+<td>抢到票后 30 分钟未支付</td>
+<td>秒级</td>
+<td>35%</td>
+</tr>
+<tr>
+<td>改签释放</td>
+<td>用户改签其他车次</td>
+<td>秒级</td>
+<td>15%</td>
+</tr>
+<tr>
+<td>动态加挂</td>
+<td>12306 官方追加车厢</td>
+<td>分钟级</td>
+<td>10%</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="4-2-事件驱动架构"><a href="#4-2-事件驱动架构" class="headerlink" title="4.2 事件驱动架构"></a>4.2 事件驱动架构</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">┌──────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                         事件来源                                 │</span><br><span class="line">├──────────┬──────────┬──────────┬─────────────────────────────────┤</span><br><span class="line">│ 退票事件  │ 超时事件  │ 改签事件  │ 加挂事件（定时任务触发）        │</span><br><span class="line">└────┬─────┴────┬─────┴────┬─────┴─────────────┬───────────────────┘</span><br><span class="line">     │          │          │                   │</span><br><span class="line">     ▼          ▼          ▼                   ▼</span><br><span class="line">┌──────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    消息队列（Kafka&#x2F;RocketMQ）                     │</span><br><span class="line">│                                                                  │</span><br><span class="line">│  Topic: ticket-released                                         │</span><br><span class="line">│  Partition: 按 train_id 分区，保证同一车次顺序处理               │</span><br><span class="line">└───────────────────────────┬──────────────────────────────────────┘</span><br><span class="line">                            │</span><br><span class="line">                            ▼</span><br><span class="line">┌──────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    候补匹配服务                                   │</span><br><span class="line">│                                                                  │</span><br><span class="line">│  1. 消费释放席位事件                                             │</span><br><span class="line">│  2. 查询对应区间的候补队列（Redis Sorted Set）                   │</span><br><span class="line">│  3. 取出队列第一名                                               │</span><br><span class="line">│  4. 执行兑现流程                                                 │</span><br><span class="line">└──────────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p><strong>事件消息结构：</strong></p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"event_id"</span>: <span class="string">"evt_20240120_123456"</span>,</span><br><span class="line">  <span class="attr">"event_type"</span>: <span class="string">"REFUND"</span>,  <span class="comment">// REFUND / TIMEOUT / RESCHEDULE / EXTRA_SEAT</span></span><br><span class="line">  <span class="attr">"train_id"</span>: <span class="string">"G1"</span>,</span><br><span class="line">  <span class="attr">"travel_date"</span>: <span class="string">"2024-01-20"</span>,</span><br><span class="line">  <span class="attr">"seat_no"</span>: <span class="string">"12A"</span>,</span><br><span class="line">  <span class="attr">"from_station"</span>: <span class="string">"beijing"</span>,</span><br><span class="line">  <span class="attr">"to_station"</span>: <span class="string">"jinan"</span>,</span><br><span class="line">  <span class="attr">"seat_type"</span>: <span class="number">2</span>,  <span class="comment">// 二等座</span></span><br><span class="line">  <span class="attr">"release_time"</span>: <span class="number">1705678901234</span>,</span><br><span class="line">  <span class="attr">"trace_id"</span>: <span class="string">"trace_abc123"</span>  <span class="comment">// 链路追踪</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="4-3-候补匹配流程"><a href="#4-3-候补匹配流程" class="headerlink" title="4.3 候补匹配流程"></a>4.3 候补匹配流程</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">席位释放事件触发：</span><br><span class="line"></span><br><span class="line">Step 1: 解析事件，确定释放的区间</span><br><span class="line">        train_id&#x3D;G1, date&#x3D;20240120, seat&#x3D;12A, from&#x3D;beijing, to&#x3D;jinan</span><br><span class="line"></span><br><span class="line">Step 2: 计算该区间覆盖的所有原子区间</span><br><span class="line">        北京→济南 &#x3D; [北京→天津, 天津→济南]</span><br><span class="line"></span><br><span class="line">Step 3: 查询这些区间的候补队列</span><br><span class="line">        - 队列 A：北京→天津（85 人）</span><br><span class="line">        - 队列 B：天津→济南（56 人）</span><br><span class="line">        - 队列 C：北京→济南（320 人）← 完全匹配，优先处理</span><br><span class="line"></span><br><span class="line">Step 4: 尝试匹配队列 C 的第一名</span><br><span class="line">        - 检查席位 12A 是否满足用户需求（座位类型、是否有票）</span><br><span class="line">        - 满足 → 执行兑现流程</span><br><span class="line">        - 不满足 → 尝试队列 C 的第二名</span><br><span class="line"></span><br><span class="line">Step 5: 若队列 C 无匹配，尝试其他队列</span><br><span class="line">        - 队列 A + 队列 B 是否有同一座位？</span><br><span class="line">        - 这涉及跨区间匹配，后文详解</span><br></pre></td></tr></table></figure>
+<h3 id="4-4-候补兑现完整流程"><a href="#4-4-候补兑现完整流程" class="headerlink" title="4.4 候补兑现完整流程"></a>4.4 候补兑现完整流程</h3><p>席位释放后，系统需要执行一整套原子流程才能完成兑现：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br></pre></td><td class="code"><pre><span class="line">┌──────────────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                        候补兑现完整流程                                   │</span><br><span class="line">├──────────────────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                                          │</span><br><span class="line">│  ┌─────────────┐                                                        │</span><br><span class="line">│  │ 席位释放事件 │                                                        │</span><br><span class="line">│  └──────┬──────┘                                                        │</span><br><span class="line">│         │                                                                │</span><br><span class="line">│         ▼                                                                │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐│</span><br><span class="line">│  │ Step 1: 查询候补队列                                                 ││</span><br><span class="line">│  │                                                                     ││</span><br><span class="line">│  │  redis.zrange(&quot;backup:G1:20240120:beijing:jinan&quot;, 0, 0)            ││</span><br><span class="line">│  │  → 取出排队第一名 user_id                                            ││</span><br><span class="line">│  └──────────────────────────────┬──────────────────────────────────────┘│</span><br><span class="line">│                                 │                                        │</span><br><span class="line">│                                 ▼                                        │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐│</span><br><span class="line">│  │ Step 2: 获取分布式锁                                                 ││</span><br><span class="line">│  │                                                                     ││</span><br><span class="line">│  │  lock_keys &#x3D; [&quot;lock:G1:20240120:12A:beijing:tianjin&quot;,              ││</span><br><span class="line">│  │               &quot;lock:G1:20240120:12A:tianjin:jinan&quot;]                 ││</span><br><span class="line">│  │  redis.set(lock_key, user_id, nx&#x3D;True, px&#x3D;5000)                    ││</span><br><span class="line">│  │  → 锁定所有原子区间，防止并发超卖                                    ││</span><br><span class="line">│  └──────────────────────────────┬──────────────────────────────────────┘│</span><br><span class="line">│                                 │                                        │</span><br><span class="line">│                                 ▼                                        │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐│</span><br><span class="line">│  │ Step 3: 检查席位可用性（双重检查）                                   ││</span><br><span class="line">│  │                                                                     ││</span><br><span class="line">│  │  bitmap_key &#x3D; &quot;train:G1:20240120:12A&quot;                               ││</span><br><span class="line">│  │  check_interval_available(bitmap_key, beijing, jinan)              ││</span><br><span class="line">│  │  → 确认席位真正可用                                                  ││</span><br><span class="line">│  └──────────────────────────────┬──────────────────────────────────────┘│</span><br><span class="line">│                                 │                                        │</span><br><span class="line">│                                 ▼                                        │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐│</span><br><span class="line">│  │ Step 4: MySQL 本地事务（原子操作）                                   ││</span><br><span class="line">│  │                                                                     ││</span><br><span class="line">│  │  BEGIN TRANSACTION;                                                 ││</span><br><span class="line">│  │    -- 4.1 标记席位占用                                               ││</span><br><span class="line">│  │    UPDATE seat SET status&#x3D;&#39;OCCUPIED&#39; WHERE ...;                     ││</span><br><span class="line">│  │    -- 4.2 创建订单                                                   ││</span><br><span class="line">│  │    INSERT INTO ticket_order (...) VALUES (...);                     ││</span><br><span class="line">│  │    -- 4.3 更新候补状态                                               ││</span><br><span class="line">│  │    UPDATE backup_order SET status&#x3D;&#39;FULFILLED&#39; WHERE ...;            ││</span><br><span class="line">│  │    -- 4.4 写入操作日志（用于 Redis 异步同步）                        ││</span><br><span class="line">│  │    INSERT INTO backup_operation_log (...) VALUES (...);             ││</span><br><span class="line">│  │  COMMIT;                                                            ││</span><br><span class="line">│  └──────────────────────────────┬──────────────────────────────────────┘│</span><br><span class="line">│                                 │                                        │</span><br><span class="line">│                                 ▼                                        │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐│</span><br><span class="line">│  │ Step 5: 异步更新 Redis                                               ││</span><br><span class="line">│  │                                                                     ││</span><br><span class="line">│  │  -- 5.1 更新席位 Bitmap                                              ││</span><br><span class="line">│  │  redis.setbit(&quot;train:G1:20240120:12A&quot;, beijing_idx, 1)             ││</span><br><span class="line">│  │  redis.setbit(&quot;train:G1:20240120:12A&quot;, tianjin_idx, 1)             ││</span><br><span class="line">│  │  -- 5.2 从候补队列移除                                               ││</span><br><span class="line">│  │  redis.zrem(&quot;backup:G1:20240120:beijing:jinan&quot;, user_id)           ││</span><br><span class="line">│  │  -- 5.3 释放分布式锁                                                 ││</span><br><span class="line">│  │  redis.del(lock_keys)                                               ││</span><br><span class="line">│  └──────────────────────────────┬──────────────────────────────────────┘│</span><br><span class="line">│                                 │                                        │</span><br><span class="line">│                                 ▼                                        │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐│</span><br><span class="line">│  │ Step 6: 后续处理                                                     ││</span><br><span class="line">│  │                                                                     ││</span><br><span class="line">│  │  -- 6.1 冻结预付款（调用支付服务）                                   ││</span><br><span class="line">│  │  -- 6.2 发送短信通知（调用通知服务）                                 ││</span><br><span class="line">│  │  -- 6.3 更新操作日志状态                                             ││</span><br><span class="line">│  └─────────────────────────────────────────────────────────────────────┘│</span><br><span class="line">│                                                                          │</span><br><span class="line">└──────────────────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p><strong>流程关键点</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>关键点</th>
+<th>失败处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>获取锁</td>
+<td>按字典序获取，避免死锁</td>
+<td>获取失败 → 席位已被抢占，跳过</td>
+</tr>
+<tr>
+<td>双重检查</td>
+<td>锁后再检查，防止并发穿透</td>
+<td>不可用 → 释放锁，尝试下一名用户</td>
+</tr>
+<tr>
+<td>MySQL 事务</td>
+<td>本地事务保证原子性</td>
+<td>失败 → 释放锁，回滚，尝试下一名</td>
+</tr>
+<tr>
+<td>异步更新 Redis</td>
+<td>通过操作日志保证最终一致</td>
+<td>失败 → 定时任务补偿恢复</td>
+</tr>
+<tr>
+<td>后续处理</td>
+<td>异步执行，不阻塞主流程</td>
+<td>失败 → 重试或告警人工处理</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="五、高并发架构设计"><a href="#五、高并发架构设计" class="headerlink" title="五、高并发架构设计"></a>五、高并发架构设计</h2><h3 id="5-1-四级防护架构"><a href="#5-1-四级防护架构" class="headerlink" title="5.1 四级防护架构"></a>5.1 四级防护架构</h3><p>从用户请求到数据落地，12306 构建了四级防护体系，逐级降压：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                        用户请求                                 │</span><br><span class="line">└─────────────────────────────┬───────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">                              ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                 第一级：网关层限流                               │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  令牌桶算法：限制单 IP、单用户请求频率                           │</span><br><span class="line">│  防刷策略：识别异常请求模式                                      │</span><br><span class="line">│  作用：挡住恶意流量，保护后端服务                                │</span><br><span class="line">└─────────────────────────────┬───────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">                              ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                 第二级：应用层本地缓存                           │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  技术：Caffeine &#x2F; Guava Cache                                  │</span><br><span class="line">│  缓存内容：                                                     │</span><br><span class="line">│    - 热门车次的区间队列长度（用户查询&quot;排队第几名&quot;）              │</span><br><span class="line">│    - 热门车次的席位概览                                         │</span><br><span class="line">│    - TTL：5-10 秒（容忍短时不一致）                             │</span><br><span class="line">│  效果：拦截 60%+ 的查询请求，减轻 Redis 压力                    │</span><br><span class="line">└─────────────────────────────┬───────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">                              ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                 第三级：Redis 集群缓存                           │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  部署：主从 + 哨兵，保证高可用                                   │</span><br><span class="line">│  存储：                                                         │</span><br><span class="line">│    - 席位 Bitmap（实时状态）                                    │</span><br><span class="line">│    - 候补 Sorted Set（排队数据）                                │</span><br><span class="line">│    - 分布式锁（并发控制）                                        │</span><br><span class="line">│  性能：单节点 10 万+ QPS，全内存操作                            │</span><br><span class="line">└─────────────────────────────┬───────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">                              ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                 第四级：MySQL 分库分表                           │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  存储：订单持久化、用户数据、候补记录                            │</span><br><span class="line">│  分片：按 user_id 分库，按 order_id 分表                        │</span><br><span class="line">│  作用：数据兜底、Redis 故障时的降级数据源                        │</span><br><span class="line">└─────────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p><strong>为什么需要四级？</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>级别</th>
+<th>核心作用</th>
+<th>如果缺失会怎样</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>网关限流</td>
+<td>拦截恶意流量</td>
+<td>后端被刷爆，正常用户无法访问</td>
+</tr>
+<tr>
+<td>本地缓存</td>
+<td>拦截高频查询</td>
+<td>Redis 被查询请求压垮</td>
+</tr>
+<tr>
+<td>Redis 缓存</td>
+<td>扛住核心读写</td>
+<td>MySQL 被高频请求打穿</td>
+</tr>
+<tr>
+<td>MySQL 持久化</td>
+<td>数据兜底</td>
+<td>Redis 故障时数据丢失</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="5-2-限流降级策略"><a href="#5-2-限流降级策略" class="headerlink" title="5.2 限流降级策略"></a>5.2 限流降级策略</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>限流策略</th>
+<th>降级措施</th>
+<th>用户感知</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>正常高峰</td>
+<td>令牌桶 10 万 QPS</td>
+<td>无</td>
+<td>正常服务</td>
+</tr>
+<tr>
+<td>超高峰</td>
+<td>滑动窗口限流</td>
+<td>排队等待</td>
+<td>“系统繁忙，请稍后”</td>
+</tr>
+<tr>
+<td>Redis 故障</td>
+<td>熔断</td>
+<td>查询走 MySQL，写入走 MQ</td>
+<td>候补延迟，排队名次不可查</td>
+</tr>
+<tr>
+<td>MySQL 故障</td>
+<td>熔断</td>
+<td>暂停下单，只读</td>
+<td>“系统维护中”</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="六、技术难点深入"><a href="#六、技术难点深入" class="headerlink" title="六、技术难点深入"></a>六、技术难点深入</h2><p>前文介绍了 12306 候补系统的核心设计，但真正让系统”稳如磐石”的，是对细节的极致处理。</p>
+<h3 id="6-1-难点一：分布式一致性"><a href="#6-1-难点一：分布式一致性" class="headerlink" title="6.1 难点一：分布式一致性"></a>6.1 难点一：分布式一致性</h3><p><strong>问题</strong>：Redis 队列与 MySQL 订单如何保持一致？</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">场景：用户取消候补</span><br><span class="line"></span><br><span class="line">方案一：先更新 MySQL，再删除 Redis</span><br><span class="line">  1. MySQL DELETE 成功</span><br><span class="line">  2. Redis ZREM 失败（网络抖动）</span><br><span class="line">  → 结果：MySQL 无订单，Redis 仍在排队，用户&quot;幽灵排队&quot;</span><br><span class="line"></span><br><span class="line">方案二：先删除 Redis，再更新 MySQL  </span><br><span class="line">  1. Redis ZREM 成功</span><br><span class="line">  2. MySQL DELETE 失败</span><br><span class="line">  → 结果：Redis 已删除，MySQL 仍存在，用户想恢复排队无法恢复</span><br></pre></td></tr></table></figure>
+<p><strong>解决方案</strong>：本地消息表 + 最终一致性</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 候补操作日志表（与业务表同库，利用本地事务）</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> backup_operation_log (</span><br><span class="line">    log_id <span class="built_in">BIGINT</span> PRIMARY <span class="keyword">KEY</span> AUTO_INCREMENT,</span><br><span class="line">    order_id <span class="built_in">BIGINT</span> <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    operation_type <span class="built_in">VARCHAR</span>(<span class="number">20</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,  <span class="comment">-- ADD / CANCEL / FULFILL</span></span><br><span class="line">    redis_status <span class="built_in">TINYINT</span> <span class="keyword">DEFAULT</span> <span class="number">0</span>,        <span class="comment">-- 0=待处理 1=成功 2=失败</span></span><br><span class="line">    mysql_status <span class="built_in">TINYINT</span> <span class="keyword">DEFAULT</span> <span class="number">0</span>,       <span class="comment">-- 0=待处理 1=成功 2=失败</span></span><br><span class="line">    retry_count <span class="built_in">INT</span> <span class="keyword">DEFAULT</span> <span class="number">0</span>,</span><br><span class="line">    create_time DATETIME,</span><br><span class="line">    update_time DATETIME,</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">INDEX</span> idx_status (redis_status, mysql_status)</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+<p><strong>操作流程</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">cancel_backup_order</span><span class="params">(order_id)</span>:</span></span><br><span class="line">    <span class="string">"""取消候补订单（保证最终一致性）"""</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 1: 本地事务，写入操作日志 + 更新订单状态</span></span><br><span class="line">    <span class="keyword">with</span> db.transaction():</span><br><span class="line">        <span class="comment"># 标记订单为"取消中"</span></span><br><span class="line">        db.execute(<span class="string">"UPDATE backup_order SET status = 'CANCELING' WHERE order_id = ?"</span>, order_id)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 写入操作日志</span></span><br><span class="line">        log_id = db.execute(<span class="string">"""</span></span><br><span class="line"><span class="string">            INSERT INTO backup_operation_log </span></span><br><span class="line"><span class="string">            (order_id, operation_type, redis_status, mysql_status) </span></span><br><span class="line"><span class="string">            VALUES (?, 'CANCEL', 0, 0)</span></span><br><span class="line"><span class="string">        """</span>, order_id)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 2: 异步处理 Redis 操作</span></span><br><span class="line">    mq.send(<span class="string">'backup_operation'</span>, &#123;<span class="string">'log_id'</span>: log_id, <span class="string">'order_id'</span>: order_id, <span class="string">'type'</span>: <span class="string">'CANCEL'</span>&#125;)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">process_cancel_message</span><span class="params">(message)</span>:</span></span><br><span class="line">    <span class="string">"""消费取消消息"""</span></span><br><span class="line">    log_id = message[<span class="string">'log_id'</span>]</span><br><span class="line">    order_id = message[<span class="string">'order_id'</span>]</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        <span class="comment"># Step 3: 从 Redis 队列移除</span></span><br><span class="line">        redis.zrem(<span class="string">f"backup:<span class="subst">&#123;train&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;<span class="keyword">from</span>&#125;</span>:<span class="subst">&#123;to&#125;</span>"</span>, order_id)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># Step 4: 更新 MySQL 订单状态</span></span><br><span class="line">        db.execute(<span class="string">"UPDATE backup_order SET status = 'CANCELED' WHERE order_id = ?"</span>, order_id)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># Step 5: 更新操作日志</span></span><br><span class="line">        db.execute(<span class="string">"UPDATE backup_operation_log SET redis_status=1, mysql_status=1 WHERE log_id=?"</span>, log_id)</span><br><span class="line">        </span><br><span class="line">    <span class="keyword">except</span> Exception <span class="keyword">as</span> e:</span><br><span class="line">        <span class="comment"># 失败后重试，超过 3 次告警</span></span><br><span class="line">        retry_count = db.query(<span class="string">"SELECT retry_count FROM backup_operation_log WHERE log_id=?"</span>, log_id)</span><br><span class="line">        <span class="keyword">if</span> retry_count &lt; <span class="number">3</span>:</span><br><span class="line">            db.execute(<span class="string">"UPDATE backup_operation_log SET retry_count = retry_count + 1 WHERE log_id=?"</span>, log_id)</span><br><span class="line">            mq.send(<span class="string">'backup_operation'</span>, message, delay=<span class="number">60</span>)  <span class="comment"># 60 秒后重试</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            alert(<span class="string">f"候补取消失败，log_id=<span class="subst">&#123;log_id&#125;</span>, error=<span class="subst">&#123;e&#125;</span>"</span>)</span><br></pre></td></tr></table></figure>
+<p><strong>定时对账任务</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">reconcile_backup_data</span><span class="params">()</span>:</span></span><br><span class="line">    <span class="string">"""每小时对账，确保 Redis 与 MySQL 一致"""</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 1: 扫描所有候补队列</span></span><br><span class="line">    all_queues = redis.keys(<span class="string">"backup:*"</span>)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> queue_key <span class="keyword">in</span> all_queues:</span><br><span class="line">        order_ids = redis.zrange(queue_key, <span class="number">0</span>, <span class="number">-1</span>)</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">for</span> order_id <span class="keyword">in</span> order_ids:</span><br><span class="line">            <span class="comment"># Step 2: 检查 MySQL 是否存在</span></span><br><span class="line">            order = db.query(<span class="string">"SELECT * FROM backup_order WHERE order_id = ?"</span>, order_id)</span><br><span class="line">            </span><br><span class="line">            <span class="keyword">if</span> <span class="keyword">not</span> order <span class="keyword">or</span> order.status == <span class="string">'CANCELED'</span>:</span><br><span class="line">                <span class="comment"># Step 3: Redis 存在，MySQL 不存在或已取消，清理 Redis</span></span><br><span class="line">                redis.zrem(queue_key, order_id)</span><br><span class="line">                log.info(<span class="string">f"清理幽灵排队：<span class="subst">&#123;order_id&#125;</span>"</span>)</span><br></pre></td></tr></table></figure>
+<hr>
+<h3 id="6-2-难点二：并发竞争与超卖"><a href="#6-2-难点二：并发竞争与超卖" class="headerlink" title="6.2 难点二：并发竞争与超卖"></a>6.2 难点二：并发竞争与超卖</h3><p><strong>问题</strong>：同一席位释放，多个区间队列如何竞争？</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">场景：</span><br><span class="line">车次 G1，座位 12A</span><br><span class="line">张三退票：北京 → 济南</span><br><span class="line"></span><br><span class="line">释放区间：北京→天津、天津→济南</span><br><span class="line"></span><br><span class="line">现有候补队列：</span><br><span class="line">- 队列 A：北京→天津（100 人）</span><br><span class="line">- 队列 B：天津→济南（80 人）</span><br><span class="line">- 队列 C：北京→济南（200 人）</span><br><span class="line"></span><br><span class="line">如果不加控制：</span><br><span class="line">1. 队列 A 把 12A 分给用户 X（北京→天津）</span><br><span class="line">2. 队列 C 把 12A 分给用户 Y（北京→济南）</span><br><span class="line">→ X 和 Y 的区间重叠，超卖！</span><br></pre></td></tr></table></figure>
+<p><strong>解决方案</strong>：分布式锁 + 区间锁定</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">allocate_seat_to_backup</span><span class="params">(train_id, date, seat_no, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    分配席位给候补用户</span></span><br><span class="line"><span class="string">    核心思想：锁定所有涉及的原子区间，防止并发超卖</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 1: 获取该区间的所有原子区间（相邻站点间）</span></span><br><span class="line">    atomic_intervals = get_atomic_intervals(train_id, from_station, to_station)</span><br><span class="line">    <span class="comment"># 例如：北京→济南 = [(北京,天津), (天津,济南)]</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 2: 生成锁 Key（按字典序排序，避免死锁）</span></span><br><span class="line">    lock_keys = sorted([</span><br><span class="line">        <span class="string">f"lock:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;seat_no&#125;</span>:<span class="subst">&#123;f&#125;</span>:<span class="subst">&#123;t&#125;</span>"</span></span><br><span class="line">        <span class="keyword">for</span> f, t <span class="keyword">in</span> atomic_intervals</span><br><span class="line">    ])</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 3: 尝试获取所有锁（SET NX PX，带超时）</span></span><br><span class="line">    lock_acquired = []</span><br><span class="line">    <span class="keyword">for</span> key <span class="keyword">in</span> lock_keys:</span><br><span class="line">        success = redis.set(key, user_id, nx=<span class="literal">True</span>, px=<span class="number">5000</span>)  <span class="comment"># 5 秒超时</span></span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> success:</span><br><span class="line">            <span class="comment"># 获取失败，释放已获取的锁</span></span><br><span class="line">            <span class="keyword">for</span> acquired_key <span class="keyword">in</span> lock_acquired:</span><br><span class="line">                redis.delete(acquired_key)</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span>, <span class="string">"席位已被占用"</span></span><br><span class="line">        lock_acquired.append(key)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        <span class="comment"># Step 4: 再次检查席位可用性（双重检查）</span></span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> check_seat_available(train_id, date, seat_no, from_station, to_station):</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span>, <span class="string">"席位不可用"</span></span><br><span class="line">        </span><br><span class="line">        <span class="comment"># Step 5: 执行兑现流程</span></span><br><span class="line">        <span class="comment"># 5.1 标记席位占用</span></span><br><span class="line">        mark_seat_occupied(train_id, date, seat_no, from_station, to_station, user_id)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 5.2 创建订单（MySQL 本地事务）</span></span><br><span class="line">        order_id = create_ticket_order(user_id, train_id, date, seat_no, from_station, to_station)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 5.3 冻结预付款</span></span><br><span class="line">        freeze_payment(user_id, order_id)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 5.4 从候补队列移除</span></span><br><span class="line">        redis.zrem(<span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span>, user_id)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 5.5 发送通知</span></span><br><span class="line">        send_notification(user_id, <span class="string">f"候补成功！订单号：<span class="subst">&#123;order_id&#125;</span>"</span>)</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">return</span> <span class="literal">True</span>, order_id</span><br><span class="line">        </span><br><span class="line">    <span class="keyword">finally</span>:</span><br><span class="line">        <span class="comment"># Step 6: 释放锁</span></span><br><span class="line">        <span class="keyword">for</span> key <span class="keyword">in</span> lock_acquired:</span><br><span class="line">            <span class="comment"># 使用 Lua 脚本，确保只释放自己持有的锁</span></span><br><span class="line">            redis.eval(<span class="string">"""</span></span><br><span class="line"><span class="string">                if redis.call("GET", KEYS[1]) == ARGV[1] then</span></span><br><span class="line"><span class="string">                    return redis.call("DEL", KEYS[1])</span></span><br><span class="line"><span class="string">                else</span></span><br><span class="line"><span class="string">                    return 0</span></span><br><span class="line"><span class="string">                end</span></span><br><span class="line"><span class="string">            """</span>, <span class="number">1</span>, key, user_id)</span><br></pre></td></tr></table></figure>
+<p><strong>关键点</strong>：</p>
+<ol>
+<li><strong>锁粒度</strong>：锁到”原子区间”级别（相邻站点间），而非整个座位</li>
+<li><strong>锁顺序</strong>：按字典序获取锁，避免死锁（A 等待 B，B 等待 A）</li>
+<li><strong>双重检查</strong>：获取锁后再次检查可用性，防止并发穿透</li>
+<li><strong>原子释放</strong>：使用 Lua 脚本，确保只释放自己持有的锁</li>
+</ol>
+<hr>
+<h3 id="6-3-难点三：跨区间匹配"><a href="#6-3-难点三：跨区间匹配" class="headerlink" title="6.3 难点三：跨区间匹配"></a>6.3 难点三：跨区间匹配</h3><p><strong>问题</strong>：候补”长区间”，释放”短区间”如何匹配？</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">场景：</span><br><span class="line">用户候补：北京 → 青岛（全程）</span><br><span class="line"></span><br><span class="line">当前释放：</span><br><span class="line">- 张三退票：北京 → 天津（仅第一段）</span><br><span class="line">- 李四退票：天津 → 济南（仅第二段）</span><br><span class="line">- 王五退票：济南 → 青岛（仅后两段）</span><br><span class="line"></span><br><span class="line">能否匹配？</span><br><span class="line">- 如果三段都同时释放，可以合并给用户</span><br><span class="line">- 但现实中，退票是离散事件，难以凑齐所有区间</span><br></pre></td></tr></table></figure>
+<p><strong>方案一</strong>：不跨区间匹配（简单，12306 当前方案）</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">规则：</span><br><span class="line">- 用户候补 北京→青岛，必须有 北京→青岛 的完整区间空位</span><br><span class="line">- 不能由 北京→天津 + 天津→青岛 拼凑</span><br><span class="line"></span><br><span class="line">优点：</span><br><span class="line">- 实现简单，逻辑清晰</span><br><span class="line">- 避免复杂的跨区间锁竞争</span><br><span class="line"></span><br><span class="line">缺点：</span><br><span class="line">- 用户体验稍差，需要分段候补</span><br><span class="line">- 票源利用率降低</span><br></pre></td></tr></table></figure>
+<p><strong>方案二</strong>：智能跨区间匹配（复杂，提升体验）</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">smart_match_backup</span><span class="params">(train_id, date, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    智能匹配：尝试拼接多个短区间满足长区间需求</span></span><br><span class="line"><span class="string">    核心逻辑：遍历所有座位，找到在所有区间都空闲的座位</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 1: 获取所有原子区间</span></span><br><span class="line">    atomic_intervals = get_atomic_intervals(train_id, from_station, to_station)</span><br><span class="line">    <span class="comment"># 例如：北京→青岛 = [北京→天津, 天津→济南, 济南→淄博, 淄博→青岛]</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 2: 获取该车次所有座位列表</span></span><br><span class="line">    all_seats = get_all_seats(train_id, date, seat_type)</span><br><span class="line">    <span class="comment"># 例如：['12A', '12B', '12C', '13A', '13B', ...]</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 3: 遍历每个座位，检查是否在所有区间都空闲</span></span><br><span class="line">    <span class="keyword">for</span> seat_no <span class="keyword">in</span> all_seats:</span><br><span class="line">        bitmap_key = <span class="string">f"train:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;seat_no&#125;</span>"</span></span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 检查该座位在所有原子区间是否空闲</span></span><br><span class="line">        all_available = <span class="literal">True</span></span><br><span class="line">        <span class="keyword">for</span> i, (f, t) <span class="keyword">in</span> enumerate(atomic_intervals):</span><br><span class="line">            station_idx = get_station_index(f)  <span class="comment"># 获取站点索引</span></span><br><span class="line">            bit = redis.getbit(bitmap_key, station_idx)</span><br><span class="line">            <span class="keyword">if</span> bit == <span class="number">1</span>:  <span class="comment"># 该区间已被占用</span></span><br><span class="line">                all_available = <span class="literal">False</span></span><br><span class="line">                <span class="keyword">break</span></span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span> all_available:</span><br><span class="line">            <span class="comment"># 找到一个在所有区间都空闲的座位</span></span><br><span class="line">            <span class="keyword">return</span> seat_no</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 4: 无完整匹配，返回 None</span></span><br><span class="line">    <span class="comment"># 可选：记录缺票区间，等待后续释放</span></span><br><span class="line">    <span class="keyword">return</span> <span class="literal">None</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">on_seat_released</span><span class="params">(train_id, date, seat_no, from_station, to_station)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    席位释放事件触发匹配</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 查询所有可能匹配的候补队列</span></span><br><span class="line">    <span class="comment"># 包括：精确匹配 + 跨区间匹配等待中的用户</span></span><br><span class="line">    related_queues = find_related_backup_queues(train_id, date, from_station, to_station)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> queue_key <span class="keyword">in</span> related_queues:</span><br><span class="line">        <span class="comment"># 取出队列前 10 名，尝试匹配</span></span><br><span class="line">        candidates = redis.zrange(queue_key, <span class="number">0</span>, <span class="number">9</span>)</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">for</span> user_id <span class="keyword">in</span> candidates:</span><br><span class="line">            <span class="comment"># 获取该用户的候补需求</span></span><br><span class="line">            request = get_backup_request(user_id)</span><br><span class="line">            </span><br><span class="line">            <span class="comment"># 尝试为该用户匹配座位</span></span><br><span class="line">            seat = smart_match_backup(</span><br><span class="line">                train_id, date, </span><br><span class="line">                request.from_station, request.to_station, </span><br><span class="line">                user_id</span><br><span class="line">            )</span><br><span class="line">            </span><br><span class="line">            <span class="keyword">if</span> seat:</span><br><span class="line">                allocate_seat(seat, request.from_station, request.to_station, user_id)</span><br><span class="line">                <span class="keyword">break</span>  <span class="comment"># 席位已分配，退出当前队列</span></span><br></pre></td></tr></table></figure>
+<p><strong>跨区间匹配的挑战</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>挑战点</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>复杂度激增</td>
+<td>需维护”缺票区间索引”，查询效率下降</td>
+</tr>
+<tr>
+<td>并发竞争更复杂</td>
+<td>多个部分匹配用户竞争同一区间</td>
+</tr>
+<tr>
+<td>用户体验不确定</td>
+<td>部分匹配时，用户不知道自己排的是哪个队列</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>实际权衡</strong>：12306 当前采用”不跨区间匹配”策略，牺牲部分体验换取系统简洁。</p>
+<hr>
+<h3 id="6-4-难点四：热点倾斜"><a href="#6-4-难点四：热点倾斜" class="headerlink" title="6.4 难点四：热点倾斜"></a>6.4 难点四：热点倾斜</h3><p><strong>问题</strong>：春运热门线路，单个区间队列百万级</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">场景：</span><br><span class="line">春节前一周，北京→哈尔滨，候补队列 200 万人</span><br><span class="line"></span><br><span class="line">Sorted Set 性能：</span><br><span class="line">- ZADD: O(log N) &#x3D; log(2,000,000) ≈ 21 次操作</span><br><span class="line">- ZRANK: O(log N) ≈ 21 次操作</span><br><span class="line">- 单次操作微秒级，没问题</span><br><span class="line"></span><br><span class="line">问题：</span><br><span class="line">1. 频繁 ZRANK 查询排队名次，热点 Key</span><br><span class="line">2. 频繁 ZRANGE 取队首用户，热点 Key</span><br><span class="line">3. Redis 单线程，单 Key 成为瓶颈</span><br></pre></td></tr></table></figure>
+<p><strong>解决方案</strong>：分片队列 + 虚拟排队</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 方案一：队列分片</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_shard_key</span><span class="params">(train_id, date, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    将单个大队列拆分成多个小队列</span></span><br><span class="line"><span class="string">    按 user_id 分片，保证同一用户始终在同一个分片</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    shard_count = <span class="number">32</span>  <span class="comment"># 分片数量</span></span><br><span class="line">    shard_id = hash(user_id) % shard_count</span><br><span class="line">    <span class="keyword">return</span> <span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>:shard:<span class="subst">&#123;shard_id&#125;</span>"</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add_to_sharded_queue</span><span class="params">(train_id, date, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    加入分片队列</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    shard_key = get_shard_key(train_id, date, from_station, to_station, user_id)</span><br><span class="line">    score = int(time.time() * <span class="number">1000</span>)</span><br><span class="line">    redis.zadd(shard_key, &#123;user_id: score&#125;)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_queue_position_sharded</span><span class="params">(train_id, date, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    查询分片队列中的名次</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    shard_key = get_shard_key(train_id, date, from_station, to_station, user_id)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 本分片内的名次</span></span><br><span class="line">    local_rank = redis.zrank(shard_key, user_id)</span><br><span class="line">    <span class="keyword">if</span> local_rank <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 加上其他分片的历史完成数</span></span><br><span class="line">    total_finished = sum([</span><br><span class="line">        redis.get(<span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>:shard:<span class="subst">&#123;i&#125;</span>:finished"</span>)</span><br><span class="line">        <span class="keyword">for</span> i <span class="keyword">in</span> range(<span class="number">32</span>)</span><br><span class="line">    ])</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 虚拟名次（更准确的估算）</span></span><br><span class="line">    <span class="keyword">return</span> local_rank + total_finished + <span class="number">1</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment"># 方案二：虚拟排队名次</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_virtual_position</span><span class="params">(redis, train_id, date, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    不返回真实名次，而是"虚拟名次"</span></span><br><span class="line"><span class="string">    避免用户看到"排队 150 万名"直接放弃</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    real_rank = get_real_position(redis, train_id, date, from_station, to_station, user_id)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> real_rank &lt;= <span class="number">100</span>:</span><br><span class="line">        <span class="comment"># 前 100 名，返回真实名次</span></span><br><span class="line">        <span class="keyword">return</span> real_rank</span><br><span class="line">    <span class="keyword">elif</span> real_rank &lt;= <span class="number">1000</span>:</span><br><span class="line">        <span class="comment"># 100-1000 名，显示"排名前 1000"</span></span><br><span class="line">        <span class="keyword">return</span> <span class="string">f"前 1000 名"</span></span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="comment"># 1000 名以后，显示预估等待时间</span></span><br><span class="line">        avg_fulfill_rate = get_historical_fulfill_rate(train_id, from_station, to_station)</span><br><span class="line">        wait_hours = real_rank / avg_fulfill_rate</span><br><span class="line">        <span class="keyword">return</span> <span class="string">f"预计等待 <span class="subst">&#123;wait_hours:<span class="number">.1</span>f&#125;</span> 小时"</span></span><br></pre></td></tr></table></figure>
+<p><strong>本地缓存优化</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 方案三：热点数据本地缓存</span></span><br><span class="line"><span class="keyword">from</span> cachetools <span class="keyword">import</span> TTLCache</span><br><span class="line"></span><br><span class="line"><span class="comment"># 本地缓存：热门车次的队列长度</span></span><br><span class="line">queue_length_cache = TTLCache(maxsize=<span class="number">10000</span>, ttl=<span class="number">10</span>)  <span class="comment"># 10 秒过期</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_queue_length</span><span class="params">(train_id, date, from_station, to_station)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    获取队列长度（优先本地缓存）</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    cache_key = <span class="string">f"<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> cache_key <span class="keyword">in</span> queue_length_cache:</span><br><span class="line">        <span class="keyword">return</span> queue_length_cache[cache_key]</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 本地缓存未命中，查询 Redis</span></span><br><span class="line">    length = redis.zcard(<span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span>)</span><br><span class="line">    queue_length_cache[cache_key] = length</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> length</span><br></pre></td></tr></table></figure>
+<hr>
+<h3 id="6-5-难点五：容灾与降级"><a href="#6-5-难点五：容灾与降级" class="headerlink" title="6.5 难点五：容灾与降级"></a>6.5 难点五：容灾与降级</h3><p><strong>问题</strong>：Redis 故障时如何保证候补可用？</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">故障场景：</span><br><span class="line">1. Redis 主节点宕机，哨兵切换中（30 秒不可用）</span><br><span class="line">2. Redis 集群网络分区，部分数据不可达</span><br><span class="line">3. Redis 内存溢出，被系统 OOM Killer 杀掉</span><br></pre></td></tr></table></figure>
+<p><strong>多级容灾设计</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                        正常流程                                 │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  用户请求 → Redis Sorted Set 排队 → 候补匹配 → 订单创建        │</span><br><span class="line">│                                                                 │</span><br><span class="line">└───────────────────────────┬─────────────────────────────────────┘</span><br><span class="line">                            │ Redis 故障检测</span><br><span class="line">                            ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                        降级流程                                 │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  用户请求 → MQ 消息队列暂存 → MySQL 记录排队 → 后台任务恢复    │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  具体措施：                                                     │</span><br><span class="line">│  1. 新增候补请求写入 MQ（Kafka），不直接写 Redis               │</span><br><span class="line">│  2. MySQL 记录候补订单（status&#x3D;PENDING）                       │</span><br><span class="line">│  3. 后台任务监控 Redis 恢复后，将 MQ 消息同步到 Redis          │</span><br><span class="line">│  4. 查询排队名次返回&quot;系统繁忙，请稍后查询&quot;                     │</span><br><span class="line">│                                                                 │</span><br><span class="line">└─────────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p><strong>降级代码示例</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add_backup_order_with_fallback</span><span class="params">(train_id, date, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    加入候补队列（带降级）</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        <span class="comment"># 尝试写入 Redis</span></span><br><span class="line">        redis.zadd(<span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span>, </span><br><span class="line">                   &#123;user_id: time.time()&#125;)</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">True</span>, <span class="string">"排队成功"</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">except</span> RedisError <span class="keyword">as</span> e:</span><br><span class="line">        <span class="comment"># Redis 故障，降级到 MQ</span></span><br><span class="line">        log.error(<span class="string">f"Redis 故障，降级到 MQ: <span class="subst">&#123;e&#125;</span>"</span>)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 写入 MQ</span></span><br><span class="line">        mq.send(<span class="string">'backup_queue_pending'</span>, &#123;</span><br><span class="line">            <span class="string">'train_id'</span>: train_id,</span><br><span class="line">            <span class="string">'date'</span>: date,</span><br><span class="line">            <span class="string">'from'</span>: from_station,</span><br><span class="line">            <span class="string">'to'</span>: to_station,</span><br><span class="line">            <span class="string">'user_id'</span>: user_id,</span><br><span class="line">            <span class="string">'timestamp'</span>: time.time()</span><br><span class="line">        &#125;)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 写入 MySQL（状态为 PENDING，待恢复）</span></span><br><span class="line">        db.execute(<span class="string">"""</span></span><br><span class="line"><span class="string">            INSERT INTO backup_order </span></span><br><span class="line"><span class="string">            (user_id, train_id, travel_date, from_station, to_station, status)</span></span><br><span class="line"><span class="string">            VALUES (?, ?, ?, ?, ?, 'PENDING')</span></span><br><span class="line"><span class="string">        """</span>, user_id, train_id, date, from_station, to_station)</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">return</span> <span class="literal">True</span>, <span class="string">"排队成功，系统繁忙，名次稍后可查"</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">recover_redis_from_mq</span><span class="params">()</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    后台任务：Redis 恢复后，从 MQ 恢复排队数据</span></span><br><span class="line"><span class="string">    关键：使用幂等操作，防止重复添加</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    messages = mq.consume(<span class="string">'backup_queue_pending'</span>, batch_size=<span class="number">100</span>)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> msg <span class="keyword">in</span> messages:</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            queue_key = <span class="string">f"backup:<span class="subst">&#123;msg[<span class="string">'train_id'</span>]&#125;</span>:<span class="subst">&#123;msg[<span class="string">'date'</span>]&#125;</span>:<span class="subst">&#123;msg[<span class="string">'from'</span>]&#125;</span>:<span class="subst">&#123;msg[<span class="string">'to'</span>]&#125;</span>"</span></span><br><span class="line">            </span><br><span class="line">            <span class="comment"># 幂等检查：先查询用户是否已在队列中</span></span><br><span class="line">            existing_score = redis.zscore(queue_key, msg[<span class="string">'user_id'</span>])</span><br><span class="line">            <span class="keyword">if</span> existing_score <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span>:</span><br><span class="line">                <span class="comment"># 用户已在队列中，跳过（保留原有的 Score，不更新）</span></span><br><span class="line">                log.info(<span class="string">f"用户 <span class="subst">&#123;msg[<span class="string">'user_id'</span>]&#125;</span> 已在队列中，跳过恢复"</span>)</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                <span class="comment"># 用户不在队列中，添加到队列</span></span><br><span class="line">                redis.zadd(queue_key, &#123;msg[<span class="string">'user_id'</span>]: msg[<span class="string">'timestamp'</span>]&#125;)</span><br><span class="line">            </span><br><span class="line">            <span class="comment"># 更新 MySQL 状态为 QUEUED</span></span><br><span class="line">            db.execute(<span class="string">"""</span></span><br><span class="line"><span class="string">                UPDATE backup_order SET status = 'QUEUED' </span></span><br><span class="line"><span class="string">                WHERE user_id = ? AND train_id = ? AND travel_date = ?</span></span><br><span class="line"><span class="string">            """</span>, msg[<span class="string">'user_id'</span>], msg[<span class="string">'train_id'</span>], msg[<span class="string">'date'</span>])</span><br><span class="line">            </span><br><span class="line">        <span class="keyword">except</span> RedisError <span class="keyword">as</span> e:</span><br><span class="line">            log.error(<span class="string">f"Redis 仍未恢复，稍后重试: <span class="subst">&#123;e&#125;</span>"</span>)</span><br><span class="line">            <span class="keyword">break</span>  <span class="comment"># Redis 仍不可用，等待下次恢复</span></span><br></pre></td></tr></table></figure>
+<p><strong>降级流程关键点</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>关键点</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>幂等恢复</td>
+<td>检查用户是否已在队列，避免重复添加或 Score 被更新</td>
+</tr>
+<tr>
+<td>状态追踪</td>
+<td>MySQL 记录 PENDING→QUEUED 状态变化，便于监控</td>
+</tr>
+<tr>
+<td>批量消费</td>
+<td>每次消费 100 条，避免单条失败阻塞整批</td>
+</tr>
+<tr>
+<td>优雅退出</td>
+<td>Redis 仍不可用时 break，保留未处理消息供下次恢复</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="七、总结与思考"><a href="#七、总结与思考" class="headerlink" title="七、总结与思考"></a>七、总结与思考</h2><h3 id="7-1-12306-候补系统的设计精髓"><a href="#7-1-12306-候补系统的设计精髓" class="headerlink" title="7.1 12306 候补系统的设计精髓"></a>7.1 12306 候补系统的设计精髓</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>设计点</th>
+<th>核心思想</th>
+<th>技术实现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>席位复用</td>
+<td>同一座位分段售卖，提升利用率</td>
+<td>Redis Bitmap</td>
+</tr>
+<tr>
+<td>分布式排队</td>
+<td>按区间独立排队，公平精准</td>
+<td>Redis Sorted Set</td>
+</tr>
+<tr>
+<td>事件驱动</td>
+<td>四类票源触发自动兑现</td>
+<td>Kafka + 消费者模式</td>
+</tr>
+<tr>
+<td>高并发架构</td>
+<td>四级防护 + 限流降级</td>
+<td>网关 + Caffeine + Redis + MySQL</td>
+</tr>
+<tr>
+<td>一致性保证</td>
+<td>本地消息表 + 最终一致</td>
+<td>MySQL 事务 + MQ</td>
+</tr>
+<tr>
+<td>并发控制</td>
+<td>分布式锁 + 双重检查</td>
+<td>Redis SET NX + Lua</td>
+</tr>
+<tr>
+<td>容灾降级</td>
+<td>MQ 暂存 + 幂等恢复</td>
+<td>Kafka + 定时对账</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="7-2-为什么官方候补比第三方靠谱？"><a href="#7-2-为什么官方候补比第三方靠谱？" class="headerlink" title="7.2 为什么官方候补比第三方靠谱？"></a>7.2 为什么官方候补比第三方靠谱？</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>对比维度</th>
+<th>官方候补</th>
+<th>第三方抢票软件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>数据源</td>
+<td>直接操作席位数据，无延迟</td>
+<td>轮询 12306 接口，有延迟</td>
+</tr>
+<tr>
+<td>排队公平性</td>
+<td>时间戳排序，先到先得</td>
+<td>无法获取真实排队数据</td>
+</tr>
+<tr>
+<td>票源覆盖</td>
+<td>四类票源全覆盖，包括动态加挂</td>
+<td>只能监控部分票源</td>
+</tr>
+<tr>
+<td>系统稳定性</td>
+<td>高并发架构 + 容灾降级</td>
+<td>容易被 12306 限流封禁</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="7-3-可借鉴的架构思想"><a href="#7-3-可借鉴的架构思想" class="headerlink" title="7.3 可借鉴的架构思想"></a>7.3 可借鉴的架构思想</h3><ol>
+<li><p><strong>数据结构选型决定系统上限</strong>：Bitmap 和 Sorted Set 的选择，让百万级数据依然高效</p>
+</li>
+<li><p><strong>分而治之解决规模问题</strong>：按区间独立排队，将全局问题拆解为局部问题</p>
+</li>
+<li><p><strong>事件驱动解耦复杂逻辑</strong>：退票、超时、改签、加挂，统一为事件，简化处理</p>
+</li>
+<li><p><strong>四级防护扛住高并发</strong>：网关限流 → 本地缓存 → Redis → MySQL，逐级降压</p>
+</li>
+<li><p><strong>最终一致胜过强一致</strong>：分布式系统中，最终一致更易实现，用户体验更好</p>
+</li>
+<li><p><strong>幂等设计防止重复操作</strong>：降级恢复时先检查再添加，避免数据错乱</p>
+</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/%E9%AB%98%E5%B9%B6%E5%8F%91%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1/" rel="tag"><i class="fa fa-tag"></i> 高并发系统设计</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/09/09/oracle_sqlloader/" rel="prev" title="介绍 Oracle SQL*Loader 及其应用">
+      <i class="fa fa-chevron-left"></i> 介绍 Oracle SQL*Loader 及其应用
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2024/12/13/langchain-vs-langgraph/" rel="next" title="LangChain vs LangGraph：从链式调用到图状态机的 Agent 演进之路">
+      LangChain vs LangGraph：从链式调用到图状态机的 Agent 演进之路 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#一、为什么-12306-如此难做？"><span class="nav-number">1.</span> <span class="nav-text">一、为什么 12306 如此难做？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-业务复杂度"><span class="nav-number">1.1.</span> <span class="nav-text">1.1 业务复杂度</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-规模数据"><span class="nav-number">1.2.</span> <span class="nav-text">1.2 规模数据</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、核心设计基石：席位复用"><span class="nav-number">2.</span> <span class="nav-text">二、核心设计基石：席位复用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-什么是席位复用？"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 什么是席位复用？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-技术实现：Redis-Bitmap"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 技术实现：Redis Bitmap</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、分布式排队机制"><span class="nav-number">3.</span> <span class="nav-text">三、分布式排队机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-核心设计：按区间独立排队"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 核心设计：按区间独立排队</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-技术实现：Redis-Sorted-Set"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 技术实现：Redis Sorted Set</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-数据持久化：MySQL-分库分表"><span class="nav-number">3.3.</span> <span class="nav-text">3.3 数据持久化：MySQL 分库分表</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、事件驱动：候补车票从哪里来？"><span class="nav-number">4.</span> <span class="nav-text">四、事件驱动：候补车票从哪里来？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-四大票源"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 四大票源</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-事件驱动架构"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 事件驱动架构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-候补匹配流程"><span class="nav-number">4.3.</span> <span class="nav-text">4.3 候补匹配流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-候补兑现完整流程"><span class="nav-number">4.4.</span> <span class="nav-text">4.4 候补兑现完整流程</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、高并发架构设计"><span class="nav-number">5.</span> <span class="nav-text">五、高并发架构设计</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-四级防护架构"><span class="nav-number">5.1.</span> <span class="nav-text">5.1 四级防护架构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-限流降级策略"><span class="nav-number">5.2.</span> <span class="nav-text">5.2 限流降级策略</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、技术难点深入"><span class="nav-number">6.</span> <span class="nav-text">六、技术难点深入</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-难点一：分布式一致性"><span class="nav-number">6.1.</span> <span class="nav-text">6.1 难点一：分布式一致性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-难点二：并发竞争与超卖"><span class="nav-number">6.2.</span> <span class="nav-text">6.2 难点二：并发竞争与超卖</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-难点三：跨区间匹配"><span class="nav-number">6.3.</span> <span class="nav-text">6.3 难点三：跨区间匹配</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-4-难点四：热点倾斜"><span class="nav-number">6.4.</span> <span class="nav-text">6.4 难点四：热点倾斜</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-5-难点五：容灾与降级"><span class="nav-number">6.5.</span> <span class="nav-text">6.5 难点五：容灾与降级</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、总结与思考"><span class="nav-number">7.</span> <span class="nav-text">七、总结与思考</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-12306-候补系统的设计精髓"><span class="nav-number">7.1.</span> <span class="nav-text">7.1 12306 候补系统的设计精髓</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-2-为什么官方候补比第三方靠谱？"><span class="nav-number">7.2.</span> <span class="nav-text">7.2 为什么官方候补比第三方靠谱？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-3-可借鉴的架构思想"><span class="nav-number">7.3.</span> <span class="nav-text">7.3 可借鉴的架构思想</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">86</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">48</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+<script pjax>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
