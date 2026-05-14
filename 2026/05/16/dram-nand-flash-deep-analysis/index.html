@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="背景2026年，AI浪潮席卷全球。 你打开新闻，满屏都是这样的标题：  “三星市值突破新高，HBM订单排到明年”“海力士股价暴涨，成英伟达最大HBM供应商”“美光宣布HBM3e量产，AI存储竞争白热化”“长鑫存储融资成功，中国DRAM再获突破”  作为技术爱好者，你可能会有很多困惑：  内存条、固态硬盘、HBM… 到底都是什么？ 为什么AI训练需要HBM，而不是普通内存条？ 三星、海力士、美光、长">
+<meta property="og:type" content="article">
+<meta property="og:title" content="存储芯片双雄：DRAM与NAND Flash全景解析">
+<meta property="og:url" content="https://donehub.github.io/2026/05/16/dram-nand-flash-deep-analysis/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="背景2026年，AI浪潮席卷全球。 你打开新闻，满屏都是这样的标题：  “三星市值突破新高，HBM订单排到明年”“海力士股价暴涨，成英伟达最大HBM供应商”“美光宣布HBM3e量产，AI存储竞争白热化”“长鑫存储融资成功，中国DRAM再获突破”  作为技术爱好者，你可能会有很多困惑：  内存条、固态硬盘、HBM… 到底都是什么？ 为什么AI训练需要HBM，而不是普通内存条？ 三星、海力士、美光、长">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-05-15T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-05-14T14:32:13.061Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="概念解读">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/05/16/dram-nand-flash-deep-analysis/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>存储芯片双雄：DRAM与NAND Flash全景解析 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/05/16/dram-nand-flash-deep-analysis/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          存储芯片双雄：DRAM与NAND Flash全景解析
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-05-16 00:00:00" itemprop="dateCreated datePublished" datetime="2026-05-16T00:00:00+08:00">2026-05-16</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-05-14 22:32:13" itemprop="dateModified" datetime="2026-05-14T22:32:13+08:00">2026-05-14</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%AD%98%E5%82%A8%E8%8A%AF%E7%89%87/" itemprop="url" rel="index"><span itemprop="name">存储芯片</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2026/05/16/dram-nand-flash-deep-analysis/" class="post-meta-item leancloud_visitors" data-flag-title="存储芯片双雄：DRAM与NAND Flash全景解析" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/05/16/dram-nand-flash-deep-analysis/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/05/16/dram-nand-flash-deep-analysis/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>2026年，AI浪潮席卷全球。</p>
+<p>你打开新闻，满屏都是这样的标题：</p>
+<blockquote>
+<p>“三星市值突破新高，HBM订单排到明年”<br>“海力士股价暴涨，成英伟达最大HBM供应商”<br>“美光宣布HBM3e量产，AI存储竞争白热化”<br>“长鑫存储融资成功，中国DRAM再获突破”</p>
+</blockquote>
+<p>作为技术爱好者，你可能会有很多困惑：</p>
+<ul>
+<li>内存条、固态硬盘、HBM… 到底都是什么？</li>
+<li>为什么AI训练需要HBM，而不是普通内存条？</li>
+<li>三星、海力士、美光、长鑫、长江存储… 各家到底做什么？</li>
+</ul>
+<p>这篇文章，用<strong>两个视角</strong>帮你彻底理清：<strong>DRAM</strong>和<strong>NAND Flash</strong>——存储芯片世界的两大支柱。</p>
+<hr>
+<h2 id="第一视角：DRAM"><a href="#第一视角：DRAM" class="headerlink" title="第一视角：DRAM"></a>第一视角：DRAM</h2><h3 id="一、DRAM是什么？"><a href="#一、DRAM是什么？" class="headerlink" title="一、DRAM是什么？"></a>一、DRAM是什么？</h3><p><strong>DRAM = Dynamic Random Access Memory</strong>，中文叫”动态随机存取存储器”。</p>
+<p>通俗理解：<strong>DRAM就是你电脑上的”临时工作台”</strong>。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">你在用Word写文档：</span><br><span class="line">硬盘（SSD）── 长期保存文件，断电后还在</span><br><span class="line">     ↓ 打开文件时加载</span><br><span class="line">内存条（DRAM）── 临时存放正在编辑的内容，断电就没了</span><br><span class="line">     ↓ CPU随时读取</span><br><span class="line">CPU ── 处理文字、格式、排版</span><br></pre></td></tr></table></figure>
+<p>忘记保存就断电？文件没了。因为DRAM里的数据瞬间清空。</p>
+<h3 id="二、为什么叫”动态”？"><a href="#二、为什么叫”动态”？" class="headerlink" title="二、为什么叫”动态”？"></a>二、为什么叫”动态”？</h3><p>这是DRAM与其他内存技术最大的区别：<strong>数据需要不断”刷新”才能保持</strong>。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">DRAM的存储单元 &#x3D; 1个电容 + 1个晶体管</span><br><span class="line"></span><br><span class="line">电容充电 &#x3D; 存储&quot;1&quot;</span><br><span class="line">电容放电 &#x3D; 存储&quot;0&quot;</span><br><span class="line"></span><br><span class="line">问题：电容会自然漏电，电荷慢慢流失</span><br><span class="line">      几毫秒后，数据就没了</span><br><span class="line"></span><br><span class="line">解决：每隔几毫秒&quot;刷新&quot;一次</span><br><span class="line">      把电荷补回去，数据才能保持</span><br></pre></td></tr></table></figure>
+<p>这就是”动态”的含义：数据不是静态保存的，需要<strong>动态、持续地刷新</strong>。</p>
+<p>对比一下SRAM（静态随机存取存储器）：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>DRAM</th>
+<th>SRAM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>存储单元</td>
+<td>1电容+1晶体管</td>
+<td>6个晶体管</td>
+</tr>
+<tr>
+<td>需要刷新</td>
+<td>✅ 必须周期刷新</td>
+<td>❌ 不需要</td>
+</tr>
+<tr>
+<td>密度</td>
+<td>高（结构简单）</td>
+<td>低（结构复杂）</td>
+</tr>
+<tr>
+<td>容量</td>
+<td>大（单芯片可达16GB）</td>
+<td>小（通常几KB到几MB）</td>
+</tr>
+<tr>
+<td>成本</td>
+<td>便宜</td>
+<td>贵</td>
+</tr>
+<tr>
+<td>应用</td>
+<td>内存条、手机内存</td>
+<td>CPU缓存（L1/L2/L3）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>一句话：<strong>DRAM性价比高，适合做大容量内存；SRAM性能好但贵，只做CPU内部的小缓存</strong>。</p>
+<h3 id="三、DRAM的核心特点"><a href="#三、DRAM的核心特点" class="headerlink" title="三、DRAM的核心特点"></a>三、DRAM的核心特点</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>特点</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>易失性</strong></td>
+<td>断电后数据立即丢失</td>
+</tr>
+<tr>
+<td><strong>需要刷新</strong></td>
+<td>每隔几毫秒必须刷新，否则数据消失</td>
+</tr>
+<tr>
+<td><strong>速度快</strong></td>
+<td>读写速度远快于硬盘</td>
+</tr>
+<tr>
+<td><strong>密度高</strong></td>
+<td>单芯片可存储大量数据</td>
+</tr>
+<tr>
+<td><strong>成本低</strong></td>
+<td>每GB价格相对便宜</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="四、DRAM产品家族"><a href="#四、DRAM产品家族" class="headerlink" title="四、DRAM产品家族"></a>四、DRAM产品家族</h3><p>都属于DRAM技术，但针对不同场景优化：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>产品</th>
+<th>特点</th>
+<th>用途</th>
+<th>带宽</th>
+<th>代表厂商</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>DDR4/DDR5</strong></td>
+<td>标准内存条</td>
+<td>PC、服务器</td>
+<td>~25GB/s</td>
+<td>三星/海力士/美光/长鑫</td>
+</tr>
+<tr>
+<td><strong>LPDDR4/LPDDR5</strong></td>
+<td>低功耗版</td>
+<td>手机、平板</td>
+<td>~60GB/s</td>
+<td>三星/海力士/美光/长鑫</td>
+</tr>
+<tr>
+<td><strong>HBM/HBM3e</strong></td>
+<td>堆叠高带宽</td>
+<td>AI训练GPU</td>
+<td>~1TB/s+</td>
+<td>三星/海力士/美光</td>
+</tr>
+<tr>
+<td><strong>GDDR6/GDDR7</strong></td>
+<td>显卡显存</td>
+<td>游戏显卡</td>
+<td>~160GB/s</td>
+<td>三星/海力士/美光</td>
+</tr>
+<tr>
+<td><strong>Server DRAM</strong></td>
+<td>服务器专用</td>
+<td>数据中心</td>
+<td>~50GB/s</td>
+<td>三星/海力士/美光/长鑫</td>
+</tr>
+<tr>
+<td><strong>Mobile DRAM</strong></td>
+<td>移动端定制</td>
+<td>智能穿戴、IoT</td>
+<td>~10GB/s</td>
+<td>各厂商均有</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="五、重点解读：HBM为什么是AI的命门"><a href="#五、重点解读：HBM为什么是AI的命门" class="headerlink" title="五、重点解读：HBM为什么是AI的命门"></a>五、重点解读：HBM为什么是AI的命门</h3><p>普通内存条有个致命瓶颈：<strong>带宽不够</strong>。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">普通内存条：单通道带宽约 25GB&#x2F;s（DDR5-6400）</span><br><span class="line">AI训练需求：几百 GB&#x2F;s 甚至 TB&#x2F;s 级别</span><br></pre></td></tr></table></figure>
+<p>GPU（如英伟达H100）算力极强，但数据喂不进去——传统内存条成了瓶颈。</p>
+<p><strong>HBM的解决方案：垂直堆叠</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">传统内存条：</span><br><span class="line">┌───┐</span><br><span class="line">│芯片│ ← 平铺在PCB上，信号要走很远</span><br><span class="line">└───┘</span><br><span class="line"></span><br><span class="line">HBM：</span><br><span class="line">┌─────┐</span><br><span class="line">│芯片8│ ↑</span><br><span class="line">├─────┤ │ 垂直堆叠8-12层</span><br><span class="line">│芯片7│ │ 通过TSV（硅通孔）连接</span><br><span class="line">│ ... │ │ 路径极短，速度极快</span><br><span class="line">└──┬──┘ ↓</span><br><span class="line">   └── GPU芯片（紧邻封装）</span><br></pre></td></tr></table></figure>
+<p><strong>核心技术</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>技术</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>TSV（硅通孔）</strong></td>
+<td>在芯片上打微孔，垂直导通</td>
+</tr>
+<tr>
+<td><strong>3D堆叠</strong></td>
+<td>8层、12层DRAM芯片叠在一起</td>
+</tr>
+<tr>
+<td><strong>CoWoS封装</strong></td>
+<td>把HBM和GPU封装在同一块硅中介层上</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>性能对比</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>带宽</th>
+<th>应用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DDR5内存条</td>
+<td>~25GB/s</td>
+<td>电脑、服务器</td>
+</tr>
+<tr>
+<td>HBM3</td>
+<td>~1TB/s</td>
+<td>AI训练GPU</td>
+</tr>
+<tr>
+<td>HBM3e</td>
+<td>~1.5TB/s+</td>
+<td>最先进AI芯片</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>这就是为什么英伟达H100价格3万美元起步——<strong>HBM成本占了很大比例</strong>。</p>
+<h3 id="六、DRAM厂商格局"><a href="#六、DRAM厂商格局" class="headerlink" title="六、DRAM厂商格局"></a>六、DRAM厂商格局</h3><p><strong>全球市场份额（2024年）</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th style="text-align:center">排名</th>
+<th>厂商</th>
+<th>国家</th>
+<th style="text-align:center">份额</th>
+<th>技术水平</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">1</td>
+<td><strong>三星电子</strong></td>
+<td>韩国</td>
+<td style="text-align:center">~40%</td>
+<td>最领先</td>
+</tr>
+<tr>
+<td style="text-align:center">2</td>
+<td><strong>SK海力士</strong></td>
+<td>韩国</td>
+<td style="text-align:center">~28%</td>
+<td>HBM领先</td>
+</tr>
+<tr>
+<td style="text-align:center">3</td>
+<td><strong>美光科技</strong></td>
+<td>美国</td>
+<td style="text-align:center">~25%</td>
+<td>一流</td>
+</tr>
+<tr>
+<td style="text-align:center">4</td>
+<td><strong>长鑫存储</strong></td>
+<td>中国</td>
+<td style="text-align:center">~3-5%</td>
+<td>追赶中</td>
+</tr>
+<tr>
+<td style="text-align:center">5</td>
+<td><strong>南亚科技</strong></td>
+<td>台湾</td>
+<td style="text-align:center">~2%</td>
+<td>中端</td>
+</tr>
+<tr>
+<td style="text-align:center">6</td>
+<td><strong>华邦电子</strong></td>
+<td>台湾</td>
+<td style="text-align:center">~1%</td>
+<td>中低端</td>
+</tr>
+<tr>
+<td style="text-align:center">7</td>
+<td><strong>力积电</strong></td>
+<td>台湾</td>
+<td style="text-align:center">&lt;1%</td>
+<td>代工</td>
+</tr>
+</tbody>
+</table>
+</div>
+<blockquote>
+<p><strong>三巨头控制90%+市场</strong></p>
+</blockquote>
+<p><strong>技术能力矩阵</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>厂商</th>
+<th style="text-align:center">DDR5</th>
+<th style="text-align:center">LPDDR5X</th>
+<th style="text-align:center">HBM3e</th>
+<th style="text-align:center">GDDR7</th>
+<th style="text-align:center">制程</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>三星</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">12nm</td>
+</tr>
+<tr>
+<td>海力士</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅领先</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">12nm</td>
+</tr>
+<tr>
+<td>美光</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">12nm</td>
+</tr>
+<tr>
+<td>长鑫</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">17nm</td>
+</tr>
+<tr>
+<td>南亚科</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">20nm</td>
+</tr>
+<tr>
+<td>华邦</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">25nm</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>中国现状</strong>：长鑫存储是中国大陆唯一的DRAM厂商，2016年成立，填补了国内空白。目前主攻DDR4/DDR5、LPDDR4/LPDDR5，HBM仍在研发阶段。</p>
+<p><strong>日本现状</strong>：日本已无DRAM厂商。曾经的霸主尔必达2012年破产被海力士收购，日本DRAM产业终结。</p>
+<hr>
+<h2 id="第二视角：NAND-Flash"><a href="#第二视角：NAND-Flash" class="headerlink" title="第二视角：NAND Flash"></a>第二视角：NAND Flash</h2><h3 id="一、NAND-Flash是什么？"><a href="#一、NAND-Flash是什么？" class="headerlink" title="一、NAND Flash是什么？"></a>一、NAND Flash是什么？</h3><p><strong>NAND Flash</strong>，中文叫”NAND闪存”，是一种<strong>非易失性存储器</strong>。</p>
+<p>通俗理解：<strong>NAND Flash就是你电脑的”永久仓库”</strong>。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">你的手机：</span><br><span class="line">RAM（DRAM）8GB ── 运行APP时临时用，断电清空</span><br><span class="line">存储（NAND）128GB ── 保存照片、APP、文件，断电后还在</span><br><span class="line"></span><br><span class="line">你的电脑：</span><br><span class="line">内存条（DRAM）16GB ── 正在运行的程序</span><br><span class="line">固态硬盘（NAND）512GB ── 系统、软件、所有文件</span><br></pre></td></tr></table></figure>
+<p><strong>核心特点</strong>：断电后数据<strong>不会丢失</strong>，可以长期保存。</p>
+<h3 id="二、为什么叫”NAND”和”闪存”"><a href="#二、为什么叫”NAND”和”闪存”" class="headerlink" title="二、为什么叫”NAND”和”闪存”"></a>二、为什么叫”NAND”和”闪存”</h3><p><strong>NAND</strong>是逻辑门电路的名字（Not AND），用这种结构的晶体管阵列存储数据，所以叫NAND Flash。</p>
+<p><strong>“闪存”的由来</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">传统EEPROM：擦除需要几秒</span><br><span class="line">NAND Flash：擦除只需几毫秒</span><br><span class="line"></span><br><span class="line">像&quot;闪光&quot;一样快 → Flash Memory（闪存）</span><br></pre></td></tr></table></figure>
+<h3 id="三、工作原理"><a href="#三、工作原理" class="headerlink" title="三、工作原理"></a>三、工作原理</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">NAND存储单元 &#x3D; 浮栅晶体管</span><br><span class="line"></span><br><span class="line">┌─────────────────┐</span><br><span class="line">│ 浮栅            │ ← 电子被困在这里</span><br><span class="line">│  有电子 &#x3D; 存储&quot;0&quot;│    不会跑掉</span><br><span class="line">│  无电子 &#x3D; 存储&quot;1&quot;│</span><br><span class="line">└─────────────────┘</span><br><span class="line"></span><br><span class="line">写入：把电子注入浮栅（高压）</span><br><span class="line">擦除：把电子从浮栅拉出来（更高电压）</span><br><span class="line">读取：检测浮栅是否有电子</span><br></pre></td></tr></table></figure>
+<p><strong>关键点</strong>：电子被困在浮栅里，没有电源也能长期保存——这就是”非易失性”的原因。</p>
+<h3 id="四、NAND-Flash的核心特点"><a href="#四、NAND-Flash的核心特点" class="headerlink" title="四、NAND Flash的核心特点"></a>四、NAND Flash的核心特点</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>特点</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>非易失性</strong></td>
+<td>断电后数据保留</td>
+</tr>
+<tr>
+<td><strong>不需要刷新</strong></td>
+<td>与DRAM不同，写入后自然保持</td>
+</tr>
+<tr>
+<td><strong>密度高</strong></td>
+<td>单芯片容量远超DRAM</td>
+</tr>
+<tr>
+<td><strong>有擦写寿命</strong></td>
+<td>每个单元可擦写几千到几万次</td>
+</tr>
+<tr>
+<td><strong>速度较慢</strong></td>
+<td>比DRAM慢，但比机械硬盘快很多</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="五、NAND分类（按每单元存储位数）"><a href="#五、NAND分类（按每单元存储位数）" class="headerlink" title="五、NAND分类（按每单元存储位数）"></a>五、NAND分类（按每单元存储位数）</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>全称</th>
+<th style="text-align:center">每单元存储</th>
+<th>特点</th>
+<th>寿命</th>
+<th>应用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SLC</strong></td>
+<td>Single-Level Cell</td>
+<td style="text-align:center">1 bit</td>
+<td>最快、最耐用、最贵</td>
+<td>10万次</td>
+<td>企业/军工</td>
+</tr>
+<tr>
+<td><strong>MLC</strong></td>
+<td>Multi-Level Cell</td>
+<td style="text-align:center">2 bit</td>
+<td>平衡性能与成本</td>
+<td>3000-1万次</td>
+<td>高端消费</td>
+</tr>
+<tr>
+<td><strong>TLC</strong></td>
+<td>Triple-Level Cell</td>
+<td style="text-align:center">3 bit</td>
+<td>主流选择，性价比高</td>
+<td>500-3000次</td>
+<td>消费级SSD</td>
+</tr>
+<tr>
+<td><strong>QLC</strong></td>
+<td>Quad-Level Cell</td>
+<td style="text-align:center">4 bit</td>
+<td>便宜但慢</td>
+<td>100-1000次</td>
+<td>大容量存储</td>
+</tr>
+</tbody>
+</table>
+</div>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">简单理解：</span><br><span class="line">SLC &#x3D; 每格只放1个东西，空间利用率低，但耐用快速</span><br><span class="line">TLC &#x3D; 每格塞3个东西，空间利用率高，但慢一些</span><br><span class="line">QLC &#x3D; 每格塞4个东西，最便宜，但寿命最短</span><br></pre></td></tr></table></figure>
+<h3 id="六、3D-NAND：垂直堆叠技术"><a href="#六、3D-NAND：垂直堆叠技术" class="headerlink" title="六、3D NAND：垂直堆叠技术"></a>六、3D NAND：垂直堆叠技术</h3><p>传统NAND是平铺的，容量有限。现代技术把存储单元垂直堆叠：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">传统2D NAND：</span><br><span class="line">┌──┐ ┌──┐ ┌──┐ ┌──┐ ← 平铺在一层</span><br><span class="line"></span><br><span class="line">3D NAND：</span><br><span class="line">┌──┐</span><br><span class="line">│232│ ↑ 垂直堆叠</span><br><span class="line">├──┤ │ 像盖楼房一样</span><br><span class="line">│...│ │ 同样面积，容量翻倍</span><br><span class="line">└──┘ ↓</span><br></pre></td></tr></table></figure>
+<p>主流3D NAND层数：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>厂商</th>
+<th style="text-align:center">最高层数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>三星</td>
+<td style="text-align:center">236层</td>
+</tr>
+<tr>
+<td>海力士</td>
+<td style="text-align:center">238层</td>
+</tr>
+<tr>
+<td>美光</td>
+<td style="text-align:center">232层</td>
+</tr>
+<tr>
+<td>长江存储</td>
+<td style="text-align:center">232层（Xtacking技术）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="七、长江存储的独创技术：Xtacking"><a href="#七、长江存储的独创技术：Xtacking" class="headerlink" title="七、长江存储的独创技术：Xtacking"></a>七、长江存储的独创技术：Xtacking</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">传统3D NAND：</span><br><span class="line">┌─────────────────┐</span><br><span class="line">│ 存储单元+外围电路 │ ← 同一片晶圆上制造</span><br><span class="line">│    叠在一起      │    层数增加会互相干扰</span><br><span class="line">└─────────────────┘</span><br><span class="line"></span><br><span class="line">Xtacking架构：</span><br><span class="line">┌──────────┐   ┌──────────┐</span><br><span class="line">│ 存储单元  │ ←→ │ 外围电路  │ ← 两片晶圆分别制造</span><br><span class="line">│（垂直堆叠）│   │（高速逻辑）│   再键合在一起</span><br><span class="line">└──────────┘   └──────────┘</span><br></pre></td></tr></table></figure>
+<p><strong>优势</strong>：存储密度更高、I/O速度更快、制造效率更高。</p>
+<h3 id="八、NAND-Flash产品家族"><a href="#八、NAND-Flash产品家族" class="headerlink" title="八、NAND Flash产品家族"></a>八、NAND Flash产品家族</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>产品</th>
+<th>特点</th>
+<th>用途</th>
+<th>速度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SSD固态硬盘</strong></td>
+<td>大容量高速存储</td>
+<td>电脑硬盘</td>
+<td>3-7GB/s</td>
+</tr>
+<tr>
+<td><strong>UFS</strong></td>
+<td>高速嵌入式存储</td>
+<td>中高端手机</td>
+<td>~4GB/s</td>
+</tr>
+<tr>
+<td><strong>eMMC</strong></td>
+<td>集成控制器，成本低</td>
+<td>低端手机/IoT</td>
+<td>~400MB/s</td>
+</tr>
+<tr>
+<td><strong>SD卡/TF卡</strong></td>
+<td>可插拔便携</td>
+<td>相机/无人机</td>
+<td>~100MB/s</td>
+</tr>
+<tr>
+<td><strong>USB闪存盘</strong></td>
+<td>便携通用</td>
+<td>数据传输</td>
+<td>~100MB/s</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="九、NAND-Flash厂商格局"><a href="#九、NAND-Flash厂商格局" class="headerlink" title="九、NAND Flash厂商格局"></a>九、NAND Flash厂商格局</h3><p><strong>全球市场份额（2024年）</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th style="text-align:center">排名</th>
+<th>厂商</th>
+<th>国家</th>
+<th style="text-align:center">份额</th>
+<th>技术水平</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">1</td>
+<td><strong>三星电子</strong></td>
+<td>韩国</td>
+<td style="text-align:center">~35%</td>
+<td>最领先</td>
+</tr>
+<tr>
+<td style="text-align:center">2</td>
+<td><strong>SK海力士</strong></td>
+<td>韩国</td>
+<td style="text-align:center">~20%</td>
+<td>一流</td>
+</tr>
+<tr>
+<td style="text-align:center">3</td>
+<td><strong>凯侠</strong></td>
+<td>日本</td>
+<td style="text-align:center">~15%</td>
+<td>一流（东芝存储前身）</td>
+</tr>
+<tr>
+<td style="text-align:center">4</td>
+<td><strong>西部数据</strong></td>
+<td>美国</td>
+<td style="text-align:center">~12%</td>
+<td>一流（与凯侠合资）</td>
+</tr>
+<tr>
+<td style="text-align:center">5</td>
+<td><strong>美光科技</strong></td>
+<td>美国</td>
+<td style="text-align:center">~10%</td>
+<td>一流</td>
+</tr>
+<tr>
+<td style="text-align:center">6</td>
+<td><strong>长江存储</strong></td>
+<td>中国</td>
+<td style="text-align:center">~5-8%</td>
+<td>接近一流</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>中国现状</strong>：长江存储是中国最大的NAND Flash厂商，技术水平与国际差距较小，232层Xtacking技术已接近第一梯队。</p>
+<p><strong>日本现状</strong>：凯侠（原东芝存储）专注NAND Flash，是日本唯一的存储芯片厂商。日本已无DRAM厂商。</p>
+<hr>
+<h2 id="两视角对比：DRAM-vs-NAND-Flash"><a href="#两视角对比：DRAM-vs-NAND-Flash" class="headerlink" title="两视角对比：DRAM vs NAND Flash"></a>两视角对比：DRAM vs NAND Flash</h2><h3 id="核心区别"><a href="#核心区别" class="headerlink" title="核心区别"></a>核心区别</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>DRAM</th>
+<th>NAND Flash</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>断电后</strong></td>
+<td>❌ 数据丢失</td>
+<td>✅ 数据保留</td>
+</tr>
+<tr>
+<td><strong>需要刷新</strong></td>
+<td>✅ 必须周期刷新</td>
+<td>❌ 不需要</td>
+</tr>
+<tr>
+<td><strong>速度</strong></td>
+<td>很快（几十GB/s）</td>
+<td>较慢（几GB/s）</td>
+</tr>
+<tr>
+<td><strong>容量</strong></td>
+<td>小（8-16GB/芯片）</td>
+<td>大（256GB-4TB/芯片）</td>
+</tr>
+<tr>
+<td><strong>擦写寿命</strong></td>
+<td>无限（理论上）</td>
+<td>有（几千到几万次）</td>
+</tr>
+<tr>
+<td><strong>成本/GB</strong></td>
+<td>较贵</td>
+<td>便宜</td>
+</tr>
+<tr>
+<td><strong>典型产品</strong></td>
+<td>内存条、HBM</td>
+<td>固态硬盘、手机存储</td>
+</tr>
+<tr>
+<td><strong>生活比喻</strong></td>
+<td>“临时工作台”</td>
+<td>“永久仓库”</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="用一个场景理解"><a href="#用一个场景理解" class="headerlink" title="用一个场景理解"></a>用一个场景理解</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">你打开一个大型游戏：</span><br><span class="line">┌─────────────────────────────────────┐</span><br><span class="line">│ 固态硬盘（NAND）                     │</span><br><span class="line">│ 存着游戏的所有文件（50GB）           │</span><br><span class="line">│ 断电后还在                           │</span><br><span class="line">└─────────────────────────────────────┘</span><br><span class="line">         ↓ 启动游戏时加载</span><br><span class="line">┌─────────────────────────────────────┐</span><br><span class="line">│ 内存条（DRAM）                       │</span><br><span class="line">│ 临时存放正在运行的游戏数据（8GB）     │</span><br><span class="line">│ 断电就没了                           │</span><br><span class="line">└─────────────────────────────────────┘</span><br><span class="line">         ↓ GPU随时读取渲染</span><br><span class="line">┌─────────────────────────────────────┐</span><br><span class="line">│ GPU + HBM                            │</span><br><span class="line">│ AI时代：GPU算力强，HBM喂得快          │</span><br><span class="line">│ 传统内存条喂不饱GPU                  │</span><br><span class="line">└─────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="中国存储产业现状"><a href="#中国存储产业现状" class="headerlink" title="中国存储产业现状"></a>中国存储产业现状</h2><h3 id="两家企业，两条路线"><a href="#两家企业，两条路线" class="headerlink" title="两家企业，两条路线"></a>两家企业，两条路线</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>企业</th>
+<th>技术领域</th>
+<th>定位</th>
+<th>国际差距</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>长鑫存储</strong></td>
+<td>DRAM</td>
+<td>中国唯一内存厂商</td>
+<td>差距较大（落后约2代）</td>
+</tr>
+<tr>
+<td><strong>长江存储</strong></td>
+<td>NAND Flash</td>
+<td>中国最大闪存厂商</td>
+<td>差距较小（接近第一梯队）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="为什么差距不同？"><a href="#为什么差距不同？" class="headerlink" title="为什么差距不同？"></a>为什么差距不同？</h3><p><strong>DRAM差距较大</strong>：</p>
+<ul>
+<li>三星、海力士、美光有40年技术积累</li>
+<li>DRAM工艺极其复杂，专利壁垒高</li>
+<li>设备（光刻机、刻蚀机）受国外限制</li>
+</ul>
+<p><strong>NAND差距较小</strong>：</p>
+<ul>
+<li>NAND技术路线相对灵活</li>
+<li>长江存储Xtacking架构实现”弯道超车”</li>
+<li>层数堆叠更多依赖工艺创新，而非单纯制程</li>
+</ul>
+<hr>
+<h2 id="写在最后"><a href="#写在最后" class="headerlink" title="写在最后"></a>写在最后</h2><p>回到开头的问题：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>新闻里提到的</th>
+<th>属于哪个领域</th>
+<th>哪家厂商在做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>内存条涨价</strong></td>
+<td>DRAM</td>
+<td>三星/海力士/美光/长鑫</td>
+</tr>
+<tr>
+<td><strong>HBM供不应求</strong></td>
+<td>DRAM（高端）</td>
+<td>三星/海力士/美光</td>
+</tr>
+<tr>
+<td><strong>固态硬盘新品</strong></td>
+<td>NAND Flash</td>
+<td>三星/凯侠/西部数据/长江存储</td>
+</tr>
+<tr>
+<td><strong>长鑫融资成功</strong></td>
+<td>DRAM</td>
+<td>中国唯一DRAM厂商</td>
+</tr>
+<tr>
+<td><strong>长江存储突破</strong></td>
+<td>NAND Flash</td>
+<td>中国NAND厂商</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>记住两张表：</p>
+<p><strong>DRAM</strong>：三巨头（三星+海力士+美光）控制90%市场，长鑫是中国唯一希望，日本已无厂商。</p>
+<p><strong>NAND Flash</strong>：六强格局（三星/海力士/凯侠/西数/美光/长江存储），长江存储技术水平接近一流。</p>
+<p>下次看到存储芯片的新闻，你就知道他们在说什么了。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/%E6%A6%82%E5%BF%B5%E8%A7%A3%E8%AF%BB/" rel="tag"><i class="fa fa-tag"></i> 概念解读</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/04/30/multi-agent-decision-and-evaluation/" rel="prev" title="多Agent系统的设计与评估">
+      <i class="fa fa-chevron-left"></i> 多Agent系统的设计与评估
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#背景"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第一视角：DRAM"><span class="nav-number">2.</span> <span class="nav-text">第一视角：DRAM</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#一、DRAM是什么？"><span class="nav-number">2.1.</span> <span class="nav-text">一、DRAM是什么？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#二、为什么叫”动态”？"><span class="nav-number">2.2.</span> <span class="nav-text">二、为什么叫”动态”？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#三、DRAM的核心特点"><span class="nav-number">2.3.</span> <span class="nav-text">三、DRAM的核心特点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#四、DRAM产品家族"><span class="nav-number">2.4.</span> <span class="nav-text">四、DRAM产品家族</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#五、重点解读：HBM为什么是AI的命门"><span class="nav-number">2.5.</span> <span class="nav-text">五、重点解读：HBM为什么是AI的命门</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#六、DRAM厂商格局"><span class="nav-number">2.6.</span> <span class="nav-text">六、DRAM厂商格局</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第二视角：NAND-Flash"><span class="nav-number">3.</span> <span class="nav-text">第二视角：NAND Flash</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#一、NAND-Flash是什么？"><span class="nav-number">3.1.</span> <span class="nav-text">一、NAND Flash是什么？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#二、为什么叫”NAND”和”闪存”"><span class="nav-number">3.2.</span> <span class="nav-text">二、为什么叫”NAND”和”闪存”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#三、工作原理"><span class="nav-number">3.3.</span> <span class="nav-text">三、工作原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#四、NAND-Flash的核心特点"><span class="nav-number">3.4.</span> <span class="nav-text">四、NAND Flash的核心特点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#五、NAND分类（按每单元存储位数）"><span class="nav-number">3.5.</span> <span class="nav-text">五、NAND分类（按每单元存储位数）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#六、3D-NAND：垂直堆叠技术"><span class="nav-number">3.6.</span> <span class="nav-text">六、3D NAND：垂直堆叠技术</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#七、长江存储的独创技术：Xtacking"><span class="nav-number">3.7.</span> <span class="nav-text">七、长江存储的独创技术：Xtacking</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#八、NAND-Flash产品家族"><span class="nav-number">3.8.</span> <span class="nav-text">八、NAND Flash产品家族</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#九、NAND-Flash厂商格局"><span class="nav-number">3.9.</span> <span class="nav-text">九、NAND Flash厂商格局</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#两视角对比：DRAM-vs-NAND-Flash"><span class="nav-number">4.</span> <span class="nav-text">两视角对比：DRAM vs NAND Flash</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#核心区别"><span class="nav-number">4.1.</span> <span class="nav-text">核心区别</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#用一个场景理解"><span class="nav-number">4.2.</span> <span class="nav-text">用一个场景理解</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#中国存储产业现状"><span class="nav-number">5.</span> <span class="nav-text">中国存储产业现状</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#两家企业，两条路线"><span class="nav-number">5.1.</span> <span class="nav-text">两家企业，两条路线</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#为什么差距不同？"><span class="nav-number">5.2.</span> <span class="nav-text">为什么差距不同？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#写在最后"><span class="nav-number">6.</span> <span class="nav-text">写在最后</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">87</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">49</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+<script pjax>
+  (function() {
+    function leancloudSelector(url) {
+      url = encodeURI(url);
+      return document.getElementById(url).querySelector('.leancloud-visitors-count');
+    }
+
+    function addCount(Counter) {
+      var visitors = document.querySelector('.leancloud_visitors');
+      var url = decodeURI(visitors.id);
+      var title = visitors.dataset.flagTitle;
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          if (results.length > 0) {
+            var counter = results[0];
+            leancloudSelector(url).innerText = counter.time + 1;
+            Counter('put', '/classes/Counter/' + counter.objectId, { time: { '__op': 'Increment', 'amount': 1 } })
+              .catch(error => {
+                console.error('Failed to save visitor count', error);
+              });
+          } else {
+              Counter('post', '/classes/Counter', { title, url, time: 1 })
+                .then(response => response.json())
+                .then(() => {
+                  leancloudSelector(url).innerText = 1;
+                })
+                .catch(error => {
+                  console.error('Failed to create', error);
+                });
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    function showTime(Counter) {
+      var visitors = document.querySelectorAll('.leancloud_visitors');
+      var entries = [...visitors].map(element => {
+        return decodeURI(element.id);
+      });
+
+      Counter('get', '/classes/Counter?where=' + encodeURIComponent(JSON.stringify({ url: { '$in': entries } })))
+        .then(response => response.json())
+        .then(({ results }) => {
+          for (let url of entries) {
+            let target = results.find(item => item.url === url);
+            leancloudSelector(url).innerText = target ? target.time : 0;
+          }
+        })
+        .catch(error => {
+          console.error('LeanCloud Counter Error', error);
+        });
+    }
+
+    let { app_id, app_key, server_url } = {"enable":true,"app_id":"eHjOI9XMuJ9k1eVrofxJmXn5-gzGzoHsz","app_key":"dpisfl8Ku3pgNp1XnVwjHC8v","server_url":null,"security":false};
+    function fetchData(api_server) {
+      var Counter = (method, url, data) => {
+        return fetch(`${api_server}/1.1${url}`, {
+          method,
+          headers: {
+            'X-LC-Id'     : app_id,
+            'X-LC-Key'    : app_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+      };
+      if (CONFIG.page.isPost) {
+        if (CONFIG.hostname !== location.hostname) return;
+        addCount(Counter);
+      } else if (document.querySelectorAll('.post-title-link').length >= 1) {
+        showTime(Counter);
+      }
+    }
+
+    let api_server = app_id.slice(-9) !== '-MdYXbMMI' ? server_url : `https://${app_id.slice(0, 8).toLowerCase()}.api.lncldglobal.com`;
+
+    if (api_server) {
+      fetchData(api_server);
+    } else {
+      fetch('https://app-router.leancloud.cn/2/route?appId=' + app_id)
+        .then(response => response.json())
+        .then(({ api_server }) => {
+          fetchData('https://' + api_server);
+        });
+    }
+  })();
+</script>
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
