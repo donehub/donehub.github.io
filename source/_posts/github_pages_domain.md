@@ -1,8 +1,8 @@
 ---
 title: GitHub Pages 绑定个人域名
 date: 2021-01-13 22:27:58
-tags: 域名
-categories: 运维
+tags: 域名绑定
+categories: 博客搭建
 ---
 
 -----
