@@ -244,6 +244,8 @@
           </div>
         {%- endif %}
 
+        {{ partial('_partials/post/post-share.swig', {}, {cache: theme.cache.enable}) }}
+
         {{ partial('_partials/post/post-footer.swig', {}, {cache: theme.cache.enable}) }}
 
         {{ post_nav(post) }}
