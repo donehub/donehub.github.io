@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="一、背景之前研究 Chrome DevTools MCP 的时候，解决的核心问题是让 AI 能操控浏览器。但那个方案有天然的局限性：必须配置 MCP Server、依赖 Chrome 调试端口、每个平台要单独写适配器。 OpenCLI 把这件事重新做了一遍，而且做得更彻底——它不只是让 AI 能操控浏览器，而是把任何网站变成标准化的命令行工具。GitHub 上 22K+ Stars，不是偶然。 这">
+<meta property="og:type" content="article">
+<meta property="og:title" content="OpenCLI 深度解析：让 AI Code Agent 操控任意网站">
+<meta property="og:url" content="https://donehub.github.io/2026/05/22/opencli-deep-analysis/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="一、背景之前研究 Chrome DevTools MCP 的时候，解决的核心问题是让 AI 能操控浏览器。但那个方案有天然的局限性：必须配置 MCP Server、依赖 Chrome 调试端口、每个平台要单独写适配器。 OpenCLI 把这件事重新做了一遍，而且做得更彻底——它不只是让 AI 能操控浏览器，而是把任何网站变成标准化的命令行工具。GitHub 上 22K+ Stars，不是偶然。 这">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-05-21T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-05-22T03:40:54.569Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="OpenCLI">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/05/22/opencli-deep-analysis/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>OpenCLI 深度解析：让 AI Code Agent 操控任意网站 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/05/22/opencli-deep-analysis/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          OpenCLI 深度解析：让 AI Code Agent 操控任意网站
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-05-22 00:00:00 / 修改时间：11:40:54" itemprop="dateCreated datePublished" datetime="2026-05-22T00:00:00+08:00">2026-05-22</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/05/22/opencli-deep-analysis/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/05/22/opencli-deep-analysis/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="一、背景"><a href="#一、背景" class="headerlink" title="一、背景"></a>一、背景</h2><p>之前研究 Chrome DevTools MCP 的时候，解决的核心问题是<strong>让 AI 能操控浏览器</strong>。但那个方案有天然的局限性：必须配置 MCP Server、依赖 Chrome 调试端口、每个平台要单独写适配器。</p>
+<p>OpenCLI 把这件事重新做了一遍，而且做得更彻底——它不只是让 AI 能操控浏览器，而是把<strong>任何网站变成标准化的命令行工具</strong>。GitHub 上 22K+ Stars，不是偶然。</p>
+<p>这篇文章的目标很明确：讲清楚 OpenCLI 是什么、架构怎么设计的、以及最核心的部分——<strong>如何在 Claude Code 等 Code Agent 里用它</strong>。</p>
+<hr>
+<h2 id="二、OpenCLI-是什么"><a href="#二、OpenCLI-是什么" class="headerlink" title="二、OpenCLI 是什么"></a>二、OpenCLI 是什么</h2><p>一句话定义：OpenCLI 是一个 AI 原生的 CLI 运行时框架，把任意网站、浏览器会话、Electron 应用统一变成标准化的命令行接口。</p>
+<p>打个比方理解它的定位：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>传统做法</th>
+<th>OpenCLI 做法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>发一篇小红书</td>
+<td>打开浏览器 → 登录 → 上传图片 → 写文案 → 发布</td>
+<td><code>opencli xiaohongshu publish --title &quot;xxx&quot; --content &quot;xxx&quot;</code></td>
+</tr>
+<tr>
+<td>看 B站播放量</td>
+<td>打开 B站创作者中心 → 刷新 → 看数据</td>
+<td><code>opencli bilibili stats</code></td>
+</tr>
+<tr>
+<td>给 Claude Code 说”帮我发篇文章”</td>
+<td>Claude Code 做不到</td>
+<td>Claude Code 通过 OpenCLI 直接完成</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>核心区别在于：传统做法每次都要手动操作网页，OpenCLI 把这些操作封装成<strong>确定性 CLI 命令</strong>，而且<strong>零 LLM 运行成本</strong>。</p>
+<hr>
+<h2 id="三、架构深度拆解"><a href="#三、架构深度拆解" class="headerlink" title="三、架构深度拆解"></a>三、架构深度拆解</h2><h3 id="3-1-整体架构图"><a href="#3-1-整体架构图" class="headerlink" title="3.1 整体架构图"></a>3.1 整体架构图</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">┌──────────────────────────────────────────────────────┐</span><br><span class="line">│                   用户 &#x2F; AI Agent                     │</span><br><span class="line">│              (Claude Code &#x2F; Cursor 等)                │</span><br><span class="line">└──────────────────────┬───────────────────────────────┘</span><br><span class="line">                       │ CLI 命令</span><br><span class="line">                       ▼</span><br><span class="line">┌──────────────────────────────────────────────────────┐</span><br><span class="line">│                   OpenCLI CLI 层                      │</span><br><span class="line">│  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐  │</span><br><span class="line">│  │  Plugin     │  │  Adapter     │  │  Session    │  │</span><br><span class="line">│  │  Loader     │  │  Resolver    │  │  Manager    │  │</span><br><span class="line">│  └─────────────┘  └──────────────┘  └─────────────┘  │</span><br><span class="line">└──────────────────────┬───────────────────────────────┘</span><br><span class="line">                       │</span><br><span class="line">          ┌────────────┴────────────┐</span><br><span class="line">          ▼                         ▼</span><br><span class="line">┌────────────────────┐   ┌────────────────────────┐</span><br><span class="line">│  YAML Adapter 引擎  │   │  CDP 通信层             │</span><br><span class="line">│  (编译期智能)       │   │  Chrome DevTools        │</span><br><span class="line">│  生成确定性命令     │   │  Protocol 注入          │</span><br><span class="line">└────────────────────┘   └────────────┬───────────┘</span><br><span class="line">                                      │</span><br><span class="line">                                      ▼</span><br><span class="line">                          ┌───────────────────────┐</span><br><span class="line">                          │  Chrome Extension     │</span><br><span class="line">                          │  (Playwright MCP      │</span><br><span class="line">                          │   Bridge)             │</span><br><span class="line">                          └───────────┬───────────┘</span><br><span class="line">                                      │</span><br><span class="line">                                      ▼</span><br><span class="line">                          ┌───────────────────────┐</span><br><span class="line">                          │  已登录的 Chrome 浏览器 │</span><br><span class="line">                          │  (你的真实用户会话)     │</span><br><span class="line">                          └───────────────────────┘</span><br></pre></td></tr></table></figure>
+<p>这个架构有几个关键设计点，值得拆开细说。</p>
+<h3 id="3-2-核心理念：编译期智能-vs-运行期智能"><a href="#3-2-核心理念：编译期智能-vs-运行期智能" class="headerlink" title="3.2 核心理念：编译期智能 vs 运行期智能"></a>3.2 核心理念：编译期智能 vs 运行期智能</h3><p>这是 OpenCLI 架构里最重要的一个设计选择。</p>
+<p><strong>运行期智能</strong>的意思是：每次执行命令时都让 LLM 实时理解页面结构、决定操作步骤。这种方式灵活，但每次都要消耗 token，而且结果不稳定。</p>
+<p><strong>编译期智能</strong>是 OpenCLI 的选择：Adapter 在生成阶段只解析一次页面结构，产出一个确定性的 YAML 定义。后续所有 CLI 调用都走这个 YAML，<strong>零 LLM 成本，结果可预测</strong>。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 一个 Adapter 示例：获取 B站视频播放量</span></span><br><span class="line"><span class="attr">name:</span> <span class="string">bilibili-stats</span></span><br><span class="line"><span class="attr">target:</span> <span class="string">https://member.bilibili.com/platform/home</span></span><br><span class="line"><span class="attr">steps:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">navigate</span></span><br><span class="line">    <span class="attr">url:</span> <span class="string">"https://member.bilibili.com/platform/home"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">extract</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">".data-overview .total-views"</span></span><br><span class="line">    <span class="attr">output:</span> <span class="string">total_views</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">extract</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">".data-overview .total-fans"</span></span><br><span class="line">    <span class="attr">output:</span> <span class="string">total_fans</span></span><br></pre></td></tr></table></figure>
+<p>这段 YAML 定义好之后，每次执行都是确定的 DOM 选择器匹配，不需要 LLM 参与。只有在 Adapter 开发阶段才需要一次智能解析。</p>
+<h3 id="3-3-CDP-驱动层：为什么不走-Selenium-Playwright-路线"><a href="#3-3-CDP-驱动层：为什么不走-Selenium-Playwright-路线" class="headerlink" title="3.3 CDP 驱动层：为什么不走 Selenium/Playwright 路线"></a>3.3 CDP 驱动层：为什么不走 Selenium/Playwright 路线</h3><p>OpenCLI 选择基于 <strong>Chrome DevTools Protocol (CDP)</strong> 而不是传统的 Selenium 或 Playwright，原因很实际：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Selenium/Playwright</th>
+<th>CDP + Chrome 实例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>登录态</td>
+<td>需要单独维护 cookies</td>
+<td>直接复用你正在用的 Chrome</td>
+</tr>
+<tr>
+<td>安全</td>
+<td>需要存储账号密码</td>
+<td>零凭证存储</td>
+</tr>
+<tr>
+<td>真实性</td>
+<td>无头浏览器可能被检测</td>
+<td>真实浏览器实例</td>
+</tr>
+<tr>
+<td>开发成本</td>
+<td>要写完整的自动化脚本</td>
+<td>YAML 声明式定义</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>关键点在于<strong>复用登录态</strong>。你在浏览器里已经登录了知乎、B站、小红书，OpenCLI 直接通过 CDP 连上这个正在运行的实例，不需要重新登录、不需要 API Key、不需要存密码。</p>
+<h3 id="3-4-浏览器扩展：Playwright-MCP-Bridge"><a href="#3-4-浏览器扩展：Playwright-MCP-Bridge" class="headerlink" title="3.4 浏览器扩展：Playwright MCP Bridge"></a>3.4 浏览器扩展：Playwright MCP Bridge</h3><p>CDP 本身只能从外部控制 Chrome，但 OpenCLI 需要双向通信——既要控制页面，也要把页面结构回传给 CLI。这个桥梁由一个 Chrome 扩展承担：</p>
+<p><strong>Playwright MCP Bridge 扩展</strong>负责：</p>
+<ol>
+<li>接收 OpenCLI CLI 的指令（点击、输入、导航）</li>
+<li>在页面中执行对应操作</li>
+<li>返回结构化 DOM 快照（不是截图，是带语义的 DOM 树）</li>
+<li>维护 Session 状态（bind/unbind 标签页）</li>
+</ol>
+<p>这个扩展是轻量级的 micro-daemon 模式，启动 OpenCLI 时自动加载。</p>
+<h3 id="3-5-Session-管理：bind-机制"><a href="#3-5-Session-管理：bind-机制" class="headerlink" title="3.5 Session 管理：bind 机制"></a>3.5 Session 管理：bind 机制</h3><p>Session 是 OpenCLI 连接 CLI 命令和具体浏览器标签页的桥梁：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 把当前浏览器某个已登录的标签页绑定到 session</span></span><br><span class="line">opencli browser my-blog <span class="built_in">bind</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 查看已绑定的 session</span></span><br><span class="line">opencli browser list</span><br><span class="line"></span><br><span class="line"><span class="comment"># 解绑</span></span><br><span class="line">opencli browser my-blog unbind</span><br></pre></td></tr></table></figure>
+<p>绑定之后，所有针对该平台的 CLI 命令都会在这个已登录的标签页里执行。</p>
+<hr>
+<h2 id="四、安装与快速上手"><a href="#四、安装与快速上手" class="headerlink" title="四、安装与快速上手"></a>四、安装与快速上手</h2><h3 id="4-1-环境要求"><a href="#4-1-环境要求" class="headerlink" title="4.1 环境要求"></a>4.1 环境要求</h3><ul>
+<li>Node.js &gt;= 20.0.0</li>
+<li>Chrome / Chromium / Brave / Edge 浏览器</li>
+</ul>
+<h3 id="4-2-安装步骤"><a href="#4-2-安装步骤" class="headerlink" title="4.2 安装步骤"></a>4.2 安装步骤</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 全局安装 OpenCLI</span></span><br><span class="line">npm install -g @jackwener/opencli</span><br><span class="line"></span><br><span class="line"><span class="comment"># 自动配置（检测 Chrome 实例、安装扩展）</span></span><br><span class="line">opencli setup</span><br></pre></td></tr></table></figure>
+<p><code>opencli setup</code> 会做这几件事：</p>
+<ol>
+<li>检测本地 Chrome 调试端口</li>
+<li>下载并加载 Playwright MCP Bridge 扩展</li>
+<li>验证 CLI 与浏览器的连通性</li>
+<li>初始化 <code>~/.opencli</code> 配置目录</li>
+</ol>
+<h3 id="4-3-运行第一个命令"><a href="#4-3-运行第一个命令" class="headerlink" title="4.3 运行第一个命令"></a>4.3 运行第一个命令</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 查看内置适配器列表</span></span><br><span class="line">opencli list</span><br><span class="line"></span><br><span class="line"><span class="comment"># 运行一个平台命令（以 B站 为例）</span></span><br><span class="line">opencli bilibili stats</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="五、在-Code-Agent-中的使用（重点）"><a href="#五、在-Code-Agent-中的使用（重点）" class="headerlink" title="五、在 Code Agent 中的使用（重点）"></a>五、在 Code Agent 中的使用（重点）</h2><p>这部分是整篇文章的核心。OpenCLI 的真正威力不在于手动敲命令，而在于<strong>让 AI Code Agent 通过它操控任意网站</strong>。</p>
+<h3 id="5-1-为什么-Code-Agent-需要-OpenCLI"><a href="#5-1-为什么-Code-Agent-需要-OpenCLI" class="headerlink" title="5.1 为什么 Code Agent 需要 OpenCLI"></a>5.1 为什么 Code Agent 需要 OpenCLI</h3><p>Claude Code、Cursor 这类 Code Agent 原生能力很强：能写代码、能读文件、能跑测试、能用 git。但有一个明确的边界——<strong>它们不能操作网页</strong>。</p>
+<p>这个边界在实际工作中很要命。举个例子：</p>
+<p>你要把一篇技术博客同步到知乎、公众号、小红书三个平台。用 Claude Code 写文章很快，但发布环节只能手动操作三个平台的后台。OpenCLI 把这个边界打通了。</p>
+<h3 id="5-2-在-Claude-Code-中集成-OpenCLI"><a href="#5-2-在-Claude-Code-中集成-OpenCLI" class="headerlink" title="5.2 在 Claude Code 中集成 OpenCLI"></a>5.2 在 Claude Code 中集成 OpenCLI</h3><h4 id="方式一：直接作为-CLI-工具调用"><a href="#方式一：直接作为-CLI-工具调用" class="headerlink" title="方式一：直接作为 CLI 工具调用"></a>方式一：直接作为 CLI 工具调用</h4><p>Claude Code 本身就能执行 shell 命令，最直接的方式就是在对话中让它执行 <code>opencli</code> 命令：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">你: 帮我查看 B站最近的视频数据</span><br><span class="line">Claude Code: 执行 opencli bilibili stats，返回结果...</span><br></pre></td></tr></table></figure>
+<p>这种方式不需要额外配置，只要本机装了 OpenCLI 就行。</p>
+<h4 id="方式二：安装-OpenCLI-Skill"><a href="#方式二：安装-OpenCLI-Skill" class="headerlink" title="方式二：安装 OpenCLI Skill"></a>方式二：安装 OpenCLI Skill</h4><p>OpenCLI 提供了适配 AI Agent 的 Skill 定义，安装后 Agent 能更准确地理解和使用 OpenCLI：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在 Claude Code 中安装 OpenCLI skill</span></span><br><span class="line">npx skills add jackwener/opencli</span><br></pre></td></tr></table></figure>
+<p>安装之后，Claude Code 会在执行浏览器相关任务时自动识别 OpenCLI 的可用命令，而不是每次都让你手动指定。</p>
+<h4 id="方式三：在-claude-commands-中自定义命令"><a href="#方式三：在-claude-commands-中自定义命令" class="headerlink" title="方式三：在 .claude/commands 中自定义命令"></a>方式三：在 .claude/commands 中自定义命令</h4><p>结合 Claude Code 的自定义命令系统，可以把常用的 OpenCLI 操作封装成斜杠命令：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># .claude/commands/publish-blog.md</span></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">发布博客到多平台</span></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"></span><br><span class="line"><span class="string">执行以下命令发布博客：</span></span><br><span class="line"><span class="number">1</span><span class="string">.</span> <span class="string">opencli</span> <span class="string">zhihu</span> <span class="string">publish</span> <span class="string">--title</span> <span class="string">"<span class="template-variable">&#123;&#123;title&#125;&#125;</span>"</span> <span class="string">--content</span> <span class="string">"<span class="template-variable">&#123;&#123;content&#125;&#125;</span>"</span></span><br><span class="line"><span class="number">2</span><span class="string">.</span> <span class="string">opencli</span> <span class="string">weixin</span> <span class="string">publish</span> <span class="string">--title</span> <span class="string">"<span class="template-variable">&#123;&#123;title&#125;&#125;</span>"</span> <span class="string">--content</span> <span class="string">"<span class="template-variable">&#123;&#123;content&#125;&#125;</span>"</span></span><br><span class="line"><span class="number">3</span><span class="string">.</span> <span class="string">opencli</span> <span class="string">xiaohongshu</span> <span class="string">publish</span> <span class="string">--title</span> <span class="string">"<span class="template-variable">&#123;&#123;title&#125;&#125;</span>"</span> <span class="string">--content</span> <span class="string">"<span class="template-variable">&#123;&#123;content&#125;&#125;</span>"</span></span><br></pre></td></tr></table></figure>
+<p>之后在 Claude Code 中只需输入 <code>/publish-blog</code> 就能一键发布。</p>
+<h3 id="5-3-实际工作流示例"><a href="#5-3-实际工作流示例" class="headerlink" title="5.3 实际工作流示例"></a>5.3 实际工作流示例</h3><h4 id="场景：AI-驱动的博客同步工作流"><a href="#场景：AI-驱动的博客同步工作流" class="headerlink" title="场景：AI 驱动的博客同步工作流"></a>场景：AI 驱动的博客同步工作流</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">你: 把 source&#x2F;_posts&#x2F;opencli-deep-analysis.md 这篇文章发到知乎、小红书、B站</span><br><span class="line"></span><br><span class="line">Claude Code 的执行流程:</span><br><span class="line">1. 读取 Markdown 文件内容</span><br><span class="line">2. 根据各平台特点调整格式（知乎支持 Markdown，</span><br><span class="line">   小红书需要短文案+图片，B站专栏有特定结构）</span><br><span class="line">3. 执行 opencli zhihu publish --title &quot;...&quot; --content &quot;...&quot;</span><br><span class="line">4. 执行 opencli xiaohongshu publish --title &quot;...&quot; --content &quot;...&quot;</span><br><span class="line">5. 执行 opencli bilibili publish --title &quot;...&quot; --content &quot;...&quot;</span><br><span class="line">6. 返回各平台的发布结果</span><br></pre></td></tr></table></figure>
+<p>整个过程不需要你打开任何一个浏览器页面。</p>
+<h4 id="场景：数据监控面板"><a href="#场景：数据监控面板" class="headerlink" title="场景：数据监控面板"></a>场景：数据监控面板</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">你: 帮我看看各平台最近一周的数据</span><br><span class="line"></span><br><span class="line">Claude Code:</span><br><span class="line">&gt; opencli bilibili stats --period 7d</span><br><span class="line">&gt; opencli zhihu stats --period 7d</span><br><span class="line">&gt; opencli xiaohongshu stats --period 7d</span><br><span class="line"></span><br><span class="line">汇总输出:</span><br><span class="line">| 平台   | 阅读量  | 点赞 | 评论 |</span><br><span class="line">|--------|--------|------|------|</span><br><span class="line">| B站    | 12,340 | 456  | 89   |</span><br><span class="line">| 知乎   | 8,920  | 312  | 56   |</span><br><span class="line">| 小红书 | 15,600 | 890  | 123  |</span><br></pre></td></tr></table></figure>
+<h4 id="场景：社区运营自动化"><a href="#场景：社区运营自动化" class="headerlink" title="场景：社区运营自动化"></a>场景：社区运营自动化</h4><p>对于数字游民社区的运营工作，OpenCLI 能大幅减少重复劳动：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">你: 检查一下社区后台有没有待审核的帖子</span><br><span class="line"></span><br><span class="line">Claude Code:</span><br><span class="line">&gt; opencli nomad-community pending-reviews</span><br><span class="line"></span><br><span class="line">返回 3 条待审核内容，逐条展示...</span><br><span class="line"></span><br><span class="line">你: 全部通过</span><br><span class="line"></span><br><span class="line">Claude Code:</span><br><span class="line">&gt; opencli nomad-community approve --all</span><br></pre></td></tr></table></figure>
+<h3 id="5-4-Agent-操作浏览器的技术细节"><a href="#5-4-Agent-操作浏览器的技术细节" class="headerlink" title="5.4 Agent 操作浏览器的技术细节"></a>5.4 Agent 操作浏览器的技术细节</h3><p>理解 Claude Code 通过 OpenCLI 操作浏览器的底层流程，有助于你排查问题和编写自定义插件。</p>
+<p><strong>完整的调用链路</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Claude Code 发起对话</span><br><span class="line">  → OpenCLI CLI 解析命令</span><br><span class="line">    → 查找对应 Adapter 定义（YAML&#x2F;TS）</span><br><span class="line">      → 通过 CDP 连接 Chrome 实例</span><br><span class="line">        → 扩展在页面中执行操作</span><br><span class="line">          → 返回结构化 DOM 快照</span><br><span class="line">            → Adapter 解析快照提取数据</span><br><span class="line">              → CLI 返回结果给 Claude Code</span><br></pre></td></tr></table></figure>
+<p><strong>结构化 DOM 快照</strong> 是理解这一切的关键。OpenCLI 不是截图给 AI 看，而是把页面转成一个带语义的结构化文本：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">[button] &quot;发布文章&quot; (clickable, enabled)</span><br><span class="line">[textbox] &quot;标题&quot; value&#x3D;&quot;OpenCLI 深度解析&quot; (editable)</span><br><span class="line">[textarea] &quot;正文内容&quot; (editable, placeholder&#x3D;&quot;输入正文...&quot;)</span><br><span class="line">[link] &quot;预览&quot; href&#x3D;&quot;&#x2F;preview&quot;</span><br></pre></td></tr></table></figure>
+<p>这种格式对 LLM 极其友好：token 消耗远低于截图，信息密度更高，而且可以直接定位到可交互元素。</p>
+<hr>
+<h2 id="六、插件开发实战"><a href="#六、插件开发实战" class="headerlink" title="六、插件开发实战"></a>六、插件开发实战</h2><p>内置适配器覆盖了主流平台，但你自己的网站或者小众平台需要写自定义插件。</p>
+<h3 id="6-1-插件目录结构"><a href="#6-1-插件目录结构" class="headerlink" title="6.1 插件目录结构"></a>6.1 插件目录结构</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">~&#x2F;.opencli&#x2F;plugins&#x2F;</span><br><span class="line">└── my-custom-plugin&#x2F;</span><br><span class="line">    ├── plugin.yaml        # 插件元信息</span><br><span class="line">    ├── adapters&#x2F;</span><br><span class="line">    │   ├── list.yaml      # 列表命令</span><br><span class="line">    │   ├── publish.yaml   # 发布命令</span><br><span class="line">    │   └── stats.yaml     # 统计命令</span><br><span class="line">    └── README.md</span><br></pre></td></tr></table></figure>
+<h3 id="6-2-编写一个完整的-Adapter"><a href="#6-2-编写一个完整的-Adapter" class="headerlink" title="6.2 编写一个完整的 Adapter"></a>6.2 编写一个完整的 Adapter</h3><p>以”从某个网站后台提取文章列表”为例：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># plugin.yaml</span></span><br><span class="line"><span class="attr">name:</span> <span class="string">my-blog-admin</span></span><br><span class="line"><span class="attr">version:</span> <span class="number">1.0</span><span class="number">.0</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">个人博客后台管理</span> <span class="string">CLI</span></span><br><span class="line"><span class="attr">base_url:</span> <span class="string">https://myblog.com/admin</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># adapters/list.yaml</span></span><br><span class="line"><span class="attr">name:</span> <span class="string">articles</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">列出所有文章</span></span><br><span class="line"><span class="attr">target:</span> <span class="string">"https://myblog.com/admin/articles"</span></span><br><span class="line"><span class="attr">steps:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">navigate</span></span><br><span class="line">    <span class="attr">url:</span> <span class="string">"https://myblog.com/admin/articles"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">wait</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">".article-table tbody tr"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">extract</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">".article-table tbody tr"</span></span><br><span class="line">    <span class="attr">fields:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">title</span></span><br><span class="line">        <span class="attr">selector:</span> <span class="string">".article-title"</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">status</span></span><br><span class="line">        <span class="attr">selector:</span> <span class="string">".article-status"</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">published_at</span></span><br><span class="line">        <span class="attr">selector:</span> <span class="string">".published-date"</span></span><br><span class="line">    <span class="attr">output:</span> <span class="string">articles</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">format</span></span><br><span class="line">    <span class="attr">template:</span> <span class="string">"<span class="template-variable">&#123;&#123;title&#125;&#125;</span> | <span class="template-variable">&#123;&#123;status&#125;&#125;</span> | <span class="template-variable">&#123;&#123;published_at&#125;&#125;</span>"</span></span><br><span class="line">    <span class="attr">output:</span> <span class="string">articles</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># adapters/publish.yaml</span></span><br><span class="line"><span class="attr">name:</span> <span class="string">publish</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">发布新文章</span></span><br><span class="line"><span class="attr">target:</span> <span class="string">"https://myblog.com/admin/articles/new"</span></span><br><span class="line"><span class="attr">inputs:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">title</span></span><br><span class="line">    <span class="attr">type:</span> <span class="string">string</span></span><br><span class="line">    <span class="attr">required:</span> <span class="literal">true</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">content</span></span><br><span class="line">    <span class="attr">type:</span> <span class="string">string</span></span><br><span class="line">    <span class="attr">required:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">steps:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">navigate</span></span><br><span class="line">    <span class="attr">url:</span> <span class="string">"https://myblog.com/admin/articles/new"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">input</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">"#article-title"</span></span><br><span class="line">    <span class="attr">value:</span> <span class="string">"<span class="template-variable">&#123;&#123;title&#125;&#125;</span>"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">input</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">"#article-content"</span></span><br><span class="line">    <span class="attr">value:</span> <span class="string">"<span class="template-variable">&#123;&#123;content&#125;&#125;</span>"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">click</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">"#publish-button"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">wait</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">".publish-success"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">extract</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">".success-message"</span></span><br><span class="line">    <span class="attr">output:</span> <span class="string">result</span></span><br></pre></td></tr></table></figure>
+<p>写好之后，通过 symlink 链接到 OpenCLI 插件目录：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Linux/Mac</span></span><br><span class="line">ln -s /path/to/my-custom-plugin ~/.opencli/plugins/my-blog-admin</span><br><span class="line"></span><br><span class="line"><span class="comment"># Windows (PowerShell)</span></span><br><span class="line">New-Item -ItemType Junction -Path <span class="string">"<span class="variable">$env</span>:USERPROFILE\.opencli\plugins\my-blog-admin"</span> -Target <span class="string">"D:\path\to\my-custom-plugin"</span></span><br></pre></td></tr></table></figure>
+<p>之后就能直接使用：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 列出文章</span></span><br><span class="line">opencli my-blog-admin articles</span><br><span class="line"></span><br><span class="line"><span class="comment"># 发布文章</span></span><br><span class="line">opencli my-blog-admin publish --title <span class="string">"OpenCLI 深度解析"</span> --content <span class="string">"..."</span></span><br></pre></td></tr></table></figure>
+<h3 id="6-3-在-Claude-Code-中使用自定义插件"><a href="#6-3-在-Claude-Code-中使用自定义插件" class="headerlink" title="6.3 在 Claude Code 中使用自定义插件"></a>6.3 在 Claude Code 中使用自定义插件</h3><p>自定义插件写好后，Claude Code 同样能调用。你可以在 Claude 的对话中直接说：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">你: 用 my-blog-admin 插件列出所有已发布的文章</span><br><span class="line">Claude Code: 执行 opencli my-blog-admin articles，返回...</span><br><span class="line"></span><br><span class="line">你: 帮我把标题为 &quot;xxx&quot; 的文章同步到知乎</span><br><span class="line">Claude Code:</span><br><span class="line">1. 执行 opencli my-blog-admin articles 获取文章内容</span><br><span class="line">2. 提取目标文章内容</span><br><span class="line">3. 执行 opencli zhihu publish 发布到知乎</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、OpenCLI-vs-其他方案对比"><a href="#七、OpenCLI-vs-其他方案对比" class="headerlink" title="七、OpenCLI vs 其他方案对比"></a>七、OpenCLI vs 其他方案对比</h2><p>市面上让 AI 操作网页的方案不少，简单对比一下：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>登录态</th>
+<th>LLM 成本</th>
+<th>开发门槛</th>
+<th>稳定性</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>OpenCLI</strong></td>
+<td>复用 Chrome</td>
+<td>零运行成本</td>
+<td>YAML 声明式</td>
+<td>确定性执行</td>
+</tr>
+<tr>
+<td>Chrome DevTools MCP</td>
+<td>复用 Chrome</td>
+<td>每次消耗 token</td>
+<td>需 MCP 配置</td>
+<td>LLM 实时判断</td>
+</tr>
+<tr>
+<td>Playwright 脚本</td>
+<td>需要维护 cookies</td>
+<td>无</td>
+<td>完整编程</td>
+<td>最高但开发成本大</td>
+</tr>
+<tr>
+<td>Browser Use 框架</td>
+<td>需要单独登录</td>
+<td>每次消耗 token</td>
+<td>Python 代码</td>
+<td>依赖 LLM 判断</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>OpenCLI 的 sweet spot 很明确：<strong>当你需要一个确定性的、零运行成本的、能复用浏览器登录态的网站操作方案时</strong>，它是最优选择。</p>
+<hr>
+<h2 id="八、注意事项与限制"><a href="#八、注意事项与限制" class="headerlink" title="八、注意事项与限制"></a>八、注意事项与限制</h2><p>任何工具都有边界，OpenCLI 也不例外。</p>
+<h3 id="8-1-不适合的场景"><a href="#8-1-不适合的场景" class="headerlink" title="8.1 不适合的场景"></a>8.1 不适合的场景</h3><ul>
+<li><strong>高频交易或实时性要求极高的操作</strong>：CDP 通信有延迟，不如直接调 API</li>
+<li><strong>需要无头浏览器批量爬取的场景</strong>：OpenCLI 依赖真实 Chrome 实例，不适合大规模并发</li>
+<li><strong>对稳定性要求 100% 的生产环境</strong>：网站改版后 Adapter 需要更新选择器</li>
+</ul>
+<h3 id="8-2-安全考量"><a href="#8-2-安全考量" class="headerlink" title="8.2 安全考量"></a>8.2 安全考量</h3><p>OpenCLI 复用浏览器登录态，意味着它能操作你已登录的任何网站。建议：</p>
+<ul>
+<li>只在受信任的 AI Agent（如本地 Claude Code）中使用</li>
+<li>不要在云端或共享环境中使用</li>
+<li>发布类操作可以先让 Agent 生成预览，人工确认后再执行</li>
+</ul>
+<h3 id="8-3-平台反爬"><a href="#8-3-平台反爬" class="headerlink" title="8.3 平台反爬"></a>8.3 平台反爬</h3><p>部分平台会检测自动化行为。OpenCLI 走的是真实浏览器实例，比无头浏览器好一些，但如果操作频率过高仍可能触发风控。控制节奏、避免短时间大量操作。</p>
+<hr>
+<h2 id="九、总结"><a href="#九、总结" class="headerlink" title="九、总结"></a>九、总结</h2><p>OpenCLI 把”让 AI 操作网页”这件事从实验阶段拉到了生产可用阶段。它的核心价值可以概括为三点：</p>
+<ol>
+<li><strong>统一接口</strong>：任何网站变成 CLI，不用管底层是网页、Electron 还是本地工具</li>
+<li><strong>零运行成本</strong>：Adapter 编译后确定性执行，不消耗 LLM token</li>
+<li><strong>安全复用登录态</strong>：不存密码、不要 API Key、走真实浏览器</li>
+</ol>
+<p>对于写博客、运营社区、管理多平台的创作者来说，配合 Claude Code 这样的 Code Agent，OpenCLI 能省掉大量重复的浏览器操作。对于开发者来说，YAML 声明式的插件开发门槛远低于写完整的自动化脚本。</p>
+
+    </div>
+
+    
+    
+    
+        
+
+  <div class="followme">
+    <p>欢迎关注我的其它发布渠道</p>
+
+    <div class="social-list">
+
+        <div class="social-item">
+          <a target="_blank" class="social-link" href="/atom.xml">
+            <span class="icon">
+              <i class="fa fa-rss"></i>
+            </span>
+
+            <span class="label">RSS</span>
+          </a>
+        </div>
+    </div>
+  </div>
+
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/OpenCLI/" rel="tag"><i class="fa fa-tag"></i> OpenCLI</a>
+          </div>
+
+        
+<div class="post-share">
+  <div class="share-title">分享到</div>
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+
+<style>
+.post-share {
+  margin: 20px 0;
+  padding: 15px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+}
+.post-share .share-title {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 10px;
+}
+.post-share .social-share {
+  text-align: center;
+}
+.post-share .social-share a {
+  margin: 0 8px;
+}
+/* 微信二维码样式优化 */
+.social-share .wechat-qrcode {
+  border: 1px solid #eee;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+.social-share .wechat-qrcode h4 {
+  color: #333;
+  font-weight: normal;
+}
+</style>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/05/16/trendradar-hot-news-aggregator-guide/" rel="prev" title="TrendRadar：告别无效刷屏，只看真正关心的新闻">
+      <i class="fa fa-chevron-left"></i> TrendRadar：告别无效刷屏，只看真正关心的新闻
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#一、背景"><span class="nav-number">1.</span> <span class="nav-text">一、背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、OpenCLI-是什么"><span class="nav-number">2.</span> <span class="nav-text">二、OpenCLI 是什么</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、架构深度拆解"><span class="nav-number">3.</span> <span class="nav-text">三、架构深度拆解</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-整体架构图"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 整体架构图</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-核心理念：编译期智能-vs-运行期智能"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 核心理念：编译期智能 vs 运行期智能</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-CDP-驱动层：为什么不走-Selenium-Playwright-路线"><span class="nav-number">3.3.</span> <span class="nav-text">3.3 CDP 驱动层：为什么不走 Selenium&#x2F;Playwright 路线</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-浏览器扩展：Playwright-MCP-Bridge"><span class="nav-number">3.4.</span> <span class="nav-text">3.4 浏览器扩展：Playwright MCP Bridge</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-5-Session-管理：bind-机制"><span class="nav-number">3.5.</span> <span class="nav-text">3.5 Session 管理：bind 机制</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、安装与快速上手"><span class="nav-number">4.</span> <span class="nav-text">四、安装与快速上手</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-环境要求"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 环境要求</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-安装步骤"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 安装步骤</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-运行第一个命令"><span class="nav-number">4.3.</span> <span class="nav-text">4.3 运行第一个命令</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、在-Code-Agent-中的使用（重点）"><span class="nav-number">5.</span> <span class="nav-text">五、在 Code Agent 中的使用（重点）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-为什么-Code-Agent-需要-OpenCLI"><span class="nav-number">5.1.</span> <span class="nav-text">5.1 为什么 Code Agent 需要 OpenCLI</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-在-Claude-Code-中集成-OpenCLI"><span class="nav-number">5.2.</span> <span class="nav-text">5.2 在 Claude Code 中集成 OpenCLI</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#方式一：直接作为-CLI-工具调用"><span class="nav-number">5.2.1.</span> <span class="nav-text">方式一：直接作为 CLI 工具调用</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#方式二：安装-OpenCLI-Skill"><span class="nav-number">5.2.2.</span> <span class="nav-text">方式二：安装 OpenCLI Skill</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#方式三：在-claude-commands-中自定义命令"><span class="nav-number">5.2.3.</span> <span class="nav-text">方式三：在 .claude&#x2F;commands 中自定义命令</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-实际工作流示例"><span class="nav-number">5.3.</span> <span class="nav-text">5.3 实际工作流示例</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#场景：AI-驱动的博客同步工作流"><span class="nav-number">5.3.1.</span> <span class="nav-text">场景：AI 驱动的博客同步工作流</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#场景：数据监控面板"><span class="nav-number">5.3.2.</span> <span class="nav-text">场景：数据监控面板</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#场景：社区运营自动化"><span class="nav-number">5.3.3.</span> <span class="nav-text">场景：社区运营自动化</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-4-Agent-操作浏览器的技术细节"><span class="nav-number">5.4.</span> <span class="nav-text">5.4 Agent 操作浏览器的技术细节</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、插件开发实战"><span class="nav-number">6.</span> <span class="nav-text">六、插件开发实战</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-插件目录结构"><span class="nav-number">6.1.</span> <span class="nav-text">6.1 插件目录结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-编写一个完整的-Adapter"><span class="nav-number">6.2.</span> <span class="nav-text">6.2 编写一个完整的 Adapter</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-在-Claude-Code-中使用自定义插件"><span class="nav-number">6.3.</span> <span class="nav-text">6.3 在 Claude Code 中使用自定义插件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、OpenCLI-vs-其他方案对比"><span class="nav-number">7.</span> <span class="nav-text">七、OpenCLI vs 其他方案对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、注意事项与限制"><span class="nav-number">8.</span> <span class="nav-text">八、注意事项与限制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#8-1-不适合的场景"><span class="nav-number">8.1.</span> <span class="nav-text">8.1 不适合的场景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-2-安全考量"><span class="nav-number">8.2.</span> <span class="nav-text">8.2 安全考量</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-3-平台反爬"><span class="nav-number">8.3.</span> <span class="nav-text">8.3 平台反爬</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#九、总结"><span class="nav-number">9.</span> <span class="nav-text">九、总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">91</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">53</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
