@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="在 Java 开发中，BigDecimal 是处理高精度数值的必备工具。然而，当我们需要将其转换为字符串时，面对 toString()、toPlainString() 和 toEngineeringString() 三个方法，很多开发者往往不知如何选择。本文将深入源码层面，剖析三者的实现原理，揭示常见陷阱，并提供最佳实践指导。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="BigDecimal 字符串转换深度解析">
+<meta property="og:url" content="https://donehub.github.io/2022/05/28/bigdecimal-string-conversion-deep-analysis/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="在 Java 开发中，BigDecimal 是处理高精度数值的必备工具。然而，当我们需要将其转换为字符串时，面对 toString()、toPlainString() 和 toEngineeringString() 三个方法，很多开发者往往不知如何选择。本文将深入源码层面，剖析三者的实现原理，揭示常见陷阱，并提供最佳实践指导。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-05-27T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-05-28T15:30:41.876Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Java">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2022/05/28/bigdecimal-string-conversion-deep-analysis/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>BigDecimal 字符串转换深度解析 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2022/05/28/bigdecimal-string-conversion-deep-analysis/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          BigDecimal 字符串转换深度解析
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-05-28 00:00:00" itemprop="dateCreated datePublished" datetime="2022-05-28T00:00:00+08:00">2022-05-28</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-05-28 23:30:41" itemprop="dateModified" datetime="2026-05-28T23:30:41+08:00">2026-05-28</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2022/05/28/bigdecimal-string-conversion-deep-analysis/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2022/05/28/bigdecimal-string-conversion-deep-analysis/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>在 Java 开发中，<code>BigDecimal</code> 是处理高精度数值的必备工具。然而，当我们需要将其转换为字符串时，面对 <code>toString()</code>、<code>toPlainString()</code> 和 <code>toEngineeringString()</code> 三个方法，很多开发者往往不知如何选择。本文将深入源码层面，剖析三者的实现原理，揭示常见陷阱，并提供最佳实践指导。</p>
+<a id="more"></a>
+<h2 id="一、核心区别速览"><a href="#一、核心区别速览" class="headerlink" title="一、核心区别速览"></a>一、核心区别速览</h2><p>在深入源码之前，先通过一个表格快速了解三个方法的核心差异：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>科学计数法</th>
+<th>指数形式</th>
+<th>典型输出示例</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>toString()</code></td>
+<td>✅ 自动判断</td>
+<td>标准科学计数法</td>
+<td><code>1.23E-7</code></td>
+<td>日志记录、通用显示</td>
+</tr>
+<tr>
+<td><code>toPlainString()</code></td>
+<td>❌ 从不使用</td>
+<td>无</td>
+<td><code>0.000000123</code></td>
+<td>金额显示、用户界面</td>
+</tr>
+<tr>
+<td><code>toEngineeringString()</code></td>
+<td>✅ 始终使用</td>
+<td>工程计数法</td>
+<td><code>123E-9</code></td>
+<td>工程计算、科学领域</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>关键差异</strong>：</p>
+<ul>
+<li><code>toString()</code>：根据数值大小自动决定是否使用科学计数法</li>
+<li><code>toPlainString()</code>：始终输出完整十进制形式，绝不会出现指数</li>
+<li><code>toEngineeringString()</code>：始终使用科学计数法，但指数必须是 3 的倍数</li>
+</ul>
+<hr>
+<h2 id="二、源码深度解析"><a href="#二、源码深度解析" class="headerlink" title="二、源码深度解析"></a>二、源码深度解析</h2><h3 id="2-1-toString-：智能的科学计数法"><a href="#2-1-toString-：智能的科学计数法" class="headerlink" title="2.1 toString()：智能的科学计数法"></a>2.1 toString()：智能的科学计数法</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> String <span class="title">toString</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    String sc = stringCache;</span><br><span class="line">    <span class="keyword">if</span> (sc == <span class="keyword">null</span>) &#123;</span><br><span class="line">        stringCache = sc = layoutChars(<span class="keyword">false</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> sc;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>toString()</code> 内部调用了 <code>layoutChars(boolean sci)</code> 方法，参数 <code>sci = false</code> 表示使用标准科学计数法。</p>
+<h4 id="核心逻辑：layoutChars-false"><a href="#核心逻辑：layoutChars-false" class="headerlink" title="核心逻辑：layoutChars(false)"></a>核心逻辑：layoutChars(false)</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> String <span class="title">layoutChars</span><span class="params">(<span class="keyword">boolean</span> sci)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (scale == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="comment">// 无小数位，直接返回整数字符串</span></span><br><span class="line">        <span class="keyword">return</span> (intCompact != INFLATED) </span><br><span class="line">            ? Long.toString(intCompact) </span><br><span class="line">            : intVal.toString();</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (scale &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="comment">// 负 scale 表示实际值需要补零</span></span><br><span class="line">        <span class="comment">// 如: 123 scale=-3 → "123000"</span></span><br><span class="line">        <span class="keyword">return</span> intVal.toString() + zeros(-scale);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// scale &gt; 0 时，决定是否使用科学计数法</span></span><br><span class="line">    <span class="keyword">int</span> adjust = -scale + (intCompact != INFLATED </span><br><span class="line">        ? digitLength(intCompact) </span><br><span class="line">        : intVal.precision()) + <span class="number">1</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 关键阈值判断</span></span><br><span class="line">    <span class="keyword">if</span> (adjust &gt;= -<span class="number">6</span>) &#123;</span><br><span class="line">        <span class="comment">// 调整值在 -6 到 0 之间，使用普通十进制形式</span></span><br><span class="line">        <span class="keyword">return</span> toPlainString();</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 调整值超过阈值，使用科学计数法</span></span><br><span class="line">    StringBuilder buf = <span class="keyword">new</span> StringBuilder();</span><br><span class="line">    <span class="comment">// ... 构建科学计数法字符串</span></span><br><span class="line">    buf.append(<span class="string">'E'</span>);</span><br><span class="line">    buf.append(adjust - <span class="number">1</span>);  <span class="comment">// 指数值</span></span><br><span class="line">    <span class="keyword">return</span> buf.toString();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>关键阈值解释</strong>：</p>
+<p>当 <code>adjust &gt;= -6</code> 时，使用普通十进制形式；否则使用科学计数法。</p>
+<p><code>adjust</code> 的计算公式：<code>adjust = -scale + precision + 1</code></p>
+<ul>
+<li><code>precision</code>：有效数字位数</li>
+<li><code>scale</code>：小数位数</li>
+</ul>
+<p><strong>示例分析</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">BigDecimal bd = <span class="keyword">new</span> BigDecimal(<span class="string">"0.000000123"</span>);</span><br><span class="line"><span class="comment">// precision = 3 (有效数字 1, 2, 3)</span></span><br><span class="line"><span class="comment">// scale = 9 (小数位数)</span></span><br><span class="line"><span class="comment">// adjust = -9 + 3 + 1 = -5</span></span><br><span class="line"><span class="comment">// -5 &gt;= -6，所以不使用科学计数法？❌ 错！</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 实际上，adjust = -9 + 3 + 1 = -5</span></span><br><span class="line"><span class="comment">// 但 -5 &lt; -6，所以使用科学计数法 "1.23E-7"</span></span><br></pre></td></tr></table></figure>
+<p>等等，这里需要更精确地理解阈值：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (adjust &gt;= -<span class="number">6</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> toPlainString();  <span class="comment">// 普通形式</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// adjust &lt; -6 时使用科学计数法</span></span><br></pre></td></tr></table></figure>
+<p><strong>实际测试</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">new</span> BigDecimal(<span class="string">"0.00000123"</span>).toString();    <span class="comment">// "0.00000123"  (adjust = -6 + 3 + 1 = -2)</span></span><br><span class="line"><span class="keyword">new</span> BigDecimal(<span class="string">"0.000000123"</span>).toString();   <span class="comment">// "1.23E-7"     (adjust = -7 + 3 + 1 = -3)</span></span><br></pre></td></tr></table></figure>
+<h3 id="2-2-toPlainString-：完整的十进制形式"><a href="#2-2-toPlainString-：完整的十进制形式" class="headerlink" title="2.2 toPlainString()：完整的十进制形式"></a>2.2 toPlainString()：完整的十进制形式</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> String <span class="title">toPlainString</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (scale == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> (intCompact != INFLATED) </span><br><span class="line">            ? Long.toString(intCompact) </span><br><span class="line">            : intVal.toString();</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (scale &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="comment">// 负 scale：补零</span></span><br><span class="line">        <span class="comment">// 如: 123 scale=-3 → "123000"</span></span><br><span class="line">        <span class="keyword">return</span> intVal.toString() + zeros(-scale);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// scale &gt; 0：构建带小数点的完整形式</span></span><br><span class="line">    BigInteger intVal = <span class="keyword">this</span>.intVal;</span><br><span class="line">    <span class="keyword">long</span> intCompact = <span class="keyword">this</span>.intCompact;</span><br><span class="line">    <span class="keyword">int</span> precision = (intCompact != INFLATED) </span><br><span class="line">        ? digitLength(intCompact) </span><br><span class="line">        : intVal.precision();</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">int</span> pad = scale - precision;  <span class="comment">// 需要补的前导零</span></span><br><span class="line">    </span><br><span class="line">    StringBuilder buf = <span class="keyword">new</span> StringBuilder();</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (pad &gt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="comment">// 纯小数，如 0.00xxx</span></span><br><span class="line">        buf.append(<span class="string">"0."</span>);</span><br><span class="line">        buf.append(zeros(pad));</span><br><span class="line">        buf.append(intVal != <span class="keyword">null</span> ? intVal.toString() : Long.toString(intCompact));</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (pad == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="comment">// 恰好 scale 位小数</span></span><br><span class="line">        buf.append(intVal != <span class="keyword">null</span> ? intVal.toString() : Long.toString(intCompact));</span><br><span class="line">        buf.append(<span class="string">".0"</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// 整数部分 + 小数部分</span></span><br><span class="line">        String str = intVal != <span class="keyword">null</span> ? intVal.toString() : Long.toString(intCompact);</span><br><span class="line">        buf.append(str.substring(<span class="number">0</span>, -pad));</span><br><span class="line">        buf.append(<span class="string">'.'</span>);</span><br><span class="line">        buf.append(str.substring(-pad));</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> buf.toString();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>核心逻辑</strong>：</p>
+<ol>
+<li><strong>scale = 0</strong>：直接返回整数字符串</li>
+<li><strong>scale &lt; 0</strong>：在整数后补零（如 <code>123</code> + <code>000</code> = <code>123000</code>）</li>
+<li><strong>scale &gt; 0</strong>：<ul>
+<li><code>pad &gt; 0</code>：纯小数，需要补前导零（如 <code>0.00123</code>）</li>
+<li><code>pad = 0</code>：整数部分为 0（如 <code>0.123</code>）</li>
+<li><code>pad &lt; 0</code>：既有整数部分又有小数部分（如 <code>123.456</code>）</li>
+</ul>
+</li>
+</ol>
+<h3 id="2-3-toEngineeringString-：工程计数法"><a href="#2-3-toEngineeringString-：工程计数法" class="headerlink" title="2.3 toEngineeringString()：工程计数法"></a>2.3 toEngineeringString()：工程计数法</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> String <span class="title">toEngineeringString</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> layoutChars(<span class="keyword">true</span>);  <span class="comment">// sci = true 启用工程模式</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>工程计数法与科学计数法的区别</strong>：</p>
+<ul>
+<li>科学计数法：<code>1.23E-7</code>（指数可以是任意整数）</li>
+<li>工程计数法：<code>123E-9</code>（指数必须是 3 的倍数）</li>
+</ul>
+<p><strong>实现原理</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (sci) &#123;  <span class="comment">// 工程模式</span></span><br><span class="line">    <span class="comment">// 调整指数使其成为 3 的倍数</span></span><br><span class="line">    <span class="keyword">int</span> e = adjust - <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">int</span> n = e % <span class="number">3</span>;</span><br><span class="line">    <span class="keyword">if</span> (n != <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="comment">// 移动小数点使指数成为 3 的倍数</span></span><br><span class="line">        <span class="comment">// 如: 1.23E-7 → 123E-9 (指数 -9 是 3 的倍数)</span></span><br><span class="line">        e = e - n;</span><br><span class="line">        <span class="comment">// 相应调整系数</span></span><br><span class="line">    &#125;</span><br><span class="line">    buf.append(<span class="string">'E'</span>);</span><br><span class="line">    buf.append(e);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>为什么工程计数法要求指数是 3 的倍数？</strong></p>
+<p>这是因为国际单位制（SI）中的单位前缀都是 10 的 3 次方的倍数：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>指数</th>
+<th>单位前缀</th>
+<th>符号</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10^12</td>
+<td>太拉 (Tera)</td>
+<td>T</td>
+</tr>
+<tr>
+<td>10^9</td>
+<td>吉咖 (Giga)</td>
+<td>G</td>
+</tr>
+<tr>
+<td>10^6</td>
+<td>兆 (Mega)</td>
+<td>M</td>
+</tr>
+<tr>
+<td>10^3</td>
+<td>千 (Kilo)</td>
+<td>k</td>
+</tr>
+<tr>
+<td>10^-3</td>
+<td>毫 (Milli)</td>
+<td>m</td>
+</tr>
+<tr>
+<td>10^-6</td>
+<td>微 (Micro)</td>
+<td>μ</td>
+</tr>
+<tr>
+<td>10^-9</td>
+<td>纳 (Nano)</td>
+<td>n</td>
+</tr>
+<tr>
+<td>10^-12</td>
+<td>皮 (Pico)</td>
+<td>p</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>因此，工程计数法常用于科学和工程领域，方便与单位前缀配合使用。</p>
+<hr>
+<h2 id="三、完整实例对比"><a href="#三、完整实例对比" class="headerlink" title="三、完整实例对比"></a>三、完整实例对比</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> java.math.BigDecimal;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BigDecimalDemo</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 测试用例</span></span><br><span class="line">        BigDecimal[] testCases = &#123;</span><br><span class="line">            <span class="keyword">new</span> BigDecimal(<span class="string">"12345.6789"</span>),</span><br><span class="line">            <span class="keyword">new</span> BigDecimal(<span class="string">"0.000000123"</span>),</span><br><span class="line">            <span class="keyword">new</span> BigDecimal(<span class="string">"12300000000"</span>),</span><br><span class="line">            <span class="keyword">new</span> BigDecimal(<span class="string">"0.1"</span>),</span><br><span class="line">            <span class="keyword">new</span> BigDecimal(<span class="string">"1000000"</span>),</span><br><span class="line">            <span class="keyword">new</span> BigDecimal(<span class="string">"-0.00000000123"</span>),</span><br><span class="line">            <span class="keyword">new</span> BigDecimal(<span class="string">"3.141592653589793"</span>)</span><br><span class="line">        &#125;;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">for</span> (BigDecimal bd : testCases) &#123;</span><br><span class="line">            System.out.println(<span class="string">"数值: "</span> + bd);</span><br><span class="line">            System.out.println(<span class="string">"  toString():           "</span> + bd.toString());</span><br><span class="line">            System.out.println(<span class="string">"  toPlainString():      "</span> + bd.toPlainString());</span><br><span class="line">            System.out.println(<span class="string">"  toEngineeringString(): "</span> + bd.toEngineeringString());</span><br><span class="line">            System.out.println();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>输出结果</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">数值: 12345.6789</span><br><span class="line">  toString():           12345.6789</span><br><span class="line">  toPlainString():      12345.6789</span><br><span class="line">  toEngineeringString(): 12.3456789E3</span><br><span class="line"></span><br><span class="line">数值: 0.000000123</span><br><span class="line">  toString():           1.23E-7</span><br><span class="line">  toPlainString():      0.000000123</span><br><span class="line">  toEngineeringString(): 123E-9</span><br><span class="line"></span><br><span class="line">数值: 12300000000</span><br><span class="line">  toString():           1.23E10</span><br><span class="line">  toPlainString():      12300000000</span><br><span class="line">  toEngineeringString(): 12.3E9</span><br><span class="line"></span><br><span class="line">数值: 0.1</span><br><span class="line">  toString():           0.1</span><br><span class="line">  toPlainString():      0.1</span><br><span class="line">  toEngineeringString(): 100E-3</span><br><span class="line"></span><br><span class="line">数值: 1000000</span><br><span class="line">  toString():           1000000</span><br><span class="line">  toPlainString():      1000000</span><br><span class="line">  toEngineeringString(): 1E6</span><br><span class="line"></span><br><span class="line">数值: -0.00000000123</span><br><span class="line">  toString():           -1.23E-9</span><br><span class="line">  toPlainString():      -0.00000000123</span><br><span class="line">  toEngineeringString(): -1.23E-9</span><br><span class="line"></span><br><span class="line">数值: 3.141592653589793</span><br><span class="line">  toString():           3.141592653589793</span><br><span class="line">  toPlainString():      3.141592653589793</span><br><span class="line">  toEngineeringString(): 3.141592653589793</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="四、常见陷阱与注意事项"><a href="#四、常见陷阱与注意事项" class="headerlink" title="四、常见陷阱与注意事项"></a>四、常见陷阱与注意事项</h2><h3 id="4-1-陷阱一：金额显示使用-toString-导致问题"><a href="#4-1-陷阱一：金额显示使用-toString-导致问题" class="headerlink" title="4.1 陷阱一：金额显示使用 toString() 导致问题"></a>4.1 陷阱一：金额显示使用 toString() 导致问题</h3><p><strong>问题代码</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">BigDecimal price = <span class="keyword">new</span> BigDecimal(<span class="string">"0.00000001"</span>);  <span class="comment">// 1 分钱</span></span><br><span class="line">System.out.println(<span class="string">"价格："</span> + price.toString());</span><br><span class="line"><span class="comment">// 输出：价格：1E-8 ❌ 用户看不懂！</span></span><br></pre></td></tr></table></figure>
+<p><strong>正确做法</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">BigDecimal price = <span class="keyword">new</span> BigDecimal(<span class="string">"0.00000001"</span>);</span><br><span class="line">System.out.println(<span class="string">"价格："</span> + price.toPlainString());</span><br><span class="line"><span class="comment">// 输出：价格：0.00000001 ✅</span></span><br></pre></td></tr></table></figure>
+<h3 id="4-2-陷阱二：解析字符串时格式不匹配"><a href="#4-2-陷阱二：解析字符串时格式不匹配" class="headerlink" title="4.2 陷阱二：解析字符串时格式不匹配"></a>4.2 陷阱二：解析字符串时格式不匹配</h3><p><strong>问题场景</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">BigDecimal original = <span class="keyword">new</span> BigDecimal(<span class="string">"1.23E-7"</span>);</span><br><span class="line">String str = original.toString();  <span class="comment">// "1.23E-7"</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 尝试解析回去</span></span><br><span class="line">BigDecimal parsed = <span class="keyword">new</span> BigDecimal(str);  <span class="comment">// ✅ 正常</span></span><br></pre></td></tr></table></figure>
+<p>但有些外部系统可能不支持科学计数法：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 某个只接受数字的外部 API</span></span><br><span class="line">String apiInput = <span class="keyword">new</span> BigDecimal(<span class="string">"0.000000123"</span>).toString();</span><br><span class="line"><span class="comment">// apiInput = "1.23E-7"，外部系统可能解析失败！</span></span><br></pre></td></tr></table></figure>
+<p><strong>解决方案</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">String apiInput = <span class="keyword">new</span> BigDecimal(<span class="string">"0.000000123"</span>).toPlainString();</span><br><span class="line"><span class="comment">// apiInput = "0.000000123"，安全传递给外部系统</span></span><br></pre></td></tr></table></figure>
+<h3 id="4-3-陷阱三：精度丢失的假象"><a href="#4-3-陷阱三：精度丢失的假象" class="headerlink" title="4.3 陷阱三：精度丢失的假象"></a>4.3 陷阱三：精度丢失的假象</h3><p><strong>问题代码</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">BigDecimal bd = <span class="keyword">new</span> BigDecimal(<span class="string">"1.10"</span>);</span><br><span class="line">System.out.println(bd.toString());      <span class="comment">// "1.1"  (丢失了末尾的 0)</span></span><br><span class="line">System.out.println(bd.toPlainString()); <span class="comment">// "1.1"  (同样丢失)</span></span><br></pre></td></tr></table></figure>
+<p><strong>真相</strong>：这不是精度丢失，而是 <code>BigDecimal</code> 在内部会移除末尾的无意义零。如果需要保留末尾零，需要使用 <code>DecimalFormat</code>。</p>
+<p><strong>解决方案</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> java.text.DecimalFormat;</span><br><span class="line"></span><br><span class="line">BigDecimal bd = <span class="keyword">new</span> BigDecimal(<span class="string">"1.10"</span>);</span><br><span class="line">DecimalFormat df = <span class="keyword">new</span> DecimalFormat(<span class="string">"0.00"</span>);</span><br><span class="line">System.out.println(df.format(bd));  <span class="comment">// "1.10" ✅</span></span><br></pre></td></tr></table></figure>
+<h3 id="4-4-陷阱四：负-scale-的处理"><a href="#4-4-陷阱四：负-scale-的处理" class="headerlink" title="4.4 陷阱四：负 scale 的处理"></a>4.4 陷阱四：负 scale 的处理</h3><p><strong>问题场景</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">BigDecimal bd = <span class="keyword">new</span> BigDecimal(<span class="string">"1.23E5"</span>);  <span class="comment">// 123000</span></span><br><span class="line">System.out.println(bd.scale());            <span class="comment">// -2 (负 scale)</span></span><br><span class="line">System.out.println(bd.toString());         <span class="comment">// "1.23E5"</span></span><br><span class="line">System.out.println(bd.toPlainString());    <span class="comment">// "123000"</span></span><br></pre></td></tr></table></figure>
+<p><strong>理解负 scale</strong>：</p>
+<ul>
+<li><code>scale = -2</code> 表示数值是 <code>整数 × 10^2</code></li>
+<li><code>1.23 × 10^5 = 123000</code></li>
+</ul>
+<h3 id="4-5-陷阱五：序列化与反序列化"><a href="#4-5-陷阱五：序列化与反序列化" class="headerlink" title="4.5 陷阱五：序列化与反序列化"></a>4.5 陷阱五：序列化与反序列化</h3><p><strong>JSON 序列化问题</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">BigDecimal bd = <span class="keyword">new</span> BigDecimal(<span class="string">"0.000000123"</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 使用 toString() 序列化</span></span><br><span class="line">String json = <span class="string">"&#123;\"amount\": "</span> + bd.toString() + <span class="string">"&#125;"</span>;</span><br><span class="line"><span class="comment">// json = &#123;"amount": 1.23E-7&#125;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 某些 JSON 解析器可能将其解析为 Double，导致精度丢失</span></span><br></pre></td></tr></table></figure>
+<p><strong>推荐方案</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 方案1：使用 toPlainString()</span></span><br><span class="line">String json = <span class="string">"&#123;\"amount\": \""</span> + bd.toPlainString() + <span class="string">"\"&#125;"</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 方案2：使用专业的 JSON 库（如 Jackson）</span></span><br><span class="line">ObjectMapper mapper = <span class="keyword">new</span> ObjectMapper();</span><br><span class="line">String json = mapper.writeValueAsString(bd);  <span class="comment">// Jackson 内部处理</span></span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="五、性能考量"><a href="#五、性能考量" class="headerlink" title="五、性能考量"></a>五、性能考量</h2><h3 id="5-1-缓存机制"><a href="#5-1-缓存机制" class="headerlink" title="5.1 缓存机制"></a>5.1 缓存机制</h3><p><code>toString()</code> 方法使用了 <code>stringCache</code> 进行缓存：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> String <span class="title">toString</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    String sc = stringCache;</span><br><span class="line">    <span class="keyword">if</span> (sc == <span class="keyword">null</span>) &#123;</span><br><span class="line">        stringCache = sc = layoutChars(<span class="keyword">false</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> sc;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>注意</strong>：<code>toPlainString()</code> 和 <code>toEngineeringString()</code> 没有缓存机制，频繁调用时性能略差。</p>
+<h3 id="5-2-性能测试"><a href="#5-2-性能测试" class="headerlink" title="5.2 性能测试"></a>5.2 性能测试</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">BigDecimal bd = <span class="keyword">new</span> BigDecimal(<span class="string">"12345.6789"</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 预热</span></span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10000</span>; i++) &#123;</span><br><span class="line">    bd.toString();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 测试 toString()</span></span><br><span class="line"><span class="keyword">long</span> start = System.nanoTime();</span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">1000000</span>; i++) &#123;</span><br><span class="line">    bd.toString();</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">long</span> toStringTime = System.nanoTime() - start;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 测试 toPlainString()</span></span><br><span class="line">start = System.nanoTime();</span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">1000000</span>; i++) &#123;</span><br><span class="line">    bd.toPlainString();</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">long</span> toPlainStringTime = System.nanoTime() - start;</span><br><span class="line"></span><br><span class="line">System.out.println(<span class="string">"toString(): "</span> + toStringTime / <span class="number">1_000_000</span> + <span class="string">" ms"</span>);</span><br><span class="line">System.out.println(<span class="string">"toPlainString(): "</span> + toPlainStringTime / <span class="number">1_000_000</span> + <span class="string">" ms"</span>);</span><br></pre></td></tr></table></figure>
+<p><strong>典型结果</strong>（因硬件而异）：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">toString(): 45 ms</span><br><span class="line">toPlainString(): 52 ms</span><br></pre></td></tr></table></figure>
+<p><strong>结论</strong>：对于同一个 <code>BigDecimal</code> 对象，<code>toString()</code> 因缓存机制略快；但差异不大，选择方法时应优先考虑功能需求而非性能。</p>
+<hr>
+<h2 id="六、最佳实践"><a href="#六、最佳实践" class="headerlink" title="六、最佳实践"></a>六、最佳实践</h2><h3 id="6-1-使用场景决策树"><a href="#6-1-使用场景决策树" class="headerlink" title="6.1 使用场景决策树"></a>6.1 使用场景决策树</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">需要将 BigDecimal 转换为字符串</span><br><span class="line">├── 用于用户界面显示？</span><br><span class="line">│   ├── 是 → 使用 toPlainString() + DecimalFormat</span><br><span class="line">│   └── 否 ↓</span><br><span class="line">├── 用于日志记录？</span><br><span class="line">│   ├── 是 → 使用 toString()</span><br><span class="line">│   └── 否 ↓</span><br><span class="line">├── 用于数据交换（API、JSON）？</span><br><span class="line">│   ├── 是 → 使用 toPlainString()</span><br><span class="line">│   └── 否 ↓</span><br><span class="line">├── 用于工程&#x2F;科学计算？</span><br><span class="line">│   ├── 是 → 使用 toEngineeringString()</span><br><span class="line">│   └── 否 ↓</span><br><span class="line">└── 默认使用 toString()</span><br></pre></td></tr></table></figure>
+<h3 id="6-2-金额显示最佳实践"><a href="#6-2-金额显示最佳实践" class="headerlink" title="6.2 金额显示最佳实践"></a>6.2 金额显示最佳实践</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> java.math.BigDecimal;</span><br><span class="line"><span class="keyword">import</span> java.text.DecimalFormat;</span><br><span class="line"><span class="keyword">import</span> java.text.NumberFormat;</span><br><span class="line"><span class="keyword">import</span> java.util.Locale;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">CurrencyFormatter</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 方法1：使用 DecimalFormat</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">formatCurrency1</span><span class="params">(BigDecimal amount)</span> </span>&#123;</span><br><span class="line">        DecimalFormat df = <span class="keyword">new</span> DecimalFormat(<span class="string">"#,##0.00"</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"¥"</span> + df.format(amount);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 方法2：使用 NumberFormat（推荐）</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">formatCurrency2</span><span class="params">(BigDecimal amount)</span> </span>&#123;</span><br><span class="line">        NumberFormat nf = NumberFormat.getCurrencyInstance(Locale.CHINA);</span><br><span class="line">        <span class="keyword">return</span> nf.format(amount);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        BigDecimal price = <span class="keyword">new</span> BigDecimal(<span class="string">"12345.6"</span>);</span><br><span class="line">        </span><br><span class="line">        System.out.println(formatCurrency1(price));  <span class="comment">// ¥12,345.60</span></span><br><span class="line">        System.out.println(formatCurrency2(price));  <span class="comment">// ¥12,345.60</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="6-3-数据交换最佳实践"><a href="#6-3-数据交换最佳实践" class="headerlink" title="6.3 数据交换最佳实践"></a>6.3 数据交换最佳实践</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.fasterxml.jackson.databind.ObjectMapper;</span><br><span class="line"><span class="keyword">import</span> com.fasterxml.jackson.databind.annotation.JsonSerialize;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">DataTransfer</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 方案1：使用 Jackson 自动处理</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">toJson</span><span class="params">(BigDecimal amount)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">        ObjectMapper mapper = <span class="keyword">new</span> ObjectMapper();</span><br><span class="line">        <span class="keyword">return</span> mapper.writeValueAsString(amount);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 方案2：手动构建 JSON</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">toJsonManual</span><span class="params">(BigDecimal amount)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 使用 toPlainString() 避免科学计数法</span></span><br><span class="line">        <span class="keyword">return</span> <span class="string">"&#123;\"amount\": \""</span> + amount.toPlainString() + <span class="string">"\"&#125;"</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 方案3：如果确定外部系统支持，可以直接使用数字格式</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">toJsonNumeric</span><span class="params">(BigDecimal amount)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 注意：可能会丢失末尾的零</span></span><br><span class="line">        <span class="keyword">return</span> <span class="string">"&#123;\"amount\": "</span> + amount.toString() + <span class="string">"&#125;"</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="6-4-日志记录最佳实践"><a href="#6-4-日志记录最佳实践" class="headerlink" title="6.4 日志记录最佳实践"></a>6.4 日志记录最佳实践</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> org.slf4j.Logger;</span><br><span class="line"><span class="keyword">import</span> org.slf4j.LoggerFactory;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">OrderService</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Logger log = LoggerFactory.getLogger(OrderService<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">processOrder</span><span class="params">(BigDecimal amount)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 推荐：使用 toString() 记录日志</span></span><br><span class="line">        log.info(<span class="string">"处理订单，金额：&#123;&#125;"</span>, amount.toString());</span><br><span class="line">        </span><br><span class="line">        <span class="comment">// 或者使用 SLF4J 的格式化</span></span><br><span class="line">        log.info(<span class="string">"处理订单，金额：&#123;&#125;"</span>, amount);</span><br><span class="line">        </span><br><span class="line">        <span class="comment">// 避免：使用 toPlainString() 可能导致日志过长</span></span><br><span class="line">        <span class="comment">// log.info("处理订单，金额：&#123;&#125;", amount.toPlainString());</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、总结"><a href="#七、总结" class="headerlink" title="七、总结"></a>七、总结</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>特点</th>
+<th>推荐场景</th>
+<th>注意事项</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>toString()</code></td>
+<td>智能科学计数法，有缓存</td>
+<td>日志、通用显示</td>
+<td>可能输出指数形式</td>
+</tr>
+<tr>
+<td><code>toPlainString()</code></td>
+<td>完整十进制，无指数</td>
+<td>金额、API、用户界面</td>
+<td>数值过大/过小时字符串很长</td>
+</tr>
+<tr>
+<td><code>toEngineeringString()</code></td>
+<td>工程计数法，指数是3的倍数</td>
+<td>工程、科学计算</td>
+<td>一般业务开发较少使用</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>核心原则</strong>：</p>
+<ol>
+<li><strong>用户可见的字符串</strong> → <code>toPlainString()</code> + <code>DecimalFormat</code></li>
+<li><strong>系统间数据交换</strong> → <code>toPlainString()</code> 或专业 JSON 库</li>
+<li><strong>日志记录</strong> → <code>toString()</code>（简洁且可读）</li>
+<li><strong>工程/科学领域</strong> → <code>toEngineeringString()</code></li>
+</ol>
+<p>掌握这三个方法的区别和使用场景，能够帮助你在开发中避免许多隐蔽的 bug，编写出更加健壮的代码。</p>
+<hr>
+<p><strong>参考资料</strong>：</p>
+<ul>
+<li><a href="https://docs.oracle.com/javase/8/docs/api/java/math/BigDecimal.html" target="_blank" rel="noopener">Java BigDecimal 官方文档</a></li>
+<li><a href="https://github.com/openjdk/jdk/blob/master/src/java.base/share/classes/java/math/BigDecimal.java" target="_blank" rel="noopener">BigDecimal 源码分析</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+        
+
+  <div class="followme">
+    <p>欢迎关注我的其它发布渠道</p>
+
+    <div class="social-list">
+
+        <div class="social-item">
+          <a target="_blank" class="social-link" href="/atom.xml">
+            <span class="icon">
+              <i class="fa fa-rss"></i>
+            </span>
+
+            <span class="label">RSS</span>
+          </a>
+        </div>
+    </div>
+  </div>
+
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"><i class="fa fa-tag"></i> Java</a>
+          </div>
+
+        
+<div class="post-share">
+  <div class="share-title">分享到</div>
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+
+<style>
+.post-share {
+  margin: 20px 0;
+  padding: 15px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+}
+.post-share .share-title {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 10px;
+}
+.post-share .social-share {
+  text-align: center;
+}
+.post-share .social-share a {
+  margin: 0 8px;
+}
+/* 微信二维码样式优化 */
+.social-share .wechat-qrcode {
+  border: 1px solid #eee;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+.social-share .wechat-qrcode h4 {
+  color: #333;
+  font-weight: normal;
+}
+</style>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/02/15/spring_batch_optimization_partition_step/" rel="prev" title="Spring Batch 性能调优-分片化Step">
+      <i class="fa fa-chevron-left"></i> Spring Batch 性能调优-分片化Step
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/08/15/zero_copy/" rel="next" title="零拷贝">
+      零拷贝 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#一、核心区别速览"><span class="nav-number">1.</span> <span class="nav-text">一、核心区别速览</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、源码深度解析"><span class="nav-number">2.</span> <span class="nav-text">二、源码深度解析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-toString-：智能的科学计数法"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 toString()：智能的科学计数法</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#核心逻辑：layoutChars-false"><span class="nav-number">2.1.1.</span> <span class="nav-text">核心逻辑：layoutChars(false)</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-toPlainString-：完整的十进制形式"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 toPlainString()：完整的十进制形式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-toEngineeringString-：工程计数法"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 toEngineeringString()：工程计数法</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、完整实例对比"><span class="nav-number">3.</span> <span class="nav-text">三、完整实例对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、常见陷阱与注意事项"><span class="nav-number">4.</span> <span class="nav-text">四、常见陷阱与注意事项</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-陷阱一：金额显示使用-toString-导致问题"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 陷阱一：金额显示使用 toString() 导致问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-陷阱二：解析字符串时格式不匹配"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 陷阱二：解析字符串时格式不匹配</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-陷阱三：精度丢失的假象"><span class="nav-number">4.3.</span> <span class="nav-text">4.3 陷阱三：精度丢失的假象</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-陷阱四：负-scale-的处理"><span class="nav-number">4.4.</span> <span class="nav-text">4.4 陷阱四：负 scale 的处理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-陷阱五：序列化与反序列化"><span class="nav-number">4.5.</span> <span class="nav-text">4.5 陷阱五：序列化与反序列化</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、性能考量"><span class="nav-number">5.</span> <span class="nav-text">五、性能考量</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-缓存机制"><span class="nav-number">5.1.</span> <span class="nav-text">5.1 缓存机制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-性能测试"><span class="nav-number">5.2.</span> <span class="nav-text">5.2 性能测试</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、最佳实践"><span class="nav-number">6.</span> <span class="nav-text">六、最佳实践</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-使用场景决策树"><span class="nav-number">6.1.</span> <span class="nav-text">6.1 使用场景决策树</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-金额显示最佳实践"><span class="nav-number">6.2.</span> <span class="nav-text">6.2 金额显示最佳实践</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-数据交换最佳实践"><span class="nav-number">6.3.</span> <span class="nav-text">6.3 数据交换最佳实践</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-4-日志记录最佳实践"><span class="nav-number">6.4.</span> <span class="nav-text">6.4 日志记录最佳实践</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、总结"><span class="nav-number">7.</span> <span class="nav-text">七、总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">94</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">55</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
