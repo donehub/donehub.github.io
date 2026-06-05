@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="背景最近在做 RAG 相关的项目，踩了不少 PDF 处理的坑。真实业务里的 PDF，可能是合同、财报、技术手册、学术论文，甚至是扫描件。里面不只有文字，还有目录、表格、流程图、页眉页脚、多栏排版。如果你直接粗暴抽文本，最后 RAG 检索出来的大概率是一堆断裂、重复、缺上下文的垃圾片段。 今天聊聊 PDF RAG 的四层架构，这是我在实践中总结出来的一套方法论，希望能给出一些参考和启发。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RAG 对 PDF 的生产级处理方案">
+<meta property="og:url" content="https://donehub.github.io/2025/04/05/pdf-rag-production-guide/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="背景最近在做 RAG 相关的项目，踩了不少 PDF 处理的坑。真实业务里的 PDF，可能是合同、财报、技术手册、学术论文，甚至是扫描件。里面不只有文字，还有目录、表格、流程图、页眉页脚、多栏排版。如果你直接粗暴抽文本，最后 RAG 检索出来的大概率是一堆断裂、重复、缺上下文的垃圾片段。 今天聊聊 PDF RAG 的四层架构，这是我在实践中总结出来的一套方法论，希望能给出一些参考和启发。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-04-04T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-06-05T16:11:06.108Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="RAG">
+<meta property="article:tag" content="PDF">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2025/04/05/pdf-rag-production-guide/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>RAG 对 PDF 的生产级处理方案 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2025/04/05/pdf-rag-production-guide/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          RAG 对 PDF 的生产级处理方案
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-04-05 00:00:00" itemprop="dateCreated datePublished" datetime="2025-04-05T00:00:00+08:00">2025-04-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-06-06 00:11:06" itemprop="dateModified" datetime="2026-06-06T00:11:06+08:00">2026-06-06</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2025/04/05/pdf-rag-production-guide/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2025/04/05/pdf-rag-production-guide/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>最近在做 RAG 相关的项目，踩了不少 PDF 处理的坑。真实业务里的 PDF，可能是合同、财报、技术手册、学术论文，甚至是扫描件。里面不只有文字，还有目录、表格、流程图、页眉页脚、多栏排版。如果你直接粗暴抽文本，最后 RAG 检索出来的大概率是一堆断裂、重复、缺上下文的垃圾片段。</p>
+<p>今天聊聊 PDF RAG 的四层架构，这是我在实践中总结出来的一套方法论，希望能给出一些参考和启发。</p>
+<a id="more"></a>
+<h2 id="为什么”PDF转文本”是-demo-级答案"><a href="#为什么”PDF转文本”是-demo-级答案" class="headerlink" title="为什么”PDF转文本”是 demo 级答案"></a>为什么”PDF转文本”是 demo 级答案</h2><p>先说个真实场景：你要做一个合同问答系统。用户问”违约金条款是多少”，你的 RAG 系统需要从合同 PDF 里找到答案。</p>
+<p>如果你只是把 PDF 转成纯文本，会发生什么？</p>
+<ol>
+<li><strong>表格信息丢失</strong>：合同里的赔偿标准表格，转成文本后可能变成一堆乱码或者断裂的字符</li>
+<li><strong>章节关系断裂</strong>：你不知道这句话是第三章第二条还是第五章第一条</li>
+<li><strong>页码信息消失</strong>：用户说”第 15 页那个条款”，你的系统完全懵了</li>
+<li><strong>图片内容丢失</strong>：合同里的签名、盖章、流程图，纯文本根本处理不了</li>
+</ol>
+<p>最后你的 Agent 回答问题时，看起来很自信，但你根本追不回来源，也没法验证答案的准确性。</p>
+<p>所以，PDF RAG 不是一个简单的”转文本+向量化”的问题，而是一个需要分层处理的系统工程。</p>
+<h2 id="四层架构：从解析到调用"><a href="#四层架构：从解析到调用" class="headerlink" title="四层架构：从解析到调用"></a>四层架构：从解析到调用</h2><p>我把 PDF RAG 的处理分成四层，每一层解决一个核心问题：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────┐</span><br><span class="line">│  第4层：Agent 调用层                           │</span><br><span class="line">│  工具链设计、按需检索、多轮对话                    │</span><br><span class="line">├─────────────────────────────────────────────┤</span><br><span class="line">│  第3层：切片和索引层                            │</span><br><span class="line">│  语义切片、metadata 标注、向量+关键词索引           │</span><br><span class="line">├─────────────────────────────────────────────┤</span><br><span class="line">│  第2层：结构还原层                              │</span><br><span class="line">│  标题层级、章节关系、表格结构、页码映射              │</span><br><span class="line">├─────────────────────────────────────────────┤</span><br><span class="line">│  第1层：解析层                                 │</span><br><span class="line">│  PDF 类型识别、文本提取、OCR、视觉理解             │</span><br><span class="line">└─────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p>下面逐层拆解。</p>
+<h3 id="第1层：解析层-——-先识别，再处理"><a href="#第1层：解析层-——-先识别，再处理" class="headerlink" title="第1层：解析层 —— 先识别，再处理"></a>第1层：解析层 —— 先识别，再处理</h3><p>处理 PDF 的第一步，不是急着抽文本，而是先判断这个 PDF 是什么类型。</p>
+<h4 id="三种-PDF-类型"><a href="#三种-PDF-类型" class="headerlink" title="三种 PDF 类型"></a>三种 PDF 类型</h4><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>特点</th>
+<th>处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>原生文本 PDF</td>
+<td>文字可选中、可复制</td>
+<td>直接提取文本</td>
+</tr>
+<tr>
+<td>扫描件 PDF</td>
+<td>本质是图片，文字不可选中</td>
+<td>OCR 识别</td>
+</tr>
+<tr>
+<td>图文混排 PDF</td>
+<td>文字+表格+图表+流程图</td>
+<td>多模态理解</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>你可以用 PyMuPDF 或 pdfplumber 先做个简单判断：检查 PDF 里的文字层是否存在，如果每页提取的文字数量极少，大概率是扫描件。</p>
+<h4 id="不同类型的不同策略"><a href="#不同类型的不同策略" class="headerlink" title="不同类型的不同策略"></a>不同类型的不同策略</h4><p><strong>原生文本 PDF</strong>：这是最简单的情况，直接用 PyMuPDF、pdfplumber 这类库提取文本。但要注意，有些 PDF 虽然是原生文本，但排版复杂（多栏、表格），提取出来的文本顺序可能是乱的。</p>
+<p><strong>扫描件 PDF</strong>：需要走 OCR 流程。Tesseract 是开源方案，但中文识别准确率一般。如果预算充足，可以考虑百度 OCR、阿里云 OCR 这类商业 API，准确率高很多。</p>
+<p><strong>图文混排 PDF</strong>：这是最复杂的情况。表格需要结构化提取，流程图需要视觉理解，截图需要多模态模型分析。Anthropic 的 Claude PDF Support 就是这个思路，它不是只能读文字，还能理解 PDF 里的图片、图表和表格。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 简单的 PDF 类型判断逻辑</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">detect_pdf_type</span><span class="params">(pdf_path)</span>:</span></span><br><span class="line">    doc = fitz.open(pdf_path)</span><br><span class="line"></span><br><span class="line">    text_pages = <span class="number">0</span></span><br><span class="line">    image_pages = <span class="number">0</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> page <span class="keyword">in</span> doc:</span><br><span class="line">        text = page.get_text()</span><br><span class="line">        images = page.get_images()</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> len(text.strip()) &gt; <span class="number">50</span>:  <span class="comment"># 有足够文字</span></span><br><span class="line">            text_pages += <span class="number">1</span></span><br><span class="line">        <span class="keyword">if</span> len(images) &gt; <span class="number">0</span>:</span><br><span class="line">            image_pages += <span class="number">1</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> text_pages &gt; len(doc) * <span class="number">0.8</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"native_text"</span></span><br><span class="line">    <span class="keyword">elif</span> image_pages &gt; len(doc) * <span class="number">0.8</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"scanned"</span></span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"mixed"</span></span><br></pre></td></tr></table></figure>
+<h3 id="第2层：结构还原-——-保留文档骨架"><a href="#第2层：结构还原-——-保留文档骨架" class="headerlink" title="第2层：结构还原 —— 保留文档骨架"></a>第2层：结构还原 —— 保留文档骨架</h3><p>抽完文本之后，下一步是还原 PDF 的结构信息。这一步很多人忽略了，但它直接决定了后续切片的质量。</p>
+<h4 id="为什么要还原结构"><a href="#为什么要还原结构" class="headerlink" title="为什么要还原结构"></a>为什么要还原结构</h4><p>想象一下，你从一份 50 页的财报里抽出了 3 万字的纯文本。如果你不知道哪段文字属于哪个章节、哪张表格，那这些文本就是一盘散沙。</p>
+<p>用户问”2023 年营收是多少”，你的系统可能检索到 2022 年的数据，因为它们在文本上很相似，但你没有年份的结构信息来区分。</p>
+<h4 id="需要保留的结构信息"><a href="#需要保留的结构信息" class="headerlink" title="需要保留的结构信息"></a>需要保留的结构信息</h4><ol>
+<li><strong>标题层级</strong>：一级标题、二级标题、三级标题，形成树状结构</li>
+<li><strong>章节关系</strong>：每段文字属于哪个章节</li>
+<li><strong>页码映射</strong>：每段文字在第几页</li>
+<li><strong>表格结构</strong>：表格的行列关系、表头、单元格</li>
+<li><strong>图片说明</strong>：图片的标题、描述、所在位置</li>
+<li><strong>页眉页脚</strong>：文档的元信息</li>
+</ol>
+<h4 id="实现思路"><a href="#实现思路" class="headerlink" title="实现思路"></a>实现思路</h4><p>可以用 pdfplumber 提取表格，用正则表达式识别标题层级，然后把这些结构信息和文本内容关联起来。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 结构化提取示例</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">DocumentStructure</span>:</span></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">__init__</span><span class="params">(self)</span>:</span></span><br><span class="line">        self.sections = []  <span class="comment"># 章节列表</span></span><br><span class="line">        self.tables = []    <span class="comment"># 表格列表</span></span><br><span class="line">        self.images = []    <span class="comment"># 图片列表</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">add_section</span><span class="params">(self, title, level, page_num, content)</span>:</span></span><br><span class="line">        self.sections.append(&#123;</span><br><span class="line">            <span class="string">"title"</span>: title,</span><br><span class="line">            <span class="string">"level"</span>: level,</span><br><span class="line">            <span class="string">"page"</span>: page_num,</span><br><span class="line">            <span class="string">"content"</span>: content</span><br><span class="line">        &#125;)</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">add_table</span><span class="params">(self, table_id, page_num, headers, rows)</span>:</span></span><br><span class="line">        self.tables.append(&#123;</span><br><span class="line">            <span class="string">"id"</span>: table_id,</span><br><span class="line">            <span class="string">"page"</span>: page_num,</span><br><span class="line">            <span class="string">"headers"</span>: headers,</span><br><span class="line">            <span class="string">"rows"</span>: rows</span><br><span class="line">        &#125;)</span><br></pre></td></tr></table></figure>
+<h3 id="第3层：切片和索引-——-语义切片是核心"><a href="#第3层：切片和索引-——-语义切片是核心" class="headerlink" title="第3层：切片和索引 —— 语义切片是核心"></a>第3层：切片和索引 —— 语义切片是核心</h3><p>这一步是整个 PDF RAG 的核心。切片质量直接决定了检索质量。</p>
+<h4 id="固定字数切片的问题"><a href="#固定字数切片的问题" class="headerlink" title="固定字数切片的问题"></a>固定字数切片的问题</h4><p>很多入门教程会教你”每 500 字切一个 chunk”，这种方法在 PDF 场景下基本不可用。</p>
+<p>为什么？因为 PDF 的内容是有结构的。一个章节可能有 2000 字，你切成 4 个 chunk，每个 chunk 都不完整。一个表格可能只有 100 字，但你把它和前后文混在一起，表格信息就被稀释了。</p>
+<h4 id="语义切片的原则"><a href="#语义切片的原则" class="headerlink" title="语义切片的原则"></a>语义切片的原则</h4><ol>
+<li><strong>按结构切</strong>：标题下面的段落放一起，不要把一个章节切成多个 chunk</li>
+<li><strong>表格单独处理</strong>：表格是结构化数据，不能和纯文本混在一起</li>
+<li><strong>图片单独处理</strong>：图片需要生成摘要，不能直接丢弃</li>
+<li><strong>长表格按行列拆分</strong>：如果表格太长，可以按行列字段转成结构化文本</li>
+</ol>
+<h4 id="metadata-标注"><a href="#metadata-标注" class="headerlink" title="metadata 标注"></a>metadata 标注</h4><p>每个 chunk 都要带 metadata，这是后续追溯的基础：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">chunk_metadata = &#123;</span><br><span class="line">    <span class="string">"doc_id"</span>: <span class="string">"contract_2024_001"</span>,      <span class="comment"># 文档 ID</span></span><br><span class="line">    <span class="string">"page"</span>: <span class="number">15</span>,                          <span class="comment"># 页码</span></span><br><span class="line">    <span class="string">"section"</span>: <span class="string">"第三章 违约责任"</span>,         <span class="comment"># 章节标题</span></span><br><span class="line">    <span class="string">"section_level"</span>: <span class="number">2</span>,                  <span class="comment"># 章节层级</span></span><br><span class="line">    <span class="string">"table_id"</span>: <span class="string">"table_3_1"</span>,            <span class="comment"># 表格编号（如果有）</span></span><br><span class="line">    <span class="string">"image_desc"</span>: <span class="string">"流程图：违约处理流程"</span>,  <span class="comment"># 图片描述（如果有）</span></span><br><span class="line">    <span class="string">"version"</span>: <span class="string">"2024-01-15"</span>,            <span class="comment"># 文档版本</span></span><br><span class="line">    <span class="string">"chunk_type"</span>: <span class="string">"text"</span>                <span class="comment"># chunk 类型：text/table/image</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="Contextual-Retrieval：给-chunk-补上下文"><a href="#Contextual-Retrieval：给-chunk-补上下文" class="headerlink" title="Contextual Retrieval：给 chunk 补上下文"></a>Contextual Retrieval：给 chunk 补上下文</h4><p>Anthropic 提出了一个很实用的方法：Contextual Retrieval。核心思路是，给每个 chunk 补一段上下文说明，让模型知道这个片段在原文中属于哪一部分。</p>
+<p>举个例子，原始 chunk 是：</p>
+<blockquote>
+<p>违约方应支付合同总金额的 20% 作为违约金。</p>
+</blockquote>
+<p>补完上下文后：</p>
+<blockquote>
+<p>本文档是《2024年服务合同》，属于第三章”违约责任”中的第3.2条”违约金计算方式”。具体内容：违约方应支付合同总金额的 20% 作为违约金。</p>
+</blockquote>
+<p>这样做的好处是，即使检索时只召回了这个 chunk，模型也能理解它的上下文，不会”只见树木，不见森林”。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Contextual Retrieval 示例</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add_context</span><span class="params">(chunk, document_context)</span>:</span></span><br><span class="line">    <span class="string">"""给 chunk 添加上下文说明"""</span></span><br><span class="line">    context_prompt = <span class="string">f"""</span></span><br><span class="line"><span class="string">    文档：<span class="subst">&#123;document_context[<span class="string">'doc_title'</span>]&#125;</span></span></span><br><span class="line"><span class="string">    章节：<span class="subst">&#123;document_context[<span class="string">'section'</span>]&#125;</span></span></span><br><span class="line"><span class="string">    位置：第<span class="subst">&#123;document_context[<span class="string">'page'</span>]&#125;</span>页</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">    请用一句话概括这个片段在原文中的位置和主题。</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line"></span><br><span class="line">    context = llm.generate(context_prompt)</span><br><span class="line">    <span class="keyword">return</span> <span class="string">f"<span class="subst">&#123;context&#125;</span>\n\n<span class="subst">&#123;chunk&#125;</span>"</span></span><br></pre></td></tr></table></figure>
+<h4 id="索引策略"><a href="#索引策略" class="headerlink" title="索引策略"></a>索引策略</h4><p>切完片之后，需要建立两种索引：</p>
+<ol>
+<li><strong>向量索引</strong>：用于语义相似度检索</li>
+<li><strong>关键词索引</strong>：用于精确匹配（如条款编号、表格编号）</li>
+</ol>
+<p>两者结合使用，检索效果会更好。可以用 Hybrid Search 的方式，把向量检索和关键词检索的结果融合。</p>
+<h3 id="第4层：Agent-调用-——-工具链按需调用"><a href="#第4层：Agent-调用-——-工具链按需调用" class="headerlink" title="第4层：Agent 调用 —— 工具链按需调用"></a>第4层：Agent 调用 —— 工具链按需调用</h3><p>最后一层是 Agent 的调用策略。核心思路是：不要把整个 PDF 塞进上下文，而是把 PDF 能力封装成工具。</p>
+<h4 id="工具设计"><a href="#工具设计" class="headerlink" title="工具设计"></a>工具设计</h4><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># PDF RAG 工具链</span></span><br><span class="line">tools = [</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="string">"name"</span>: <span class="string">"search_pdf"</span>,</span><br><span class="line">        <span class="string">"description"</span>: <span class="string">"检索 PDF 中的相关片段"</span>,</span><br><span class="line">        <span class="string">"parameters"</span>: &#123;</span><br><span class="line">            <span class="string">"query"</span>: <span class="string">"检索关键词"</span>,</span><br><span class="line">            <span class="string">"doc_id"</span>: <span class="string">"文档 ID（可选）"</span>,</span><br><span class="line">            <span class="string">"section"</span>: <span class="string">"章节筛选（可选）"</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="string">"name"</span>: <span class="string">"read_page"</span>,</span><br><span class="line">        <span class="string">"description"</span>: <span class="string">"读取 PDF 指定页的内容"</span>,</span><br><span class="line">        <span class="string">"parameters"</span>: &#123;</span><br><span class="line">            <span class="string">"doc_id"</span>: <span class="string">"文档 ID"</span>,</span><br><span class="line">            <span class="string">"page_num"</span>: <span class="string">"页码"</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="string">"name"</span>: <span class="string">"extract_table"</span>,</span><br><span class="line">        <span class="string">"description"</span>: <span class="string">"提取 PDF 中的表格数据"</span>,</span><br><span class="line">        <span class="string">"parameters"</span>: &#123;</span><br><span class="line">            <span class="string">"doc_id"</span>: <span class="string">"文档 ID"</span>,</span><br><span class="line">            <span class="string">"table_id"</span>: <span class="string">"表格编号"</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="string">"name"</span>: <span class="string">"analyze_chart"</span>,</span><br><span class="line">        <span class="string">"description"</span>: <span class="string">"分析 PDF 中的图表"</span>,</span><br><span class="line">        <span class="string">"parameters"</span>: &#123;</span><br><span class="line">            <span class="string">"doc_id"</span>: <span class="string">"文档 ID"</span>,</span><br><span class="line">            <span class="string">"image_id"</span>: <span class="string">"图片编号"</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="string">"name"</span>: <span class="string">"quote_source"</span>,</span><br><span class="line">        <span class="string">"description"</span>: <span class="string">"返回原文引用和页码"</span>,</span><br><span class="line">        <span class="string">"parameters"</span>: &#123;</span><br><span class="line">            <span class="string">"chunk_id"</span>: <span class="string">"片段 ID"</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">]</span><br></pre></td></tr></table></figure>
+<h4 id="调用策略"><a href="#调用策略" class="headerlink" title="调用策略"></a>调用策略</h4><p>不同类型的用户问题，走不同的调用路径：</p>
+<ol>
+<li><strong>简单事实问题</strong>（如”违约金是多少”）→ 直接向量召回</li>
+<li><strong>复杂对比问题</strong>（如”A 合同和 B 合同的违约金差异”）→ 先检索多个章节，再让 Agent 规划阅读</li>
+<li><strong>表格问题</strong>（如”2023 年各季度营收”）→ 调用 extract_table</li>
+<li><strong>图表问题</strong>（如”这个流程图说明了什么”）→ 调用 analyze_chart</li>
+</ol>
+<p>这种设计的好处是，Agent 可以根据问题的复杂度，动态决定调用哪些工具，而不是一次性把所有信息都塞进上下文。</p>
+<h2 id="生产级细节：可追溯引用和评测"><a href="#生产级细节：可追溯引用和评测" class="headerlink" title="生产级细节：可追溯引用和评测"></a>生产级细节：可追溯引用和评测</h2><p>如果你的 PDF RAG 系统要上生产，有两个东西是必须要做的：可追溯引用和评测。</p>
+<h3 id="可追溯引用"><a href="#可追溯引用" class="headerlink" title="可追溯引用"></a>可追溯引用</h3><p>Agent 回答问题时，必须带上来源信息：</p>
+<ul>
+<li>页码：答案来自第几页</li>
+<li>章节：答案属于哪个章节</li>
+<li>原文片段：原始文本是什么</li>
+</ul>
+<p>这样做的好处是，用户可以验证答案的准确性，你也可以追溯问题的根源。</p>
+<p>Anthropic 的 Citation 文档里也提到，PDF 可以按提取出的文本做引用，并返回页码范围。这是一个很好的实践。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 带引用的回答示例</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">answer_with_citation</span><span class="params">(question, doc_id)</span>:</span></span><br><span class="line">    <span class="comment"># 检索相关片段</span></span><br><span class="line">    chunks = search_pdf(question, doc_id)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 生成回答</span></span><br><span class="line">    answer = generate_answer(question, chunks)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 构建引用</span></span><br><span class="line">    citations = []</span><br><span class="line">    <span class="keyword">for</span> chunk <span class="keyword">in</span> chunks:</span><br><span class="line">        citations.append(&#123;</span><br><span class="line">            <span class="string">"page"</span>: chunk.metadata[<span class="string">"page"</span>],</span><br><span class="line">            <span class="string">"section"</span>: chunk.metadata[<span class="string">"section"</span>],</span><br><span class="line">            <span class="string">"text"</span>: chunk.content[:<span class="number">200</span>] + <span class="string">"..."</span></span><br><span class="line">        &#125;)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> &#123;</span><br><span class="line">        <span class="string">"answer"</span>: answer,</span><br><span class="line">        <span class="string">"citations"</span>: citations</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<h3 id="评测体系"><a href="#评测体系" class="headerlink" title="评测体系"></a>评测体系</h3><p>评测不能只看最终答案对不对，还要看整个链路的质量：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>评测维度</th>
+<th>评测内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>检索质量</td>
+<td>检索片段是否命中、排序是否合理</td>
+</tr>
+<tr>
+<td>页码准确性</td>
+<td>返回的页码是否正确</td>
+</tr>
+<tr>
+<td>表格解析</td>
+<td>表格是否正确提取、结构是否完整</td>
+</tr>
+<tr>
+<td>OCR 质量</td>
+<td>是否漏字、错字</td>
+</tr>
+<tr>
+<td>图表理解</td>
+<td>图表信息是否被正确理解</td>
+</tr>
+<tr>
+<td>答案准确性</td>
+<td>最终答案是否正确</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>建议搭建一个评测数据集，包含不同类型的 PDF 和对应的问题，定期跑评测，监控系统质量。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>PDF RAG 不是一个简单的”转文本+向量化”的问题。生产级的 PDF RAG 需要四层架构：</p>
+<ol>
+<li><strong>解析层</strong>：识别 PDF 类型，采用不同处理策略</li>
+<li><strong>结构还原层</strong>：保留文档的骨架信息</li>
+<li><strong>切片和索引层</strong>：语义切片 + metadata 标注 + 上下文补充</li>
+<li><strong>Agent 调用层</strong>：工具链按需调用</li>
+</ol>
+<p>最后，一定要做可追溯引用和评测闭环。这样你的系统才能真正用起来，而不是停留在 demo 阶段。</p>
+<hr>
+<p><strong>参考资源</strong>：</p>
+<ul>
+<li><a href="https://docs.anthropic.com/en/docs/build-with-claude/pdf-support" target="_blank" rel="noopener">Anthropic Claude PDF Support</a></li>
+<li><a href="https://www.anthropic.com/news/contextual-retrieval" target="_blank" rel="noopener">Anthropic Contextual Retrieval</a></li>
+<li><a href="https://docs.anthropic.com/en/docs/build-with-claude/citation" target="_blank" rel="noopener">Anthropic Citation</a></li>
+<li><a href="https://github.com/jsvine/pdfplumber" target="_blank" rel="noopener">pdfplumber 文档</a></li>
+<li><a href="https://pymupdf.readthedocs.io/" target="_blank" rel="noopener">PyMuPDF 文档</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+        
+
+  <div class="followme">
+    <p>欢迎关注我的其它发布渠道</p>
+
+    <div class="social-list">
+
+        <div class="social-item">
+          <a target="_blank" class="social-link" href="/atom.xml">
+            <span class="icon">
+              <i class="fa fa-rss"></i>
+            </span>
+
+            <span class="label">RSS</span>
+          </a>
+        </div>
+    </div>
+  </div>
+
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/RAG/" rel="tag"><i class="fa fa-tag"></i> RAG</a>
+              <a href="/tags/PDF/" rel="tag"><i class="fa fa-tag"></i> PDF</a>
+          </div>
+
+        
+<div class="post-share">
+  <div class="share-title">分享到</div>
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+
+<style>
+.post-share {
+  margin: 20px 0;
+  padding: 15px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+}
+.post-share .share-title {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 10px;
+}
+.post-share .social-share {
+  text-align: center;
+}
+.post-share .social-share a {
+  margin: 0 8px;
+}
+/* 微信二维码样式优化 */
+.social-share .wechat-qrcode {
+  border: 1px solid #eee;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+.social-share .wechat-qrcode h4 {
+  color: #333;
+  font-weight: normal;
+}
+</style>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/03/13/agent-opensource-learning-guide/" rel="prev" title="Agent 开发实战指南：10+ 个开源项目带你从入门到进阶">
+      <i class="fa fa-chevron-left"></i> Agent 开发实战指南：10+ 个开源项目带你从入门到进阶
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2025/05/19/vector-database-deep-analysis/" rel="next" title="向量数据库深度解析">
+      向量数据库深度解析 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#背景"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#为什么”PDF转文本”是-demo-级答案"><span class="nav-number">2.</span> <span class="nav-text">为什么”PDF转文本”是 demo 级答案</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四层架构：从解析到调用"><span class="nav-number">3.</span> <span class="nav-text">四层架构：从解析到调用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#第1层：解析层-——-先识别，再处理"><span class="nav-number">3.1.</span> <span class="nav-text">第1层：解析层 —— 先识别，再处理</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#三种-PDF-类型"><span class="nav-number">3.1.1.</span> <span class="nav-text">三种 PDF 类型</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#不同类型的不同策略"><span class="nav-number">3.1.2.</span> <span class="nav-text">不同类型的不同策略</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#第2层：结构还原-——-保留文档骨架"><span class="nav-number">3.2.</span> <span class="nav-text">第2层：结构还原 —— 保留文档骨架</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#为什么要还原结构"><span class="nav-number">3.2.1.</span> <span class="nav-text">为什么要还原结构</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#需要保留的结构信息"><span class="nav-number">3.2.2.</span> <span class="nav-text">需要保留的结构信息</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#实现思路"><span class="nav-number">3.2.3.</span> <span class="nav-text">实现思路</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#第3层：切片和索引-——-语义切片是核心"><span class="nav-number">3.3.</span> <span class="nav-text">第3层：切片和索引 —— 语义切片是核心</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#固定字数切片的问题"><span class="nav-number">3.3.1.</span> <span class="nav-text">固定字数切片的问题</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#语义切片的原则"><span class="nav-number">3.3.2.</span> <span class="nav-text">语义切片的原则</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#metadata-标注"><span class="nav-number">3.3.3.</span> <span class="nav-text">metadata 标注</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Contextual-Retrieval：给-chunk-补上下文"><span class="nav-number">3.3.4.</span> <span class="nav-text">Contextual Retrieval：给 chunk 补上下文</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#索引策略"><span class="nav-number">3.3.5.</span> <span class="nav-text">索引策略</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#第4层：Agent-调用-——-工具链按需调用"><span class="nav-number">3.4.</span> <span class="nav-text">第4层：Agent 调用 —— 工具链按需调用</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#工具设计"><span class="nav-number">3.4.1.</span> <span class="nav-text">工具设计</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#调用策略"><span class="nav-number">3.4.2.</span> <span class="nav-text">调用策略</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#生产级细节：可追溯引用和评测"><span class="nav-number">4.</span> <span class="nav-text">生产级细节：可追溯引用和评测</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#可追溯引用"><span class="nav-number">4.1.</span> <span class="nav-text">可追溯引用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#评测体系"><span class="nav-number">4.2.</span> <span class="nav-text">评测体系</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#总结"><span class="nav-number">5.</span> <span class="nav-text">总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">95</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">57</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
