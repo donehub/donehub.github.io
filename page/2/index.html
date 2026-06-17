@@ -195,6 +195,509 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/15/claude-code-why-no-langchain/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/04/15/claude-code-why-no-langchain/" class="post-title-link" itemprop="url">Claude Code 为什么不用 LangChain/LangGraph：自研架构的深层逻辑</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-04-15 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-15T00:00:00+08:00">2026-04-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-13 09:35:20" itemprop="dateModified" datetime="2026-04-13T09:35:20+08:00">2026-04-13</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/15/claude-code-why-no-langchain/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/15/claude-code-why-no-langchain/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>LangChain 和 LangGraph 是当下最流行的 Agent 开发框架，但 Anthropic 的 Claude Code 却完全不用它们。这不是傲慢，而是基于技术本质、产品体验、API 特性和工程可控性的四重考量。本文从多个层面剖析 Claude Code 的自研架构选择，以及它用什么技术替代了 LangChain/LangGraph 的能力。</p>
+</blockquote>
+<hr>
+<h2 id="一、先说结论"><a href="#一、先说结论" class="headerlink" title="一、先说结论"></a>一、先说结论</h2><p>Claude Code 不用 LangChain/LangGraph，原因有四个：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>层面</th>
+<th>LangChain/LangGraph 的限制</th>
+<th>Claude Code 的选择</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>架构层面</strong></td>
+<td>ReAct 模式的串行瓶颈</td>
+<td>Async Generator 状态机</td>
+</tr>
+<tr>
+<td><strong>API 层面</strong></td>
+<td>无法充分利用 Anthropic API 特性</td>
+<td>原生 SDK 直接集成</td>
+</tr>
+<tr>
+<td><strong>性能层面</strong></td>
+<td>抽象层增加延迟</td>
+<td>零抽象，直接流式处理</td>
+</tr>
+<tr>
+<td><strong>可控层面</strong></td>
+<td>框架黑盒，难以定制</td>
+<td>全栈自研，精准控制</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>一句话概括</strong>：LangChain/LangGraph 是”通用框架”，Claude Code 是”专用系统”。通用框架追求易用，专用系统追求极致体验。</p>
+<hr>
+<h2 id="二、架构层面：为什么放弃-ReAct"><a href="#二、架构层面：为什么放弃-ReAct" class="headerlink" title="二、架构层面：为什么放弃 ReAct"></a>二、架构层面：为什么放弃 ReAct</h2><h3 id="2-1-ReAct-模式的根本缺陷"><a href="#2-1-ReAct-模式的根本缺陷" class="headerlink" title="2.1 ReAct 模式的根本缺陷"></a>2.1 ReAct 模式的根本缺陷</h3><p>LangChain 和 LangGraph 的核心都是 <strong>ReAct 模式</strong>（Reasoning + Acting）：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">思考(Thought) → 行动(Action) → 观察(Observation) → 思考 → ...</span><br></pre></td></tr></table></figure>
+<p>这个模式直观易懂，但存在三个根本缺陷：</p>
+<p><strong>缺陷一：串行瓶颈</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    ReAct 串行流程                            │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  用户输入 → 等待完整响应 → 解析工具调用 → 执行工具 → 等待 →  │</span><br><span class="line">│            └───────────────────────────────────┘            │</span><br><span class="line">│                        用户感知到的延迟                       │</span><br><span class="line">│                                                             │</span><br><span class="line">│  问题：用户要等模型生成完整响应后才能看到工具执行             │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p>在 CLI 交互场景中，这种延迟是致命的——用户盯着屏幕等待，不知道发生了什么。</p>
+<p><strong>缺陷二：无法利用流式传输</strong></p>
+<p>现代 LLM API 都支持流式输出（SSE），但 ReAct 模式下流式的价值被大大削弱：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LangChain 的 Agent 执行</span></span><br><span class="line">agent.run(<span class="string">"帮我分析这个项目"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 内部流程：</span></span><br><span class="line"><span class="comment"># 1. LLM 生成完整响应（即使流式，也要等 action 完整）</span></span><br><span class="line"><span class="comment"># 2. OutputParser 解析响应文本</span></span><br><span class="line"><span class="comment"># 3. 提取工具名称和参数</span></span><br><span class="line"><span class="comment"># 4. 执行工具</span></span><br><span class="line"><span class="comment"># 5. 工具结果返回给 LLM</span></span><br><span class="line"><span class="comment"># 6. 重复...</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 流式输出的价值：实时看到模型"在想什么"</span></span><br><span class="line"><span class="comment"># 但工具执行：必须等完整响应后才能开始</span></span><br><span class="line"><span class="comment"># 两者冲突，流式体验被割裂</span></span><br></pre></td></tr></table></figure>
+<p><strong>缺陷三：状态恢复困难</strong></p>
+<p>ReAct 模式没有统一的状态表示，每一步都是独立的：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Step 1: Thought → Action → Observation  (无状态记忆)</span><br><span class="line">Step 2: Thought → Action → Observation  (重新开始)</span><br><span class="line">Step 3: ...</span><br><span class="line"></span><br><span class="line">当 API 超时、Token 溢出时：</span><br><span class="line">- LangChain：抛出异常，用户需手动处理</span><br><span class="line">- LangGraph：需要显式定义 checkpoint，复杂度高</span><br><span class="line">- Claude Code：State 对象统一承载，自动恢复</span><br></pre></td></tr></table></figure>
+<h3 id="2-2-Claude-Code-的替代方案：Async-Generator-状态机"><a href="#2-2-Claude-Code-的替代方案：Async-Generator-状态机" class="headerlink" title="2.2 Claude Code 的替代方案：Async Generator 状态机"></a>2.2 Claude Code 的替代方案：Async Generator 状态机</h3><p>Claude Code 用一个 <strong>while(true) 循环 + State 赋值</strong> 替代 ReAct：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/query.ts 核心（简化版）</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">async</span> <span class="function"><span class="keyword">function</span>* <span class="title">query</span>(<span class="params">params: QueryParams</span>): <span class="title">AsyncGenerator</span>&lt;<span class="title">QueryUpdate</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">let</span> state: State = &#123;</span><br><span class="line">    messages: [...],</span><br><span class="line">    toolUseContext: &#123;...&#125;,</span><br><span class="line">    turnCount: <span class="number">0</span>,</span><br><span class="line">    transition: <span class="literal">undefined</span>,</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">    <span class="comment">// 阶段1: 消息压缩（自动处理 Token 溢出）</span></span><br><span class="line">    <span class="comment">// 阶段2: 流式 API 调用（工具即时执行）</span></span><br><span class="line">    <span class="comment">// 阶段3: 决策点（继续还是结束）</span></span><br><span class="line">    <span class="comment">// 阶段4: 工具编排（并行只读，串行写入）</span></span><br><span class="line">    <span class="comment">// 阶段5: 状态更新</span></span><br><span class="line">    </span><br><span class="line">    state = next  <span class="comment">// 通过赋值驱动循环</span></span><br><span class="line">    <span class="keyword">continue</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>核心优势对比</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>ReAct</th>
+<th>Async Generator 状态机</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>执行方式</td>
+<td>串行，等待完整响应</td>
+<td>流式，工具即时执行</td>
+</tr>
+<tr>
+<td>状态管理</td>
+<td>无统一状态</td>
+<td>State 对象承载所有信息</td>
+</tr>
+<tr>
+<td>错误恢复</td>
+<td>手动处理</td>
+<td>6 种内置恢复策略</td>
+</tr>
+<tr>
+<td>内存安全</td>
+<td>可能递归溢出</td>
+<td>状态赋值，无递归风险</td>
+</tr>
+<tr>
+<td>可观测性</td>
+<td>需要额外追踪</td>
+<td>transition 字段记录转换原因</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="2-3-流式即时执行：StreamingToolExecutor"><a href="#2-3-流式即时执行：StreamingToolExecutor" class="headerlink" title="2.3 流式即时执行：StreamingToolExecutor"></a>2.3 流式即时执行：StreamingToolExecutor</h3><p>Claude Code 的关键创新是 <strong>工具在模型生成过程中就开始执行</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                 Claude Code 流式执行流程                      │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  模型流式输出：                                              │</span><br><span class="line">│    &quot;我来帮你分析这个项目...&quot;                                 │</span><br><span class="line">│    &quot;首先读取 README...&quot;                                     │</span><br><span class="line">│    [生成 tool_use 块: Read &#123; path: &quot;README.md&quot; &#125;]           │</span><br><span class="line">│                                                             │</span><br><span class="line">│                    ↓ 立即执行                                │</span><br><span class="line">│                                                             │</span><br><span class="line">│  StreamingToolExecutor:                                     │</span><br><span class="line">│    检测到 tool_use → 立即调用 Read 工具                     │</span><br><span class="line">│    工具结果实时返回                                          │</span><br><span class="line">│                                                             │</span><br><span class="line">│  用户感知：                                                  │</span><br><span class="line">│    实时看到模型思考                                          │</span><br><span class="line">│    实时看到工具执行                                          │</span><br><span class="line">│    无需等待完整响应                                          │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p><strong>对比 LangChain</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">LangChain 流程：</span><br><span class="line">  用户输入 → 等待(模型完整响应) → 解析 → 执行工具 → 等待 → ...</span><br><span class="line">  总延迟 &#x3D; 模型生成时间 + 解析时间 + 工具执行时间</span><br><span class="line"></span><br><span class="line">Claude Code 流程：</span><br><span class="line">  用户输入 → 流式生成(工具即时执行) → 流式输出 → ...</span><br><span class="line">  总延迟 &#x3D; max(模型生成时间, 工具执行时间)</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="三、API-层面：原生特性的充分利用"><a href="#三、API-层面：原生特性的充分利用" class="headerlink" title="三、API 层面：原生特性的充分利用"></a>三、API 层面：原生特性的充分利用</h2><h3 id="3-1-LangChain-的”框架税”"><a href="#3-1-LangChain-的”框架税”" class="headerlink" title="3.1 LangChain 的”框架税”"></a>3.1 LangChain 的”框架税”</h3><p>LangChain 作为通用框架，需要在多种模型 API 之间保持一致性。这意味着：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Anthropic API 特性          → LangChain 抽象层 → 用户代码</span><br><span class="line">                                    ↓</span><br><span class="line">                          被抹平或延迟支持</span><br></pre></td></tr></table></figure>
+<p><strong>Anthropic 独有的 API 特性</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>说明</th>
+<th>LangChain 支持情况</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Prompt Caching</strong></td>
+<td>提示词缓存，降本 90%</td>
+<td>2024 年后才支持，使用复杂</td>
+</tr>
+<tr>
+<td><strong>Extended Thinking</strong></td>
+<td>思维链输出，推理透明</td>
+<td>LangChain 无原生支持</td>
+</tr>
+<tr>
+<td><strong>Computer Use</strong></td>
+<td>屏幕操作能力</td>
+<td>LangChain 无原生支持</td>
+</tr>
+<tr>
+<td><strong>原生 tool_use</strong></td>
+<td>结构化工具调用块</td>
+<td>LangChain 用 OutputParser 解析文本</td>
+</tr>
+<tr>
+<td><strong>原生流式 tool_use</strong></td>
+<td>流式传输中工具即时触发</td>
+<td>LangChain 需等待完整响应</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="3-2-Claude-Code-的原生集成"><a href="#3-2-Claude-Code-的原生集成" class="headerlink" title="3.2 Claude Code 的原生集成"></a>3.2 Claude Code 的原生集成</h3><p>Claude Code 直接使用 Anthropic SDK，充分利用所有原生特性：</p>
+<p><strong>示例：Prompt Caching 的利用</strong></p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Claude Code 的提示词组装（src/constants/prompts.ts）</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 静态可缓存区域（scope: 'global'）</span></span><br><span class="line"><span class="keyword">const</span> systemPrompt = &#123;</span><br><span class="line">  <span class="keyword">type</span>: <span class="string">'text'</span>,</span><br><span class="line">  text: <span class="string">`</span></span><br><span class="line"><span class="string">    ## 角色定义</span></span><br><span class="line"><span class="string">    Claude Code 是一个...</span></span><br><span class="line"><span class="string">    </span></span><br><span class="line"><span class="string">    ## 系统规则</span></span><br><span class="line"><span class="string">    你必须遵守...</span></span><br><span class="line"><span class="string">    </span></span><br><span class="line"><span class="string">    ## 工具说明</span></span><br><span class="line"><span class="string">    以下工具可用...</span></span><br><span class="line"><span class="string">  `</span>,</span><br><span class="line">  cache_control: &#123; <span class="keyword">type</span>: <span class="string">'ephemeral'</span> &#125;  <span class="comment">// 缓存标记</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 动态不可缓存区域（scope: 'ephemeral'）</span></span><br><span class="line"><span class="keyword">const</span> dynamicPrompt = &#123;</span><br><span class="line">  <span class="keyword">type</span>: <span class="string">'text'</span>,</span><br><span class="line">  text: <span class="string">`</span></span><br><span class="line"><span class="string">    ## 当前环境</span></span><br><span class="line"><span class="string">    工作目录: <span class="subst">$&#123;cwd&#125;</span></span></span><br><span class="line"><span class="string">    </span></span><br><span class="line"><span class="string">    ## 用户记忆</span></span><br><span class="line"><span class="string">    <span class="subst">$&#123;claudeMdContent&#125;</span></span></span><br><span class="line"><span class="string">  `</span>,</span><br><span class="line">  cache_control: &#123; <span class="keyword">type</span>: <span class="string">'ephemeral'</span> &#125;  <span class="comment">// 独立缓存</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>缓存效果</strong>：</p>
+<ul>
+<li>第一次调用：完整 token 计费</li>
+<li>后续调用：静态部分缓存命中，降本约 <strong>90%</strong></li>
+</ul>
+<p>LangChain 也支持 Prompt Caching，但需要用户手动配置，且无法像 Claude Code 这样精细划分缓存边界。</p>
+<p><strong>示例：原生 tool_use 块</strong></p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Anthropic API 响应格式</span></span><br><span class="line">&#123;</span><br><span class="line">  content: [</span><br><span class="line">    &#123; <span class="keyword">type</span>: <span class="string">'text'</span>, text: <span class="string">'我来帮你...'</span> &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="keyword">type</span>: <span class="string">'tool_use'</span>,</span><br><span class="line">      id: <span class="string">'toolu_01...'</span>,</span><br><span class="line">      name: <span class="string">'Read'</span>,</span><br><span class="line">      input: &#123; file_path: <span class="string">'/path/to/file'</span> &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Claude Code 直接处理</span></span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">const</span> block of response.content) &#123;</span><br><span class="line">  <span class="keyword">if</span> (block.type === <span class="string">'tool_use'</span>) &#123;</span><br><span class="line">    <span class="comment">// 立即执行，无需解析文本</span></span><br><span class="line">    <span class="keyword">await</span> executeTool(block.name, block.input)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>对比 LangChain</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LangChain 的工具调用</span></span><br><span class="line">response = llm.invoke(prompt)</span><br><span class="line"></span><br><span class="line"><span class="comment"># OutputParser 解析文本</span></span><br><span class="line">parsed = output_parser.parse(response.content)</span><br><span class="line"><span class="comment"># 解析可能失败，格式不固定</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> parsed[<span class="string">'action'</span>]:</span><br><span class="line">    tool_name = parsed[<span class="string">'action'</span>][<span class="string">'tool'</span>]</span><br><span class="line">    tool_input = parsed[<span class="string">'action'</span>][<span class="string">'input'</span>]</span><br><span class="line">    result = tools[tool_name].run(tool_input)</span><br></pre></td></tr></table></figure>
+<p>LangChain 需要 OutputParser 解析模型输出的文本，这是脆弱的——模型格式不固定时解析会失败。</p>
+<hr>
+<h2 id="四、性能层面：零抽象的流式优先"><a href="#四、性能层面：零抽象的流式优先" class="headerlink" title="四、性能层面：零抽象的流式优先"></a>四、性能层面：零抽象的流式优先</h2><h3 id="4-1-LangChain-的抽象层堆叠"><a href="#4-1-LangChain-的抽象层堆叠" class="headerlink" title="4.1 LangChain 的抽象层堆叠"></a>4.1 LangChain 的抽象层堆叠</h3><p>LangChain 的抽象层结构：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">用户代码</span><br><span class="line">  → Chain</span><br><span class="line">    → AgentExecutor</span><br><span class="line">      → LLM</span><br><span class="line">        → Memory</span><br><span class="line">          → Tools</span><br><span class="line">            → OutputParser</span><br><span class="line">              → 实际 API 调用</span><br></pre></td></tr></table></figure>
+<p>每一层都增加处理开销。对于 Web 应用，这些开销可以忽略；但对于 <strong>CLI 交互工具</strong>，延迟是致命的。</p>
+<h3 id="4-2-Claude-Code-的零抽象设计"><a href="#4-2-Claude-Code-的零抽象设计" class="headerlink" title="4.2 Claude Code 的零抽象设计"></a>4.2 Claude Code 的零抽象设计</h3><p>Claude Code 的结构：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">用户输入</span><br><span class="line">  → query() AsyncGenerator</span><br><span class="line">    → Anthropic SDK（直接调用）</span><br><span class="line">      → 工具执行（流式即时）</span><br></pre></td></tr></table></figure>
+<p><strong>没有中间抽象层</strong>，API 响应直接流式传递给用户。</p>
+<h3 id="4-3-工具编排的性能优化"><a href="#4-3-工具编排的性能优化" class="headerlink" title="4.3 工具编排的性能优化"></a>4.3 工具编排的性能优化</h3><p>Claude Code 的工具编排策略：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">工具调用列表</span><br><span class="line">  │</span><br><span class="line">  ├─ 分类：只读 vs 写入</span><br><span class="line">  │</span><br><span class="line">  ├─ 只读工具 ──→ 并行执行（最多 10 个并发）</span><br><span class="line">  │   ├─ Read      ──→ 同时开始</span><br><span class="line">  │   ├─ Grep      ──→ 同时开始</span><br><span class="line">  │   ├─ Glob      ──→ 同时开始</span><br><span class="line">  │   └─ WebFetch  ──→ 同时开始</span><br><span class="line">  │</span><br><span class="line">  └─ 写入工具 ──→ 串行执行（保证顺序）</span><br><span class="line">      ├─ FileEdit  ──→ 等待上一个完成</span><br><span class="line">      ├─ Write     ──→ 等待上一个完成</span><br><span class="line">      └─ Bash      ──→ 等待上一个完成</span><br></pre></td></tr></table></figure>
+<p><strong>LangChain 的工具执行</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LangChain Agent 默认串行执行</span></span><br><span class="line"><span class="keyword">for</span> tool_call <span class="keyword">in</span> parsed_tool_calls:</span><br><span class="line">    result = tool.run(tool_call.input)  <span class="comment"># 一个一个执行</span></span><br></pre></td></tr></table></figure>
+<p>LangChain 需要显式配置并行，且配置复杂；Claude Code 自动分析工具性质，智能编排。</p>
+<hr>
+<h2 id="五、可控层面：全栈自研的精准控制"><a href="#五、可控层面：全栈自研的精准控制" class="headerlink" title="五、可控层面：全栈自研的精准控制"></a>五、可控层面：全栈自研的精准控制</h2><h3 id="5-1-框架黑盒问题"><a href="#5-1-框架黑盒问题" class="headerlink" title="5.1 框架黑盒问题"></a>5.1 框架黑盒问题</h3><p>使用 LangChain/LangGraph 时，你无法精准控制：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>LangChain 行为</th>
+<th>你的控制力</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>工具执行顺序</td>
+<td>默认串行</td>
+<td>需要显式配置</td>
+</tr>
+<tr>
+<td>错误恢复</td>
+<td>抛出异常</td>
+<td>需要自己处理</td>
+</tr>
+<tr>
+<td>Token 溢出</td>
+<td>截断或报错</td>
+<td>需要自己检测</td>
+</tr>
+<tr>
+<td>提示词组装</td>
+<td>模板拼接</td>
+<td>无法精细控制</td>
+</tr>
+<tr>
+<td>流式输出</td>
+<td>部分支持</td>
+<td>需要适配框架</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="5-2-Claude-Code-的精准控制"><a href="#5-2-Claude-Code-的精准控制" class="headerlink" title="5.2 Claude Code 的精准控制"></a>5.2 Claude Code 的精准控制</h3><p>Claude Code 自研每一层，可以精确控制：</p>
+<p><strong>控制一：工具执行权限</strong></p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Claude Code 的权限系统（src/utils/permissions）</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> PermissionResult = &#123;</span><br><span class="line">  behavior: <span class="string">'allow'</span> | <span class="string">'deny'</span> | <span class="string">'ask'</span></span><br><span class="line">  message?: <span class="built_in">string</span></span><br><span class="line">  suggestions?: <span class="built_in">string</span>[]</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 精细的权限检查</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">checkPermissions</span>(<span class="params">tool, input, context</span>) </span>&#123;</span><br><span class="line">  <span class="comment">// 1. deny 规则最高优先级</span></span><br><span class="line">  <span class="keyword">if</span> (matchesDenyRule(tool.name)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; behavior: <span class="string">'deny'</span>, message: <span class="string">'Blocked by deny rule'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 工具自定义检查</span></span><br><span class="line">  <span class="keyword">if</span> (tool.checkPermissions) &#123;</span><br><span class="line">    <span class="keyword">const</span> result = <span class="keyword">await</span> tool.checkPermissions(input, context)</span><br><span class="line">    <span class="keyword">if</span> (result.behavior !== <span class="string">'passthrough'</span>) &#123;</span><br><span class="line">      <span class="keyword">return</span> result</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. allow 规则</span></span><br><span class="line">  <span class="keyword">if</span> (matchesAllowRule(tool.name, input)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 默认询问用户</span></span><br><span class="line">  <span class="keyword">return</span> &#123; behavior: <span class="string">'ask'</span>, message: <span class="string">'Do you want to allow?'</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>控制二：自动压缩策略</strong></p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Claude Code 的四级压缩（src/query）</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Level 1: Snip — 删除旧消息中的冗余 token</span></span><br><span class="line">messages = snipMessages(messages)</span><br><span class="line"></span><br><span class="line"><span class="comment">// Level 2: Micro — 修改已缓存消息的内容</span></span><br><span class="line">messages = microCompact(messages)</span><br><span class="line"></span><br><span class="line"><span class="comment">// Level 3: Collapse — 分阶段摘要历史消息</span></span><br><span class="line">messages = collapseMessages(messages)</span><br><span class="line"></span><br><span class="line"><span class="comment">// Level 4: Auto Compact — 通过 Claude 生成完整摘要</span></span><br><span class="line">messages = <span class="keyword">await</span> autoCompact(messages)</span><br><span class="line"></span><br><span class="line"><span class="comment">// LangChain 的处理方式：</span></span><br><span class="line"><span class="comment">// messages = messages.slice(-max_tokens)  // 简单截断</span></span><br></pre></td></tr></table></figure>
+<p><strong>控制三：钩子扩展系统</strong></p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// settings.json</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="attr">"hooks"</span>: &#123;</span><br><span class="line">    <span class="attr">"PreToolUse"</span>: [</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="attr">"matcher"</span>: <span class="string">"Bash"</span>,</span><br><span class="line">        <span class="attr">"hooks"</span>: [</span><br><span class="line">          &#123;</span><br><span class="line">            <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">            <span class="attr">"command"</span>: <span class="string">"security-check.sh"</span></span><br><span class="line">          &#125;</span><br><span class="line">        ]</span><br><span class="line">      &#125;</span><br><span class="line">    ],</span><br><span class="line">    <span class="attr">"PostToolUse"</span>: [</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="attr">"matcher"</span>: <span class="string">"FileEdit"</span>,</span><br><span class="line">        <span class="attr">"hooks"</span>: [</span><br><span class="line">          &#123;</span><br><span class="line">            <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">            <span class="attr">"command"</span>: <span class="string">"run-tests.sh"</span></span><br><span class="line">          &#125;</span><br><span class="line">        ]</span><br><span class="line">      &#125;</span><br><span class="line">    ]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>用户可以在工具执行的任意阶段注入自定义逻辑，LangChain 需要继承类或修改源码才能实现类似功能。</p>
+<hr>
+<h2 id="六、能力映射：Claude-Code-用什么替代-LangChain-LangGraph"><a href="#六、能力映射：Claude-Code-用什么替代-LangChain-LangGraph" class="headerlink" title="六、能力映射：Claude Code 用什么替代 LangChain/LangGraph"></a>六、能力映射：Claude Code 用什么替代 LangChain/LangGraph</h2><h3 id="6-1-LangChain-能力-→-Claude-Code-替代方案"><a href="#6-1-LangChain-能力-→-Claude-Code-替代方案" class="headerlink" title="6.1 LangChain 能力 → Claude Code 替代方案"></a>6.1 LangChain 能力 → Claude Code 替代方案</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>LangChain 能力</th>
+<th>Claude Code 替代方案</th>
+<th>实现文件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LLM 调用</strong></td>
+<td>Anthropic SDK 直接集成</td>
+<td><code>src/query.ts</code></td>
+</tr>
+<tr>
+<td><strong>工具定义</strong></td>
+<td><code>Tool</code> 类型 + <code>buildTool()</code></td>
+<td><code>src/Tool.ts</code></td>
+</tr>
+<tr>
+<td><strong>工具注册</strong></td>
+<td>三阶段流水线注册</td>
+<td><code>src/tools.ts</code></td>
+</tr>
+<tr>
+<td><strong>Agent 循环</strong></td>
+<td><code>while(true)</code> 状态机</td>
+<td><code>src/query.ts</code></td>
+</tr>
+<tr>
+<td><strong>Memory</strong></td>
+<td>Channel 系统 + 文件记忆</td>
+<td><code>src/state/</code>, <code>src/memdir/</code></td>
+</tr>
+<tr>
+<td><strong>RAG</strong></td>
+<td>文件工具 + 向量工具（可选 MCP）</td>
+<td><code>src/tools/</code></td>
+</tr>
+<tr>
+<td><strong>OutputParser</strong></td>
+<td>原生 <code>tool_use</code> 块解析</td>
+<td>无需解析</td>
+</tr>
+<tr>
+<td><strong>Callbacks</strong></td>
+<td>钩子系统</td>
+<td><code>src/hooks/</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="6-2-LangGraph-能力-→-Claude-Code-替代方案"><a href="#6-2-LangGraph-能力-→-Claude-Code-替代方案" class="headerlink" title="6.2 LangGraph 能力 → Claude Code 替代方案"></a>6.2 LangGraph 能力 → Claude Code 替代方案</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>LangGraph 能力</th>
+<th>Claude Code 替代方案</th>
+<th>实现文件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>StateGraph</strong></td>
+<td><code>State</code> 对象 + 状态赋值</td>
+<td><code>src/query.ts</code></td>
+</tr>
+<tr>
+<td><strong>节点定义</strong></td>
+<td><code>while</code> 循环的阶段划分</td>
+<td><code>src/query.ts:307-1728</code></td>
+</tr>
+<tr>
+<td><strong>边流转</strong></td>
+<td><code>transition</code> + <code>continue</code></td>
+<td><code>src/query/transitions.ts</code></td>
+</tr>
+<tr>
+<td><strong>条件分支</strong></td>
+<td><code>if/switch</code> + <code>state.transition</code></td>
+<td><code>src/query.ts</code></td>
+</tr>
+<tr>
+<td><strong>Checkpoint</strong></td>
+<td>消息历史 + 文件系统</td>
+<td><code>src/assistant/</code></td>
+</tr>
+<tr>
+<td><strong>多 Agent</strong></td>
+<td><code>AgentTool</code> + 子代理系统</td>
+<td><code>src/tools/AgentTool/</code></td>
+</tr>
+<tr>
+<td><strong>可视化调试</strong></td>
+<td><code>transition</code> 字段追踪</td>
+<td>可观测性设计</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="6-3-核心代码映射"><a href="#6-3-核心代码映射" class="headerlink" title="6.3 核心代码映射"></a>6.3 核心代码映射</h3><p><strong>LangChain Agent → Claude Code query()</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LangChain</span></span><br><span class="line">agent = AgentExecutor.from_agent_and_tools(agent, tools)</span><br><span class="line">result = agent.invoke(&#123;<span class="string">"input"</span>: <span class="string">"do something"</span>&#125;)</span><br></pre></td></tr></table></figure>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Claude Code</span></span><br><span class="line"><span class="keyword">for</span> <span class="keyword">await</span> (<span class="keyword">const</span> update of query(&#123; messages, tools, systemPrompt &#125;)) &#123;</span><br><span class="line">  <span class="built_in">console</span>.log(update)  <span class="comment">// 实时输出</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>LangGraph StateGraph → Claude Code while 循环</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LangGraph</span></span><br><span class="line">graph = StateGraph(AgentState)</span><br><span class="line">graph.add_node(<span class="string">"agent"</span>, agent_node)</span><br><span class="line">graph.add_node(<span class="string">"tool"</span>, tool_node)</span><br><span class="line">graph.add_conditional_edges(<span class="string">"agent"</span>, should_continue, </span><br><span class="line">    &#123;<span class="string">"continue"</span>: <span class="string">"tool"</span>, <span class="string">"end"</span>: END&#125;)</span><br><span class="line">app = graph.compile()</span><br></pre></td></tr></table></figure>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Claude Code（src/query.ts）</span></span><br><span class="line"><span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">  <span class="comment">// 阶段 2: 流式 API 调用</span></span><br><span class="line">  <span class="keyword">const</span> response = <span class="keyword">await</span> callModel(state)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 阶段 3: 决策点（条件分支）</span></span><br><span class="line">  <span class="keyword">if</span> (hasToolUse(response)) &#123;</span><br><span class="line">    <span class="comment">// 阶段 4: 工具执行</span></span><br><span class="line">    <span class="keyword">const</span> results = <span class="keyword">await</span> executeTools(response.tool_use_blocks)</span><br><span class="line">    state = &#123; ...state, messages: [...messages, results] &#125;</span><br><span class="line">    <span class="keyword">continue</span>  <span class="comment">// 继续循环</span></span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="comment">// 结束</span></span><br><span class="line">    <span class="keyword">yield</span> finalResult</span><br><span class="line">    <span class="keyword">return</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、什么时候该用-LangChain-LangGraph"><a href="#七、什么时候该用-LangChain-LangGraph" class="headerlink" title="七、什么时候该用 LangChain/LangGraph"></a>七、什么时候该用 LangChain/LangGraph</h2><p>Claude Code 的自研架构不是所有人的最优解。它们的选择基于：</p>
+<ol>
+<li><strong>顶级工程团队</strong>：有能力自研高性能架构</li>
+<li><strong>单一模型依赖</strong>：只需要支持 Anthropic API</li>
+<li><strong>极致体验追求</strong>：CLI 交互需要零延迟感知</li>
+<li><strong>深度定制需求</strong>：权限、压缩、钩子都需要精准控制</li>
+</ol>
+<p><strong>如果你不具备这些条件，LangChain/LangGraph 仍然是好选择</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>你的情况</th>
+<th>推荐</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>小团队，快速验证想法</td>
+<td>LangChain</td>
+</tr>
+<tr>
+<td>需要支持多种模型</td>
+<td>LangChain</td>
+</tr>
+<tr>
+<td>需要可视化 Agent 流程</td>
+<td>LangGraph</td>
+</tr>
+<tr>
+<td>需要多 Agent 协作且不想自研</td>
+<td>LangGraph 或 CrewAI</td>
+</tr>
+<tr>
+<td>Web 应用，延迟不敏感</td>
+<td>LangChain/LangGraph</td>
+</tr>
+<tr>
+<td>企业级系统，有专业团队</td>
+<td>LangGraph 或自研</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="八、总结"><a href="#八、总结" class="headerlink" title="八、总结"></a>八、总结</h2><p>Claude Code 不用 LangChain/LangGraph，不是傲慢，而是<strong>基于产品定位的理性选择</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">LangChain&#x2F;LangGraph 定位：通用框架</span><br><span class="line">  → 易用性优先</span><br><span class="line">  → 支持多种模型</span><br><span class="line">  → 抽象层统一</span><br><span class="line">  → 适合快速原型和通用应用</span><br><span class="line"></span><br><span class="line">Claude Code 定位：专用系统</span><br><span class="line">  → 性能优先</span><br><span class="line">  → 单一模型极致利用</span><br><span class="line">  → 零抽象流式处理</span><br><span class="line">  → 适合 CLI 交互和专业场景</span><br></pre></td></tr></table></figure>
+<p><strong>Claude Code 用什么替代了 LangChain/LangGraph</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>替代</th>
+<th>技术</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ReAct 循环</td>
+<td>Async Generator 状态机</td>
+</tr>
+<tr>
+<td>工具定义</td>
+<td>Tool 类型 + buildTool()</td>
+</tr>
+<tr>
+<td>工具执行管道</td>
+<td>七步执行管道</td>
+</tr>
+<tr>
+<td>状态管理</td>
+<td>State 对象 + 状态赋值</td>
+</tr>
+<tr>
+<td>错误恢复</td>
+<td>6 种内置恢复策略</td>
+</tr>
+<tr>
+<td>扩展机制</td>
+<td>钩子系统 + MCP 协议</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>核心启示</strong>：框架不是必须的，适合自己的才是最好的。LangChain/LangGraph 解决了”怎么快速搭建 Agent”的问题；Claude Code 解决了”怎么搭建极致体验的 Agent”的问题。</p>
+<hr>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="/claude-code-architecture-overview/">Claude Code 源码揭秘：整体架构概览</a></li>
+<li><a href="/claude-code-async-generator-state-machine/">打破 ReAct 迷思：Async Generator 状态机</a></li>
+<li><a href="/claude-code-tool-system/">工具系统设计：从定义到执行的七步管道</a></li>
+<li><a href="https://docs.anthropic.com/" target="_blank" rel="noopener">Anthropic API 文档</a></li>
+<li><a href="https://python.langchain.com/docs/" target="_blank" rel="noopener">LangChain 官方文档</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/" target="_blank" rel="noopener">LangGraph 官方文档</a></li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/07/claude-code-architecture-overview/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -360,6 +863,188 @@
           <!--noindex-->
             <div class="post-button">
               <a class="btn" href="/2026/04/06/claude-code-channel-system/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-context-compression/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/04/06/claude-code-context-compression/" class="post-title-link" itemprop="url">Context 管理：四级压缩与无限对话的秘密</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:24" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/claude-code-context-compression/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-context-compression/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>“对话没有上下文限制”——这是 Claude Code 的一个核心承诺。但它真的能做到吗？答案是：通过四级压缩系统，实现”伪无限对话”。这背后的设计非常精妙：不是简单截断，而是智能地压缩和保留关键信息。</p>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/06/claude-code-context-compression/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-permission-security/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/04/06/claude-code-permission-security/" class="post-title-link" itemprop="url">权限与安全：分层模型与人机协作</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:36" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/claude-code-permission-security/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-permission-security/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>AI Agent 执行命令、修改文件、访问网络——这些都是高风险操作。Claude Code 的权限系统设计了一个分层的决策模型：规则 → 模式 → 钩子 → 分类器 → 用户确认。每一层都可以独立中断工具调用，确保安全性。</p>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/06/claude-code-permission-security/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -565,7 +1250,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-permission-security/">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-memory-system/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -579,7 +1264,7 @@
       <header class="post-header">
         <h2 class="post-title" itemprop="name headline">
           
-            <a href="/2026/04/06/claude-code-permission-security/" class="post-title-link" itemprop="url">权限与安全：分层模型与人机协作</a>
+            <a href="/2026/04/06/claude-code-memory-system/" class="post-title-link" itemprop="url">Memory 系统：跨会话持久化知识库</a>
         </h2>
 
         <div class="post-meta">
@@ -590,7 +1275,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:36" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:37" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -611,8 +1296,8 @@
       </span>
       <span class="post-meta-item-text">Valine：</span>
     
-    <a title="valine" href="/2026/04/06/claude-code-permission-security/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-permission-security/" itemprop="commentCount"></span>
+    <a title="valine" href="/2026/04/06/claude-code-memory-system/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-memory-system/" itemprop="commentCount"></span>
     </a>
   </span>
   
@@ -628,11 +1313,11 @@
 
       
           <blockquote>
-<p>AI Agent 执行命令、修改文件、访问网络——这些都是高风险操作。Claude Code 的权限系统设计了一个分层的决策模型：规则 → 模式 → 钩子 → 分类器 → 用户确认。每一层都可以独立中断工具调用，确保安全性。</p>
+<p>让 Claude Code 跨会话记住你是谁、你偏好什么、项目正在发生什么——这是 Memory 系统的核心目标。它不是简单的聊天记录持久化，而是一个结构化的知识管理系统，通过四种记忆类型、自动提取机制、团队同步等功能，让 AI 真正”理解”你。</p>
 </blockquote>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2026/04/06/claude-code-permission-security/#more" rel="contents">
+              <a class="btn" href="/2026/04/06/claude-code-memory-system/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -747,188 +1432,6 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-memory-system/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/04/06/claude-code-memory-system/" class="post-title-link" itemprop="url">Memory 系统：跨会话持久化知识库</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:37" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
-                </span>
-            </span>
-
-          
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2026/04/06/claude-code-memory-system/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-memory-system/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>让 Claude Code 跨会话记住你是谁、你偏好什么、项目正在发生什么——这是 Memory 系统的核心目标。它不是简单的聊天记录持久化，而是一个结构化的知识管理系统，通过四种记忆类型、自动提取机制、团队同步等功能，让 AI 真正”理解”你。</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2026/04/06/claude-code-memory-system/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-context-compression/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/04/06/claude-code-context-compression/" class="post-title-link" itemprop="url">Context 管理：四级压缩与无限对话的秘密</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:24" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
-                </span>
-            </span>
-
-          
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2026/04/06/claude-code-context-compression/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-context-compression/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>“对话没有上下文限制”——这是 Claude Code 的一个核心承诺。但它真的能做到吗？答案是：通过四级压缩系统，实现”伪无限对话”。这背后的设计非常精妙：不是简单截断，而是智能地压缩和保留关键信息。</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2026/04/06/claude-code-context-compression/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-skills-system/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -997,97 +1500,6 @@
           <!--noindex-->
             <div class="post-button">
               <a class="btn" href="/2026/04/06/claude-code-skills-system/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-terminal-ui/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/04/06/claude-code-terminal-ui/" class="post-title-link" itemprop="url">Terminal UI：React + Ink 的 TUI 实现</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:40" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
-                </span>
-            </span>
-
-          
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2026/04/06/claude-code-terminal-ui/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-terminal-ui/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>Claude Code 的终端界面不是传统的 CLI——它是一个完整的 React 应用，运行在终端中。通过 Ink 框架（自定义 React Reconciler + Yoga 布局引擎），Claude Code 实现了组件化 UI、双缓冲渲染、交互式对话框等高级特性。这是 Terminal UI 开发的教科书级案例。</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2026/04/06/claude-code-terminal-ui/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -1179,7 +1591,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">95</span>
+          <span class="site-state-item-count">96</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1192,7 +1604,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">57</span>
+        <span class="site-state-item-count">58</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

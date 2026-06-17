@@ -195,6 +195,645 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2024/05/28/kong-api-gateway-deep-analysis/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/05/28/kong-api-gateway-deep-analysis/" class="post-title-link" itemprop="url">Kong API 网关深度解析</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-05-28 00:00:00" itemprop="dateCreated datePublished" datetime="2024-05-28T00:00:00+08:00">2024-05-28</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-05-28 10:39:47" itemprop="dateModified" datetime="2026-05-28T10:39:47+08:00">2026-05-28</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2024/05/28/kong-api-gateway-deep-analysis/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2024/05/28/kong-api-gateway-deep-analysis/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="一、背景"><a href="#一、背景" class="headerlink" title="一、背景"></a>一、背景</h2><p>做微服务架构的人，基本绕不开 API 网关这个东西。不管你用 Spring Cloud Gateway、Envoy 还是 Nginx 手搓，总得有个统一的入口把请求转发给后端服务。</p>
+<p>Kong 是这个领域里做得最成熟的开源方案之一，GitHub 上 40K+ Stars，背后有商业公司维护，插件生态完善，大厂用得也多。但很多开发者对 Kong 的理解停留在”哦，就是个网关”这个层面，对其架构设计、插件系统、配置模式这些核心东西没深入过。</p>
+<hr>
+<h2 id="二、Kong-是什么"><a href="#二、Kong-是什么" class="headerlink" title="二、Kong 是什么"></a>二、Kong 是什么</h2><p>一句话定义：Kong 是一个基于 <strong>Nginx + OpenResty（LuaJIT）</strong> 的开源 API 网关，核心能力是<strong>路由转发、认证鉴权、流量控制、可观测性</strong>。</p>
+<p>打个比方理解它的定位：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>没有网关</th>
+<th>有了 Kong</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10 个微服务都要做认证</td>
+<td>每个服务自己实现一遍</td>
+<td>Kong 统一做，服务只管业务</td>
+</tr>
+<tr>
+<td>要对某个接口限流</td>
+<td>在代码里写限流逻辑</td>
+<td>Kong 配个插件就搞定</td>
+</tr>
+<tr>
+<td>要记录所有请求日志</td>
+<td>每个服务加日志代码</td>
+<td>Kong 统一采集，不影响业务</td>
+</tr>
+<tr>
+<td>要做灰度发布</td>
+<td>改代码或改 Nginx 配置</td>
+<td>Kong 按权重分流，配置即生效</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>核心区别在于：传统做法每个服务都要重复造轮子，Kong 把这些<strong>横切关注点（Cross-Cutting Concerns）</strong> 统一收口到网关层。</p>
+<hr>
+<h2 id="三、架构深度拆解"><a href="#三、架构深度拆解" class="headerlink" title="三、架构深度拆解"></a>三、架构深度拆解</h2><h3 id="3-1-整体架构图"><a href="#3-1-整体架构图" class="headerlink" title="3.1 整体架构图"></a>3.1 整体架构图</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">                    客户端请求</span><br><span class="line">                        │</span><br><span class="line">                        ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                      Kong Gateway                           │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────┐   │</span><br><span class="line">│  │              Nginx (反向代理层)                        │   │</span><br><span class="line">│  ├─────────────────────────────────────────────────────┤   │</span><br><span class="line">│  │              OpenResty &#x2F; LuaJIT                       │   │</span><br><span class="line">│  ├─────────────────────────────────────────────────────┤   │</span><br><span class="line">│  │                Kong Core                              │   │</span><br><span class="line">│  │  ┌───────────────────────────────────────────────┐   │   │</span><br><span class="line">│  │  │           Plugin System (插件系统)              │   │   │</span><br><span class="line">│  │  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐  │   │   │</span><br><span class="line">│  │  │  │ 认证    │ │ 限流   │ │ 日志   │ │ 转换   │  │   │   │</span><br><span class="line">│  │  │  └────────┘ └────────┘ └────────┘ └────────┘  │   │   │</span><br><span class="line">│  │  └───────────────────────────────────────────────┘   │   │</span><br><span class="line">│  ├─────────────────────────────────────────────────────┤   │</span><br><span class="line">│  │              Admin API (管理接口)                      │   │</span><br><span class="line">│  └─────────────────────────────────────────────────────┘   │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br><span class="line">                        │</span><br><span class="line">                        ▼</span><br><span class="line">              ┌─────────────────────┐</span><br><span class="line">              │   数据存储层          │</span><br><span class="line">              │  PostgreSQL &#x2F;        │</span><br><span class="line">              │  Cassandra &#x2F; 声明式   │</span><br><span class="line">              └─────────────────────┘</span><br><span class="line">                        │</span><br><span class="line">                        ▼</span><br><span class="line">              ┌─────────────────────┐</span><br><span class="line">              │   上游服务集群        │</span><br><span class="line">              │  (User Service,     │</span><br><span class="line">              │   Order Service...) │</span><br><span class="line">              └─────────────────────┘</span><br></pre></td></tr></table></figure>
+<p>这个架构有几个关键点值得拆开说。</p>
+<h3 id="3-2-为什么是-Nginx-OpenResty"><a href="#3-2-为什么是-Nginx-OpenResty" class="headerlink" title="3.2 为什么是 Nginx + OpenResty"></a>3.2 为什么是 Nginx + OpenResty</h3><p>Kong 没有用 Java、没用 Go，选了 Lua 这个相对小众的语言，原因在于 <strong>OpenResty</strong>。</p>
+<p>OpenResty 是 Nginx 的一个增强版，把 LuaJIT 嵌入到 Nginx 的请求处理生命周期里。这意味着：</p>
+<ol>
+<li><strong>性能极高</strong>：Nginx 本身就以高并发著称，LuaJIT 的执行速度接近 C</li>
+<li><strong>非阻塞 I/O</strong>：OpenResty 把所有网络操作都封装成非阻塞的，一个请求在等数据库返回的时候不会阻塞其他请求</li>
+<li><strong>生命周期钩子</strong>：Nginx 的各个处理阶段（rewrite、access、content、log）都能用 Lua 来扩展</li>
+</ol>
+<p>Kong 本质上就是一个<strong>用 Lua 写的、运行在 OpenResty 上的 Nginx 配置生成器 + 插件执行引擎</strong>。</p>
+<h3 id="3-3-核心抽象模型"><a href="#3-3-核心抽象模型" class="headerlink" title="3.3 核心抽象模型"></a>3.3 核心抽象模型</h3><p>Kong 的配置管理围绕几个核心概念展开：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">Consumer (消费者)</span><br><span class="line">    │</span><br><span class="line">    ├── 某个调用方的身份（API Key、JWT 等标识）</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">Route (路由)</span><br><span class="line">    │</span><br><span class="line">    ├── 匹配规则：路径、Host、HTTP Method</span><br><span class="line">    ├── 一个 Service 可以挂多个 Route</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">Service (服务)</span><br><span class="line">    │</span><br><span class="line">    ├── 一个上游服务的抽象（URL、协议、超时配置）</span><br><span class="line">    ├── 指向 Upstream</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">Upstream (上游)</span><br><span class="line">    │</span><br><span class="line">    ├── 一组 Target 的集合</span><br><span class="line">    ├── 负载均衡策略、健康检查</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">Target (目标)</span><br><span class="line">    │</span><br><span class="line">    └── 具体的后端实例地址（IP:Port）</span><br></pre></td></tr></table></figure>
+<p>举个实际例子：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 定义一个服务</span></span><br><span class="line"><span class="attr">Service:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">user-service</span></span><br><span class="line">  <span class="attr">url:</span> <span class="string">http://user-api.internal:8080</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 给这个服务定义路由</span></span><br><span class="line"><span class="attr">Route:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">user-route</span></span><br><span class="line">  <span class="attr">paths:</span> <span class="string">["/api/v1/users"]</span></span><br><span class="line">  <span class="attr">methods:</span> <span class="string">["GET",</span> <span class="string">"POST"</span><span class="string">]</span></span><br><span class="line">  <span class="attr">service:</span> <span class="string">user-service</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 给路由加认证插件</span></span><br><span class="line"><span class="attr">Plugin:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">key-auth</span></span><br><span class="line">  <span class="attr">route:</span> <span class="string">user-route</span></span><br></pre></td></tr></table></figure>
+<p>这个模型的设计很清晰：<strong>Service 是对后端服务的抽象，Route 是对请求匹配规则的抽象，Plugin 是对横切逻辑的抽象</strong>。</p>
+<h3 id="3-4-请求生命周期"><a href="#3-4-请求生命周期" class="headerlink" title="3.4 请求生命周期"></a>3.4 请求生命周期</h3><p>一个请求到达 Kong 之后，会经历这些阶段：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line">1. 客户端发送请求</span><br><span class="line">   │</span><br><span class="line">   ▼</span><br><span class="line">2. SSL&#x2F;TLS 握手（certificate 阶段）</span><br><span class="line">   │  ← 这里可以执行 mTLS 插件</span><br><span class="line">   ▼</span><br><span class="line">3. URI 重写（rewrite 阶段）</span><br><span class="line">   │  ← 这里可以执行 URL 重写插件</span><br><span class="line">   ▼</span><br><span class="line">4. 路由匹配</span><br><span class="line">   │  ← Kong 根据 Host&#x2F;Path&#x2F;Method 找到对应的 Route</span><br><span class="line">   ▼</span><br><span class="line">5. 认证 &amp; 鉴权（access 阶段）</span><br><span class="line">   │  ← 执行 key-auth、jwt、oauth2 等插件</span><br><span class="line">   ▼</span><br><span class="line">6. 限流 &amp; 配额（access 阶段）</span><br><span class="line">   │  ← 执行 rate-limiting、quota 等插件</span><br><span class="line">   ▼</span><br><span class="line">7. 请求转换（access 阶段）</span><br><span class="line">   │  ← 执行 request-transformer 插件</span><br><span class="line">   ▼</span><br><span class="line">8. 转发请求到上游服务</span><br><span class="line">   │</span><br><span class="line">   ▼</span><br><span class="line">9. 接收上游响应</span><br><span class="line">   │</span><br><span class="line">   ▼</span><br><span class="line">10. 响应头处理（header_filter 阶段）</span><br><span class="line">    │  ← 执行 cors、response-transformer 等插件</span><br><span class="line">    ▼</span><br><span class="line">11. 响应体处理（body_filter 阶段）</span><br><span class="line">    │  ← 可以修改响应内容</span><br><span class="line">    ▼</span><br><span class="line">12. 日志记录（log 阶段）</span><br><span class="line">    │  ← 执行 tcp-log、http-log、file-log 等插件</span><br><span class="line">    ▼</span><br><span class="line">13. 返回响应给客户端</span><br></pre></td></tr></table></figure>
+<p>注意 <strong>access 阶段</strong>是核心，大部分插件都在这个阶段执行。每个插件有优先级（priority），priority 越高越先执行。</p>
+<hr>
+<h2 id="四、插件系统：Kong-的核心竞争力"><a href="#四、插件系统：Kong-的核心竞争力" class="headerlink" title="四、插件系统：Kong 的核心竞争力"></a>四、插件系统：Kong 的核心竞争力</h2><p>插件系统是 Kong 区别于其他网关的最大优势。理解插件系统，才算真正理解 Kong。</p>
+<h3 id="4-1-插件的作用域"><a href="#4-1-插件的作用域" class="headerlink" title="4.1 插件的作用域"></a>4.1 插件的作用域</h3><p>Kong 的插件不是全局一把梭，而是可以分层配置：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">全局插件（Global Plugin）</span><br><span class="line">    │</span><br><span class="line">    ├── 对所有请求生效</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">服务级插件（Service-level Plugin）</span><br><span class="line">    │</span><br><span class="line">    ├── 对某个 Service 的所有请求生效</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">路由级插件（Route-level Plugin）</span><br><span class="line">    │</span><br><span class="line">    ├── 对匹配某个 Route 的请求生效</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">消费者级插件（Consumer-level Plugin）</span><br><span class="line">    │</span><br><span class="line">    └── 对某个 Consumer 的请求生效</span><br></pre></td></tr></table></figure>
+<p>这种分层设计很实用。比如：</p>
+<ul>
+<li>全局开启 CORS 插件</li>
+<li>对支付服务单独开启更严格的限流</li>
+<li>对 VIP 消费者放宽配额限制</li>
+</ul>
+<h3 id="4-2-插件执行机制"><a href="#4-2-插件执行机制" class="headerlink" title="4.2 插件执行机制"></a>4.2 插件执行机制</h3><p>每个插件本质上是一个 <strong>Lua 模块</strong>，实现了特定的钩子函数：</p>
+<figure class="highlight lua"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 一个最简单的 Kong 插件示例</span></span><br><span class="line"><span class="keyword">local</span> MyPlugin = &#123;</span><br><span class="line">  PRIORITY = <span class="number">1000</span>,  <span class="comment">-- 优先级，越大越先执行</span></span><br><span class="line">  VERSION = <span class="string">"1.0.0"</span>,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- access 阶段执行的逻辑</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">MyPlugin:access</span><span class="params">(conf)</span></span></span><br><span class="line">  <span class="comment">-- 从请求中获取某个 header</span></span><br><span class="line">  <span class="keyword">local</span> request_id = kong.request.get_header(<span class="string">"X-Request-ID"</span>)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">if</span> <span class="keyword">not</span> request_id <span class="keyword">then</span></span><br><span class="line">    <span class="comment">-- 如果没有 request_id，直接返回 400</span></span><br><span class="line">    <span class="keyword">return</span> kong.response.<span class="built_in">exit</span>(<span class="number">400</span>, &#123;</span><br><span class="line">      message = <span class="string">"Missing X-Request-ID header"</span></span><br><span class="line">    &#125;)</span><br><span class="line">  <span class="keyword">end</span></span><br><span class="line">  </span><br><span class="line">  <span class="comment">-- 把 request_id 传给上游服务</span></span><br><span class="line">  kong.service.request.set_header(<span class="string">"X-Request-ID"</span>, request_id)</span><br><span class="line"><span class="keyword">end</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">return</span> MyPlugin</span><br></pre></td></tr></table></figure>
+<p>Kong 提供了 <strong>PDK（Plugin Development Kit）</strong>，这是一组 Lua 函数，封装了所有常用操作：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>PDK 函数</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kong.request.get_header()</code></td>
+<td>获取请求头</td>
+</tr>
+<tr>
+<td><code>kong.request.get_body()</code></td>
+<td>获取请求体</td>
+</tr>
+<tr>
+<td><code>kong.response.exit()</code></td>
+<td>直接返回响应</td>
+</tr>
+<tr>
+<td><code>kong.service.request.set_header()</code></td>
+<td>修改转发给上游的请求头</td>
+</tr>
+<tr>
+<td><code>kong.client.get_consumer()</code></td>
+<td>获取当前消费者信息</td>
+</tr>
+<tr>
+<td><code>kong.ip.get_source()</code></td>
+<td>获取客户端真实 IP</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="4-3-内置插件分类"><a href="#4-3-内置插件分类" class="headerlink" title="4.3 内置插件分类"></a>4.3 内置插件分类</h3><p>Kong 的内置插件可以分成这几大类：</p>
+<p><strong>认证类</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>插件</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>key-auth</td>
+<td>API Key 认证，最简单常用</td>
+</tr>
+<tr>
+<td>jwt</td>
+<td>JWT Token 认证</td>
+</tr>
+<tr>
+<td>oauth2</td>
+<td>完整的 OAuth 2.0 流程</td>
+</tr>
+<tr>
+<td>basic-auth</td>
+<td>HTTP Basic 认证</td>
+</tr>
+<tr>
+<td>hmac-auth</td>
+<td>HMAC 签名认证</td>
+</tr>
+<tr>
+<td>ldap-auth</td>
+<td>LDAP 目录认证</td>
+</tr>
+<tr>
+<td>openid-connect</td>
+<td>OIDC 认证（对接 Okta、Auth0 等）</td>
+</tr>
+<tr>
+<td>mtls-auth</td>
+<td>双向 TLS 认证</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>流量控制类</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>插件</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>rate-limiting</td>
+<td>基于 IP/Consumer/Service 的速率限制</td>
+</tr>
+<tr>
+<td>request-size-limiting</td>
+<td>限制请求体大小</td>
+</tr>
+<tr>
+<td>proxy-cache</td>
+<td>响应缓存</td>
+</tr>
+<tr>
+<td>canary</td>
+<td>金丝雀发布，按权重分流</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>转换类</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>插件</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>request-transformer</td>
+<td>修改请求头、Body、URL 参数</td>
+</tr>
+<tr>
+<td>response-transformer</td>
+<td>修改响应头、Body</td>
+</tr>
+<tr>
+<td>request-validator</td>
+<td>JSON Schema 请求验证</td>
+</tr>
+<tr>
+<td>correlation-id</td>
+<td>生成请求唯一标识</td>
+</tr>
+<tr>
+<td>cors</td>
+<td>跨域配置</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>可观测性类</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>插件</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>prometheus</td>
+<td>暴露 Prometheus 指标</td>
+</tr>
+<tr>
+<td>datadog</td>
+<td>集成 Datadog APM</td>
+</tr>
+<tr>
+<td>zipkin</td>
+<td>分布式链路追踪</td>
+</tr>
+<tr>
+<td>tcp-log</td>
+<td>TCP 方式发送日志</td>
+</tr>
+<tr>
+<td>http-log</td>
+<td>HTTP 方式发送日志</td>
+</tr>
+<tr>
+<td>file-log</td>
+<td>写入本地文件</td>
+</tr>
+<tr>
+<td>kafka-log</td>
+<td>发送到 Kafka</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="4-4-插件开发实战"><a href="#4-4-插件开发实战" class="headerlink" title="4.4 插件开发实战"></a>4.4 插件开发实战</h3><p>官方内置插件覆盖了大部分场景，但有时候你得写自己的插件。比如：给所有经过网关的请求加上公司内部的审计日志。</p>
+<p><strong>目录结构</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">kong-plugin-audit-log&#x2F;</span><br><span class="line">├── kong&#x2F;</span><br><span class="line">│   └── plugins&#x2F;</span><br><span class="line">│       └── audit-log&#x2F;</span><br><span class="line">│           ├── handler.lua    # 插件逻辑</span><br><span class="line">│           └── schema.lua     # 配置校验</span><br><span class="line">└── kong-plugin-audit-log-0.1.0-1.rockspec</span><br></pre></td></tr></table></figure>
+<p><strong>handler.lua - 插件主逻辑</strong></p>
+<figure class="highlight lua"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">local</span> AuditLog = &#123;</span><br><span class="line">  PRIORITY = <span class="number">10</span>,</span><br><span class="line">  VERSION = <span class="string">"1.0.0"</span>,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">AuditLog:log</span><span class="params">(conf)</span></span></span><br><span class="line">  <span class="comment">-- 获取请求信息</span></span><br><span class="line">  <span class="keyword">local</span> request = &#123;</span><br><span class="line">    method = kong.request.get_method(),</span><br><span class="line">    <span class="built_in">path</span> = kong.request.get_path(),</span><br><span class="line">    query = kong.request.get_raw_query(),</span><br><span class="line">    headers = kong.request.get_headers(),</span><br><span class="line">    client_ip = kong.client.get_ip(),</span><br><span class="line">    consumer = kong.client.get_consumer(),</span><br><span class="line">    service = kong.router.get_service(),</span><br><span class="line">    response_status = kong.response.get_status(),</span><br><span class="line">    request_id = kong.request.get_header(<span class="string">"X-Request-ID"</span>),</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">-- 序列化后发送到审计系统</span></span><br><span class="line">  <span class="keyword">local</span> cjson = <span class="built_in">require</span>(<span class="string">"cjson"</span>)</span><br><span class="line">  <span class="keyword">local</span> log_data = cjson.encode(request)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">-- 发送到 Kafka 或 HTTP 端点</span></span><br><span class="line">  <span class="keyword">local</span> http = <span class="built_in">require</span>(<span class="string">"resty.http"</span>)</span><br><span class="line">  <span class="keyword">local</span> httpc = http.new()</span><br><span class="line">  httpc:request_uri(conf.audit_endpoint, &#123;</span><br><span class="line">    method = <span class="string">"POST"</span>,</span><br><span class="line">    body = log_data,</span><br><span class="line">    headers = &#123;</span><br><span class="line">      [<span class="string">"Content-Type"</span>] = <span class="string">"application/json"</span>,</span><br><span class="line">    &#125;,</span><br><span class="line">  &#125;)</span><br><span class="line"><span class="keyword">end</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">return</span> AuditLog</span><br></pre></td></tr></table></figure>
+<p><strong>schema.lua - 配置校验</strong></p>
+<figure class="highlight lua"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">return</span> &#123;</span><br><span class="line">  name = <span class="string">"audit-log"</span>,</span><br><span class="line">  fields = &#123;</span><br><span class="line">    &#123; consumer = typedefs.no_consumer &#125;,</span><br><span class="line">    &#123; <span class="built_in">config</span> = &#123;</span><br><span class="line">        <span class="built_in">type</span> = <span class="string">"record"</span>,</span><br><span class="line">        fields = &#123;</span><br><span class="line">          &#123; audit_endpoint = &#123; <span class="built_in">type</span> = <span class="string">"string"</span>, required = <span class="literal">true</span> &#125; &#125;,</span><br><span class="line">          &#123; include_headers = &#123; <span class="built_in">type</span> = <span class="string">"boolean"</span>, default = <span class="literal">true</span> &#125; &#125;,</span><br><span class="line">        &#125;,</span><br><span class="line">      &#125;,</span><br><span class="line">    &#125;,</span><br><span class="line">  &#125;,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>安装插件</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 打包</span></span><br><span class="line">luarocks make</span><br><span class="line"></span><br><span class="line"><span class="comment"># 在 kong.conf 中启用</span></span><br><span class="line">plugins = bundled,audit-log</span><br><span class="line"></span><br><span class="line"><span class="comment"># 或者通过环境变量</span></span><br><span class="line">KONG_PLUGINS=bundled,audit-log</span><br></pre></td></tr></table></figure>
+<h3 id="4-5-多语言插件支持"><a href="#4-5-多语言插件支持" class="headerlink" title="4.5 多语言插件支持"></a>4.5 多语言插件支持</h3><p>Lua 不是所有人都熟，Kong 后来加了 <strong>External Plugins</strong> 机制，支持用其他语言写插件：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>语言</th>
+<th>方式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Go</td>
+<td>Go PDK</td>
+<td>通过 gRPC 和 Kong 通信</td>
+</tr>
+<tr>
+<td>Python</td>
+<td>Python PDK</td>
+<td>同样走 gRPC</td>
+</tr>
+<tr>
+<td>JavaScript</td>
+<td>JS PDK</td>
+<td>同样走 gRPC</td>
+</tr>
+<tr>
+<td>WebAssembly</td>
+<td>WASM</td>
+<td>新一代扩展方式</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>原理是一样的：Kong 在插件执行阶段通过 gRPC 调用外部插件服务，外部服务处理完返回结果。性能比原生 Lua 插件差一点，但开发门槛低很多。</p>
+<hr>
+<h2 id="五、配置管理：三种模式"><a href="#五、配置管理：三种模式" class="headerlink" title="五、配置管理：三种模式"></a>五、配置管理：三种模式</h2><p>Kong 支持三种配置管理模式，适应不同的部署场景。</p>
+<h3 id="5-1-传统数据库模式（DB-Mode）"><a href="#5-1-传统数据库模式（DB-Mode）" class="headerlink" title="5.1 传统数据库模式（DB Mode）"></a>5.1 传统数据库模式（DB Mode）</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Kong 节点 ──→ PostgreSQL &#x2F; Cassandra</span><br><span class="line">    │</span><br><span class="line">    └── Admin API 操作配置</span><br></pre></td></tr></table></figure>
+<p>这是最经典的模式。所有配置（Service、Route、Plugin、Consumer）都存在数据库里，通过 Admin API 管理。</p>
+<p><strong>优点</strong>：</p>
+<ul>
+<li>配置变更实时生效，不需要重启</li>
+<li>多个 Kong 节点共享同一份配置</li>
+<li>适合动态环境，服务频繁上下线</li>
+</ul>
+<p><strong>缺点</strong>：</p>
+<ul>
+<li>依赖数据库，多了一个运维组件</li>
+<li>数据库挂了 Kong 就废了（虽然有缓存，但配置变更就没了）</li>
+</ul>
+<h3 id="5-2-DB-less-声明式模式"><a href="#5-2-DB-less-声明式模式" class="headerlink" title="5.2 DB-less 声明式模式"></a>5.2 DB-less 声明式模式</h3><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># kong.yml</span></span><br><span class="line"><span class="attr">_format_version:</span> <span class="string">"3.0"</span></span><br><span class="line"></span><br><span class="line"><span class="attr">services:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">user-service</span></span><br><span class="line">    <span class="attr">url:</span> <span class="string">http://user-api:8080</span></span><br><span class="line">    <span class="attr">routes:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">user-route</span></span><br><span class="line">        <span class="attr">paths:</span> <span class="string">["/api/users"]</span></span><br><span class="line">    <span class="attr">plugins:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">key-auth</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">rate-limiting</span></span><br><span class="line">        <span class="attr">config:</span></span><br><span class="line">          <span class="attr">minute:</span> <span class="number">100</span></span><br><span class="line">          <span class="attr">policy:</span> <span class="string">local</span></span><br><span class="line"></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">order-service</span></span><br><span class="line">    <span class="attr">url:</span> <span class="string">http://order-api:8080</span></span><br><span class="line">    <span class="attr">routes:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">order-route</span></span><br><span class="line">        <span class="attr">paths:</span> <span class="string">["/api/orders"]</span></span><br></pre></td></tr></table></figure>
+<p>启动时加载配置文件：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kong start -c kong.conf --declarative-config kong.yml</span><br></pre></td></tr></table></figure>
+<p><strong>优点</strong>：</p>
+<ul>
+<li>不需要数据库，部署更简单</li>
+<li>配置即代码，可以 Git 管理</li>
+<li>适合 GitOps、CI/CD 流程</li>
+<li>适合 Kubernetes ConfigMap/Secret</li>
+</ul>
+<p><strong>缺点</strong>：</p>
+<ul>
+<li>配置变更需要重新加载（不是重启，是 reload）</li>
+<li>不支持 Consumer 的动态注册</li>
+</ul>
+<h3 id="5-3-混合模式（Hybrid-Mode）"><a href="#5-3-混合模式（Hybrid-Mode）" class="headerlink" title="5.3 混合模式（Hybrid Mode）"></a>5.3 混合模式（Hybrid Mode）</h3><p>这是 Kong 比较新的部署模式，把控制平面和数据平面分离：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────┐         ┌─────────────────────┐</span><br><span class="line">│    Control Plane     │         │     Data Plane       │</span><br><span class="line">│    (控制平面)         │         │     (数据平面)        │</span><br><span class="line">│                      │         │                      │</span><br><span class="line">│  ┌───────────────┐   │   mTLS   │   ┌───────────────┐  │</span><br><span class="line">│  │  Admin API    │   │◄────────►│   │  Proxy Only   │  │</span><br><span class="line">│  │  配置管理      │   │   同步    │   │  只做代理      │  │</span><br><span class="line">│  └───────────────┘   │   配置    │   └───────────────┘  │</span><br><span class="line">│                      │         │                      │</span><br><span class="line">│  ┌───────────────┐   │         │   无 Admin API        │</span><br><span class="line">│  │  PostgreSQL   │   │         │   无数据库             │</span><br><span class="line">│  └───────────────┘   │         │                      │</span><br><span class="line">└─────────────────────┘         └─────────────────────┘</span><br></pre></td></tr></table></figure>
+<p><strong>工作原理</strong>：</p>
+<ol>
+<li>控制平面负责配置管理，连接数据库</li>
+<li>数据平面只做代理，不连数据库</li>
+<li>控制平面通过 mTLS 把配置推送到数据平面</li>
+<li>数据平面本地缓存配置，即使控制平面挂了也能继续工作</li>
+</ol>
+<p><strong>优点</strong>：</p>
+<ul>
+<li>数据平面不暴露 Admin API，安全性更高</li>
+<li>数据平面不需要数据库，部署更轻量</li>
+<li>可以跨机房部署，控制平面集中管理</li>
+<li>适合大规模微服务架构</li>
+</ul>
+<p><strong>缺点</strong>：</p>
+<ul>
+<li>架构复杂度增加</li>
+<li>需要管理 mTLS 证书</li>
+</ul>
+<hr>
+<h2 id="六、负载均衡与服务发现"><a href="#六、负载均衡与服务发现" class="headerlink" title="六、负载均衡与服务发现"></a>六、负载均衡与服务发现</h2><h3 id="6-1-负载均衡算法"><a href="#6-1-负载均衡算法" class="headerlink" title="6.1 负载均衡算法"></a>6.1 负载均衡算法</h3><p>Kong 支持多种负载均衡算法：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>算法</th>
+<th>说明</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>round-robin</td>
+<td>轮询</td>
+<td>通用场景，最常用</td>
+</tr>
+<tr>
+<td>consistent-hashing</td>
+<td>一致性哈希</td>
+<td>需要会话保持的场景</td>
+</tr>
+<tr>
+<td>least-connections</td>
+<td>最少连接数</td>
+<td>后端实例性能不均</td>
+</tr>
+<tr>
+<td>latency</td>
+<td>最低延迟</td>
+<td>对延迟敏感的场景</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>一致性哈希</strong>特别值得说一下。它可以基于不同的维度做哈希：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 基于 Consumer 做哈希，同一个消费者的请求总是打到同一个后端</span></span><br><span class="line">curl -X POST http://localhost:8001/upstreams/my-upstream \</span><br><span class="line">  --data name=my-upstream \</span><br><span class="line">  --data hash_on=consumer</span><br><span class="line"></span><br><span class="line"><span class="comment"># 基于 IP 做哈希</span></span><br><span class="line">curl -X POST http://localhost:8001/upstreams/my-upstream \</span><br><span class="line">  --data name=my-upstream \</span><br><span class="line">  --data hash_on=ip</span><br><span class="line"></span><br><span class="line"><span class="comment"># 基于某个 Header 做哈希</span></span><br><span class="line">curl -X POST http://localhost:8001/upstreams/my-upstream \</span><br><span class="line">  --data name=my-upstream \</span><br><span class="line">  --data hash_on=header \</span><br><span class="line">  --data hash_on_header=X-User-ID</span><br></pre></td></tr></table></figure>
+<h3 id="6-2-健康检查"><a href="#6-2-健康检查" class="headerlink" title="6.2 健康检查"></a>6.2 健康检查</h3><p>Kong 支持两种健康检查机制：</p>
+<p><strong>主动检查（Active Health Checks）</strong></p>
+<p>Kong 定期向后端实例发送探测请求：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">curl -X POST http://localhost:8001/upstreams/my-upstream/healthcheck \</span><br><span class="line">  --data active.healthy.interval=5 \</span><br><span class="line">  --data active.unhealthy.interval=2 \</span><br><span class="line">  --data active.http_path=/health \</span><br><span class="line">  --data active.http_statuses=200,302</span><br></pre></td></tr></table></figure>
+<p><strong>被动检查（Passive Health Checks）</strong></p>
+<p>基于实际请求的失败情况来判断后端是否健康（也叫熔断）：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">curl -X POST http://localhost:8001/upstreams/my-upstream/healthcheck \</span><br><span class="line">  --data passive.healthy.successes=5 \</span><br><span class="line">  --data passive.unhealthy.tcp_failures=3 \</span><br><span class="line">  --data passive.unhealthy.timeouts=3 \</span><br><span class="line">  --data passive.unhealthy.http_failures=5</span><br></pre></td></tr></table></figure>
+<p>两种方式通常配合使用：主动检查发现故障，被动检查在故障发生时快速熔断。</p>
+<h3 id="6-3-服务发现"><a href="#6-3-服务发现" class="headerlink" title="6.3 服务发现"></a>6.3 服务发现</h3><p>Kong 支持与服务发现系统集成：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>方式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DNS SRV</td>
+<td>通过 DNS 记录发现服务</td>
+</tr>
+<tr>
+<td>Consul</td>
+<td>集成 HashiCorp Consul</td>
+</tr>
+<tr>
+<td>Kubernetes</td>
+<td>直接使用 K8s Service 名称</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Kubernetes 集成最常用。在 K8s 里，Kong 直接用 Service 名称做 upstream：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">services:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">user-service</span></span><br><span class="line">    <span class="attr">url:</span> <span class="string">http://user-service.default.svc.cluster.local:8080</span></span><br></pre></td></tr></table></figure>
+<p>Kong 会自动解析 K8s Service 的 ClusterIP，不需要手动维护后端实例列表。</p>
+<hr>
+<h2 id="七、实战：快速上手"><a href="#七、实战：快速上手" class="headerlink" title="七、实战：快速上手"></a>七、实战：快速上手</h2><h3 id="7-1-Docker-一键启动"><a href="#7-1-Docker-一键启动" class="headerlink" title="7.1 Docker 一键启动"></a>7.1 Docker 一键启动</h3><p>最简单的方式是用 Docker Compose：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># docker-compose.yml</span></span><br><span class="line"><span class="attr">version:</span> <span class="string">"3.8"</span></span><br><span class="line"></span><br><span class="line"><span class="attr">services:</span></span><br><span class="line">  <span class="attr">kong-database:</span></span><br><span class="line">    <span class="attr">image:</span> <span class="string">postgres:15</span></span><br><span class="line">    <span class="attr">environment:</span></span><br><span class="line">      <span class="attr">POSTGRES_USER:</span> <span class="string">kong</span></span><br><span class="line">      <span class="attr">POSTGRES_DB:</span> <span class="string">kong</span></span><br><span class="line">      <span class="attr">POSTGRES_PASSWORD:</span> <span class="string">kong</span></span><br><span class="line">    <span class="attr">volumes:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">kong-db-data:/var/lib/postgresql/data</span></span><br><span class="line"></span><br><span class="line">  <span class="attr">kong-migrations:</span></span><br><span class="line">    <span class="attr">image:</span> <span class="string">kong:3.6</span></span><br><span class="line">    <span class="attr">command:</span> <span class="string">kong</span> <span class="string">migrations</span> <span class="string">bootstrap</span></span><br><span class="line">    <span class="attr">environment:</span></span><br><span class="line">      <span class="attr">KONG_DATABASE:</span> <span class="string">postgres</span></span><br><span class="line">      <span class="attr">KONG_PG_HOST:</span> <span class="string">kong-database</span></span><br><span class="line">      <span class="attr">KONG_PG_USER:</span> <span class="string">kong</span></span><br><span class="line">      <span class="attr">KONG_PG_PASSWORD:</span> <span class="string">kong</span></span><br><span class="line">    <span class="attr">depends_on:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">kong-database</span></span><br><span class="line"></span><br><span class="line">  <span class="attr">kong:</span></span><br><span class="line">    <span class="attr">image:</span> <span class="string">kong:3.6</span></span><br><span class="line">    <span class="attr">environment:</span></span><br><span class="line">      <span class="attr">KONG_DATABASE:</span> <span class="string">postgres</span></span><br><span class="line">      <span class="attr">KONG_PG_HOST:</span> <span class="string">kong-database</span></span><br><span class="line">      <span class="attr">KONG_PG_USER:</span> <span class="string">kong</span></span><br><span class="line">      <span class="attr">KONG_PG_PASSWORD:</span> <span class="string">kong</span></span><br><span class="line">      <span class="attr">KONG_PROXY_ACCESS_LOG:</span> <span class="string">/dev/stdout</span></span><br><span class="line">      <span class="attr">KONG_ADMIN_ACCESS_LOG:</span> <span class="string">/dev/stdout</span></span><br><span class="line">      <span class="attr">KONG_PROXY_ERROR_LOG:</span> <span class="string">/dev/stderr</span></span><br><span class="line">      <span class="attr">KONG_ADMIN_ERROR_LOG:</span> <span class="string">/dev/stderr</span></span><br><span class="line">      <span class="attr">KONG_ADMIN_LISTEN:</span> <span class="number">0.0</span><span class="number">.0</span><span class="number">.0</span><span class="string">:8001</span></span><br><span class="line">    <span class="attr">ports:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">"8000:8000"</span>   <span class="comment"># Proxy</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">"8443:8443"</span>   <span class="comment"># Proxy SSL</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">"8001:8001"</span>   <span class="comment"># Admin API</span></span><br><span class="line">    <span class="attr">depends_on:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">kong-database</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">kong-migrations</span></span><br><span class="line"></span><br><span class="line"><span class="attr">volumes:</span></span><br><span class="line">  <span class="attr">kong-db-data:</span></span><br></pre></td></tr></table></figure>
+<p>启动：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker-compose up -d</span><br></pre></td></tr></table></figure>
+<h3 id="7-2-配置第一个-API"><a href="#7-2-配置第一个-API" class="headerlink" title="7.2 配置第一个 API"></a>7.2 配置第一个 API</h3><p>用 Admin API 注册一个服务和路由：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1. 创建服务</span></span><br><span class="line">curl -X POST http://localhost:8001/services \</span><br><span class="line">  --data <span class="string">"name=httpbin"</span> \</span><br><span class="line">  --data <span class="string">"url=https://httpbin.org"</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. 创建路由</span></span><br><span class="line">curl -X POST http://localhost:8001/services/httpbin/routes \</span><br><span class="line">  --data <span class="string">"name=httpbin-route"</span> \</span><br><span class="line">  --data <span class="string">"paths[]=/httpbin"</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. 测试</span></span><br><span class="line">curl http://localhost:8000/httpbin/get</span><br></pre></td></tr></table></figure>
+<h3 id="7-3-加上认证和限流"><a href="#7-3-加上认证和限流" class="headerlink" title="7.3 加上认证和限流"></a>7.3 加上认证和限流</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1. 启用 key-auth 插件</span></span><br><span class="line">curl -X POST http://localhost:8001/services/httpbin/plugins \</span><br><span class="line">  --data <span class="string">"name=key-auth"</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. 创建消费者</span></span><br><span class="line">curl -X POST http://localhost:8001/consumers \</span><br><span class="line">  --data <span class="string">"username=app-001"</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. 给消费者分配 API Key</span></span><br><span class="line">curl -X POST http://localhost:8001/consumers/app-001/key-auth \</span><br><span class="line">  --data <span class="string">"key=my-secret-api-key"</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 4. 测试（不带 Key）</span></span><br><span class="line">curl http://localhost:8000/httpbin/get</span><br><span class="line"><span class="comment"># 返回 401 Unauthorized</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 5. 测试（带 Key）</span></span><br><span class="line">curl http://localhost:8000/httpbin/get \</span><br><span class="line">  -H <span class="string">"apikey: my-secret-api-key"</span></span><br><span class="line"><span class="comment"># 返回正常数据</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 6. 启用限流插件</span></span><br><span class="line">curl -X POST http://localhost:8001/services/httpbin/plugins \</span><br><span class="line">  --data <span class="string">"name=rate-limiting"</span> \</span><br><span class="line">  --data <span class="string">"config.minute=10"</span> \</span><br><span class="line">  --data <span class="string">"config.policy=local"</span></span><br></pre></td></tr></table></figure>
+<h3 id="7-4-DB-less-模式启动"><a href="#7-4-DB-less-模式启动" class="headerlink" title="7.4 DB-less 模式启动"></a>7.4 DB-less 模式启动</h3><p>如果不想用数据库，直接用声明式配置：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># kong.yml</span></span><br><span class="line"><span class="attr">_format_version:</span> <span class="string">"3.0"</span></span><br><span class="line"></span><br><span class="line"><span class="attr">services:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">httpbin</span></span><br><span class="line">    <span class="attr">url:</span> <span class="string">https://httpbin.org</span></span><br><span class="line">    <span class="attr">routes:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">httpbin-route</span></span><br><span class="line">        <span class="attr">paths:</span> <span class="string">["/httpbin"]</span></span><br><span class="line">    <span class="attr">plugins:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">rate-limiting</span></span><br><span class="line">        <span class="attr">config:</span></span><br><span class="line">          <span class="attr">minute:</span> <span class="number">100</span></span><br><span class="line">          <span class="attr">policy:</span> <span class="string">local</span></span><br><span class="line"></span><br><span class="line"><span class="attr">consumers:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">username:</span> <span class="string">app-001</span></span><br><span class="line">    <span class="attr">keyauth_credentials:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">key:</span> <span class="string">my-secret-api-key</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># DB-less 模式启动</span></span><br><span class="line">KONG_DATABASE=off kong start -c kong.conf --declarative-config kong.yml</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="八、企业级场景"><a href="#八、企业级场景" class="headerlink" title="八、企业级场景"></a>八、企业级场景</h2><h3 id="8-1-多环境管理"><a href="#8-1-多环境管理" class="headerlink" title="8.1 多环境管理"></a>8.1 多环境管理</h3><p>实际项目里通常有开发、测试、生产多套环境。Kong 的命名空间（Namespaces）或者用不同的 Kong 实例来隔离：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 开发环境 Kong</span></span><br><span class="line">KONG_PROXY_LISTEN=0.0.0.0:8000</span><br><span class="line">KONG_ADMIN_LISTEN=0.0.0.0:8001</span><br><span class="line"></span><br><span class="line"><span class="comment"># 生产环境 Kong</span></span><br><span class="line">KONG_PROXY_LISTEN=0.0.0.0:9000</span><br><span class="line">KONG_ADMIN_LISTEN=0.0.0.0:9001</span><br></pre></td></tr></table></figure>
+<h3 id="8-2-灰度发布"><a href="#8-2-灰度发布" class="headerlink" title="8.2 灰度发布"></a>8.2 灰度发布</h3><p>Kong 的 Canary 插件支持按权重分流：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 90% 流量打到 v1，10% 打到 v2</span></span><br><span class="line">curl -X POST http://localhost:8001/services/my-service/plugins \</span><br><span class="line">  --data <span class="string">"name=canary"</span> \</span><br><span class="line">  --data <span class="string">"config.upstream_host=v2.internal"</span> \</span><br><span class="line">  --data <span class="string">"config.upstream_port=8080"</span> \</span><br><span class="line">  --data <span class="string">"config.percentage=10"</span></span><br></pre></td></tr></table></figure>
+<h3 id="8-3-API-版本管理"><a href="#8-3-API-版本管理" class="headerlink" title="8.3 API 版本管理"></a>8.3 API 版本管理</h3><p>用 Route 的优先级来做 API 版本管理：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># v1 路由（低优先级）</span></span><br><span class="line">curl -X POST http://localhost:8001/services/user-v1/routes \</span><br><span class="line">  --data <span class="string">"name=user-v1"</span> \</span><br><span class="line">  --data <span class="string">"paths[]=/api/v1/users"</span> \</span><br><span class="line">  --data <span class="string">"priority=1"</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># v2 路由（高优先级，覆盖 v1）</span></span><br><span class="line">curl -X POST http://localhost:8001/services/user-v2/routes \</span><br><span class="line">  --data <span class="string">"name=user-v2"</span> \</span><br><span class="line">  --data <span class="string">"paths[]=/api/v2/users"</span> \</span><br><span class="line">  --data <span class="string">"priority=10"</span></span><br></pre></td></tr></table></figure>
+<h3 id="8-4-跨域处理"><a href="#8-4-跨域处理" class="headerlink" title="8.4 跨域处理"></a>8.4 跨域处理</h3><p>微服务架构下跨域问题很常见，用 CORS 插件统一处理：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">curl -X POST http://localhost:8001/services/my-service/plugins \</span><br><span class="line">  --data <span class="string">"name=cors"</span> \</span><br><span class="line">  --data <span class="string">"config.origins=https://app.example.com"</span> \</span><br><span class="line">  --data <span class="string">"config.methods=GET,POST,PUT,DELETE"</span> \</span><br><span class="line">  --data <span class="string">"config.headers=Content-Type,Authorization"</span> \</span><br><span class="line">  --data <span class="string">"config.max_age=3600"</span></span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="九、Kong-vs-其他方案"><a href="#九、Kong-vs-其他方案" class="headerlink" title="九、Kong vs 其他方案"></a>九、Kong vs 其他方案</h2><p>市面上 API 网关不少，简单对比一下：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Kong</th>
+<th>Spring Cloud Gateway</th>
+<th>Envoy</th>
+<th>APISIX</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>语言</td>
+<td>Lua</td>
+<td>Java</td>
+<td>C++</td>
+<td>Lua</td>
+</tr>
+<tr>
+<td>性能</td>
+<td>极高</td>
+<td>中等</td>
+<td>极高</td>
+<td>极高</td>
+</tr>
+<tr>
+<td>插件生态</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>⭐⭐</td>
+<td>⭐⭐⭐</td>
+<td>⭐⭐⭐⭐</td>
+</tr>
+<tr>
+<td>动态配置</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>管理界面</td>
+<td>企业版有</td>
+<td>需自己开发</td>
+<td>无</td>
+<td>有</td>
+</tr>
+<tr>
+<td>学习成本</td>
+<td>中等</td>
+<td>低（Java 生态）</td>
+<td>高</td>
+<td>中等</td>
+</tr>
+<tr>
+<td>K8s 集成</td>
+<td>Ingress Controller</td>
+<td>较弱</td>
+<td>原生支持</td>
+<td>Ingress Controller</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td>通用</td>
+<td>Spring Cloud 体系</td>
+<td>Service Mesh</td>
+<td>通用</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>选型建议</strong>：</p>
+<ul>
+<li>Java 技术栈为主 → Spring Cloud Gateway</li>
+<li>Service Mesh 架构 → Envoy</li>
+<li>通用场景、插件生态要求高 → Kong 或 APISIX</li>
+<li>已经在用 OpenResty → Kong 或 APISIX</li>
+</ul>
+<hr>
+<h2 id="十、注意事项与局限性"><a href="#十、注意事项与局限性" class="headerlink" title="十、注意事项与局限性"></a>十、注意事项与局限性</h2><h3 id="10-1-性能考量"><a href="#10-1-性能考量" class="headerlink" title="10.1 性能考量"></a>10.1 性能考量</h3><p>Kong 的延迟开销通常在 1-5ms（不含插件处理时间），但插件用多了会明显增加延迟。实际压测数据：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">无插件：~1ms 延迟，50K+ RPS</span><br><span class="line">3 个插件：~3ms 延迟，30K+ RPS</span><br><span class="line">5+ 个插件：~5-10ms 延迟，20K+ RPS</span><br></pre></td></tr></table></figure>
+<p><strong>建议</strong>：只启用真正需要的插件，不要为了”以防万一”开启一堆不用的插件。</p>
+<h3 id="10-2-Admin-API-安全"><a href="#10-2-Admin-API-安全" class="headerlink" title="10.2 Admin API 安全"></a>10.2 Admin API 安全</h3><p>Admin API 是 Kong 的管理接口，默认监听 8001 端口。<strong>生产环境必须限制访问</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 只允许内网访问</span></span><br><span class="line">KONG_ADMIN_LISTEN=127.0.0.1:8001</span><br><span class="line"></span><br><span class="line"><span class="comment"># 或者加认证</span></span><br><span class="line">KONG_ADMIN_GUI_AUTH=basic-auth</span><br></pre></td></tr></table></figure>
+<h3 id="10-3-配置备份"><a href="#10-3-配置备份" class="headerlink" title="10.3 配置备份"></a>10.3 配置备份</h3><p>用 DB 模式时，定期备份 PostgreSQL 数据库。用 DB-less 模式时，确保 <code>kong.yml</code> 文件在 Git 里有版本管理。</p>
+<h3 id="10-4-日志与监控"><a href="#10-4-日志与监控" class="headerlink" title="10.4 日志与监控"></a>10.4 日志与监控</h3><p>生产环境一定要配好日志和监控。推荐组合：</p>
+<ul>
+<li><strong>Prometheus 插件</strong> → 暴露指标</li>
+<li><strong>Grafana</strong> → 可视化</li>
+<li><strong>http-log 或 kafka-log</strong> → 请求日志持久化</li>
+</ul>
+<hr>
+<h2 id="十一、总结"><a href="#十一、总结" class="headerlink" title="十一、总结"></a>十一、总结</h2><p>Kong 的核心价值可以概括为三点：</p>
+<ol>
+<li><strong>统一收口</strong>：把认证、限流、日志这些横切关注点统一到网关层，业务服务只管业务</li>
+<li><strong>插件化架构</strong>：功能按需启用，支持 Lua/Go/Python/JS 多语言扩展</li>
+<li><strong>部署灵活</strong>：DB 模式、DB-less 模式、Hybrid 模式，适应不同规模和场景</li>
+</ol>
+<p>对于中大型微服务架构，Kong 是一个成熟可靠的选择。小团队或者简单场景，可能 Nginx 手搓配置就够了，没必要上 Kong。但当服务数量上了规模，统一网关的价值就体现出来了。</p>
+<hr>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://docs.konghq.com/" target="_blank" rel="noopener">Kong 官方文档</a></li>
+<li><a href="https://github.com/Kong/kong" target="_blank" rel="noopener">Kong GitHub 仓库</a></li>
+<li><a href="https://docs.konghq.com/hub/" target="_blank" rel="noopener">Kong 插件文档</a></li>
+<li><a href="https://openresty.org/en/" target="_blank" rel="noopener">OpenResty 官方文档</a></li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2024/05/03/12306-backup-queue-system-design/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1890,134 +2529,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2022/02/03/spring_batch_item_readers/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/02/03/spring_batch_item_readers/" class="post-title-link" itemprop="url">Spring Batch 数据读取器</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-02-03 12:48:01" itemprop="dateCreated datePublished" datetime="2022-02-03T12:48:01+08:00">2022-02-03</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
-                </span>
-            </span>
-
-          
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2022/02/03/spring_batch_item_readers/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2022/02/03/spring_batch_item_readers/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <hr>
-<h4 id="一、Spring-Batch-数据读取器"><a href="#一、Spring-Batch-数据读取器" class="headerlink" title="一、Spring Batch 数据读取器"></a>一、Spring Batch 数据读取器</h4><p>Spring Batch 的数据读取器，是通过接口 <code>ItemReader</code> 来实现的。针对常用的数据读取场景，Spring Batch 提供了丰富的组件支持（<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/appendix.html#itemReadersAppendix" target="_blank" rel="noopener">查看所有组件</a>），本文介绍最常用的五个组件：</p>
-<ul>
-<li><code>FlatFileItemReader</code>：读取文本数据；</li>
-<li><code>JdbcPagingItemReader</code>：分页读取数据库的数据；</li>
-<li><code>StaxEventItemReader</code>：读取 <code>XML</code> 文件数据；</li>
-<li><code>JsonItemReader</code>：读取 <code>JSON</code> 文件数据；</li>
-<li><code>MultiResourceItemReader</code>：读取多文本数据；</li>
-</ul>
-<h4 id="二、简单使用"><a href="#二、简单使用" class="headerlink" title="二、简单使用"></a>二、简单使用</h4><p>实体类 <code>Ticket.class</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> lombok.Data;</span><br><span class="line"><span class="keyword">import</span> java.math.BigDecimal;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Data</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Ticket</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 始发站</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> String departureStation;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 到达站</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> String arrivalStation;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 票价</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> BigDecimal price;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">toString</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> String.format(<span class="string">"始发站: %s; 到达站: %s; 票价: %s"</span>, departureStation, arrivalStation, price);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h5 id="2-1-FlatFileItemReader-文本数据读取"><a href="#2-1-FlatFileItemReader-文本数据读取" class="headerlink" title="2.1 FlatFileItemReader-文本数据读取"></a>2.1 FlatFileItemReader-文本数据读取</h5><p>文件 <code>ticket.csv</code>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">合肥,蚌埠,60.00</span><br><span class="line">南京,蚌埠,70.00</span><br><span class="line">上海,蚌埠,220.00</span><br><span class="line">上海,杭州,75.20</span><br><span class="line">上海,昆山,19.00</span><br></pre></td></tr></table></figure>
-<p>可以看到，文本数据的每一行代表一个 <code>Ticket</code> 实体，对象属性之间以英文逗号分隔。通过 <code>FlatFileItemReader</code>，可以按照行将文本数据转换为 <code>POJO</code> 存储。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testFlatItemFileReaderJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testFlatItemFileReaderJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testFlatFileItemReaderStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testFlatFileItemReaderStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testFlatFileItemReaderStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testFlatFileItemReaderStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Ticket, Ticket&gt;chunk(<span class="number">10</span>)</span><br><span class="line">        .reader(ticketFileItemReader)</span><br><span class="line">        .writer(list -&gt; list.forEach(System.out::println))</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Ticket&gt; <span class="title">ticketFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"ticket.csv"</span>))</span><br><span class="line">        .delimited()</span><br><span class="line">        .names(<span class="keyword">new</span> String[]&#123;<span class="string">"departureStation"</span>, <span class="string">"arrivalStation"</span>, <span class="string">"price"</span>&#125;)</span><br><span class="line">        .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Ticket&gt;() &#123;&#123;</span><br><span class="line">            setTargetType(Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        &#125;&#125;)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>启动应用，控制台打印日志：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">13</span>:<span class="number">50</span>:<span class="number">23.538</span>  INFO <span class="number">77808</span> --- [restartedMain] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=testFlatItemFileReaderJob]] launched with the following parameters: [&#123;run.id=<span class="number">2</span>&#125;]</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">13</span>:<span class="number">50</span>:<span class="number">23.599</span>  INFO <span class="number">77808</span> --- [restartedMain] o.s.batch.core.job.SimpleStepHandler     : Executing step: [testFlatFileItemReaderStep]</span><br><span class="line">始发站: 合肥; 到达站: 蚌埠; 票价: <span class="number">60.00</span></span><br><span class="line">始发站: 南京; 到达站: 蚌埠; 票价: <span class="number">70.00</span></span><br><span class="line">始发站: 上海; 到达站: 蚌埠; 票价: <span class="number">220.00</span></span><br><span class="line">始发站: 上海; 到达站: 杭州; 票价: <span class="number">75.20</span></span><br><span class="line">始发站: 上海; 到达站: 昆山; 票价: <span class="number">19.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">13</span>:<span class="number">50</span>:<span class="number">23.680</span>  INFO <span class="number">77808</span> --- [restartedMain] o.s.batch.core.step.AbstractStep         : Step: [testFlatFileItemReaderStep] executed in <span class="number">79</span>ms</span><br></pre></td></tr></table></figure>
-<h5 id="2-2-JdbcPagingItemReader-数据库数据读取"><a href="#2-2-JdbcPagingItemReader-数据库数据读取" class="headerlink" title="2.2 JdbcPagingItemReader-数据库数据读取"></a>2.2 JdbcPagingItemReader-数据库数据读取</h5><p>从 <code>MySQL</code> 数据库，分页读取表 <code>student</code> 的数据，并打印数据内容。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testDatabaseItemReaderJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testDatabaseItemReaderJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testDatabaseItemReaderStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testDatabaseItemReaderStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testDatabaseItemReaderStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testDatabaseItemReaderStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Student, Student&gt;chunk(<span class="number">10</span>)</span><br><span class="line">        .reader(studentItemReader)</span><br><span class="line">        .writer(list -&gt; list.forEach(System.out::println))</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"studentItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> JdbcPagingItemReader&lt;Student&gt; <span class="title">studentItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    MySqlPagingQueryProvider queryProvider = <span class="keyword">new</span> MySqlPagingQueryProvider();</span><br><span class="line">    queryProvider.setSelectClause(<span class="string">"student_id, name, address"</span>);</span><br><span class="line">    queryProvider.setFromClause(<span class="string">"from student_source"</span>);</span><br><span class="line"></span><br><span class="line">    Map&lt;String, Order&gt; sortKeys = <span class="keyword">new</span> HashMap&lt;&gt;(<span class="number">1</span>);</span><br><span class="line">    sortKeys.put(<span class="string">"student_id"</span>, Order.ASCENDING);</span><br><span class="line">    queryProvider.setSortKeys(sortKeys);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> JdbcPagingItemReaderBuilder&lt;Student&gt;()</span><br><span class="line">        .name(<span class="string">"studentItemReader"</span>)</span><br><span class="line">        .dataSource(batchDemoDB)</span><br><span class="line">        .fetchSize(<span class="number">1000</span>)</span><br><span class="line">        .rowMapper(<span class="keyword">new</span> StudentRowMapper())</span><br><span class="line">        .queryProvider(queryProvider)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">StudentRowMapper</span> <span class="keyword">implements</span> <span class="title">RowMapper</span>&lt;<span class="title">Student</span>&gt; </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Student 字段映射</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Student <span class="title">mapRow</span><span class="params">(ResultSet rs, <span class="keyword">int</span> rowNum)</span> <span class="keyword">throws</span> SQLException </span>&#123;</span><br><span class="line"></span><br><span class="line">        Student student = <span class="keyword">new</span> Student();</span><br><span class="line">        student.setStudentId(rs.getLong(<span class="string">"student_id"</span>));</span><br><span class="line">        student.setName(rs.getString(<span class="string">"name"</span>));</span><br><span class="line">        student.setAddress(rs.getString(<span class="string">"address"</span>));</span><br><span class="line">        <span class="keyword">return</span> student;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * MySQL 数据源配置</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Primary</span></span><br><span class="line"><span class="meta">@Bean</span>(name = <span class="string">"batchDemoDB"</span>)</span><br><span class="line"><span class="meta">@ConfigurationProperties</span>(prefix = <span class="string">"spring.datasource.batch-demo"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> DataSource <span class="title">druidDataSource</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> DataSourceBuilder.create().type(HikariDataSource<span class="class">.<span class="keyword">class</span>).<span class="title">build</span>()</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>启动应用，控制台打印日志：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">14</span>:<span class="number">00</span>:<span class="number">19.010</span>  INFO <span class="number">67748</span> --- [restartedMain] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=testDatabaseItemReaderJob]] launched with the following parameters: [&#123;run.id=<span class="number">2</span>&#125;]</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">14</span>:<span class="number">00</span>:<span class="number">19.107</span>  INFO <span class="number">67748</span> --- [restartedMain] o.s.batch.core.job.SimpleStepHandler     : Executing step: [testDatabaseItemReaderStep]</span><br><span class="line">name: 张三<span class="number">1</span>, address: 上海市<span class="number">1</span></span><br><span class="line">name: 张三<span class="number">2</span>, address: 上海市<span class="number">2</span></span><br><span class="line">name: 张三<span class="number">3</span>, address: 上海市<span class="number">3</span></span><br><span class="line">name: 张三<span class="number">4</span>, address: 上海市<span class="number">4</span></span><br><span class="line">name: 张三<span class="number">5</span>, address: 上海市<span class="number">5</span></span><br><span class="line">name: 张三<span class="number">6</span>, address: 上海市<span class="number">6</span></span><br><span class="line">name: 张三<span class="number">7</span>, address: 上海市<span class="number">7</span></span><br><span class="line">name: 张三<span class="number">8</span>, address: 上海市<span class="number">8</span></span><br><span class="line">name: 张三<span class="number">9</span>, address: 上海市<span class="number">9</span></span><br><span class="line">name: 张三<span class="number">10</span>, address: 上海市<span class="number">10</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">14</span>:<span class="number">00</span>:<span class="number">19.284</span>  INFO <span class="number">67748</span> --- [restartedMain] o.s.batch.core.step.AbstractStep         : Step: [testDatabaseItemReaderStep] executed in <span class="number">176</span>ms</span><br></pre></td></tr></table></figure>
-<h5 id="2-3-StaxEventItemReader-XML-数据读取"><a href="#2-3-StaxEventItemReader-XML-数据读取" class="headerlink" title="2.3 StaxEventItemReader-XML 数据读取"></a>2.3 StaxEventItemReader-XML 数据读取</h5><p>文件 <code>ticket.xml</code>：</p>
-<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">tickets</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">ticket</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>合肥<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>蚌埠<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">price</span>&gt;</span>60.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">ticket</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">ticket</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>南京<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>蚌埠<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">price</span>&gt;</span>70.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">ticket</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">ticket</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>上海<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>蚌埠<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">price</span>&gt;</span>220.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">ticket</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">ticket</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>上海<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>杭州<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">price</span>&gt;</span>75.20<span class="tag">&lt;/<span class="name">price</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">ticket</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">ticket</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>上海<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>昆山<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">price</span>&gt;</span>19.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">ticket</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">tickets</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>可以看到，文件内容是多组 <code>ticket</code> 标签组成的，每一个标签代表一个 <code>Ticket</code> 实体；每个 <code>ticket</code> 标签，内含 3 个子标签，代表 <code>Ticket</code> 实体的 3 个属性值。</p>
-<p>涉及到 <code>XML</code> 与 <code>Object</code> 的映射，因此需要引入 <code>OXM</code> 技术。推荐使用 <code>spring oxm</code>，pom 依赖：</p>
-<figure class="highlight"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">&lt;dependency&gt;</span><br><span class="line">    &lt;groupId&gt;org.springframework&lt;/groupId&gt;</span><br><span class="line">    &lt;artifactId&gt;spring-oxm&lt;/artifactId&gt;</span><br><span class="line">&lt;/dependency&gt;</span><br><span class="line">&lt;dependency&gt;</span><br><span class="line">    &lt;groupId&gt;com.thoughtworks.xstream&lt;/groupId&gt;</span><br><span class="line">    &lt;artifactId&gt;xstream&lt;/artifactId&gt;</span><br><span class="line">    &lt;version&gt;1.4.11.1&lt;/version&gt;</span><br><span class="line">&lt;/dependency&gt;</span><br></pre></td></tr></table></figure>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testXmlItemReaderJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testXmlItemReaderJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testXmlItemReaderStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testXmlItemReaderStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testXmlItemReaderStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testXmlItemReaderStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Ticket, Ticket&gt;chunk(<span class="number">10</span>)</span><br><span class="line">        .reader(ticketXmlItemReader)</span><br><span class="line">        .writer(list -&gt; list.forEach(System.out::println))</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketXmlItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> StaxEventItemReader&lt;Ticket&gt; <span class="title">itemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> StaxEventItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketXmlItemReader"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"ticket.xml"</span>))</span><br><span class="line">        .addFragmentRootElements(<span class="string">"ticket"</span>)</span><br><span class="line">        .unmarshaller(ticketMarshaller)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 映射器</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketMarshaller"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> XStreamMarshaller <span class="title">ticketMarshaller</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    Map&lt;String, Class&lt;Ticket&gt;&gt; aliases = <span class="keyword">new</span> HashMap&lt;&gt;(<span class="number">1</span>);</span><br><span class="line">    aliases.put(<span class="string">"ticket"</span>, Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    XStreamMarshaller marshaller = <span class="keyword">new</span> XStreamMarshaller();</span><br><span class="line">    marshaller.setAliases(aliases);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> marshaller;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>启动应用，控制台打印日志：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">14</span>:<span class="number">15</span>:<span class="number">48.444</span>  INFO <span class="number">87024</span> --- [restartedMain] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=testXmlItemReaderJob]] launched with the following parameters: [&#123;run.id=<span class="number">3</span>&#125;]</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">14</span>:<span class="number">15</span>:<span class="number">48.503</span>  INFO <span class="number">87024</span> --- [restartedMain] o.s.batch.core.job.SimpleStepHandler     : Executing step: [testXmlItemReaderStep]</span><br><span class="line">始发站: 合肥; 到达站: 蚌埠; 票价: <span class="number">60.00</span></span><br><span class="line">始发站: 南京; 到达站: 蚌埠; 票价: <span class="number">70.00</span></span><br><span class="line">始发站: 上海; 到达站: 蚌埠; 票价: <span class="number">220.00</span></span><br><span class="line">始发站: 上海; 到达站: 杭州; 票价: <span class="number">75.20</span></span><br><span class="line">始发站: 上海; 到达站: 昆山; 票价: <span class="number">19.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">14</span>:<span class="number">15</span>:<span class="number">48.710</span>  INFO <span class="number">87024</span> --- [restartedMain] o.s.batch.core.step.AbstractStep         : Step: [testXmlItemReaderStep] executed in <span class="number">205</span>ms</span><br></pre></td></tr></table></figure>
-<h5 id="2-4-JsonItemReader-JSON-数据读取"><a href="#2-4-JsonItemReader-JSON-数据读取" class="headerlink" title="2.4 JsonItemReader-JSON 数据读取"></a>2.4 JsonItemReader-JSON 数据读取</h5><p>文件 <code>ticket.json</code>：</p>
-<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">[</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="attr">"departureStation"</span>: <span class="string">"合肥"</span>,</span><br><span class="line">    <span class="attr">"arrivalStation"</span>: <span class="string">"蚌埠"</span>,</span><br><span class="line">    <span class="attr">"price"</span>: <span class="string">"60.00"</span></span><br><span class="line">  &#125;,</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="attr">"departureStation"</span>: <span class="string">"南京"</span>,</span><br><span class="line">    <span class="attr">"arrivalStation"</span>: <span class="string">"蚌埠"</span>,</span><br><span class="line">    <span class="attr">"price"</span>: <span class="string">"70.00"</span></span><br><span class="line">  &#125;,</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="attr">"departureStation"</span>: <span class="string">"上海"</span>,</span><br><span class="line">    <span class="attr">"arrivalStation"</span>: <span class="string">"蚌埠"</span>,</span><br><span class="line">    <span class="attr">"price"</span>: <span class="string">"220.00"</span></span><br><span class="line">  &#125;,</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="attr">"departureStation"</span>: <span class="string">"上海"</span>,</span><br><span class="line">    <span class="attr">"arrivalStation"</span>: <span class="string">"杭州"</span>,</span><br><span class="line">    <span class="attr">"price"</span>: <span class="string">"75.20"</span></span><br><span class="line">  &#125;,</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="attr">"departureStation"</span>: <span class="string">"上海"</span>,</span><br><span class="line">    <span class="attr">"arrivalStation"</span>: <span class="string">"昆山"</span>,</span><br><span class="line">    <span class="attr">"price"</span>: <span class="string">"19.00"</span></span><br><span class="line">  &#125;</span><br><span class="line">]</span><br></pre></td></tr></table></figure>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testJsonItemReaderJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testJsonItemReaderJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testJsonItemReaderStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testJsonItemReaderStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testJsonItemReaderStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testJsonItemReaderStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Ticket, Ticket&gt;chunk(<span class="number">10</span>)</span><br><span class="line">        .reader(ticketJsonItemReader)</span><br><span class="line">        .writer(list -&gt; list.forEach(System.out::println))</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketJsonItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> JsonItemReader&lt;Ticket&gt; <span class="title">ticketJsonItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> JsonItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketJsonItemReader"</span>)</span><br><span class="line">        .jsonObjectReader(<span class="keyword">new</span> JacksonJsonObjectReader&lt;&gt;(Ticket<span class="class">.<span class="keyword">class</span>))</span></span><br><span class="line">        .resource(new ClassPathResource("ticket.json"))</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>启动应用，控制台打印日志：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">14</span>:<span class="number">25</span>:<span class="number">38.142</span>  INFO <span class="number">76544</span> --- [restartedMain] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=testJsonItemReaderJob]] launched with the following parameters: [&#123;run.id=<span class="number">2</span>&#125;]</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">14</span>:<span class="number">25</span>:<span class="number">38.211</span>  INFO <span class="number">76544</span> --- [restartedMain] o.s.batch.core.job.SimpleStepHandler     : Executing step: [testJsonItemReaderStep]</span><br><span class="line">始发站: 合肥; 到达站: 蚌埠; 票价: <span class="number">60.00</span></span><br><span class="line">始发站: 南京; 到达站: 蚌埠; 票价: <span class="number">70.00</span></span><br><span class="line">始发站: 上海; 到达站: 蚌埠; 票价: <span class="number">220.00</span></span><br><span class="line">始发站: 上海; 到达站: 杭州; 票价: <span class="number">75.20</span></span><br><span class="line">始发站: 上海; 到达站: 昆山; 票价: <span class="number">19.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">14</span>:<span class="number">25</span>:<span class="number">38.328</span>  INFO <span class="number">76544</span> --- [restartedMain] o.s.batch.core.step.AbstractStep         : Step: [testJsonItemReaderStep] executed in <span class="number">116</span>ms</span><br></pre></td></tr></table></figure>
-<h5 id="2-5-MultiResourceItemReader-多文本数据读取"><a href="#2-5-MultiResourceItemReader-多文本数据读取" class="headerlink" title="2.5 MultiResourceItemReader-多文本数据读取"></a>2.5 MultiResourceItemReader-多文本数据读取</h5><p>多文本数据读取，与文本数据读取的原理一致，只是在其基础上，做了一层代理。多文本数据读取，要求每个文本的数据结构相同，如从 <code>ticket-1.cvs</code> 和 <code>ticket-2.cvs</code> 两个文件中读取数据：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">合肥,蚌埠,60.00</span><br><span class="line">南京,蚌埠,70.00</span><br><span class="line">上海,蚌埠,220.00</span><br></pre></td></tr></table></figure>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">上海,杭州,75.20</span><br><span class="line">上海,昆山,19.00</span><br></pre></td></tr></table></figure>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testMultiFileItemReaderJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testMultiFileItemReaderJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testMultiFileItemReaderStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testMultiFileItemReaderStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testMultiFileItemReaderStep1</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testMultiFileItemReaderStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Ticket, Ticket&gt;chunk(<span class="number">10</span>)</span><br><span class="line">        .reader(ticketMultiFileItemReader)</span><br><span class="line">        .writer(list -&gt; list.forEach(System.out::println))</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Proxy Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketMultiFileItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> MultiResourceItemReader&lt;Ticket&gt; <span class="title">ticketMultiFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 资源文件</span></span><br><span class="line">    Resource[] resources = <span class="keyword">new</span> Resource[]&#123;</span><br><span class="line">        <span class="keyword">new</span> ClassPathResource(<span class="string">"ticket-1.csv"</span>),</span><br><span class="line">        <span class="keyword">new</span> ClassPathResource(<span class="string">"ticket-2.csv"</span>)&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> MultiResourceItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketMultiFileItemReader"</span>)</span><br><span class="line">        .delegate(commonTicketFileItemReader())</span><br><span class="line">        .resources(resources)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"commonTicketFileItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Ticket&gt; <span class="title">commonTicketFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"commonTicketFileItemReader"</span>)</span><br><span class="line">        .delimited()</span><br><span class="line">        .names(<span class="keyword">new</span> String[]&#123;<span class="string">"departureStation"</span>, <span class="string">"arrivalStation"</span>, <span class="string">"price"</span>&#125;)</span><br><span class="line">        .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Ticket&gt;() &#123;&#123;</span><br><span class="line">            setTargetType(Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        &#125;&#125;)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>启动程序，控制台打印日志：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">14</span>:<span class="number">37</span>:<span class="number">49.693</span>  INFO <span class="number">86124</span> --- [restartedMain] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=testMultiFileItemReaderJob]] launched with the following parameters: [&#123;run.id=<span class="number">2</span>&#125;]</span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">14</span>:<span class="number">37</span>:<span class="number">49.785</span>  INFO <span class="number">86124</span> --- [restartedMain] o.s.batch.core.job.SimpleStepHandler     : Executing step: [testMultiFileItemReaderStep]</span><br><span class="line">始发站: 合肥; 到达站: 蚌埠; 票价: <span class="number">60.00</span></span><br><span class="line">始发站: 南京; 到达站: 蚌埠; 票价: <span class="number">70.00</span></span><br><span class="line">始发站: 上海; 到达站: 蚌埠; 票价: <span class="number">220.00</span></span><br><span class="line">始发站: 上海; 到达站: 杭州; 票价: <span class="number">75.20</span></span><br><span class="line">始发站: 上海; 到达站: 昆山; 票价: <span class="number">19.00</span></span><br><span class="line"><span class="number">2022</span>-<span class="number">06</span>-<span class="number">02</span> <span class="number">14</span>:<span class="number">37</span>:<span class="number">49.944</span>  INFO <span class="number">86124</span> --- [restartedMain] o.s.batch.core.step.AbstractStep         : Step: [testMultiFileItemReaderStep] executed in <span class="number">157</span>ms</span><br></pre></td></tr></table></figure>
-<p>示例代码：<a href="https://github.com/donehub/spring-batch-demo" target="_blank" rel="noopener">spring-batch-demo</a></p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -2090,7 +2601,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">95</span>
+          <span class="site-state-item-count">96</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2103,7 +2614,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">57</span>
+        <span class="site-state-item-count">58</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
