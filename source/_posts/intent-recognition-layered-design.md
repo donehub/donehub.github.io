@@ -1,6 +1,6 @@
 ---
 title: 意图识别生产实践
-date: 2025-08-09
+date: 2025-11-09
 tags: [意图识别]
 categories: AI
 ---
