@@ -195,6 +195,489 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2024/12/13/langchain-vs-langgraph/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/12/13/langchain-vs-langgraph/" class="post-title-link" itemprop="url">LangChain vs LangGraph：从链式调用到图状态机的 Agent 演进之路</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-12-13 00:00:00" itemprop="dateCreated datePublished" datetime="2024-12-13T00:00:00+08:00">2024-12-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-13 09:14:02" itemprop="dateModified" datetime="2026-04-13T09:14:02+08:00">2026-04-13</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2024/12/13/langchain-vs-langgraph/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2024/12/13/langchain-vs-langgraph/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>这篇文章不讲废话，只讲干货：LangChain 和 LangGraph 分别是什么、为什么 LangChain 团队要造 LangGraph、两者的技术本质差异、以及你该选哪个。</p>
+</blockquote>
+<hr>
+<h2 id="一、先说结论"><a href="#一、先说结论" class="headerlink" title="一、先说结论"></a>一、先说结论</h2><p><strong>LangChain 是”零件库”，LangGraph 是”组装图纸”。</strong></p>
+<ul>
+<li><strong>LangChain</strong>：给你各种组件——LLM 连接器、工具定义、记忆系统、向量检索器。你用它来”组装”一个 LLM 应用。</li>
+<li><strong>LangGraph</strong>：帮你定义组件之间的”组装方式”——怎么循环、怎么分支、怎么传递状态、什么时候结束。</li>
+</ul>
+<p>两者不是竞争关系，而是<strong>互补关系</strong>。LangChain 团队自己造了 LangGraph，用来解决 LangChain 原生 Agent 能力不足的问题。</p>
+<hr>
+<h2 id="二、LangChain：起源与发展"><a href="#二、LangChain：起源与发展" class="headerlink" title="二、LangChain：起源与发展"></a>二、LangChain：起源与发展</h2><h3 id="2-1-创始人与背景"><a href="#2-1-创始人与背景" class="headerlink" title="2.1 创始人与背景"></a>2.1 创始人与背景</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>创始人</strong></td>
+<td>Harrison Chase</td>
+</tr>
+<tr>
+<td><strong>背景</strong></td>
+<td>曾在 Robust Intelligence（AI 安全公司）和 McKinsey 工作</td>
+</tr>
+<tr>
+<td><strong>创立时间</strong></td>
+<td>2022 年 10 月，作为开源项目发布在 GitHub</td>
+</tr>
+<tr>
+<td><strong>公司成立</strong></td>
+<td>2023 年初，LangChain Inc. 成立，获得风险投资</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="2-2-为什么能火"><a href="#2-2-为什么能火" class="headerlink" title="2.2 为什么能火"></a>2.2 为什么能火</h3><p>2022 年 10 月，ChatGPT 还没发布（11 月才发布）。Harrison Chase 做了一件关键的事：<strong>把 LLM 应用开发的”碎片化经验”变成”标准化组件”</strong>。</p>
+<p>当时开发者面临的问题：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">每个 LLM 应用都要自己解决：</span><br><span class="line">- 怎么调用不同模型的 API（OpenAI、Anthropic、 Cohere...）</span><br><span class="line">- 怎么记住用户之前说了什么</span><br><span class="line">- 怎么让 LLM 调用外部工具</span><br><span class="line">- 怎么把长文档切成小块让 LLM 能读</span><br><span class="line">- 怎么把检索结果喂给 LLM</span><br></pre></td></tr></table></figure>
+<p>LangChain 把这些问题<strong>抽象成统一的组件</strong>，你只需要配置参数，不用自己造轮子。</p>
+<h3 id="2-3-发展时间线"><a href="#2-3-发展时间线" class="headerlink" title="2.3 发展时间线"></a>2.3 发展时间线</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>时间</th>
+<th>事件</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>2022.10</strong></td>
+<td>LangChain 开源发布</td>
+<td>GitHub 迅速获得数千 Star</td>
+</tr>
+<tr>
+<td><strong>2022.12</strong></td>
+<td>ChatGPT 发布，LLM 应用需求爆发</td>
+<td>LangChain 成为首选框架</td>
+</tr>
+<tr>
+<td><strong>2023.01</strong></td>
+<td>LangChain Inc. 成立，获风险投资</td>
+<td>商业化运营</td>
+</tr>
+<tr>
+<td><strong>2023.03</strong></td>
+<td>推出 LCEL（LangChain Expression Language）</td>
+<td>链式调用更简洁</td>
+</tr>
+<tr>
+<td><strong>2023.06</strong></td>
+<td>LangSmith 发布</td>
+<td>可观测性平台</td>
+</tr>
+<tr>
+<td><strong>2023.10</strong></td>
+<td>LangServe 发布</td>
+<td>快速部署 API</td>
+</tr>
+<tr>
+<td><strong>2024.01</strong></td>
+<td>LangGraph 发布</td>
+<td>解决 Agent 循环问题</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="2-4-核心组件一览"><a href="#2-4-核心组件一览" class="headerlink" title="2.4 核心组件一览"></a>2.4 核心组件一览</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">LangChain &#x3D; 以下组件的集合</span><br><span class="line"></span><br><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    LangChain 组件体系                         │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │</span><br><span class="line">│  │   Models    │  │   Prompts   │  │   Memory    │        │</span><br><span class="line">│  │  (LLM连接)  │  │ (模板管理)  │  │ (对话记忆)  │        │</span><br><span class="line">│  └─────────────┘  └─────────────┘  └─────────────┘        │</span><br><span class="line">│                                                             │</span><br><span class="line">│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │</span><br><span class="line">│  │   Tools     │  │   Chains    │  │   Agents    │        │</span><br><span class="line">│  │ (外部工具)  │  │ (调用链)    │  │ (决策执行)  │        │</span><br><span class="line">│  └─────────────┘  └─────────────┘  └─────────────┘        │</span><br><span class="line">│                                                             │</span><br><span class="line">│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │</span><br><span class="line">│  │  Retrieval  │  │   Output    │  │   Document  │        │</span><br><span class="line">│  │  (RAG检索)  │  │   Parser    │  │   Loaders   │        │</span><br><span class="line">│  └─────────────┘  └─────────────┘  └─────────────┘        │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<h3 id="2-5-LangChain-的技术本质"><a href="#2-5-LangChain-的技术本质" class="headerlink" title="2.5 LangChain 的技术本质"></a>2.5 LangChain 的技术本质</h3><p><strong>LangChain 的核心抽象是 “Chain”（链）</strong>——把多个步骤串起来，线性执行：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LangChain LCEL 语法（链式调用）</span></span><br><span class="line">chain = (</span><br><span class="line">    &#123;<span class="string">"context"</span>: retriever, <span class="string">"question"</span>: RunnablePassthrough()&#125;</span><br><span class="line">    | prompt</span><br><span class="line">    | llm</span><br><span class="line">    | output_parser</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">result = chain.invoke(<span class="string">"什么是 Agent？"</span>)</span><br></pre></td></tr></table></figure>
+<p><strong>优点</strong>：</p>
+<ul>
+<li>简单直观，上手快</li>
+<li>组件丰富，生态完善</li>
+<li>适合 RAG、简单问答、固定流程的场景</li>
+</ul>
+<p><strong>缺点</strong>（这也是 LangGraph 存在的原因）：</p>
+<ul>
+<li>无法循环执行（Agent 需要 ReAct 循环）</li>
+<li>无法根据中间结果动态选择路径</li>
+<li>状态管理能力弱</li>
+</ul>
+<hr>
+<h2 id="三、LangGraph：为什么-LangChain-团队要造它"><a href="#三、LangGraph：为什么-LangChain-团队要造它" class="headerlink" title="三、LangGraph：为什么 LangChain 团队要造它"></a>三、LangGraph：为什么 LangChain 团队要造它</h2><h3 id="3-1-核心问题：LangChain-的-Agent-不够用"><a href="#3-1-核心问题：LangChain-的-Agent-不够用" class="headerlink" title="3.1 核心问题：LangChain 的 Agent 不够用"></a>3.1 核心问题：LangChain 的 Agent 不够用</h3><p>LangChain 有 <code>AgentExecutor</code>，理论上可以做 Agent。但实际使用中发现：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">问题 1：AgentExecutor 无法真正循环</span><br><span class="line">- LangChain 的链是线性的：A → B → C → 结束</span><br><span class="line">- Agent 需要 ReAct 循环：思考 → 执行 → 观察 → 再思考 → 再执行...</span><br><span class="line">- 用 LangChain 做 Agent，只能&quot;模拟&quot;循环，很别扭</span><br><span class="line"></span><br><span class="line">问题 2：无法控制流程分支</span><br><span class="line">- Agent 执行到某一步，可能需要：</span><br><span class="line">  - 成功了 → 结束</span><br><span class="line">  - 失败了 → 重试</span><br><span class="line">  - 信息不够 → 再搜索</span><br><span class="line">- LangChain 的链无法根据条件选择不同路径</span><br><span class="line"></span><br><span class="line">问题 3：状态管理混乱</span><br><span class="line">- Agent 需要记住&quot;我刚才做了什么&quot;、&quot;我现在的进度&quot;</span><br><span class="line">- LangChain 的记忆系统是独立的，无法和执行流程绑定</span><br></pre></td></tr></table></figure>
+<h3 id="3-2-LangGraph-的诞生"><a href="#3-2-LangGraph-的诞生" class="headerlink" title="3.2 LangGraph 的诞生"></a>3.2 LangGraph 的诞生</h3><p>2024 年第一季度，LangChain 团队推出 LangGraph，<strong>专门解决 Agent 工作流问题</strong>。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>发布时间</strong></td>
+<td>2024 年第一季度</td>
+</tr>
+<tr>
+<td><strong>创始人</strong></td>
+<td>LangChain 团队（Harrison Chase 领导）</td>
+</tr>
+<tr>
+<td><strong>核心目的</strong></td>
+<td>让 Agent 能真正循环执行、状态管理、流程分支</td>
+</tr>
+<tr>
+<td><strong>技术本质</strong></td>
+<td>状态机（State Machine） + 图结构（Graph）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="3-3-LangGraph-的核心创新"><a href="#3-3-LangGraph-的核心创新" class="headerlink" title="3.3 LangGraph 的核心创新"></a>3.3 LangGraph 的核心创新</h3><p><strong>LangGraph 的核心抽象是 “StateGraph”（状态图）</strong>——用图结构定义执行流程：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> StateGraph, END</span><br><span class="line"></span><br><span class="line"><span class="comment"># 定义状态</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">AgentState</span><span class="params">(TypedDict)</span>:</span></span><br><span class="line">    messages: list</span><br><span class="line">    next_step: str</span><br><span class="line"></span><br><span class="line"><span class="comment"># 构建图</span></span><br><span class="line">graph = StateGraph(AgentState)</span><br><span class="line">graph.add_node(<span class="string">"agent"</span>, agent_node)      <span class="comment"># Agent 思考节点</span></span><br><span class="line">graph.add_node(<span class="string">"tool"</span>, tool_node)        <span class="comment"># 工具执行节点</span></span><br><span class="line">graph.add_node(<span class="string">"check"</span>, check_node)      <span class="comment"># 结果检查节点</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 定义边（流转关系）</span></span><br><span class="line">graph.add_edge(<span class="string">"agent"</span>, <span class="string">"tool"</span>)</span><br><span class="line">graph.add_edge(<span class="string">"tool"</span>, <span class="string">"check"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 条件分支：根据检查结果决定下一步</span></span><br><span class="line">graph.add_conditional_edges(<span class="string">"check"</span>, </span><br><span class="line">    <span class="keyword">lambda</span> state: state[<span class="string">"next_step"</span>],</span><br><span class="line">    &#123;<span class="string">"continue"</span>: <span class="string">"agent"</span>, <span class="string">"end"</span>: END&#125;  <span class="comment"># 循环回去或结束</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 编译执行</span></span><br><span class="line">app = graph.compile()</span><br></pre></td></tr></table></figure>
+<p><strong>LangGraph 解决的三大问题</strong>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>LangChain 方案</th>
+<th>LangGraph 方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>循环执行</strong></td>
+<td>用 AgentExecutor 模拟，很别扭</td>
+<td>用图的边连接回去，原生支持循环</td>
+</tr>
+<tr>
+<td><strong>流程分支</strong></td>
+<td>无法根据条件选择路径</td>
+<td><code>add_conditional_edges</code> 原生支持</td>
+</tr>
+<tr>
+<td><strong>状态管理</strong></td>
+<td>Memory 独立，不绑定流程</td>
+<td>State 在节点间传递，自动管理</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="3-4-LangGraph-发展时间线"><a href="#3-4-LangGraph-发展时间线" class="headerlink" title="3.4 LangGraph 发展时间线"></a>3.4 LangGraph 发展时间线</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>时间</th>
+<th>事件</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>2024.Q1</strong></td>
+<td>LangGraph 发布</td>
+<td>解决 Agent 循环问题</td>
+</tr>
+<tr>
+<td><strong>2024.06</strong></td>
+<td>LangGraph Studio 发布</td>
+<td>可视化调试工具</td>
+</tr>
+<tr>
+<td><strong>2024.08</strong></td>
+<td>支持多 Agent 协作</td>
+<td>复杂系统必备</td>
+</tr>
+<tr>
+<td><strong>2025.01</strong></td>
+<td>LangGraph 0.3 发布</td>
+<td>流式输出、多租户、改进调试</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="四、技术对比：本质差异"><a href="#四、技术对比：本质差异" class="headerlink" title="四、技术对比：本质差异"></a>四、技术对比：本质差异</h2><h3 id="4-1-抽象模型对比"><a href="#4-1-抽象模型对比" class="headerlink" title="4.1 抽象模型对比"></a>4.1 抽象模型对比</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>LangChain</th>
+<th>LangGraph</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>核心抽象</strong></td>
+<td>Chain（链）</td>
+<td>StateGraph（状态图）</td>
+</tr>
+<tr>
+<td><strong>执行模式</strong></td>
+<td>线性执行</td>
+<td>循环 + 分支执行</td>
+</tr>
+<tr>
+<td><strong>状态管理</strong></td>
+<td>独立 Memory 组件</td>
+<td>State 在节点间传递</td>
+</tr>
+<tr>
+<td><strong>流程控制</strong></td>
+<td>固定顺序</td>
+<td>条件分支、并行、循环</td>
+</tr>
+<tr>
+<td><strong>适用场景</strong></td>
+<td>RAG、问答、固定流程</td>
+<td>Agent、多步骤决策</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="4-2-架构图对比"><a href="#4-2-架构图对比" class="headerlink" title="4.2 架构图对比"></a>4.2 架构图对比</h3><p><strong>LangChain：线性链</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">Input → [Prompt] → [LLM] → [Parser] → Output</span><br><span class="line"></span><br><span class="line">特点：</span><br><span class="line">- 单向流动</span><br><span class="line">- 固定顺序</span><br><span class="line">- 无法回头</span><br></pre></td></tr></table></figure>
+<p><strong>LangGraph：状态图</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">              ┌─────────┐</span><br><span class="line">              │  Start  │</span><br><span class="line">              └────┬────┘</span><br><span class="line">                   │</span><br><span class="line">              ┌────▼────┐</span><br><span class="line">              │ Agent   │ ←─────┐</span><br><span class="line">              │(思考)   │       │</span><br><span class="line">              └────┬────┘       │</span><br><span class="line">                   │            │ 循环</span><br><span class="line">         ┌─────────┼─────────┐  │</span><br><span class="line">         │                   │  │</span><br><span class="line">    ┌────▼────┐         ┌────▼────┤</span><br><span class="line">    │ Tool A  │         │ Tool B  │</span><br><span class="line">    │(执行)   │         │(执行)   │</span><br><span class="line">    └────┬────┘         └────┬────┤</span><br><span class="line">         │                   │  │</span><br><span class="line">         └───────┬───────────┘  │</span><br><span class="line">                 │              │</span><br><span class="line">            ┌────▼────┐         │</span><br><span class="line">            │  Check  │─────────┘</span><br><span class="line">            │(检查)   │</span><br><span class="line">            └────┬────┘</span><br><span class="line">                 │</span><br><span class="line">         ┌───────┴───────┐</span><br><span class="line">         │               │</span><br><span class="line">    ┌────▼────┐     ┌────▼────┐</span><br><span class="line">    │ Continue│     │   End   │</span><br><span class="line">    │ (继续)  │     │  (结束) │</span><br><span class="line">    └─────────┘     └─────────┘</span><br><span class="line"></span><br><span class="line">特点：</span><br><span class="line">- 可以循环（边可以指向之前的节点）</span><br><span class="line">- 可以分支（条件判断选择路径）</span><br><span class="line">- State 在节点间自动传递</span><br></pre></td></tr></table></figure>
+<h3 id="4-3-代码对比：同一功能的不同实现"><a href="#4-3-代码对比：同一功能的不同实现" class="headerlink" title="4.3 代码对比：同一功能的不同实现"></a>4.3 代码对比：同一功能的不同实现</h3><p><strong>任务：让 Agent 搜索信息，如果不够就再搜索</strong></p>
+<p><strong>LangChain 方案（别扭）</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 只能模拟循环，用 max_iterations 限制</span></span><br><span class="line"><span class="keyword">from</span> langchain.agents <span class="keyword">import</span> AgentExecutor</span><br><span class="line"></span><br><span class="line">agent_executor = AgentExecutor(</span><br><span class="line">    agent=agent,</span><br><span class="line">    tools=[search_tool],</span><br><span class="line">    max_iterations=<span class="number">5</span>,  <span class="comment"># 强制限制循环次数</span></span><br><span class="line">    verbose=<span class="literal">True</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 问题：无法精确控制"什么时候结束"</span></span><br><span class="line"><span class="comment"># 只能靠 iterations 数量硬限制</span></span><br></pre></td></tr></table></figure>
+<p><strong>LangGraph 方案（原生支持）</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> StateGraph, END</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">check_result</span><span class="params">(state)</span>:</span></span><br><span class="line">    <span class="comment"># 精确判断：信息是否足够</span></span><br><span class="line">    <span class="keyword">if</span> state[<span class="string">"info_complete"</span>]:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"end"</span></span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"continue"</span></span><br><span class="line"></span><br><span class="line">graph = StateGraph(AgentState)</span><br><span class="line">graph.add_node(<span class="string">"agent"</span>, agent_node)</span><br><span class="line">graph.add_node(<span class="string">"search"</span>, search_node)</span><br><span class="line">graph.add_node(<span class="string">"check"</span>, check_node)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 精确控制：根据 check 结果决定循环或结束</span></span><br><span class="line">graph.add_edge(<span class="string">"agent"</span>, <span class="string">"search"</span>)</span><br><span class="line">graph.add_edge(<span class="string">"search"</span>, <span class="string">"check"</span>)</span><br><span class="line">graph.add_conditional_edges(<span class="string">"check"</span>, check_result,</span><br><span class="line">    &#123;<span class="string">"continue"</span>: <span class="string">"agent"</span>, <span class="string">"end"</span>: END&#125;)</span><br><span class="line"></span><br><span class="line">app = graph.compile()</span><br><span class="line"><span class="comment"># 优点：循环条件精确可控，不是硬限制</span></span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="五、应用场景对比：该选哪个"><a href="#五、应用场景对比：该选哪个" class="headerlink" title="五、应用场景对比：该选哪个"></a>五、应用场景对比：该选哪个</h2><h3 id="5-1-选-LangChain-的场景"><a href="#5-1-选-LangChain-的场景" class="headerlink" title="5.1 选 LangChain 的场景"></a>5.1 选 LangChain 的场景</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>RAG 应用</strong></td>
+<td>检索 → 生成，固定流程，不需要循环</td>
+</tr>
+<tr>
+<td><strong>问答机器人</strong></td>
+<td>用户问 → LLM 答，简单线性</td>
+</tr>
+<tr>
+<td><strong>文档处理</strong></td>
+<td>读文档 → 提取 → 输出，固定步骤</td>
+</tr>
+<tr>
+<td><strong>快速原型</strong></td>
+<td>上手快，组件多，适合验证想法</td>
+</tr>
+<tr>
+<td><strong>单轮任务</strong></td>
+<td>一次调用就完成，不需要多步骤决策</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>典型 LangChain 代码（RAG）</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langchain_openai <span class="keyword">import</span> ChatOpenAI</span><br><span class="line"><span class="keyword">from</span> langchain_community.vectorstores <span class="keyword">import</span> Chroma</span><br><span class="line"><span class="keyword">from</span> langchain.chains <span class="keyword">import</span> RetrievalQA</span><br><span class="line"></span><br><span class="line"><span class="comment"># 用 LangChain 做 RAG，三行搞定</span></span><br><span class="line">llm = ChatOpenAI(model=<span class="string">"gpt-4o"</span>)</span><br><span class="line">vectorstore = Chroma.from_documents(docs, embeddings)</span><br><span class="line">qa = RetrievalQA.from_chain_type(llm, retriever=vectorstore.as_retriever())</span><br><span class="line"></span><br><span class="line">answer = qa.run(<span class="string">"什么是 Agent？"</span>)</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-选-LangGraph-的场景"><a href="#5-2-选-LangGraph-的场景" class="headerlink" title="5.2 选 LangGraph 的场景"></a>5.2 选 LangGraph 的场景</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>真正的 Agent</strong></td>
+<td>需要 ReAct 循环（思考→执行→观察→再思考）</td>
+</tr>
+<tr>
+<td><strong>多步骤决策</strong></td>
+<td>执行到某一步后，需要判断下一步做什么</td>
+</tr>
+<tr>
+<td><strong>复杂工作流</strong></td>
+<td>有分支、有并行、有循环</td>
+</tr>
+<tr>
+<td><strong>多 Agent 协作</strong></td>
+<td>多个 Agent 互相配合</td>
+</tr>
+<tr>
+<td><strong>需要状态管理</strong></td>
+<td>要追踪”做了什么”、”进度如何”</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>典型 LangGraph 代码（Agent）</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> StateGraph, END</span><br><span class="line"><span class="keyword">from</span> langgraph.prebuilt <span class="keyword">import</span> create_react_agent</span><br><span class="line"></span><br><span class="line"><span class="comment"># 用 LangGraph 做真正的 Agent</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">AgentState</span><span class="params">(TypedDict)</span>:</span></span><br><span class="line">    messages: list</span><br><span class="line">    tools_result: dict</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">should_continue</span><span class="params">(state)</span>:</span></span><br><span class="line">    <span class="comment"># 精确判断：任务是否完成</span></span><br><span class="line">    <span class="keyword">if</span> state[<span class="string">"tools_result"</span>][<span class="string">"complete"</span>]:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"end"</span></span><br><span class="line">    <span class="keyword">return</span> <span class="string">"continue"</span></span><br><span class="line"></span><br><span class="line">graph = StateGraph(AgentState)</span><br><span class="line">graph.add_node(<span class="string">"agent"</span>, agent_node)</span><br><span class="line">graph.add_node(<span class="string">"tools"</span>, tools_node)</span><br><span class="line"></span><br><span class="line">graph.add_edge(<span class="string">"agent"</span>, <span class="string">"tools"</span>)</span><br><span class="line">graph.add_conditional_edges(<span class="string">"tools"</span>, should_continue,</span><br><span class="line">    &#123;<span class="string">"continue"</span>: <span class="string">"agent"</span>, <span class="string">"end"</span>: END&#125;)</span><br><span class="line"></span><br><span class="line">app = graph.compile()</span><br></pre></td></tr></table></figure>
+<h3 id="5-3-选型决策树"><a href="#5-3-选型决策树" class="headerlink" title="5.3 选型决策树"></a>5.3 选型决策树</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">你的需求是什么？</span><br><span class="line">│</span><br><span class="line">├─ 固定流程、单次调用（如 RAG、问答）</span><br><span class="line">│   → 选 LangChain</span><br><span class="line">│</span><br><span class="line">├─ 需要循环执行（如 Agent 多轮决策）</span><br><span class="line">│   → 选 LangGraph</span><br><span class="line">│</span><br><span class="line">├─ 需要根据结果选择不同路径</span><br><span class="line">│   → 选 LangGraph</span><br><span class="line">│</span><br><span class="line">├─ 需要多个 Agent 协作</span><br><span class="line">│   → 选 LangGraph 或 CrewAI</span><br><span class="line">│</span><br><span class="line">├─ 快速验证想法</span><br><span class="line">│   → 先用 LangChain，复杂了再迁移到 LangGraph</span><br><span class="line">│</span><br><span class="line">└─ 生产级复杂系统</span><br><span class="line">    → LangGraph + LangChain 组件配合使用</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="六、最佳实践：两者配合使用"><a href="#六、最佳实践：两者配合使用" class="headerlink" title="六、最佳实践：两者配合使用"></a>六、最佳实践：两者配合使用</h2><p>LangGraph 和 LangChain 不是竞争关系，而是<strong>配合关系</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">LangChain 提供&quot;零件&quot;：</span><br><span class="line">- LLM 连接器（ChatOpenAI、ChatAnthropic）</span><br><span class="line">- 工具定义（@tool 装饰器）</span><br><span class="line">- 向量检索器</span><br><span class="line">- 文档加载器</span><br><span class="line"></span><br><span class="line">LangGraph 定义&quot;组装方式&quot;：</span><br><span class="line">- 怎么让 Agent 循环执行</span><br><span class="line">- 怎么根据结果选择路径</span><br><span class="line">- 怎么管理状态</span><br></pre></td></tr></table></figure>
+<p><strong>配合使用的典型代码</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langchain_openai <span class="keyword">import</span> ChatOpenAI          <span class="comment"># LangChain 组件</span></span><br><span class="line"><span class="keyword">from</span> langchain_community.tools <span class="keyword">import</span> Tool       <span class="comment"># LangChain 组件</span></span><br><span class="line"><span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> StateGraph, END      <span class="comment"># LangGraph 编排</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 用 LangChain 定义零件</span></span><br><span class="line">llm = ChatOpenAI(model=<span class="string">"gpt-4o"</span>)</span><br><span class="line">search_tool = Tool(name=<span class="string">"search"</span>, func=search, description=<span class="string">"搜索"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 用 LangGraph 定义流程</span></span><br><span class="line">graph = StateGraph(AgentState)</span><br><span class="line">graph.add_node(<span class="string">"agent"</span>, <span class="keyword">lambda</span> s: llm.invoke(s[<span class="string">"messages"</span>]))</span><br><span class="line">graph.add_node(<span class="string">"tool"</span>, <span class="keyword">lambda</span> s: search_tool.invoke(s[<span class="string">"tool_input"</span>]))</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="七、生态对比"><a href="#七、生态对比" class="headerlink" title="七、生态对比"></a>七、生态对比</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>生态组件</th>
+<th>LangChain</th>
+<th>LangGraph</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>文档</strong></td>
+<td>python.langchain.com/docs</td>
+<td>langchain-ai.github.io/langgraph</td>
+</tr>
+<tr>
+<td><strong>调试工具</strong></td>
+<td>LangSmith</td>
+<td>LangGraph Studio</td>
+</tr>
+<tr>
+<td><strong>部署</strong></td>
+<td>LangServe</td>
+<td>LangGraph Platform</td>
+</tr>
+<tr>
+<td><strong>社区</strong></td>
+<td>GitHub 90k+ Star</td>
+<td>GitHub 50k+ Star</td>
+</tr>
+<tr>
+<td><strong>教程</strong></td>
+<td>官方教程丰富</td>
+<td>官方教程 + LangGraph Mastery Course</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="八、总结：一句话记住两者的区别"><a href="#八、总结：一句话记住两者的区别" class="headerlink" title="八、总结：一句话记住两者的区别"></a>八、总结：一句话记住两者的区别</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>框架</th>
+<th>一句话定义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LangChain</strong></td>
+<td>给你砖块、水泥、门窗——各种 LLM 应用组件</td>
+</tr>
+<tr>
+<td><strong>LangGraph</strong></td>
+<td>教你怎么画房子的结构图——定义组件的组装流程</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>什么时候用 LangChain</strong>：固定流程、单次调用、快速原型。</p>
+<p><strong>什么时候用 LangGraph</strong>：需要循环、需要分支、需要状态管理、真正的 Agent。</p>
+<p><strong>最佳方案</strong>：两者配合使用——LangChain 提供组件，LangGraph 定义流程。</p>
+<hr>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://python.langchain.com/docs/" target="_blank" rel="noopener">LangChain 官方文档</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/" target="_blank" rel="noopener">LangGraph 官方文档</a></li>
+<li><a href="https://www.youtube.com/watch?v=Hilp4F9dtRw" target="_blank" rel="noopener">LangGraph Origins - Harrison Chase 演讲</a></li>
+<li><a href="https://medium.com/@ankushksinghal/langgraph-0-3-released-7bc72a5b86a2" target="_blank" rel="noopener">LangGraph 0.3 Released</a></li>
+<li><a href="https://www.codecademy.com/resources/blog/langgraph-vs-langchain/" target="_blank" rel="noopener">LangGraph vs LangChain: 6 Key Differences</a></li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2024/05/28/kong-api-gateway-deep-analysis/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -2403,132 +2886,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2022/02/03/spring_batch_item_writers/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/02/03/spring_batch_item_writers/" class="post-title-link" itemprop="url">Spring Batch 数据输出器</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-02-03 23:21:35" itemprop="dateCreated datePublished" datetime="2022-02-03T23:21:35+08:00">2022-02-03</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
-                </span>
-            </span>
-
-          
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2022/02/03/spring_batch_item_writers/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2022/02/03/spring_batch_item_writers/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <hr>
-<h4 id="一、Spring-Batch-数据输出器"><a href="#一、Spring-Batch-数据输出器" class="headerlink" title="一、Spring Batch 数据输出器"></a>一、Spring Batch 数据输出器</h4><p>Spring Batch 的数据输出器，是通过接口 <code>ItemWriter</code> 来实现的。针对常用的数据输出场景，Spring Batch 提供了丰富的组件支持（<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/appendix.html#itemWritersAppendix" target="_blank" rel="noopener">查看所有组件</a>），本文介绍最常用的五个组件：</p>
-<ul>
-<li><code>FlatFileItemWriter</code>：输出文本数据；</li>
-<li><code>JdbcBatchItemWriter</code>：输出数据到数据库；</li>
-<li><code>StaxEventItemWriter</code>：输出 <code>XML</code> 文件数据；</li>
-<li><code>JsonFileItemWriter</code>：输出 <code>JSON</code> 文件数据；</li>
-<li><code>ClassifierCompositeItemWriter</code>：输出多文本数据；</li>
-</ul>
-<h4 id="二、简单使用"><a href="#二、简单使用" class="headerlink" title="二、简单使用"></a>二、简单使用</h4><p>实体类 <code>Ticket.class</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> lombok.Data;</span><br><span class="line"><span class="keyword">import</span> java.math.BigDecimal;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Data</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Ticket</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 始发站</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> String departureStation;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 到达站</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> String arrivalStation;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 票价</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> BigDecimal price;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">toString</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> String.format(<span class="string">"始发站: %s; 到达站: %s; 票价: %s"</span>, departureStation, arrivalStation, price);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>文件 <code>ticket.csv</code>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">合肥,蚌埠,60.00</span><br><span class="line">南京,蚌埠,70.00</span><br><span class="line">上海,蚌埠,220.00</span><br><span class="line">上海,杭州,75.20</span><br><span class="line">上海,昆山,19.00</span><br></pre></td></tr></table></figure>
-<h5 id="2-1-FlatFileItemWriter-文本数据输出"><a href="#2-1-FlatFileItemWriter-文本数据输出" class="headerlink" title="2.1 FlatFileItemWriter-文本数据输出"></a>2.1 FlatFileItemWriter-文本数据输出</h5><p>将 <code>ticket.csv</code> 中的信息，转换为 JSON 字符串，输出到文件 <code>ticket_output.txt</code> 中：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testFlatFileItemWriterJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testFlatFileItemWriterJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testFlatFileItemWriterStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testFlatFileItemWriterStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testFlatFileItemWriterStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testFlatFileItemWriterStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .reader(ticketFileItemReader)</span><br><span class="line">        .writer(ticketFileItemWriter)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Ticket&gt; <span class="title">ticketFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"ticket.csv"</span>))</span><br><span class="line">        .delimited()</span><br><span class="line">        .names(<span class="keyword">new</span> String[]&#123;<span class="string">"departureStation"</span>, <span class="string">"arrivalStation"</span>, <span class="string">"price"</span>&#125;)</span><br><span class="line">        .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Ticket&gt;() &#123;&#123;</span><br><span class="line">            setTargetType(Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        &#125;&#125;)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketFileItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemWriter&lt;Ticket&gt; <span class="title">ticketFileItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 聚合器; JSON 序列化</span></span><br><span class="line">    LineAggregator&lt;Ticket&gt; aggregator = item -&gt; &#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            ObjectMapper mapper = <span class="keyword">new</span> ObjectMapper();</span><br><span class="line">            <span class="keyword">return</span> mapper.writeValueAsString(item);</span><br><span class="line">        &#125; <span class="keyword">catch</span> (JsonProcessingException e) &#123;</span><br><span class="line">            LOGGER.error(<span class="string">"parse object to json error: &#123;&#125;"</span>, e.getMessage(), e);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="string">""</span>;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemWriterBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemWriter"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> FileSystemResource(<span class="string">"ticket_output.txt"</span>))</span><br><span class="line">        .lineAggregator(aggregator)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>输出文本数据，要求目标数据的格式为字符串，因此需要将 <code>POJO</code> 按照一定规则聚合成字符串。Spring Batch 已实现聚合器 <code>LineAggregator</code> ：<code>PassThroughLineAggregator</code>（打印 <code>POJO</code>）、<code>RecursiveCollectionLineAggregator</code>（打印 <code>POJO</code> 列表）、<code>DelimitedLineAggregator</code>（分隔符拼接 <code>POJO</code> 字段值）、<code>FormatterLineAggregator</code>（格式化 <code>POJO</code> 字段值）。当然，我们也可以手动实现聚合器，例如示例代码中，将 <code>POJO</code> 转换为 JSON 格式。</p>
-<p>启动应用，生成文件 <code>ticket_output.txt</code>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&#123;&quot;departureStation&quot;:&quot;合肥&quot;,&quot;arrivalStation&quot;:&quot;蚌埠&quot;,&quot;price&quot;:60.00&#125;</span><br><span class="line">&#123;&quot;departureStation&quot;:&quot;南京&quot;,&quot;arrivalStation&quot;:&quot;蚌埠&quot;,&quot;price&quot;:70.00&#125;</span><br><span class="line">&#123;&quot;departureStation&quot;:&quot;上海&quot;,&quot;arrivalStation&quot;:&quot;蚌埠&quot;,&quot;price&quot;:220.00&#125;</span><br><span class="line">&#123;&quot;departureStation&quot;:&quot;上海&quot;,&quot;arrivalStation&quot;:&quot;杭州&quot;,&quot;price&quot;:75.20&#125;</span><br><span class="line">&#123;&quot;departureStation&quot;:&quot;上海&quot;,&quot;arrivalStation&quot;:&quot;昆山&quot;,&quot;price&quot;:19.00&#125;</span><br></pre></td></tr></table></figure>
-<h5 id="2-2-JdbcBatchItemWriter-数据库数据输出"><a href="#2-2-JdbcBatchItemWriter-数据库数据输出" class="headerlink" title="2.2 JdbcBatchItemWriter-数据库数据输出"></a>2.2 JdbcBatchItemWriter-数据库数据输出</h5><p>将文件 <code>student.cvs</code> 中的信息（内容如下），导入到 MySQL 数据表 <code>student</code> 中：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1,张三,合肥</span><br><span class="line">2,李四,蚌埠</span><br><span class="line">3,王二,南京</span><br></pre></td></tr></table></figure>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testDatabaseItemWriterJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testDatabaseItemWriterJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testDatabaseItemWriterStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testDatabaseItemWriterStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testDatabaseItemWriterStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testDatabaseItemWriterStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Student, Student&gt;chunk(<span class="number">10</span>)</span><br><span class="line">        .reader(studentFileItemReader)</span><br><span class="line">        .writer(studentItemWriter)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"studentFileItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Student&gt; <span class="title">studentFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Student&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"student.csv"</span>))</span><br><span class="line">        .delimited()</span><br><span class="line">        .names(<span class="keyword">new</span> String[]&#123;<span class="string">"studentId"</span>, <span class="string">"name"</span>, <span class="string">"address"</span>&#125;)</span><br><span class="line">        .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Student&gt;() &#123;&#123;</span><br><span class="line">            setTargetType(Student<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        &#125;&#125;)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"studentItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> JdbcBatchItemWriter&lt;Student&gt; <span class="title">studentItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> JdbcBatchItemWriterBuilder&lt;Student&gt;()</span><br><span class="line">        .itemSqlParameterSourceProvider(<span class="keyword">new</span> BeanPropertyItemSqlParameterSourceProvider&lt;&gt;())</span><br><span class="line">        .sql(<span class="string">"INSERT INTO student_target (student_id, name, address) VALUES (:studentId, :name, :address)"</span>)</span><br><span class="line">        .dataSource(batchDemoDB)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * MySQL 数据源配置</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Primary</span></span><br><span class="line"><span class="meta">@Bean</span>(name = <span class="string">"batchDemoDB"</span>)</span><br><span class="line"><span class="meta">@ConfigurationProperties</span>(prefix = <span class="string">"spring.datasource.batch-demo"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> DataSource <span class="title">druidDataSource</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> DataSourceBuilder.create().type(HikariDataSource<span class="class">.<span class="keyword">class</span>).<span class="title">build</span>()</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>启动应用，文件中的数据已导入表 <code>student</code>：</p>
-<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/06/3_18_46_44_database_writer_result.png" alt=""></p>
-<h5 id="2-3-StaxEventItemWriter-XML-文件数据输出"><a href="#2-3-StaxEventItemWriter-XML-文件数据输出" class="headerlink" title="2.3 StaxEventItemWriter-XML 文件数据输出"></a>2.3 StaxEventItemWriter-XML 文件数据输出</h5><p>将 <code>ticket.csv</code> 中的信息，输出到文件 <code>ticket_output.xml</code> 中：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testXmlItemWriterJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testXmlItemWriterJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testXmlItemWriterStep)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testXmlItemWriterStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testXmlItemWriterStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testXmlItemWriterStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Ticket, Ticket&gt;chunk(<span class="number">10</span>)</span><br><span class="line">        .reader(ticketFileItemReader)</span><br><span class="line">        .writer(ticketXmlItemWriter)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Ticket&gt; <span class="title">ticketFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"ticket.csv"</span>))</span><br><span class="line">        .delimited()</span><br><span class="line">        .names(<span class="keyword">new</span> String[]&#123;<span class="string">"departureStation"</span>, <span class="string">"arrivalStation"</span>, <span class="string">"price"</span>&#125;)</span><br><span class="line">        .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Ticket&gt;() &#123;&#123;</span><br><span class="line">            setTargetType(Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        &#125;&#125;)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketXmlItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> StaxEventItemWriter&lt;Ticket&gt; <span class="title">ticketXmlItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> StaxEventItemWriterBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketXmlItemWriter"</span>)</span><br><span class="line">        .marshaller(ticketMarshaller)</span><br><span class="line">        .resource(<span class="keyword">new</span> FileSystemResource(<span class="string">"ticket_output.xml"</span>))</span><br><span class="line">        .rootTagName(<span class="string">"tickets"</span>)</span><br><span class="line">        .overwriteOutput(<span class="keyword">true</span>)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 映射器</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketMarshaller"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> XStreamMarshaller <span class="title">ticketMarshaller</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    Map&lt;String, Class&lt;Ticket&gt;&gt; aliases = <span class="keyword">new</span> HashMap&lt;&gt;(<span class="number">1</span>);</span><br><span class="line">    aliases.put(<span class="string">"ticket"</span>, Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    XStreamMarshaller marshaller = <span class="keyword">new</span> XStreamMarshaller();</span><br><span class="line">    marshaller.setAliases(aliases);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> marshaller;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>启动应用，生成文件 <code>ticket_output.xml</code>：</p>
-<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span><span class="tag">&lt;<span class="name">tickets</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>合肥<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>蚌埠<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>60.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>南京<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>蚌埠<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>70.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>上海<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>蚌埠<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>220.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>上海<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>杭州<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>75.20<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>上海<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>昆山<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>19.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;/<span class="name">tickets</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<h5 id="2-4-JsonFileItemWriter-JSON文件数据输出"><a href="#2-4-JsonFileItemWriter-JSON文件数据输出" class="headerlink" title="2.4 JsonFileItemWriter-JSON文件数据输出"></a>2.4 JsonFileItemWriter-JSON文件数据输出</h5><p>将 <code>ticket.csv</code> 中的信息，输出到文件 <code>ticket_output.json</code> 中：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testJsonItemWriterJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testJsonItemWriterJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testJsonItemWriterStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testJsonItemWriterStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testJsonItemWriterStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testJsonItemWriterStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Ticket, Ticket&gt;chunk(<span class="number">10</span>)</span><br><span class="line">        .reader(ticketFileItemReader)</span><br><span class="line">        .writer(ticketJsonItemWriter)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Ticket&gt; <span class="title">ticketFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"ticket.csv"</span>))</span><br><span class="line">        .delimited()</span><br><span class="line">        .names(<span class="keyword">new</span> String[]&#123;<span class="string">"departureStation"</span>, <span class="string">"arrivalStation"</span>, <span class="string">"price"</span>&#125;)</span><br><span class="line">        .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Ticket&gt;() &#123;&#123;</span><br><span class="line">            setTargetType(Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        &#125;&#125;)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketJsonItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> JsonFileItemWriter&lt;Ticket&gt; <span class="title">ticketJsonItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> JsonFileItemWriterBuilder&lt;Ticket&gt;()</span><br><span class="line">        .jsonObjectMarshaller(<span class="keyword">new</span> JacksonJsonObjectMarshaller&lt;&gt;())</span><br><span class="line">        .resource(<span class="keyword">new</span> FileSystemResource(<span class="string">"ticket_output.json"</span>))</span><br><span class="line">        .name(<span class="string">"ticketJsonItemWriter"</span>)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>启动应用，生成文件 <code>ticket_output.json</code>：</p>
-<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">[</span><br><span class="line"> &#123;<span class="attr">"departureStation"</span>:<span class="string">"合肥"</span>,<span class="attr">"arrivalStation"</span>:<span class="string">"蚌埠"</span>,<span class="attr">"price"</span>:<span class="number">60.00</span>&#125;,</span><br><span class="line"> &#123;<span class="attr">"departureStation"</span>:<span class="string">"南京"</span>,<span class="attr">"arrivalStation"</span>:<span class="string">"蚌埠"</span>,<span class="attr">"price"</span>:<span class="number">70.00</span>&#125;,</span><br><span class="line"> &#123;<span class="attr">"departureStation"</span>:<span class="string">"上海"</span>,<span class="attr">"arrivalStation"</span>:<span class="string">"蚌埠"</span>,<span class="attr">"price"</span>:<span class="number">220.00</span>&#125;,</span><br><span class="line"> &#123;<span class="attr">"departureStation"</span>:<span class="string">"上海"</span>,<span class="attr">"arrivalStation"</span>:<span class="string">"杭州"</span>,<span class="attr">"price"</span>:<span class="number">75.20</span>&#125;,</span><br><span class="line"> &#123;<span class="attr">"departureStation"</span>:<span class="string">"上海"</span>,<span class="attr">"arrivalStation"</span>:<span class="string">"昆山"</span>,<span class="attr">"price"</span>:<span class="number">19.00</span>&#125;</span><br><span class="line">]</span><br></pre></td></tr></table></figure>
-<h5 id="2-5-ClassifierCompositeItemWriter-输出多文本数据"><a href="#2-5-ClassifierCompositeItemWriter-输出多文本数据" class="headerlink" title="2.5 ClassifierCompositeItemWriter-输出多文本数据"></a>2.5 ClassifierCompositeItemWriter-输出多文本数据</h5><p>将文件 <code>ticket.csv</code> 中始发站为<strong>上海</strong>的车票信息输出到文本中，其余的输出到 XML 文件中：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Job</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> Job <span class="title">testMultiFileItemWriterJob</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> jobBuilderFactory.get(<span class="string">"testMultiFileItemWriterJob"</span>)</span><br><span class="line">        .incrementer(<span class="keyword">new</span> RunIdIncrementer())</span><br><span class="line">        .flow(testMultiFileItemWriterStep)</span><br><span class="line">        .end()</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Step</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"testMultiFileItemWriterStep"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> Step <span class="title">testMultiFileItemWriterStep</span><span class="params">(PlatformTransactionManager transactionManager)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> stepBuilderFactory.get(<span class="string">"testMultiFileItemWriterStep"</span>)</span><br><span class="line">        .transactionManager(transactionManager)</span><br><span class="line">        .&lt;Ticket, Ticket&gt;chunk(<span class="number">10</span>)</span><br><span class="line">        .reader(ticketFileItemReader)</span><br><span class="line">        .writer(ticketClassifierMultiFileItemWriter)</span><br><span class="line">        .stream(ticketFileItemWriter)</span><br><span class="line">        .stream(ticketXmlItemWriter)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Reader</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemReader&lt;Ticket&gt; <span class="title">ticketFileItemReader</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemReaderBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemReader"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> ClassPathResource(<span class="string">"ticket.csv"</span>))</span><br><span class="line">        .delimited()</span><br><span class="line">        .names(<span class="keyword">new</span> String[]&#123;<span class="string">"departureStation"</span>, <span class="string">"arrivalStation"</span>, <span class="string">"price"</span>&#125;)</span><br><span class="line">        .fieldSetMapper(<span class="keyword">new</span> BeanWrapperFieldSetMapper&lt;Ticket&gt;() &#123;&#123;</span><br><span class="line">            setTargetType(Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line">        &#125;&#125;)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Classifier Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketClassifierMultiFileItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> ClassifierCompositeItemWriter&lt;Ticket&gt; <span class="title">ticketClassifierMultiFileItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    ClassifierCompositeItemWriter&lt;Ticket&gt; writer = <span class="keyword">new</span> ClassifierCompositeItemWriter&lt;&gt;();</span><br><span class="line">    writer.setClassifier((Classifier&lt;Ticket, ItemWriter&lt;? <span class="keyword">super</span> Ticket&gt;&gt;) ticket -&gt; &#123;</span><br><span class="line">        <span class="comment">// 始发站是上海的, 输出到文本中, 否则输出到 XML 文件中</span></span><br><span class="line">        <span class="keyword">return</span> <span class="string">"上海"</span>.equals(ticket.getDepartureStation()) ? ticketFileItemWriter() : ticketXmlItemWriter();</span><br><span class="line">    &#125;);</span><br><span class="line">    <span class="keyword">return</span> writer;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 文本-Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketFileItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> FlatFileItemWriter&lt;Ticket&gt; <span class="title">ticketFileItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 聚合器; JSON 序列化</span></span><br><span class="line">    LineAggregator&lt;Ticket&gt; aggregator = item -&gt; &#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            ObjectMapper mapper = <span class="keyword">new</span> ObjectMapper();</span><br><span class="line">            <span class="keyword">return</span> mapper.writeValueAsString(item);</span><br><span class="line">        &#125; <span class="keyword">catch</span> (JsonProcessingException e) &#123;</span><br><span class="line">            LOGGER.error(<span class="string">"parse object to json error: &#123;&#125;"</span>, e.getMessage(), e);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="string">""</span>;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> FlatFileItemWriterBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketFileItemWriter"</span>)</span><br><span class="line">        .resource(<span class="keyword">new</span> FileSystemResource(<span class="string">"ticket_output.txt"</span>))</span><br><span class="line">        .lineAggregator(aggregator)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * XML-Writer</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketXmlItemWriter"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> StaxEventItemWriter&lt;Ticket&gt; <span class="title">ticketXmlItemWriter</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> StaxEventItemWriterBuilder&lt;Ticket&gt;()</span><br><span class="line">        .name(<span class="string">"ticketXmlItemWriter"</span>)</span><br><span class="line">        .marshaller(ticketMarshaller)</span><br><span class="line">        .resource(<span class="keyword">new</span> FileSystemResource(<span class="string">"ticket_output.xml"</span>))</span><br><span class="line">        .rootTagName(<span class="string">"tickets"</span>)</span><br><span class="line">        .overwriteOutput(<span class="keyword">true</span>)</span><br><span class="line">        .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 映射器</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@Bean</span>(<span class="string">"ticketMarshaller"</span>)</span><br><span class="line"><span class="function"><span class="keyword">public</span> XStreamMarshaller <span class="title">ticketMarshaller</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    Map&lt;String, Class&lt;Ticket&gt;&gt; aliases = <span class="keyword">new</span> HashMap&lt;&gt;(<span class="number">1</span>);</span><br><span class="line">    aliases.put(<span class="string">"ticket"</span>, Ticket<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    XStreamMarshaller marshaller = <span class="keyword">new</span> XStreamMarshaller();</span><br><span class="line">    marshaller.setAliases(aliases);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> marshaller;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>启动应用，生成文件如下：</p>
-<p><code>ticket_output.txt</code>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#123;&quot;departureStation&quot;:&quot;上海&quot;,&quot;arrivalStation&quot;:&quot;蚌埠&quot;,&quot;price&quot;:220.00&#125;</span><br><span class="line">&#123;&quot;departureStation&quot;:&quot;上海&quot;,&quot;arrivalStation&quot;:&quot;杭州&quot;,&quot;price&quot;:75.20&#125;</span><br><span class="line">&#123;&quot;departureStation&quot;:&quot;上海&quot;,&quot;arrivalStation&quot;:&quot;昆山&quot;,&quot;price&quot;:19.00&#125;</span><br></pre></td></tr></table></figure>
-<p><code>ticket_output.xml</code>：</p>
-<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span><span class="tag">&lt;<span class="name">tickets</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>合肥<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>蚌埠<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>60.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">ticket</span>&gt;</span><span class="tag">&lt;<span class="name">departureStation</span>&gt;</span>南京<span class="tag">&lt;/<span class="name">departureStation</span>&gt;</span><span class="tag">&lt;<span class="name">arrivalStation</span>&gt;</span>蚌埠<span class="tag">&lt;/<span class="name">arrivalStation</span>&gt;</span><span class="tag">&lt;<span class="name">price</span>&gt;</span>70.00<span class="tag">&lt;/<span class="name">price</span>&gt;</span><span class="tag">&lt;/<span class="name">ticket</span>&gt;</span><span class="tag">&lt;/<span class="name">tickets</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>示例代码：<a href="https://github.com/donehub/spring-batch-demo" target="_blank" rel="noopener">spring-batch-demo</a></p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -2601,7 +2958,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">96</span>
+          <span class="site-state-item-count">97</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2614,7 +2971,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">58</span>
+        <span class="site-state-item-count">59</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
