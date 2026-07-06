@@ -195,6 +195,126 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/02/20/fork_join_thred_pool/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/02/20/fork_join_thred_pool/" class="post-title-link" itemprop="url">JUC线程池-ForkJoinPool</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-02-20 10:57:01" itemprop="dateCreated datePublished" datetime="2021-02-20T10:57:01+08:00">2021-02-20</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2021/02/20/fork_join_thred_pool/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2021/02/20/fork_join_thred_pool/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <hr>
+<h4 id="一、ForkJoinPool-介绍"><a href="#一、ForkJoinPool-介绍" class="headerlink" title="一、ForkJoinPool 介绍"></a>一、ForkJoinPool 介绍</h4><p>ForkJoinPool 是 jdk 1.7 引入的一个线程池，其底层设计基于分治算法(Divide-and-Conquer)的并行实现，是一款可以获得良好并行性能的简单且高效的设计技术。通过任务分治，可以更好地利用多处理器，并行处理任务，提升计算效能。</p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/13_20_27_1_fork_join.png" alt=""></p>
+<p>Fork/Join 框架主要包含三个模块：</p>
+<ul>
+<li>线程池：ForkJoinPool</li>
+<li>执行 Fork/Join 任务的线程：ForkJoinWorkerThread</li>
+<li>任务对象：ForkJoinTask，继承者有 RecursiveTask、RecursiveAction、CountedCompleter</li>
+</ul>
+<p>ForkJoinPool 通过 ForkJoinWorkerThread 来处理提交的 ForkJoinTask。通常不会直接创建 ForkJoinTask，而是借助其继承类，根据实际需要创建对应的分治任务。RecursiveTask 是一个可以递归执行的 ForkJoinTask；RecursiveAction 是一个没有返回值的 RecursiveTask；CountedCompleter 在完成任务执行后，回自动触发执行一个自定义的钩子函数。</p>
+<h4 id="二、工作窃取（Work-Stealing）算法"><a href="#二、工作窃取（Work-Stealing）算法" class="headerlink" title="二、工作窃取（Work-Stealing）算法"></a>二、工作窃取（Work-Stealing）算法</h4><p>工作窃取 (work-stealing) 算法，是 Fork/Join 的设计原理，指线程池内的所有工作线程都尝试找到并执行已经提交的任务，或者是被其他活动任务创建的子任务。因此，在运行多个可以产生子任务的任务，或提交的许多小任务，ForkJoinPool 的效率非常高。</p>
+<p>在 ForkJoinPool 中，每个工作线程 (ForkJoinWorkerThread) 都对应一个任务队列 (WorkQueue)，工作线程优先处理自身队列的任务，然后以 FIFO 的顺序随机窃取其他队列中的任务。处理自身队列的任务的方式有两种：先进先出 (FIFO)、先进后出 (LIFO)。这由 ForkJoinPool 的构造参数 asyncMode 决定，默认先进先出 (FIFO)。</p>
+<ul>
+<li>每个工作线程 (ForkJoinWorkerThread) 都有自己的一个 WorkQueue，该工作队列是一个双端队列；</li>
+<li>WorkQueue 支持三种操作 push、pop、poll；</li>
+<li>push/pop 只能被队列的所有者线程调用，而 poll 可以被其他线程调用；</li>
+<li>划分的子任务调用 fork 方法时，都会被 push 到自己的 WorkQueue 中；</li>
+<li>一般情况下，工作线程 (ForkJoinWorkerThread) 从自己的双端队列获出任务并执行；</li>
+<li>当自己的队列为空时，工作线程 (ForkJoinWorkerThread) 便随机从其他 WorkQueue 末尾调用 poll 方法窃取任务并执行；</li>
+</ul>
+<h4 id="三、ForkJoinPool-使用"><a href="#三、ForkJoinPool-使用" class="headerlink" title="三、ForkJoinPool 使用"></a>三、ForkJoinPool 使用</h4><p>我们以 RecursiveTask 学习使用 ForkJoinPool，可递归分治任务实现类图：</p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/03/13_20_49_59_recursive_task.png" alt=""></p>
+<p>计算1+2+3+…+10000的值：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SumTest</span> <span class="keyword">extends</span> <span class="title">RecursiveTask</span>&lt;<span class="title">Integer</span>&gt; </span>&#123;</span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">int</span> start;</span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">int</span> end;</span><br><span class="line"></span><br><span class="line">    SumTest(<span class="keyword">int</span> start, <span class="keyword">int</span> end) &#123;</span><br><span class="line">        <span class="keyword">this</span>.start = start;</span><br><span class="line">        <span class="keyword">this</span>.end = end;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> Integer <span class="title">compute</span><span class="params">()</span> </span>&#123;</span><br><span class="line">		</span><br><span class="line">        <span class="keyword">if</span> (end - start &lt; <span class="number">100</span>) &#123;</span><br><span class="line">            System.out.println(Thread.currentThread().getName() + <span class="string">" 开始执行: "</span> + start + <span class="string">"-"</span> + end);</span><br><span class="line">            <span class="keyword">int</span> sum = <span class="number">0</span>;</span><br><span class="line">            <span class="keyword">for</span> (<span class="keyword">int</span> i = start; i &lt;= end; i++) &#123;</span><br><span class="line">                sum += i;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> sum;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        SumTest sumTest1 = <span class="keyword">new</span> SumTest(start, (end + start) / <span class="number">2</span>);</span><br><span class="line">        SumTest sumTest2 = <span class="keyword">new</span> SumTest((start + end) / <span class="number">2</span> + <span class="number">1</span>, end);</span><br><span class="line"></span><br><span class="line">        sumTest1.fork();</span><br><span class="line">        sumTest2.fork();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> sumTest1.join() + sumTest2.join();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> ExecutionException, InterruptedException </span>&#123;</span><br><span class="line">        ForkJoinPool pool = <span class="keyword">new</span> ForkJoinPool();</span><br><span class="line">        ForkJoinTask&lt;Integer&gt; task = <span class="keyword">new</span> SumTest(<span class="number">1</span>, <span class="number">1000</span>);</span><br><span class="line">        pool.submit(task);</span><br><span class="line">        System.out.println(task.get());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>运行结果：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">13</span> 开始执行: <span class="number">1</span>-<span class="number">63</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">11</span> 开始执行: <span class="number">501</span>-<span class="number">563</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">13</span> 开始执行: <span class="number">126</span>-<span class="number">188</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">11</span> 开始执行: <span class="number">564</span>-<span class="number">625</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">13</span> 开始执行: <span class="number">189</span>-<span class="number">250</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">10</span> 开始执行: <span class="number">251</span>-<span class="number">313</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">4</span> 开始执行: <span class="number">64</span>-<span class="number">125</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">10</span> 开始执行: <span class="number">314</span>-<span class="number">375</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">13</span> 开始执行: <span class="number">376</span>-<span class="number">438</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">10</span> 开始执行: <span class="number">439</span>-<span class="number">500</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">4</span> 开始执行: <span class="number">626</span>-<span class="number">688</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">0</span> 开始执行: <span class="number">814</span>-<span class="number">875</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">7</span> 开始执行: <span class="number">751</span>-<span class="number">813</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">11</span> 开始执行: <span class="number">689</span>-<span class="number">750</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">3</span> 开始执行: <span class="number">939</span>-<span class="number">1000</span></span><br><span class="line">ForkJoinPool-<span class="number">1</span>-worker-<span class="number">15</span> 开始执行: <span class="number">876</span>-<span class="number">938</span></span><br><span class="line"><span class="number">500500</span></span><br></pre></td></tr></table></figure>
+<p>从执行结果来看，ForkJoinPool 通过分治算法，一级级拆分表达式，直到拆分的数据单元的差值小于100，接着分别计算各个小数据单元的和，提交汇总。</p>
+<h4 id="四、Fork-Join-任务提交方式"><a href="#四、Fork-Join-任务提交方式" class="headerlink" title="四、Fork/Join 任务提交方式"></a>四、Fork/Join 任务提交方式</h4><p>ForkJoinPool 支持三种任务提交方式：</p>
+<ul>
+<li>submit: 异步执行，有返回值，通过 task.get() 获取执行结果；</li>
+<li>invoke: 同步执行，等待任务执行完毕后，返回计算结果；</li>
+<li>execute: 直接提交任务，同步执行，无返回结果。</li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2021/01/14/blog-seo-optimization-guide/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1188,131 +1308,11 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2020/07/06/redis_pubsub/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/07/06/redis_pubsub/" class="post-title-link" itemprop="url">redis 发布订阅模式</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-07-06 09:00:12" itemprop="dateCreated datePublished" datetime="2020-07-06T09:00:12+08:00">2020-07-06</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E4%B8%AD%E9%97%B4%E4%BB%B6/" itemprop="url" rel="index"><span itemprop="name">中间件</span></a>
-                </span>
-            </span>
-
-          
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2020/07/06/redis_pubsub/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2020/07/06/redis_pubsub/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="一、技术背景"><a href="#一、技术背景" class="headerlink" title="一、技术背景"></a>一、技术背景</h4><p>实现发布订阅的中间件有许多，包括时下最热的<code>Kafka</code>、<code>RabbitMQ</code>、<code>ActiveMQ</code>，不太常见的<code>Guava</code>下的<code>EventBus</code>，以及<code>Redis</code>等。关于<code>MQ</code>之流的分析已经够多了，今天详细介绍下<code>Redis</code>的发布订阅机制及其实现。事实上，<code>Redis</code>的发布订阅机制在具体项目中的应用非常少，主要有两方面原因：其一，<code>Redis</code>的可靠性比较差，一旦出现断网等情况，则发布的消息便全部丢失；其二，<code>Redis</code>的消息处理方式是通过单线程循环遍历实现的，若存在大量的消息发布，则可能导致输出缓冲区膨胀，甚至服务崩溃。但对数据安全性和稳定性要求不高的场景来说，<code>Redis</code>不失为最佳的选择。</p>
-<h4 id="二、基本操作"><a href="#二、基本操作" class="headerlink" title="二、基本操作"></a>二、基本操作</h4><p><code>Redis</code> 的发布订阅模式包括普通订阅，普通订阅取消，模式订阅，模式订阅取消这四个场景。用命令实现如下：</p>
-<ul>
-<li><p>启动 <code>Redis</code> 服务（以 <code>Windows</code> 平台为例）</p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">C:\<span class="title">Tools</span>\<span class="title">Redis</span>&gt;<span class="title">redis</span>-<span class="title">server.exe</span> <span class="title">redis.windows.conf</span></span></span><br><span class="line"><span class="function">...</span></span><br><span class="line"><span class="function"><span class="title">The</span> <span class="title">server</span> <span class="title">is</span> <span class="title">now</span> <span class="title">ready</span> <span class="title">to</span> <span class="title">accept</span> <span class="title">connections</span> <span class="title">on</span> <span class="title">port</span> 6379</span></span><br></pre></td></tr></table></figure>
-</li>
-<li><p>创建客户端<code>client1</code>，并以普通订阅渠道<code>channel1</code></p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">redis-cli.exe -h <span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span> -p <span class="number">6379</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt; SUBSCRIBE channel1</span><br><span class="line">Reading messages... (press Ctrl-C to quit)</span><br><span class="line"><span class="number">1</span>) "subscribe"</span><br><span class="line"><span class="number">2</span>) "channel1"</span><br><span class="line"><span class="number">3</span>) (integer) <span class="number">1</span></span><br></pre></td></tr></table></figure>
-</li>
-<li><p>创建客户端<code>client2</code>，并普通订阅渠道<code>channel2</code></p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">redis-cli.exe -h <span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span> -p <span class="number">6379</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt; SUBSCRIBE channel2</span><br><span class="line">Reading messages... (press Ctrl-C to quit)</span><br><span class="line"><span class="number">1</span>) "subscribe"</span><br><span class="line"><span class="number">2</span>) "channel2"</span><br><span class="line"><span class="number">3</span>) (integer) <span class="number">1</span></span><br></pre></td></tr></table></figure>
-</li>
-<li><p>创建客户端<code>client3</code>，并模式订阅渠道<code>channel*</code></p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">redis-cli.exe -h <span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span> -p <span class="number">6379</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt; PSUBSCRIBE channel*</span><br><span class="line">Reading messages... (press Ctrl-C to quit)</span><br><span class="line"><span class="number">1</span>) "psubscribe"</span><br><span class="line"><span class="number">2</span>) "channel*"</span><br><span class="line"><span class="number">3</span>) (integer) <span class="number">1</span></span><br></pre></td></tr></table></figure>
-</li>
-<li><p>向渠道<code>channel2</code>发布一条消息</p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">redis-cli.exe -h <span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span> -p <span class="number">6379</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt; PUBLISH channel2 "msg from channel2"</span><br><span class="line">(integer) <span class="number">2</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt;</span><br></pre></td></tr></table></figure>
-</li>
-<li><p><code>client2</code> 、<code>client3</code> 接收到消息</p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"># ----------client2---------</span><br><span class="line"><span class="number">1</span>) "message"</span><br><span class="line"><span class="number">2</span>) "channel2"</span><br><span class="line"><span class="number">3</span>) "msg from channel2"</span><br><span class="line"></span><br><span class="line"># ----------client3---------</span><br><span class="line"><span class="number">1</span>) "pmessage"</span><br><span class="line"><span class="number">2</span>) "channel*"</span><br><span class="line"><span class="number">3</span>) "channel2"</span><br><span class="line"><span class="number">4</span>) "msg from channel2"</span><br></pre></td></tr></table></figure>
-</li>
-</ul>
-<p>因此，我们可以猜测，消息发布者与消息订阅者之间是通过渠道连接的，包括精准匹配（普通订阅）和模糊匹配（模式订阅）。经过分析其结构设计，可表示为用例：</p>
-<p><img data-src="http://www.plantuml.com/plantuml/png/SoWkIImgAStDuU8gIaqkISnBpqbLA4fDoIoEBoXDYYykJLAevk9I08ASrBGIXP9yXQBCz8mIXPHCaFBC_3omN69oINwHmjF-YKztDBzeQ4KIUx5kqSiPhK0nGso2HjW4ZI7sbHQd9YSMfog4EXig91OhA3tRiU1bu-IOlEICnBoyr9oOl8B4afBKeZmbi7A4vGgwkdOWJLPG8R0qI00iWN2F5PIDNTe8lxGnNBgMoo4rBmKOW000" alt=""></p>
-<h4 id="三、原理分析"><a href="#三、原理分析" class="headerlink" title="三、原理分析"></a>三、原理分析</h4><p><code>Redis</code>发布订阅的核心实现在<code>pubsub.c</code>文件。从头文件<code>server.h</code>中可以读取相关函数声明：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">void subscribeCommand(client *c);      &#x2F;* 普通订阅 *&#x2F;</span><br><span class="line">void unsubscribeCommand(client *c);    &#x2F;* 普通订阅取消 *&#x2F;</span><br><span class="line">void psubscribeCommand(client *c);     &#x2F;* 模式订阅 *&#x2F;</span><br><span class="line">void punsubscribeCommand(client *c);   &#x2F;* 模式订阅取消 *&#x2F;</span><br><span class="line">void publishCommand(client *c);</span><br><span class="line">void pubsubCommand(client *c);</span><br></pre></td></tr></table></figure>
-<ul>
-<li>普通订阅模式：</li>
-</ul>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> CLIENT_PUBSUB (1&lt;&lt;18)      <span class="comment">/* Client is in Pub/Sub mode. */</span></span></span><br><span class="line"><span class="comment">/*-----------------------------------------------------------------------------</span></span><br><span class="line"><span class="comment"> * Pubsub commands implementation</span></span><br><span class="line"><span class="comment"> *----------------------------------------------------------------------------*/</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">subscribeCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> j;</span><br><span class="line">	<span class="comment">/* 分析client结构，c-&gt;argv[0]为命令本身，第2位开始为渠道参数 */</span></span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">1</span>; j &lt; c-&gt;argc; j++)</span><br><span class="line">        <span class="comment">/* 订阅一个渠道 */</span></span><br><span class="line">        pubsubSubscribeChannel(c,c-&gt;argv[j]);</span><br><span class="line">    <span class="comment">/* 设置客户端为发布订阅模式，此模式在processCommand中为校验值 */</span></span><br><span class="line">    c-&gt;flags |= CLIENT_PUBSUB;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* 一个客户端订阅一个渠道。若返回 1，则订阅成功；若返回 0，则该客户端已订阅该渠道 */</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pubsubSubscribeChannel</span><span class="params">(client *c, robj *channel)</span> </span>&#123;</span><br><span class="line">    dictEntry *de;</span><br><span class="line">    <span class="built_in">list</span> *clients = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="keyword">int</span> retval = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 将该渠道添加到该客户端的pubsub_channels哈希表中； key: channel，value: NULL*/</span></span><br><span class="line">    <span class="keyword">if</span> (dictAdd(c-&gt;pubsub_channels,channel,<span class="literal">NULL</span>) == DICT_OK) &#123;</span><br><span class="line">        retval = <span class="number">1</span>;</span><br><span class="line">        <span class="comment">/* 引用自增 1 */</span></span><br><span class="line">        incrRefCount(channel);</span><br><span class="line">        <span class="comment">/* 在服务端pubsub_channels中查找该channel */</span></span><br><span class="line">        de = dictFind(server.pubsub_channels,channel);</span><br><span class="line">        <span class="comment">/* 若该channel不存在，则新建 */</span></span><br><span class="line">        <span class="keyword">if</span> (de == <span class="literal">NULL</span>) &#123;</span><br><span class="line">            clients = listCreate();</span><br><span class="line">            <span class="comment">/* 将该客户端添加到该服务端的pubsub_channels哈希表中; key: channel，value: client*/</span></span><br><span class="line">            dictAdd(server.pubsub_channels,channel,clients);</span><br><span class="line">             <span class="comment">/* 引用自增 1 */</span></span><br><span class="line">            incrRefCount(channel);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            clients = dictGetVal(de);</span><br><span class="line">        &#125;</span><br><span class="line">         <span class="comment">/* 将客户端c记录在订阅客户端列表 */</span></span><br><span class="line">        listAddNodeTail(clients,c);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">/* 通知客户端订阅结果 */</span></span><br><span class="line">    addReplyPubsubSubscribed(c,channel);</span><br><span class="line">    <span class="keyword">return</span> retval;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>普通订阅模式主要做了两件事：将订阅渠道添加至客户端<code>pubsub_channels</code>哈希表中；将订阅客户端添加至服务端的<code>pubsub_channels</code>哈希表中。可如下表示：</p>
-<p><img data-src="http://www.plantuml.com/plantuml/png/VP5FJyCW6CRFurEGdcjJ_kpYjcRHws8yw6anXXOwYCWMIgE9-jrz1Tk5Is_yVW_mFeJz48GFuxj524bpykAYSMUDSW5_ePKNxaqQZtVuwMw3qCgTfJeEMbmKAA-wivSb_Z0oQE2Ab5WhSz8Xmijqe3vQqIeBijZsTTDfuPoov7lRamae09s00R09E01lggegIlmPxzaLzwdVuzWEO_lwlt4eve4a7_ZmV3X0c3AwaB65Z2zawooBPQ-Fl-thcoQsWjLcbYH9cacQ9CiaIv9daYUvZl87eRroykyJVm40" alt=""></p>
-<p><img data-src="http://www.plantuml.com/plantuml/png/RL9TJuCm57tlhsXuHa8_W4mtikZhOapKfyMOifQLYDrIG4tK_-uT26ipUBhduvnxcx1kMc7Rxhr6I5PxAuuQDyf-A8k_4ORF2lCcAujN-Eds1lMKEKYrRRGuAc2jsXsi3F5d9LiDE28XrghQwxO7BquctjQYK3NmmRACyvqMngYQ_2nBCW8AW8w00M0Zu01u7aLHuEpYtguGV_KBLi7Zy8A7hcYwulM_eGdSOuX_p5rTATCIi4mEwZlkdpSRLsPp1THry3a7Tns9xu3NUJUcSmNCBSZc78bNifYpf9ublYxZg_mq4PZExMJYKvZy01a4UY7GGM1U4vkQiei06mG-1aQU3tpY1xAfQT4BlmYjbP6d7_WF" alt=""></p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/8/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/8/">8</a><span class="page-number current">9</span><a class="page-number" href="/page/10/">10</a><a class="extend next" rel="next" href="/page/10/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/8/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/8/">8</a><span class="page-number current">9</span><a class="page-number" href="/page/10/">10</a><a class="page-number" href="/page/11/">11</a><a class="extend next" rel="next" href="/page/10/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1380,7 +1380,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">100</span>
+          <span class="site-state-item-count">101</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1393,7 +1393,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">60</span>
+        <span class="site-state-item-count">61</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

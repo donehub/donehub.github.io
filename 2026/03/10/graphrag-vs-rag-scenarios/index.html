@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="背景微软开源了 GraphRAG，各大技术社区都在讨论。今天这篇文章，把以下几个核心问题讲透：  普通 RAG 的能力边界在哪 GraphRAG 解决的到底是什么问题 哪四类场景必须考虑 GraphRAG 工程上为什么不能无脑上 GraphRAG 混合路由架构怎么设计">
+<meta property="og:type" content="article">
+<meta property="og:title" content="GraphRAG 与普通 RAG 的应用分析">
+<meta property="og:url" content="https://donehub.github.io/2026/03/10/graphrag-vs-rag-scenarios/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="背景微软开源了 GraphRAG，各大技术社区都在讨论。今天这篇文章，把以下几个核心问题讲透：  普通 RAG 的能力边界在哪 GraphRAG 解决的到底是什么问题 哪四类场景必须考虑 GraphRAG 工程上为什么不能无脑上 GraphRAG 混合路由架构怎么设计">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-03-09T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-07-06T17:17:39.827Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="GraphRAG">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/03/10/graphrag-vs-rag-scenarios/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>GraphRAG 与普通 RAG 的应用分析 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/03/10/graphrag-vs-rag-scenarios/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          GraphRAG 与普通 RAG 的应用分析
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-03-10 00:00:00" itemprop="dateCreated datePublished" datetime="2026-03-10T00:00:00+08:00">2026-03-10</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-07-07 01:17:39" itemprop="dateModified" datetime="2026-07-07T01:17:39+08:00">2026-07-07</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/03/10/graphrag-vs-rag-scenarios/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/03/10/graphrag-vs-rag-scenarios/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>微软开源了 GraphRAG，各大技术社区都在讨论。今天这篇文章，把以下几个核心问题讲透：</p>
+<ul>
+<li>普通 RAG 的能力边界在哪</li>
+<li>GraphRAG 解决的到底是什么问题</li>
+<li>哪四类场景必须考虑 GraphRAG</li>
+<li>工程上为什么不能无脑上 GraphRAG</li>
+<li>混合路由架构怎么设计</li>
+</ul>
+<a id="more"></a>
+<h2 id="普通-RAG-能力边界"><a href="#普通-RAG-能力边界" class="headerlink" title="普通 RAG 能力边界"></a>普通 RAG 能力边界</h2><h3 id="普通-RAG-核心机制"><a href="#普通-RAG-核心机制" class="headerlink" title="普通 RAG 核心机制"></a>普通 RAG 核心机制</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">文档 → 切 Chunk → 向量 Embedding → 存入向量数据库</span><br><span class="line">                                    ↓</span><br><span class="line">用户 Query → 向量化 → 语义相似度检索 → TopK Chunk → 喂给大模型 → 生成答案</span><br></pre></td></tr></table></figure>
+<p>这套机制的本质是文本片段的相似度匹配。它能做好的事情，和它做不好的事情，边界非常清晰。</p>
+<h3 id="普通-RAG-擅长"><a href="#普通-RAG-擅长" class="headerlink" title="普通 RAG 擅长"></a>普通 RAG 擅长</h3><p>单点事实类问题，答案完整地存在于某个 Chunk 里。比如查询”接口超时时间””产品支持的功能””GPT-4 发布时间”这类事实。</p>
+<p>只要答案在某个 Chunk 里写得明明白白，普通 RAG 基本都能精准召回。这类问题占据了企业知识库 70% 以上的查询量。</p>
+<h3 id="普通-RAG-短板"><a href="#普通-RAG-短板" class="headerlink" title="普通 RAG 短板"></a>普通 RAG 短板</h3><p>短板在于：它只能找到片段，但不一定能把片段之间的关系连起来。</p>
+<p>来看一个真实场景。用户输入一个多条件查询：有没有一款适合拍视频、续航也不错、而且用户评价稳定的手机</p>
+<p>普通 RAG 的处理方式如下：</p>
+<ul>
+<li>可能召回 Chunk A：”XX 手机影像系统强大，视频拍摄能力突出”</li>
+<li>可能召回 Chunk B：”XX 手机电池 5500mAh，续航表现优秀”</li>
+<li>可能召回 Chunk C：”用户评价：用了半年，系统稳定，没有大问题”</li>
+</ul>
+<p>问题是：A、B、C 可能来自三篇不同的文档，描述的是三款不同的手机。普通 RAG 把三个 Chunk 一起扔给大模型，大模型也不知道到底哪款手机同时满足这三个条件。</p>
+<p>这就是普通 RAG 的根本局限：</p>
+<blockquote>
+<p><strong>它的检索单元是文本片段，不是实体，更不是关系。它擅长”找到相似的文字”，不擅长”找到满足多个关系约束的答案”。</strong></p>
+</blockquote>
+<p>那什么场景下这个问题会变得无法回避，下面逐一分析。</p>
+<h2 id="场景一：多维度关联查询"><a href="#场景一：多维度关联查询" class="headerlink" title="场景一：多维度关联查询"></a>场景一：多维度关联查询</h2><h3 id="多维度关联查询的含义"><a href="#多维度关联查询的含义" class="headerlink" title="多维度关联查询的含义"></a>多维度关联查询的含义</h3><p>注意，不是简单的多条件过滤。多条件过滤是 <code>&quot;价格 &lt; 5000 AND 品牌 = 华为&quot;</code>，这是 SQL 能干的事。</p>
+<p>多维度关联查询指的是：多个维度之间存在结构化的关系，需要沿着关系做导航和交集运算。</p>
+<h3 id="典型场景：商品推荐系统"><a href="#典型场景：商品推荐系统" class="headerlink" title="典型场景：商品推荐系统"></a>典型场景：商品推荐系统</h3><p>商品知识不是一张扁平的表，而是一个关系网络：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">商品 A ──→ 品牌: XX</span><br><span class="line">       ──→ 价格段: 高端</span><br><span class="line">       ──→ 核心卖点: 影像旗舰</span><br><span class="line">       ──→ 适用人群: 摄影爱好者</span><br><span class="line">       ──→ 用户口碑: 稳定</span><br><span class="line"></span><br><span class="line">商品 B ──→ 品牌: YY</span><br><span class="line">       ──→ 价格段: 中高端</span><br><span class="line">       ──→ 核心卖点: 性能旗舰</span><br><span class="line">       ──→ 适用人群: 游戏玩家</span><br><span class="line">       ──→ 用户口碑: 良好</span><br></pre></td></tr></table></figure>
+<p>用户输入：”有没有适合拍视频、性能强、口碑稳定的旗舰机”</p>
+<p>普通 RAG 的做法是在文本里模糊匹配，召回”影像强”的片段、”性能强”的片段、”口碑好”的片段，最后让大模型自己猜。</p>
+<p>GraphRAG 的做法是：把知识建成图，然后沿着关系边做导航——找到”影像旗舰”节点，找到”性能旗舰”节点，找到”用户口碑稳定”节点，然后取它们关联的商品实体的交集。</p>
+<p>这不是语义相似度的问题，这是图遍历的问题。</p>
+<h3 id="为什么普通-RAG-在这里失效"><a href="#为什么普通-RAG-在这里失效" class="headerlink" title="为什么普通 RAG 在这里失效"></a>为什么普通 RAG 在这里失效</h3><p>根本原因：普通 RAG 的检索空间是向量空间，它衡量的是两段文本像不像。而多维度关联查询需要的检索空间是关系空间，它需要的是沿着实体关系做路径查找。</p>
+<p>两个完全不同的空间，用错工具，效果天差地别。</p>
+<h2 id="场景二：全局总结类问题"><a href="#场景二：全局总结类问题" class="headerlink" title="场景二：全局总结类问题"></a>场景二：全局总结类问题</h2><h3 id="全局总结类问题的特征"><a href="#全局总结类问题的特征" class="headerlink" title="全局总结类问题的特征"></a>全局总结类问题的特征</h3><p>不是问某个点，而是问整体。比如”最近几年高端手机的发展趋势””目前 AI Agent 行业的技术格局””公司各部门的业务关联情况”这类问题。</p>
+<h3 id="普通-RAG-在这里翻车"><a href="#普通-RAG-在这里翻车" class="headerlink" title="普通 RAG 在这里翻车"></a>普通 RAG 在这里翻车</h3><p>这类问题的特点是：答案不在任何一个 Chunk 里，而是分散在整个语料库中。</p>
+<p>普通 RAG 召回的是 TopK 个最相似的 Chunk，可能Chunk 1 讲影像，Chunk 2 讲芯片，Chunk 3 讲价格，Chunk 4 讲 AI 功能。大模型拿到这些碎片化的信息，只能硬拼，最后生成一个面面俱到但毫无洞察的答案——读起来像目录，不像分析。</p>
+<h3 id="GraphRAG-的解法：社区发现-分层摘要"><a href="#GraphRAG-的解法：社区发现-分层摘要" class="headerlink" title="GraphRAG 的解法：社区发现 + 分层摘要"></a>GraphRAG 的解法：社区发现 + 分层摘要</h3><p>GraphRAG 的核心机制是这样的：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">知识图谱</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">┌─────────────────────────┐</span><br><span class="line">│  社区发现算法              │</span><br><span class="line">│  (如 Leiden 算法)         │</span><br><span class="line">│  把图谱划分为若干社区       │</span><br><span class="line">└──────────┬──────────────┘</span><br><span class="line">           │</span><br><span class="line">     ┌─────┼──────────┬──────────┐</span><br><span class="line">     ▼     ▼          ▼          ▼</span><br><span class="line">  社区A   社区B      社区C      社区D</span><br><span class="line">  影像    芯片性能    品牌竞争    用户需求</span><br><span class="line">     │     │          │          │</span><br><span class="line">     ▼     ▼          ▼          ▼</span><br><span class="line">  局部摘要 局部摘要   局部摘要   局部摘要</span><br><span class="line">     │     │          │          │</span><br><span class="line">     └─────┴──────────┴──────────┘</span><br><span class="line">                  │</span><br><span class="line">                  ▼</span><br><span class="line">           全局汇总摘要</span><br></pre></td></tr></table></figure>
+<p>第一步，用社区发现算法把知识图谱划分成若干个语义社区。每个社区里的实体关系紧密，社区之间相对松散。</p>
+<p>第二步，对每个社区分别做摘要，生成局部摘要。</p>
+<p>第三步，把所有局部摘要汇总，生成全局摘要。</p>
+<p>这个分层摘要的机制，天然适合回答”整体趋势””行业格局”这一类问题。因为它不是从碎片拼凑，而是从结构化的社区出发，每个社区都有自己的主题和洞察，最后合并起来就是全局视图。</p>
+<h2 id="场景三：隐性关系发现"><a href="#场景三：隐性关系发现" class="headerlink" title="场景三：隐性关系发现"></a>场景三：隐性关系发现</h2><h3 id="隐性关系的定义"><a href="#隐性关系的定义" class="headerlink" title="隐性关系的定义"></a>隐性关系的定义</h3><p>两个实体之间，文本里从来没有直接说明它们有关系，但通过中间节点可以推断出关联。</p>
+<p>举个例子：</p>
+<ul>
+<li>产品 A 和产品 B 从来没有被任何文档直接比较过</li>
+<li>但产品 A：价格段 = 高端，目标人群 = 商务用户，核心能力 = 影像</li>
+<li>产品 B：价格段 = 高端，目标人群 = 商务用户，核心能力 = 影像</li>
+</ul>
+<p>在图结构里，产品 A 和产品 B 虽然不直接相连，但它们共享了多个相同的邻居节点。这种结构上的接近性，就是隐性关系。</p>
+<h3 id="普通-RAG-无法发现隐性关系的原因"><a href="#普通-RAG-无法发现隐性关系的原因" class="headerlink" title="普通 RAG 无法发现隐性关系的原因"></a>普通 RAG 无法发现隐性关系的原因</h3><p>普通 RAG 的检索是基于 Query 和 Chunk 的语义相似度。如果没有任何文档把产品 A 和产品 B 放在同一段文字里，普通 RAG 就完全没有办法发现它们之间的联系——因为它的信息组织单位是文本片段，不是实体关系图。</p>
+<h3 id="依赖隐性关系发现的典型业务场景"><a href="#依赖隐性关系发现的典型业务场景" class="headerlink" title="依赖隐性关系发现的典型业务场景"></a>依赖隐性关系发现的典型业务场景</h3><ul>
+<li><strong>竞品分析</strong>：发现没有被直接对比，但实质上高度重叠的竞品</li>
+<li><strong>风控排查</strong>：多个看似无关的账户，通过中间节点发现它们共享同一控制人</li>
+<li><strong>推荐系统</strong>：用户 A 和用户 B 从未被直接比较，但行为模式高度相似</li>
+<li><strong>药物研发</strong>：两种靶点蛋白没有被同一篇论文提及，但通过通路网络发现它们在同一信号通路上</li>
+</ul>
+<p>这些都是普通 RAG 根本做不到的事。</p>
+<h2 id="场景四：分散信息的因果链追溯"><a href="#场景四：分散信息的因果链追溯" class="headerlink" title="场景四：分散信息的因果链追溯"></a>场景四：分散信息的因果链追溯</h2><h3 id="问题描述"><a href="#问题描述" class="headerlink" title="问题描述"></a>问题描述</h3><p>有些问题的答案，需要从多个文档中串联多条信息，才能推导出根因。</p>
+<p>典型的例子是”XX 项目延期的根本原因分析”。真实的答案可能分散在：</p>
+<ul>
+<li>需求文档：中期发生了重大需求变更</li>
+<li>排期表：关键开发人员被借调到其他项目</li>
+<li>研发周报：接口联调出现了预期外的问题</li>
+<li>测试反馈：某个第三方 SDK 有 Bug，阻塞了测试进度</li>
+<li>客户沟通记录：客户在验收阶段新增了功能点</li>
+</ul>
+<h3 id="普通-RAG-的处理方式"><a href="#普通-RAG-的处理方式" class="headerlink" title="普通 RAG 的处理方式"></a>普通 RAG 的处理方式</h3><p>普通 RAG 最可能召回的是某一篇文档中的一个片段，比如会议纪要里的一句话：”本次会议确认项目延期两周，主要原因是需求变更。”</p>
+<p>这个答案不算错，但不完整。真正的根因是多个因素叠加的结果，只看其中一个，会误导决策。</p>
+<h3 id="GraphRAG-的处理方式"><a href="#GraphRAG-的处理方式" class="headerlink" title="GraphRAG 的处理方式"></a>GraphRAG 的处理方式</h3><p>GraphRAG 把人、需求、任务、时间、风险、依赖关系全部建模成图的节点和边：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">需求变更 ──→ 影响任务A ──→ 阻塞任务B ──→ 延期</span><br><span class="line">    ↑</span><br><span class="line">开发人员借调 ──→ 任务A人力不足 ──→ 延期</span><br><span class="line">    ↑</span><br><span class="line">SDK Bug ──→ 联调阻塞 ──→ 延期</span><br><span class="line">    ↑</span><br><span class="line">客户新增需求 ──→ 验收阶段返工 ──→ 延期</span><br></pre></td></tr></table></figure>
+<p>从”项目延期”这个现象出发，沿着关系边可以追溯到多个根因节点。这是图上的路径查找问题，不是文本相似度问题。</p>
+<h2 id="GraphRAG-的代价：为什么不能无脑上"><a href="#GraphRAG-的代价：为什么不能无脑上" class="headerlink" title="GraphRAG 的代价：为什么不能无脑上"></a>GraphRAG 的代价：为什么不能无脑上</h2><p>讲完四个场景，必须马上泼一盆冷水。GraphRAG 的索引阶段和普通 RAG 完全不在一个量级：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>环节</th>
+<th>普通 RAG</th>
+<th>GraphRAG</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>文档处理</td>
+<td>切 Chunk</td>
+<td>实体抽取 + 关系抽取</td>
+</tr>
+<tr>
+<td>索引构建</td>
+<td>向量 Embedding</td>
+<td>图构建 + 社区发现 + 每社区摘要</td>
+</tr>
+<tr>
+<td>LLM 调用量</td>
+<td>低（只做 Embedding）</td>
+<td><strong>极高</strong>（抽取、摘要都在调 LLM）</td>
+</tr>
+<tr>
+<td>索引时间</td>
+<td>分钟级</td>
+<td>小时级甚至天级（视语料规模）</td>
+</tr>
+<tr>
+<td>查询延迟</td>
+<td>毫秒 ~ 秒级</td>
+<td>秒级 ~ 十秒级（遍历 + 合成）</td>
+</tr>
+<tr>
+<td>存储成本</td>
+<td>向量数据库</td>
+<td>图数据库 + 向量库 + 摘要存储</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>举个量化的例子：一份 100 万 Token 的企业知识库，普通 RAG 的索引成本可能只需要几美元的 Embedding 费用。而 GraphRAG 的索引阶段——实体抽取、关系抽取、社区摘要——可能需要几十甚至上百美元的 LLM 调用费用。</p>
+<p>这还没有算查询阶段的开销。每次查询，GraphRAG 可能需要遍历更多节点、读取更多关系、合成更长的上下文，这些都是 Token 成本。</p>
+<p>所以结论非常清晰：</p>
+<blockquote>
+<p><strong>如果你的场景 80% 以上都是简单事实类问题，上 GraphRAG 就是过度设计。</strong> 花钱更多，延迟更高，简单问题的回答质量可能还更差。</p>
+</blockquote>
+<h2 id="工程实践：混合路由架构"><a href="#工程实践：混合路由架构" class="headerlink" title="工程实践：混合路由架构"></a>工程实践：混合路由架构</h2><p>真正做过线上系统的人，不会在普通 RAG 和 GraphRAG 之间二选一。正确的做法是混合路由。</p>
+<h3 id="架构设计"><a href="#架构设计" class="headerlink" title="架构设计"></a>架构设计</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">用户 Query</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">┌─────────────────────────┐</span><br><span class="line">│   Query Router          │</span><br><span class="line">│   (LLM &#x2F; 规则引擎)       │</span><br><span class="line">│   判断问题类型           │</span><br><span class="line">└──────────┬──────────────┘</span><br><span class="line">           │</span><br><span class="line">     ┌─────┼──────────────┬──────────────┐</span><br><span class="line">     ▼     ▼              ▼              ▼</span><br><span class="line">  简单事实  结构化查询     关系推理        全局总结</span><br><span class="line">     │        │             │              │</span><br><span class="line">     ▼        ▼             ▼              ▼</span><br><span class="line">  普通RAG   SQL查询      GraphRAG      GraphRAG</span><br><span class="line">  + BM25    (转SQL)      (图遍历)      (社区摘要)</span><br><span class="line">     │        │             │              │</span><br><span class="line">     └────────┴─────────────┴──────────────┘</span><br><span class="line">                         │</span><br><span class="line">                         ▼</span><br><span class="line">                   答案合成 &amp; 输出</span><br></pre></td></tr></table></figure>
+<h3 id="Query-Router-的设计方式"><a href="#Query-Router-的设计方式" class="headerlink" title="Query Router 的设计方式"></a>Query Router 的设计方式</h3><p>Query Router 是整个混合路由的大脑。它的职责是判断用户的问题属于哪一类，然后路由到对应的检索引擎。</p>
+<p>实现方式有三种，从轻到重：</p>
+<p><strong>方式一：规则路由</strong></p>
+<p>基于关键词和句式模式匹配，速度快，成本低。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">route_query</span><span class="params">(query: str)</span> -&gt; str:</span></span><br><span class="line">    <span class="comment"># 全局总结类关键词</span></span><br><span class="line">    summary_keywords = [<span class="string">"趋势"</span>, <span class="string">"格局"</span>, <span class="string">"整体"</span>, <span class="string">"总结"</span>, <span class="string">"概括"</span>, <span class="string">"发展"</span>]</span><br><span class="line">    <span class="keyword">if</span> any(kw <span class="keyword">in</span> query <span class="keyword">for</span> kw <span class="keyword">in</span> summary_keywords):</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"graphrag_summary"</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 结构化查询类关键词</span></span><br><span class="line">    <span class="keyword">if</span> <span class="string">"多少"</span> <span class="keyword">in</span> query <span class="keyword">or</span> <span class="string">"什么时候"</span> <span class="keyword">in</span> query <span class="keyword">or</span> <span class="string">"是什么"</span> <span class="keyword">in</span> query:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"normal_rag"</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 关系推理类关键词</span></span><br><span class="line">    relation_keywords = [<span class="string">"关联"</span>, <span class="string">"影响"</span>, <span class="string">"原因"</span>, <span class="string">"依赖"</span>, <span class="string">"共同"</span>]</span><br><span class="line">    <span class="keyword">if</span> any(kw <span class="keyword">in</span> query <span class="keyword">for</span> kw <span class="keyword">in</span> relation_keywords):</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"graphrag_relation"</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="string">"normal_rag"</span>  <span class="comment"># 默认走普通 RAG</span></span><br></pre></td></tr></table></figure>
+<p><strong>方式二：LLM 分类路由</strong></p>
+<p>用一个小模型（如 GPT-4o-mini）对 Query 做分类，准确率更高，但有额外延迟和成本。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">ROUTER_PROMPT = <span class="string">"""</span></span><br><span class="line"><span class="string">请将以下用户问题分类为以下类型之一：</span></span><br><span class="line"><span class="string">- factual：简单事实查询，答案在某段文本中</span></span><br><span class="line"><span class="string">- sql：可转为结构化查询的问题</span></span><br><span class="line"><span class="string">- relation：需要跨实体关系推理的问题</span></span><br><span class="line"><span class="string">- summary：需要全局总结或趋势分析的问题</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">用户问题：&#123;query&#125;</span></span><br><span class="line"><span class="string">类型：</span></span><br><span class="line"><span class="string">"""</span></span><br></pre></td></tr></table></figure>
+<p><strong>方式三：混合路由</strong></p>
+<p>规则优先，规则无法判断时再调 LLM。成本和延迟之间取得平衡。</p>
+<h3 id="路由策略的核心原则"><a href="#路由策略的核心原则" class="headerlink" title="路由策略的核心原则"></a>路由策略的核心原则</h3><blockquote>
+<p><strong>默认走普通 RAG，只在明确需要时路由到 GraphRAG。</strong></p>
+</blockquote>
+<p>原因很简单：大部分查询都是简单事实类问题，GraphRAG 应该是”特种兵”，不是”常规军”。</p>
+<p>如果反过来，所有问题都走 GraphRAG，你会发现：成本上去了，延迟上去了，简单问题的准确率反而下降了。因为 GraphRAG 的上下文更长、噪声更多，大模型反而更容易被干扰。</p>
+<h2 id="一张表总结：场景与工具对应关系"><a href="#一张表总结：场景与工具对应关系" class="headerlink" title="一张表总结：场景与工具对应关系"></a>一张表总结：场景与工具对应关系</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>问题类型</th>
+<th>举例</th>
+<th>推荐工具</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单点事实</td>
+<td>“接口超时时间查询”</td>
+<td>普通 RAG / SQL</td>
+<td>Chunk 里有答案，杀鸡不用牛刀</td>
+</tr>
+<tr>
+<td>多条件过滤</td>
+<td>“价格 &lt; 5000 的华为手机”</td>
+<td>SQL / 结构化查询</td>
+<td>这是数据库的活</td>
+</tr>
+<tr>
+<td>多实体关系推理</td>
+<td>“适合拍视频、口碑好的旗舰机”</td>
+<td>GraphRAG</td>
+<td>需要沿关系边做交集</td>
+</tr>
+<tr>
+<td>全局趋势</td>
+<td>“AI Agent 行业格局”</td>
+<td>GraphRAG</td>
+<td>需要社区摘要机制</td>
+</tr>
+<tr>
+<td>隐性关系发现</td>
+<td>“两个账户的关联分析”</td>
+<td>GraphRAG</td>
+<td>需要图结构推断</td>
+</tr>
+<tr>
+<td>跨文档因果追溯</td>
+<td>“项目延期的根因”</td>
+<td>GraphRAG</td>
+<td>需要多路径汇聚</td>
+</tr>
+<tr>
+<td>简单对比</td>
+<td>“A 和 B 的区别”</td>
+<td>普通 RAG</td>
+<td>两段文本拼起来就行</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>技术在演进，但工程思维不变。GraphRAG 不是普通 RAG 的替代品，而是补充。它们解决的是不同类型的问题，没有谁比谁更高级，只有谁更适合哪个场景。</p>
+<p>做技术选型的时候，正确的思路不是列举某个技术的优点，而是先说清楚现有方案的能力边界，再说新方案补的是什么，最后说工程上怎么把两者结合起来。</p>
+<p>能把这个选型逻辑讲清楚，就说明不是在追热点，而是真的做过系统，踩过坑，想清楚了。</p>
+
+    </div>
+
+    
+    
+    
+        
+
+  <div class="followme">
+    <p>欢迎关注我的其它发布渠道</p>
+
+    <div class="social-list">
+
+        <div class="social-item">
+          <a target="_blank" class="social-link" href="/atom.xml">
+            <span class="icon">
+              <i class="fa fa-rss"></i>
+            </span>
+
+            <span class="label">RSS</span>
+          </a>
+        </div>
+    </div>
+  </div>
+
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/GraphRAG/" rel="tag"><i class="fa fa-tag"></i> GraphRAG</a>
+          </div>
+
+        
+<div class="post-share">
+  <div class="share-title">分享到</div>
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+
+<style>
+.post-share {
+  margin: 20px 0;
+  padding: 15px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+}
+.post-share .share-title {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 10px;
+}
+.post-share .social-share {
+  text-align: center;
+}
+.post-share .social-share a {
+  margin: 0 8px;
+}
+/* 微信二维码样式优化 */
+.social-share .wechat-qrcode {
+  border: 1px solid #eee;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+.social-share .wechat-qrcode h4 {
+  color: #333;
+  font-weight: normal;
+}
+</style>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/02/15/superpowers-vs-speckit-guide/" rel="prev" title="Superpowers 介绍与使用">
+      <i class="fa fa-chevron-left"></i> Superpowers 介绍与使用
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/03/21/llm-function-calling-deep-analysis/" rel="next" title="大模型 Function Calling：底层原理与训练机制">
+      大模型 Function Calling：底层原理与训练机制 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#背景"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#普通-RAG-能力边界"><span class="nav-number">2.</span> <span class="nav-text">普通 RAG 能力边界</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#普通-RAG-核心机制"><span class="nav-number">2.1.</span> <span class="nav-text">普通 RAG 核心机制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#普通-RAG-擅长"><span class="nav-number">2.2.</span> <span class="nav-text">普通 RAG 擅长</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#普通-RAG-短板"><span class="nav-number">2.3.</span> <span class="nav-text">普通 RAG 短板</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#场景一：多维度关联查询"><span class="nav-number">3.</span> <span class="nav-text">场景一：多维度关联查询</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#多维度关联查询的含义"><span class="nav-number">3.1.</span> <span class="nav-text">多维度关联查询的含义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#典型场景：商品推荐系统"><span class="nav-number">3.2.</span> <span class="nav-text">典型场景：商品推荐系统</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#为什么普通-RAG-在这里失效"><span class="nav-number">3.3.</span> <span class="nav-text">为什么普通 RAG 在这里失效</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#场景二：全局总结类问题"><span class="nav-number">4.</span> <span class="nav-text">场景二：全局总结类问题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#全局总结类问题的特征"><span class="nav-number">4.1.</span> <span class="nav-text">全局总结类问题的特征</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#普通-RAG-在这里翻车"><span class="nav-number">4.2.</span> <span class="nav-text">普通 RAG 在这里翻车</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#GraphRAG-的解法：社区发现-分层摘要"><span class="nav-number">4.3.</span> <span class="nav-text">GraphRAG 的解法：社区发现 + 分层摘要</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#场景三：隐性关系发现"><span class="nav-number">5.</span> <span class="nav-text">场景三：隐性关系发现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#隐性关系的定义"><span class="nav-number">5.1.</span> <span class="nav-text">隐性关系的定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#普通-RAG-无法发现隐性关系的原因"><span class="nav-number">5.2.</span> <span class="nav-text">普通 RAG 无法发现隐性关系的原因</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#依赖隐性关系发现的典型业务场景"><span class="nav-number">5.3.</span> <span class="nav-text">依赖隐性关系发现的典型业务场景</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#场景四：分散信息的因果链追溯"><span class="nav-number">6.</span> <span class="nav-text">场景四：分散信息的因果链追溯</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#问题描述"><span class="nav-number">6.1.</span> <span class="nav-text">问题描述</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#普通-RAG-的处理方式"><span class="nav-number">6.2.</span> <span class="nav-text">普通 RAG 的处理方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#GraphRAG-的处理方式"><span class="nav-number">6.3.</span> <span class="nav-text">GraphRAG 的处理方式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#GraphRAG-的代价：为什么不能无脑上"><span class="nav-number">7.</span> <span class="nav-text">GraphRAG 的代价：为什么不能无脑上</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#工程实践：混合路由架构"><span class="nav-number">8.</span> <span class="nav-text">工程实践：混合路由架构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#架构设计"><span class="nav-number">8.1.</span> <span class="nav-text">架构设计</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Query-Router-的设计方式"><span class="nav-number">8.2.</span> <span class="nav-text">Query Router 的设计方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#路由策略的核心原则"><span class="nav-number">8.3.</span> <span class="nav-text">路由策略的核心原则</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一张表总结：场景与工具对应关系"><span class="nav-number">9.</span> <span class="nav-text">一张表总结：场景与工具对应关系</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#总结"><span class="nav-number">10.</span> <span class="nav-text">总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">101</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">61</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
