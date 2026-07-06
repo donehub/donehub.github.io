@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="背景做 RAG 系统的开发者，大概都会经历过这样一个过程： Demo 阶段跑几个测试用例，效果惊艳。一上真实业务数据，准确率直接掉到 60% 甚至更低，用户投诉不断，自己也说不清问题出在哪。 我曾经连续三周每天晚上对着 Bad Case 分析表发呆，改了 Prompt 没用，换了大模型没用，调了 TopK 还是没用。最后发现，问题根本不在大模型那一环，而是在大模型之前的整条链路上。 这篇文章通过深">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RAG 准确率优化">
+<meta property="og:url" content="https://donehub.github.io/2026/05/05/rag-accuracy-optimization/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="背景做 RAG 系统的开发者，大概都会经历过这样一个过程： Demo 阶段跑几个测试用例，效果惊艳。一上真实业务数据，准确率直接掉到 60% 甚至更低，用户投诉不断，自己也说不清问题出在哪。 我曾经连续三周每天晚上对着 Bad Case 分析表发呆，改了 Prompt 没用，换了大模型没用，调了 TopK 还是没用。最后发现，问题根本不在大模型那一环，而是在大模型之前的整条链路上。 这篇文章通过深">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-05-04T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-07-06T16:23:19.861Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="RAG">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/05/05/rag-accuracy-optimization/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>RAG 准确率优化 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/05/05/rag-accuracy-optimization/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          RAG 准确率优化
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-05-05 00:00:00" itemprop="dateCreated datePublished" datetime="2026-05-05T00:00:00+08:00">2026-05-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-07-07 00:23:19" itemprop="dateModified" datetime="2026-07-07T00:23:19+08:00">2026-07-07</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/05/05/rag-accuracy-optimization/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/05/05/rag-accuracy-optimization/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>做 RAG 系统的开发者，大概都会经历过这样一个过程：</p>
+<p>Demo 阶段跑几个测试用例，效果惊艳。一上真实业务数据，准确率直接掉到 60% 甚至更低，用户投诉不断，自己也说不清问题出在哪。</p>
+<p>我曾经连续三周每天晚上对着 Bad Case 分析表发呆，改了 Prompt 没用，换了大模型没用，调了 TopK 还是没用。最后发现，问题根本不在大模型那一环，而是在大模型之前的整条链路上。</p>
+<p>这篇文章通过深度讲解四步优化，每一步都能量化地拉高准确率，最终从 60% 做到 85%。</p>
+<a id="more"></a>
+<h2 id="先看全局：RAG-全链路优化地图"><a href="#先看全局：RAG-全链路优化地图" class="headerlink" title="先看全局：RAG 全链路优化地图"></a>先看全局：RAG 全链路优化地图</h2><p>在动手之前，先把整个链路摊开来看。RAG 系统不是”检索 + 生成”两个黑盒，而是一条精密的流水线，任何一个环节出问题，最终输出都会崩。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">用户输入</span><br><span class="line">  │</span><br><span class="line">  ▼</span><br><span class="line">┌──────────────────────┐</span><br><span class="line">│  ① Query 预处理       │  ← 第二环：改写 + 校验</span><br><span class="line">└──────────┬───────────┘</span><br><span class="line">           │</span><br><span class="line">           ▼</span><br><span class="line">┌──────────────────────┐</span><br><span class="line">│  ② 混合检索          │  ← 第三环：向量 + BM25 + LambdaMART 重排</span><br><span class="line">│     (向量 + 关键词)    │</span><br><span class="line">└──────────┬───────────┘</span><br><span class="line">           │</span><br><span class="line">           ▼</span><br><span class="line">┌──────────────────────┐</span><br><span class="line">│  ③ 上下文组装         │  ← 检索结果拼装，喂给大模型</span><br><span class="line">└──────────┬───────────┘</span><br><span class="line">           │</span><br><span class="line">           ▼</span><br><span class="line">┌──────────────────────┐</span><br><span class="line">│  ④ 大模型生成         │  ← Prompt + 生成策略</span><br><span class="line">└──────────────────────┘</span><br><span class="line"></span><br><span class="line">        ↕ 贯穿全链路 ↕</span><br><span class="line"></span><br><span class="line">┌──────────────────────┐</span><br><span class="line">│  ⑤ 文档分块 &amp; 索引    │  ← 第一环：地基，离线阶段</span><br><span class="line">└──────────────────────┘</span><br></pre></td></tr></table></figure>
+<p>下面按优先级从高到低，逐环拆解。</p>
+<h2 id="第一环：文档分块-——-全链路性价比最高的优化"><a href="#第一环：文档分块-——-全链路性价比最高的优化" class="headerlink" title="第一环：文档分块 —— 全链路性价比最高的优化"></a>第一环：文档分块 —— 全链路性价比最高的优化</h2><h3 id="为什么文档分块是地基"><a href="#为什么文档分块是地基" class="headerlink" title="为什么文档分块是地基"></a>为什么文档分块是地基</h3><p>很多人做文档切分图省事，直接固定 Token 数一刀切——每 500 Token 切一段，简单粗暴。这是典型的实验室玩法，上线必出问题。因为你一刀下去，很可能把一件完整的事情切成两半：</p>
+<ul>
+<li>一个完整的知识点被拦腰截断</li>
+<li>一张结构化表格被切成上半截和下半截</li>
+<li>一段”因为…所以…”的因果关系，”因为”在上一个 chunk，”所以”在下一个 chunk</li>
+</ul>
+<p>检索的时候，召回的全是碎片化的残缺信息。大模型连完整上下文都看不到，更没法指望它给出正确答案。</p>
+<p>这就好比你要查字典找一个词的完整释义，结果字典被人从中间撕开了，你只看到前半句——“此药适用于”——后面的内容没了。你知道它适用，但你不知道适用于什么。</p>
+<h3 id="工业界怎么做：语义感知的动态切分"><a href="#工业界怎么做：语义感知的动态切分" class="headerlink" title="工业界怎么做：语义感知的动态切分"></a>工业界怎么做：语义感知的动态切分</h3><p>我们不用死板的 Token 计数器，而是用NLP 语义感知的方式做动态切分。核心思路是：绝不让一个完整的语义单元被拆到两个 chunk 里。</p>
+<p>具体怎么做？分三步走。</p>
+<h4 id="第一步：文档结构解析"><a href="#第一步：文档结构解析" class="headerlink" title="第一步：文档结构解析"></a>第一步：文档结构解析</h4><p>在切分之前，先解析文档的骨架结构。这一步要用专业的解析模型，而不是简单的正则匹配。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langchain.text_splitter <span class="keyword">import</span> RecursiveCharacterTextSplitter</span><br><span class="line"><span class="keyword">import</span> spacy</span><br><span class="line"></span><br><span class="line"><span class="comment"># 加载中文 NLP 模型</span></span><br><span class="line">nlp = spacy.load(<span class="string">"zh_core_web_sm"</span>)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">parse_document_structure</span><span class="params">(raw_text)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    解析文档的层级结构，返回结构化的章节树。</span></span><br><span class="line"><span class="string">    识别标题层级、段落边界、表格区域等。</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    doc = nlp(raw_text)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 按句子边界切分，保留完整句子</span></span><br><span class="line">    sentences = [sent.text <span class="keyword">for</span> sent <span class="keyword">in</span> doc.sents]</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 识别标题（这里简化处理，实际场景需要更复杂的规则或模型）</span></span><br><span class="line">    sections = []</span><br><span class="line">    current_section = &#123;<span class="string">"title"</span>: <span class="string">"default"</span>, <span class="string">"paragraphs"</span>: []&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> sent <span class="keyword">in</span> sentences:</span><br><span class="line">        <span class="keyword">if</span> is_heading(sent):  <span class="comment"># 判断是否是标题</span></span><br><span class="line">            <span class="keyword">if</span> current_section[<span class="string">"paragraphs"</span>]:</span><br><span class="line">                sections.append(current_section)</span><br><span class="line">            current_section = &#123;<span class="string">"title"</span>: sent, <span class="string">"paragraphs"</span>: []&#125;</span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            current_section[<span class="string">"paragraphs"</span>].append(sent)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> current_section[<span class="string">"paragraphs"</span>]:</span><br><span class="line">        sections.append(current_section)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> sections</span><br></pre></td></tr></table></figure>
+<h4 id="第二步：语义完整性保护"><a href="#第二步：语义完整性保护" class="headerlink" title="第二步：语义完整性保护"></a>第二步：语义完整性保护</h4><p>解析完结构后，切分时必须遵循语义完整性原则：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>规则</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>标题和正文不分离</td>
+<td>标题必须和它下面的段落绑定在同一个 chunk</td>
+</tr>
+<tr>
+<td>因果不断裂</td>
+<td>“因为…所以…”、”如果…那么…”必须在同一 chunk</td>
+</tr>
+<tr>
+<td>表格整体化</td>
+<td>结构化表格要么整体作为一个 chunk，要么按行/列做结构化拆分</td>
+</tr>
+<tr>
+<td>列表不割裂</td>
+<td>一个有序列表或无序列表尽量保持在同一 chunk</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h4 id="第三步：上下文重叠窗口"><a href="#第三步：上下文重叠窗口" class="headerlink" title="第三步：上下文重叠窗口"></a>第三步：上下文重叠窗口</h4><p>即使做了语义感知切分，相邻 chunk 之间也可能存在语义断层。所以必须加重叠窗口：每个 chunk 保留头部和尾部 10%~20% 的内容作为重叠区。</p>
+<p>打个比方，就像接力赛的交棒区：前一个选手和后一个选手有一段距离是共同持有的，这样交接的时候不会掉棒。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">SemanticChunker</span>:</span></span><br><span class="line">    <span class="string">"""语义感知的文档分块器"""</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">__init__</span><span class="params">(</span></span></span><br><span class="line"><span class="function"><span class="params">        self,</span></span></span><br><span class="line"><span class="function"><span class="params">        chunk_size: int = <span class="number">512</span>,        <span class="comment"># 目标 chunk 大小（Token 数）</span></span></span></span><br><span class="line"><span class="function"><span class="params">        overlap_ratio: float = <span class="number">0.15</span>,  <span class="comment"># 重叠比例 15%</span></span></span></span><br><span class="line"><span class="function"><span class="params">        min_chunk_size: int = <span class="number">100</span>,    <span class="comment"># 最小 chunk 大小</span></span></span></span><br><span class="line"><span class="function"><span class="params">    )</span>:</span></span><br><span class="line">        self.chunk_size = chunk_size</span><br><span class="line">        self.overlap_tokens = int(chunk_size * overlap_ratio)  <span class="comment"># ~77 tokens</span></span><br><span class="line">        self.min_chunk_size = min_chunk_size</span><br><span class="line">        self.nlp = spacy.load(<span class="string">"zh_core_web_sm"</span>)</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">chunk_document</span><span class="params">(self, text: str)</span> -&gt; list[dict]:</span></span><br><span class="line">        <span class="string">"""</span></span><br><span class="line"><span class="string">        对文档进行语义感知分块。</span></span><br><span class="line"><span class="string">        返回 chunk 列表，每个 chunk 包含内容和元数据。</span></span><br><span class="line"><span class="string">        """</span></span><br><span class="line">        <span class="comment"># 1. 解析文档结构</span></span><br><span class="line">        sections = self._parse_structure(text)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 2. 按结构边界进行初步切分</span></span><br><span class="line">        raw_chunks = self._split_by_structure(sections)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 3. 对过长的 chunk 做二次切分（以句子为最小单位）</span></span><br><span class="line">        refined_chunks = self._refine_chunks(raw_chunks)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 4. 添加重叠窗口</span></span><br><span class="line">        final_chunks = self._add_overlap(refined_chunks)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> final_chunks</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">_split_by_structure</span><span class="params">(self, sections: list)</span> -&gt; list[str]:</span></span><br><span class="line">        <span class="string">"""按文档结构边界切分，保证标题-段落完整性"""</span></span><br><span class="line">        chunks = []</span><br><span class="line">        <span class="keyword">for</span> section <span class="keyword">in</span> sections:</span><br><span class="line">            <span class="comment"># 标题 + 所属段落绑定为一个单元</span></span><br><span class="line">            section_text = <span class="string">f"<span class="subst">&#123;section[<span class="string">'title'</span>]&#125;</span>\n"</span> + <span class="string">"\n"</span>.join(</span><br><span class="line">                section[<span class="string">"paragraphs"</span>]</span><br><span class="line">            )</span><br><span class="line">            chunks.append(section_text)</span><br><span class="line">        <span class="keyword">return</span> chunks</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">_refine_chunks</span><span class="params">(self, raw_chunks: list[str])</span> -&gt; list[str]:</span></span><br><span class="line">        <span class="string">"""对超长 chunk 按句子边界二次切分"""</span></span><br><span class="line">        refined = []</span><br><span class="line">        <span class="keyword">for</span> chunk <span class="keyword">in</span> raw_chunks:</span><br><span class="line">            doc = self.nlp(chunk)</span><br><span class="line">            sentences = [sent.text <span class="keyword">for</span> sent <span class="keyword">in</span> doc.sents]</span><br><span class="line"></span><br><span class="line">            current_chunk = <span class="string">""</span></span><br><span class="line">            <span class="keyword">for</span> sent <span class="keyword">in</span> sentences:</span><br><span class="line">                <span class="comment"># 如果加上这句话超过 chunk_size，且当前已有内容</span></span><br><span class="line">                <span class="keyword">if</span> (</span><br><span class="line">                    len(self._tokenize(current_chunk + sent))</span><br><span class="line">                    &gt; self.chunk_size</span><br><span class="line">                    <span class="keyword">and</span> current_chunk</span><br><span class="line">                ):</span><br><span class="line">                    refined.append(current_chunk.strip())</span><br><span class="line">                    current_chunk = sent</span><br><span class="line">                <span class="keyword">else</span>:</span><br><span class="line">                    current_chunk += sent</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> current_chunk <span class="keyword">and</span> len(current_chunk.strip()) &gt; self.min_chunk_size:</span><br><span class="line">                refined.append(current_chunk.strip())</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> refined</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">_add_overlap</span><span class="params">(self, chunks: list[str])</span> -&gt; list[dict]:</span></span><br><span class="line">        <span class="string">"""为相邻 chunk 添加头尾重叠窗口"""</span></span><br><span class="line">        result = []</span><br><span class="line">        <span class="keyword">for</span> i, chunk <span class="keyword">in</span> enumerate(chunks):</span><br><span class="line">            <span class="comment"># 头部重叠：取上一个 chunk 的尾部</span></span><br><span class="line">            head_overlap = <span class="string">""</span></span><br><span class="line">            <span class="keyword">if</span> i &gt; <span class="number">0</span>:</span><br><span class="line">                prev_tokens = self._tokenize(chunks[i - <span class="number">1</span>])</span><br><span class="line">                head_overlap = self._detokenize(</span><br><span class="line">                    prev_tokens[-self.overlap_tokens:]</span><br><span class="line">                )</span><br><span class="line"></span><br><span class="line">            <span class="comment"># 尾部重叠：取下一个 chunk 的头部</span></span><br><span class="line">            tail_overlap = <span class="string">""</span></span><br><span class="line">            <span class="keyword">if</span> i &lt; len(chunks) - <span class="number">1</span>:</span><br><span class="line">                next_tokens = self._tokenize(chunks[i + <span class="number">1</span>])</span><br><span class="line">                tail_overlap = self._detokenize(</span><br><span class="line">                    next_tokens[:self.overlap_tokens]</span><br><span class="line">                )</span><br><span class="line"></span><br><span class="line">            result.append(&#123;</span><br><span class="line">                <span class="string">"content"</span>: chunk,</span><br><span class="line">                <span class="string">"metadata"</span>: &#123;</span><br><span class="line">                    <span class="string">"head_overlap"</span>: head_overlap,</span><br><span class="line">                    <span class="string">"tail_overlap"</span>: tail_overlap,</span><br><span class="line">                    <span class="string">"chunk_index"</span>: i,</span><br><span class="line">                &#125;,</span><br><span class="line">            &#125;)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> result</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">_tokenize</span><span class="params">(self, text: str)</span> -&gt; list[str]:</span></span><br><span class="line">        <span class="string">"""简单的 Token 化（实际场景用 tiktoken 等专业工具）"""</span></span><br><span class="line">        <span class="keyword">return</span> text.split()</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">_detokenize</span><span class="params">(self, tokens: list[str])</span> -&gt; str:</span></span><br><span class="line">        <span class="keyword">return</span> <span class="string">" "</span>.join(tokens)</span><br></pre></td></tr></table></figure>
+<h3 id="这一步的效果"><a href="#这一步的效果" class="headerlink" title="这一步的效果"></a>这一步的效果</h3><p>在固定 Token 切分的基线上，不用动大模型分毫，光是把切分策略从一刀切换成语义感知动态切分 + 重叠窗口，准确率就能直接拉升 10~15 个百分点。</p>
+<p>这就是为什么我说它是全链路性价比最高的优化——投入产出比太高了。</p>
+<h2 id="第二环：Query-预处理-——-上线后准确率跳水的主因"><a href="#第二环：Query-预处理-——-上线后准确率跳水的主因" class="headerlink" title="第二环：Query 预处理 —— 上线后准确率跳水的主因"></a>第二环：Query 预处理 —— 上线后准确率跳水的主因</h2><h3 id="真实用户的提问会比较离谱"><a href="#真实用户的提问会比较离谱" class="headerlink" title="真实用户的提问会比较离谱"></a>真实用户的提问会比较离谱</h3><p>实验室里测试的时候，习惯用完整的问句：”请问这个产品的退款政策是什么？”</p>
+<p>但真实用户可能是这样问的：</p>
+<ul>
+<li>“怎么退费”</li>
+<li>“开票规则”</li>
+<li>“有效期”</li>
+<li>“能不能退”</li>
+</ul>
+<p>两三个字，语义极度模糊。你拿”开票规则”四个字去做向量检索，embedding 模型能给你算出一个向量，但这个向量在语义空间里指向的方向是极其不确定的——它可能匹配到”如何开发票”，也可能匹配到”发票开具的时间规定”，甚至匹配到”开票系统的使用说明”。</p>
+<p>直接检索，准确率不可能高。</p>
+<h3 id="标准做法：Query-扩写"><a href="#标准做法：Query-扩写" class="headerlink" title="标准做法：Query 扩写"></a>标准做法：Query 扩写</h3><p>常规的解法是用一个小模型对用户原始 Query 做扩写，生成几个同义或近义的问句，然后分别检索，最后合并结果。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">expand_query</span><span class="params">(original_query: str)</span> -&gt; list[str]:</span></span><br><span class="line">    <span class="string">"""用 LLM 对用户 Query 进行扩写"""</span></span><br><span class="line">    prompt = <span class="string">f"""</span></span><br><span class="line"><span class="string">    用户输入了一个简短的问题："<span class="subst">&#123;original_query&#125;</span>"</span></span><br><span class="line"><span class="string">    请生成 3 个语义相近但表述不同的改写版本，</span></span><br><span class="line"><span class="string">    帮助用户更全面地检索相关信息。</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">    要求：</span></span><br><span class="line"><span class="string">    1. 改写后的问题必须和原问题语义一致</span></span><br><span class="line"><span class="string">    2. 覆盖不同的表述角度</span></span><br><span class="line"><span class="string">    3. 每个改写独立一行，用数字编号</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">    示例：</span></span><br><span class="line"><span class="string">    用户输入："怎么退费"</span></span><br><span class="line"><span class="string">    改写：</span></span><br><span class="line"><span class="string">    1. 如何申请退款，退费的流程是什么？</span></span><br><span class="line"><span class="string">    2. 退款需要满足什么条件，多久能到账？</span></span><br><span class="line"><span class="string">    3. 退费申请在哪里提交，需要哪些材料？</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    response = llm.generate(prompt)</span><br><span class="line">    <span class="keyword">return</span> parse_expansions(response)</span><br></pre></td></tr></table></figure>
+<p>思路没错，但这里藏着一个非常容易踩到的巨坑。</p>
+<h3 id="巨坑：改写模型的幻觉"><a href="#巨坑：改写模型的幻觉" class="headerlink" title="巨坑：改写模型的幻觉"></a>巨坑：改写模型的幻觉</h3><p>扩写模型一旦出现幻觉，你的整个检索就会被带偏。</p>
+<p>举个例子：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>原始 Query</th>
+<th>正确扩写</th>
+<th>幻觉扩写</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>怎么退费</td>
+<td>如何申请退款</td>
+<td>如何收费 ← <strong>反义了！</strong></td>
+</tr>
+<tr>
+<td>开票规则</td>
+<td>发票开具的规定</td>
+<td>不开票的流程</td>
+</tr>
+<tr>
+<td>有效期</td>
+<td>产品的有效期限</td>
+<td>过期了怎么办 ← <strong>语义偏移了</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>“怎么退费”被扩写成”怎么收费”——一个是问退款，一个是问收费，语义完全相反。这种扩写结果参与检索，不仅不会帮忙，反而会引入大量噪声，把正确答案从 Top-K 里挤出去。</p>
+<p>你花大力气做的检索系统，被自己加的 Query 扩写模块给废了。</p>
+<h3 id="兜底机制：余弦相似度校验"><a href="#兜底机制：余弦相似度校验" class="headerlink" title="兜底机制：余弦相似度校验"></a>兜底机制：余弦相似度校验</h3><p>这里必须加一道防线：对所有扩写后的 Query，做语义相似度校验。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> sentence_transformers <span class="keyword">import</span> SentenceTransformer, util</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">QueryRewriter</span>:</span></span><br><span class="line">    <span class="string">"""带语义校验的 Query 扩写器"""</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 相似度阈值：通用场景的黄金值</span></span><br><span class="line">    SIMILARITY_THRESHOLD = <span class="number">0.8</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">__init__</span><span class="params">(self)</span>:</span></span><br><span class="line">        self.embed_model = SentenceTransformer(<span class="string">"BAAI/bge-large-zh-v1.5"</span>)</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">safe_expand</span><span class="params">(self, original_query: str)</span> -&gt; list[str]:</span></span><br><span class="line">        <span class="string">"""</span></span><br><span class="line"><span class="string">        安全扩写：扩写 + 语义校验，过滤掉偏离原意的改写。</span></span><br><span class="line"><span class="string">        """</span></span><br><span class="line">        <span class="comment"># 1. 用 LLM 生成扩写结果</span></span><br><span class="line">        expansions = self._llm_expand(original_query)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 2. 计算原始 Query 的 embedding</span></span><br><span class="line">        original_embedding = self.embed_model.encode(</span><br><span class="line">            original_query, convert_to_tensor=<span class="literal">True</span></span><br><span class="line">        )</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 3. 逐条校验</span></span><br><span class="line">        valid_expansions = []</span><br><span class="line">        <span class="keyword">for</span> exp <span class="keyword">in</span> expansions:</span><br><span class="line">            exp_embedding = self.embed_model.encode(</span><br><span class="line">                exp, convert_to_tensor=<span class="literal">True</span></span><br><span class="line">            )</span><br><span class="line">            cosine_sim = util.cos_sim(</span><br><span class="line">                original_embedding, exp_embedding</span><br><span class="line">            ).item()</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> cosine_sim &gt;= self.SIMILARITY_THRESHOLD:</span><br><span class="line">                <span class="comment"># 相似度达标，保留</span></span><br><span class="line">                valid_expansions.append(exp)</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                <span class="comment"># 相似度不达标，说明改写偏离了原意，废弃</span></span><br><span class="line">                print(</span><br><span class="line">                    <span class="string">f"[过滤] '<span class="subst">&#123;exp&#125;</span>' 与原 Query 相似度仅 <span class="subst">&#123;cosine_sim:<span class="number">.3</span>f&#125;</span>，"</span></span><br><span class="line">                    <span class="string">f"低于阈值 <span class="subst">&#123;self.SIMILARITY_THRESHOLD&#125;</span>，已丢弃"</span></span><br><span class="line">                )</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 4. 兜底：如果所有扩写都被过滤了，至少用原始 Query 检索</span></span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> valid_expansions:</span><br><span class="line">            valid_expansions = [original_query]</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> valid_expansions</span><br></pre></td></tr></table></figure>
+<p>0.8 这个阈值是怎么来的？</p>
+<p>这是通用场景下经过大量实验验证的经验值：</p>
+<ul>
+<li><strong>≥ 0.8</strong>：改写基本保持了原意，可以安全使用</li>
+<li><strong>0.6 ~ 0.8</strong>：有一定语义偏移，需要根据具体业务判断</li>
+<li><strong>&lt; 0.6</strong>：基本可以认为改写偏离了原意</li>
+</ul>
+<p>当然，你的业务场景不同，这个阈值需要微调。建议拿 100 条真实用户 Query，人工标注扩写质量，画出相似度分布图，找到最佳切分点。</p>
+<h3 id="这一步的价值"><a href="#这一步的价值" class="headerlink" title="这一步的价值"></a>这一步的价值</h3><p>这一步的核心价值不在于”提升上限”，而在于守住下限：从源头杜绝我们自己给系统引入噪声。不加这道防线，你的 Query 扩写模块就是一个随机的噪声注入器，系统表现会极不稳定。</p>
+<h2 id="第三环：混合检索与重排序-——-解决量纲冲突"><a href="#第三环：混合检索与重排序-——-解决量纲冲突" class="headerlink" title="第三环：混合检索与重排序 —— 解决量纲冲突"></a>第三环：混合检索与重排序 —— 解决量纲冲突</h2><h3 id="问题：两个维度的分数怎么合并"><a href="#问题：两个维度的分数怎么合并" class="headerlink" title="问题：两个维度的分数怎么合并"></a>问题：两个维度的分数怎么合并</h3><p>大家都知道 RAG 要做混合检索：向量检索（Dense Retrieval）+ 关键词检索（BM25 Sparse Retrieval）。向量检索擅长语义匹配，BM25 擅长精确关键词匹配，两者互补。</p>
+<p>但问题来了——</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>检索方式</th>
+<th>打分范围</th>
+<th>示例分数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>向量检索（余弦相似度）</td>
+<td>[0, 1]</td>
+<td>0.87</td>
+</tr>
+<tr>
+<td>BM25</td>
+<td>[0, +∞)</td>
+<td>15.3</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>向量检索的打分是 0~1 之间的余弦相似度，BM25 的打分可能是十几甚至几十。两个维度的量纲完全不一样，我们怎么合并？</p>
+<p>最朴素的做法是归一化，然后加权求和：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 朴素做法（不推荐）</span></span><br><span class="line">final_score = <span class="number">0.7</span> * normalize(vector_score) + <span class="number">0.3</span> * normalize(bm25_score)</span><br></pre></td></tr></table></figure>
+<p>0.7 和 0.3 都是拍脑袋定的。</p>
+<p>不同的 Query 类型，最优权重完全不一样：</p>
+<ul>
+<li>对于”合同违约条款第几条”这种精确关键词查询，BM25 的权重应该更高</li>
+<li>对于”这个产品适合什么人用”这种语义模糊查询，向量检索的权重应该更高</li>
+</ul>
+<p>拍脑袋定一个固定权重，等于用一种策略应对所有场景，效果不可能好。</p>
+<h3 id="工业界解法：LambdaMART-排序学习"><a href="#工业界解法：LambdaMART-排序学习" class="headerlink" title="工业界解法：LambdaMART 排序学习"></a>工业界解法：LambdaMART 排序学习</h3><p>工业界的标准做法是用排序学习（Learning to Rank）模型，其中 LambdaMART 是最成熟、应用最广泛的算法之一。</p>
+<p>LambdaMART 的核心思想是：不靠人拍脑袋定权重，而是让模型自己学。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">                  ┌──────────────┐</span><br><span class="line">向量检索分数 ─────→│              │</span><br><span class="line">                  │  LambdaMART  │──→ 统一打分</span><br><span class="line">BM25 分数 ───────→│   模型       │</span><br><span class="line">                  │              │</span><br><span class="line">其他特征 ────────→│              │</span><br><span class="line">(文档长度、       └──────────────┘</span><br><span class="line"> 标题匹配度、</span><br><span class="line"> 位置信息等)</span><br></pre></td></tr></table></figure>
+<p>它做的事情是：把所有检索通道的特征（向量分数、BM25 分数、文档长度、标题匹配度、位置信息等）统一映射到同一个打分维度，输出一个科学合理的综合排序分数。</p>
+<h4 id="为什么是-LambdaMART"><a href="#为什么是-LambdaMART" class="headerlink" title="为什么是 LambdaMART"></a>为什么是 LambdaMART</h4><p>排序学习有三大类方法：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>方法类别</th>
+<th>代表算法</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pointwise</td>
+<td>线性回归、逻辑回归</td>
+<td>逐条打分，不考虑文档间的相对顺序</td>
+</tr>
+<tr>
+<td>Pairwise</td>
+<td>RankSVM、RankNet</td>
+<td>优化文档对的相对顺序</td>
+</tr>
+<tr>
+<td>Listwise</td>
+<td>LambdaMART、LambdaRank</td>
+<td>直接优化整个排序列表的指标（如 NDCG）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>LambdaMART 属于 Listwise 方法，它直接优化 NDCG 这样的排序质量指标，而不是逐条或逐对优化。这在信息检索场景下效果最好，因为用户关心的是整个结果列表的质量，而不是某一条结果的绝对分数。</p>
+<h4 id="实操代码"><a href="#实操代码" class="headerlink" title="实操代码"></a>实操代码</h4><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> lightgbm <span class="keyword">as</span> lgb</span><br><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">HybridRetriever</span>:</span></span><br><span class="line">    <span class="string">"""基于 LambdaMART 的混合检索重排序器"""</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">__init__</span><span class="params">(self)</span>:</span></span><br><span class="line">        self.lambdamart_model = <span class="literal">None</span></span><br><span class="line">        self.vector_retriever = VectorRetriever()</span><br><span class="line">        self.bm25_retriever = BM25Retriever()</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">retrieve</span><span class="params">(self, query: str, top_k: int = <span class="number">10</span>)</span> -&gt; list[dict]:</span></span><br><span class="line">        <span class="string">"""混合检索 + LambdaMART 重排序"""</span></span><br><span class="line"></span><br><span class="line">        <span class="comment"># 1. 双路召回</span></span><br><span class="line">        vector_results = self.vector_retriever.search(query, top_k=<span class="number">50</span>)</span><br><span class="line">        bm25_results = self.bm25_retriever.search(query, top_k=<span class="number">50</span>)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 2. 合并候选集（去重）</span></span><br><span class="line">        candidates = self._merge_candidates(vector_results, bm25_results)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 3. 构建特征矩阵</span></span><br><span class="line">        features = self._build_features(query, candidates)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 4. LambdaMART 重排序</span></span><br><span class="line">        reranked_scores = self.lambdamart_model.predict(features)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 5. 按重排序分数排序，返回 Top-K</span></span><br><span class="line">        sorted_indices = np.argsort(-reranked_scores)</span><br><span class="line">        <span class="keyword">return</span> [candidates[i] <span class="keyword">for</span> i <span class="keyword">in</span> sorted_indices[:top_k]]</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">_build_features</span><span class="params">(self, query: str, candidates: list)</span> -&gt; np.ndarray:</span></span><br><span class="line">        <span class="string">"""</span></span><br><span class="line"><span class="string">        为每个候选文档构建特征向量。</span></span><br><span class="line"><span class="string">        这些特征就是 LambdaMART 的输入。</span></span><br><span class="line"><span class="string">        """</span></span><br><span class="line">        features = []</span><br><span class="line">        <span class="keyword">for</span> doc <span class="keyword">in</span> candidates:</span><br><span class="line">            feature = [</span><br><span class="line">                doc[<span class="string">"vector_score"</span>],           <span class="comment"># 向量相似度分数</span></span><br><span class="line">                doc[<span class="string">"bm25_score"</span>],             <span class="comment"># BM25 分数</span></span><br><span class="line">                doc[<span class="string">"title_match_score"</span>],      <span class="comment"># 标题匹配度</span></span><br><span class="line">                doc[<span class="string">"doc_length"</span>],             <span class="comment"># 文档长度</span></span><br><span class="line">                doc[<span class="string">"query_doc_overlap"</span>],      <span class="comment"># Query 与文档的关键词重叠率</span></span><br><span class="line">                doc[<span class="string">"position_in_doc"</span>],        <span class="comment"># 匹配片段在文档中的位置</span></span><br><span class="line">                doc[<span class="string">"section_level"</span>],          <span class="comment"># 所在章节层级</span></span><br><span class="line">            ]</span><br><span class="line">            features.append(feature)</span><br><span class="line">        <span class="keyword">return</span> np.array(features)</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">train</span><span class="params">(self, train_data: lgb.Dataset, params: dict)</span>:</span></span><br><span class="line">        <span class="string">"""训练 LambdaMART 模型"""</span></span><br><span class="line">        params.update(&#123;</span><br><span class="line">            <span class="string">"objective"</span>: <span class="string">"lambdarank"</span>,     <span class="comment"># 排序学习目标</span></span><br><span class="line">            <span class="string">"metric"</span>: <span class="string">"ndcg"</span>,              <span class="comment"># 优化 NDCG 指标</span></span><br><span class="line">            <span class="string">"ndcg_eval_at"</span>: [<span class="number">5</span>, <span class="number">10</span>],       <span class="comment"># 在 Top-5 和 Top-10 处评估</span></span><br><span class="line">            <span class="string">"learning_rate"</span>: <span class="number">0.05</span>,</span><br><span class="line">            <span class="string">"num_leaves"</span>: <span class="number">31</span>,</span><br><span class="line">            <span class="string">"max_depth"</span>: <span class="number">6</span>,</span><br><span class="line">            <span class="string">"min_data_in_leaf"</span>: <span class="number">50</span>,</span><br><span class="line">        &#125;)</span><br><span class="line">        self.lambdamart_model = lgb.train(params, train_data)</span><br></pre></td></tr></table></figure>
+<p>训练数据的标注也不复杂：对于一批真实的 Query，标注每个候选文档的相关性等级（0=不相关，1=部分相关，2=完全相关），构造成排序学习的训练格式即可。</p>
+<h3 id="这一步的效果-1"><a href="#这一步的效果-1" class="headerlink" title="这一步的效果"></a>这一步的效果</h3><p>相比固定权重的线性融合，LambdaMART 重排序通常能把 Recall@10 提升 5~10 个百分点，NDCG@10 提升更明显。而且它是轻量模型，推理延迟在毫秒级，不会影响线上性能。</p>
+<h2 id="第四环：评估指标拆解-——-不做”笼统评分”"><a href="#第四环：评估指标拆解-——-不做”笼统评分”" class="headerlink" title="第四环：评估指标拆解 —— 不做”笼统评分”"></a>第四环：评估指标拆解 —— 不做”笼统评分”</h2><h3 id="为什么”准确率-85-”没有说服力"><a href="#为什么”准确率-85-”没有说服力" class="headerlink" title="为什么”准确率 85%”没有说服力"></a>为什么”准确率 85%”没有说服力</h3><p>老板：系统准确率多少？你说：85%。</p>
+<p>老板：那剩下的 15% 是什么问题？你说：呃…</p>
+<p>只说整体准确率，完全没有意义。 因为你不知道问题出在哪——是检索没找到正确答案？还是检索找到了，但大模型没用好？还是大模型瞎编了？</p>
+<p>不同环节的问题，优化方向完全不同。你必须把指标拆开看。</p>
+<h3 id="两个核心指标"><a href="#两个核心指标" class="headerlink" title="两个核心指标"></a>两个核心指标</h3><p>RAG 系统的评估，核心盯两个指标就够了：</p>
+<h4 id="指标一：Context-Recall（上下文召回率）"><a href="#指标一：Context-Recall（上下文召回率）" class="headerlink" title="指标一：Context Recall（上下文召回率）"></a>指标一：Context Recall（上下文召回率）</h4><blockquote>
+<p><strong>定义</strong>：用户问题的正确答案，是否出现在检索回来的 Top-N 切片里</p>
+</blockquote>
+<p>换句话说：检索环节是否把”正确答案的线索”给找回来了？</p>
+<ul>
+<li>如果正确答案不在 Top-N 里 → 检索环节出了问题 → 去优化文档分块、检索策略</li>
+<li>如果正确答案在 Top-N 里但最终回答错了 → 检索没问题，问题在生成环节</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">compute_context_recall</span><span class="params">(</span></span></span><br><span class="line"><span class="function"><span class="params">    question: str,</span></span></span><br><span class="line"><span class="function"><span class="params">    ground_truth: str,</span></span></span><br><span class="line"><span class="function"><span class="params">    retrieved_chunks: list[str],</span></span></span><br><span class="line"><span class="function"><span class="params">    evaluator_llm</span></span></span><br><span class="line"><span class="function"><span class="params">)</span> -&gt; float:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    计算 Context Recall。</span></span><br><span class="line"><span class="string">    核心思路：检查 ground_truth 中的关键信息是否出现在 retrieved_chunks 中。</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    prompt = <span class="string">f"""</span></span><br><span class="line"><span class="string">    问题：<span class="subst">&#123;question&#125;</span></span></span><br><span class="line"><span class="string">    标准答案：<span class="subst">&#123;ground_truth&#125;</span></span></span><br><span class="line"><span class="string">    检索到的上下文：</span></span><br><span class="line"><span class="string">    <span class="subst">&#123;<span class="string">""</span>.join([<span class="string">f"[<span class="subst">&#123;i+<span class="number">1</span>&#125;</span>] <span class="subst">&#123;chunk&#125;</span>"</span> <span class="keyword">for</span> i, chunk <span class="keyword">in</span> enumerate(retrieved_chunks)])&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">    请判断：标准答案中的关键信息，有多少能在检索到的上下文中找到？</span></span><br><span class="line"><span class="string">    请返回一个 0~1 之间的分数。</span></span><br><span class="line"><span class="string">    评分标准：</span></span><br><span class="line"><span class="string">    - 1.0：所有关键信息都能在上下文中找到</span></span><br><span class="line"><span class="string">    - 0.5：部分关键信息能找到</span></span><br><span class="line"><span class="string">    - 0.0：关键信息完全找不到</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    score = evaluator_llm.generate(prompt)</span><br><span class="line">    <span class="keyword">return</span> float(score)</span><br></pre></td></tr></table></figure>
+<h4 id="指标二：Faithfulness（忠实度）"><a href="#指标二：Faithfulness（忠实度）" class="headerlink" title="指标二：Faithfulness（忠实度）"></a>指标二：Faithfulness（忠实度）</h4><blockquote>
+<p><strong>定义</strong>：大模型生成的回答，是否忠实于检索到的资料？有没有脱离资料瞎编？</p>
+</blockquote>
+<p>这就是我们常说的幻觉率。检索回来的资料里明明写的是 A，大模型偏偏说是 B，这就是不忠实。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">compute_faithfulness</span><span class="params">(</span></span></span><br><span class="line"><span class="function"><span class="params">    answer: str,</span></span></span><br><span class="line"><span class="function"><span class="params">    retrieved_chunks: list[str],</span></span></span><br><span class="line"><span class="function"><span class="params">    evaluator_llm</span></span></span><br><span class="line"><span class="function"><span class="params">)</span> -&gt; float:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    计算 Faithfulness。</span></span><br><span class="line"><span class="string">    核心思路：检查回答中的每个声明，是否都能从检索到的资料中找到依据。</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    <span class="comment"># 1. 把回答拆解成独立的声明（claims）</span></span><br><span class="line">    claims_prompt = <span class="string">f"""</span></span><br><span class="line"><span class="string">    请将以下回答拆解为独立的事实声明：</span></span><br><span class="line"><span class="string">    <span class="subst">&#123;answer&#125;</span></span></span><br><span class="line"><span class="string">    每行一个声明。</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    claims = evaluator_llm.generate(claims_prompt).strip().split(<span class="string">"\n"</span>)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 2. 逐条检查每个声明是否有资料支撑</span></span><br><span class="line">    context = <span class="string">"\n"</span>.join(retrieved_chunks)</span><br><span class="line">    supported_count = <span class="number">0</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> claim <span class="keyword">in</span> claims:</span><br><span class="line">        check_prompt = <span class="string">f"""</span></span><br><span class="line"><span class="string">        声明：<span class="subst">&#123;claim&#125;</span></span></span><br><span class="line"><span class="string">        上下文资料：</span></span><br><span class="line"><span class="string">        <span class="subst">&#123;context&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">        这个声明能否从上下文资料中得到支撑？</span></span><br><span class="line"><span class="string">        回答 "yes" 或 "no"。</span></span><br><span class="line"><span class="string">        """</span></span><br><span class="line">        result = evaluator_llm.generate(check_prompt).strip().lower()</span><br><span class="line">        <span class="keyword">if</span> result == <span class="string">"yes"</span>:</span><br><span class="line">            supported_count += <span class="number">1</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 3. Faithfulness = 有依据的声明数 / 总声明数</span></span><br><span class="line">    <span class="keyword">return</span> supported_count / len(claims) <span class="keyword">if</span> claims <span class="keyword">else</span> <span class="number">0.0</span></span><br></pre></td></tr></table></figure>
+<h3 id="用指标拆解驱动优化"><a href="#用指标拆解驱动优化" class="headerlink" title="用指标拆解驱动优化"></a>用指标拆解驱动优化</h3><p>把这两个指标监控起来之后，你就能精准定位问题了：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th style="text-align:center">Context Recall</th>
+<th style="text-align:center">Faithfulness</th>
+<th>诊断</th>
+<th>优化方向</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">高</td>
+<td style="text-align:center">高</td>
+<td>✅ 系统健康</td>
+<td>维持现状</td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>低</strong></td>
+<td style="text-align:center">高</td>
+<td>检索没找对，但生成没问题</td>
+<td>优化文档分块、Query 扩写、检索策略</td>
+</tr>
+<tr>
+<td style="text-align:center">高</td>
+<td style="text-align:center"><strong>低</strong></td>
+<td>检索找对了，但大模型瞎编</td>
+<td>优化 Prompt、加引用约束、换模型</td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>低</strong></td>
+<td style="text-align:center"><strong>低</strong></td>
+<td>全链路都有问题</td>
+<td>从头到尾逐步排查</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>这才是工程化的做法</strong>——不是看着一个笼统的分数盲目调参，而是用指标拆解精确定位问题环节，针对性优化。</p>
+<h2 id="效果总结：四步优化的累计收益"><a href="#效果总结：四步优化的累计收益" class="headerlink" title="效果总结：四步优化的累计收益"></a>效果总结：四步优化的累计收益</h2><p>把四步优化串起来，看一个典型的收益曲线：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">准确率</span><br><span class="line">  │</span><br><span class="line">  │                                          ● 85%</span><br><span class="line">  │                                    ●─────┘</span><br><span class="line">  │                              ●─────┘</span><br><span class="line">  │  ● 60%               ●─────┘</span><br><span class="line">  │  │  基线        ●─────┘</span><br><span class="line">  │  │              │</span><br><span class="line">  │  │    +15pp     │ +5pp</span><br><span class="line">  │  │  (文档分块)  │(混合重排)</span><br><span class="line">  │  │              │</span><br><span class="line">  │  ●────────●─────●</span><br><span class="line">  │           │</span><br><span class="line">  │      守住下限</span><br><span class="line">  │     (Query校验)</span><br><span class="line">  └────────────────────────────────→</span><br><span class="line">     基线    第一步   第二步   第三步   第四步</span><br><span class="line">                                 (指标拆解)</span><br></pre></td></tr></table></figure>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>优化步骤</th>
+<th>核心动作</th>
+<th>典型收益</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第一步：文档分块</td>
+<td>语义感知动态切分 + 重叠窗口</td>
+<td><strong>+10~15pp</strong></td>
+</tr>
+<tr>
+<td>第二步：Query 校验</td>
+<td>扩写 + 余弦相似度 ≥ 0.8 兜底</td>
+<td>守住下限，防退化</td>
+</tr>
+<tr>
+<td>第三步：混合重排</td>
+<td>LambdaMART 统一打分</td>
+<td><strong>+5~10pp</strong>（Recall@10）</td>
+</tr>
+<tr>
+<td>第四步：指标拆解</td>
+<td>Context Recall + Faithfulness 分开监控</td>
+<td>精准定位，持续迭代</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><blockquote>
+<p><strong>切分</strong>不搞一刀切，动态语义加重叠。<br><strong>改写</strong>不丢原语义，相似度校验做兜底。<br><strong>排序</strong>不拍脑袋定，LambdaMART 来统一。<br><strong>优化</strong>不看笼统分，召回忠实拆分明。</p>
+</blockquote>
+<p>RAG 系统从 Demo 到工业级，不是靠换一个更大的模型就能解决的。它是一条精密的流水线，每一个环节都需要工程化的思维和可量化的优化。把上面这四步做透，RAG 系统就能真正扛住线上流量的考验。</p>
+<hr>
+<p><strong>参考资源</strong>：</p>
+<ul>
+<li><a href="https://www.anthropic.com/news/contextual-retrieval" target="_blank" rel="noopener">Anthropic Contextual Retrieval</a></li>
+<li><a href="https://github.com/explodinggradients/ragas" target="_blank" rel="noopener">RAGAS — RAG 评估框架</a></li>
+<li><a href="https://lightgbm.readthedocs.io/en/latest/parameters.html#learning-rate-parameters" target="_blank" rel="noopener">LightGBM LambdaRank 文档</a></li>
+<li><a href="https://www.sbert.net/" target="_blank" rel="noopener">Sentence Transformers</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+        
+
+  <div class="followme">
+    <p>欢迎关注我的其它发布渠道</p>
+
+    <div class="social-list">
+
+        <div class="social-item">
+          <a target="_blank" class="social-link" href="/atom.xml">
+            <span class="icon">
+              <i class="fa fa-rss"></i>
+            </span>
+
+            <span class="label">RSS</span>
+          </a>
+        </div>
+    </div>
+  </div>
+
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/RAG/" rel="tag"><i class="fa fa-tag"></i> RAG</a>
+          </div>
+
+        
+<div class="post-share">
+  <div class="share-title">分享到</div>
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+
+<style>
+.post-share {
+  margin: 20px 0;
+  padding: 15px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+}
+.post-share .share-title {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 10px;
+}
+.post-share .social-share {
+  text-align: center;
+}
+.post-share .social-share a {
+  margin: 0 8px;
+}
+/* 微信二维码样式优化 */
+.social-share .wechat-qrcode {
+  border: 1px solid #eee;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+.social-share .wechat-qrcode h4 {
+  color: #333;
+  font-weight: normal;
+}
+</style>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/04/30/multi-agent-decision-and-evaluation/" rel="prev" title="多Agent系统的设计与评估">
+      <i class="fa fa-chevron-left"></i> 多Agent系统的设计与评估
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/05/14/dram-nand-flash-deep-analysis/" rel="next" title="存储芯片双雄：DRAM与NAND Flash全景解析">
+      存储芯片双雄：DRAM与NAND Flash全景解析 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#背景"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#先看全局：RAG-全链路优化地图"><span class="nav-number">2.</span> <span class="nav-text">先看全局：RAG 全链路优化地图</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第一环：文档分块-——-全链路性价比最高的优化"><span class="nav-number">3.</span> <span class="nav-text">第一环：文档分块 —— 全链路性价比最高的优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#为什么文档分块是地基"><span class="nav-number">3.1.</span> <span class="nav-text">为什么文档分块是地基</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#工业界怎么做：语义感知的动态切分"><span class="nav-number">3.2.</span> <span class="nav-text">工业界怎么做：语义感知的动态切分</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#第一步：文档结构解析"><span class="nav-number">3.2.1.</span> <span class="nav-text">第一步：文档结构解析</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#第二步：语义完整性保护"><span class="nav-number">3.2.2.</span> <span class="nav-text">第二步：语义完整性保护</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#第三步：上下文重叠窗口"><span class="nav-number">3.2.3.</span> <span class="nav-text">第三步：上下文重叠窗口</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#这一步的效果"><span class="nav-number">3.3.</span> <span class="nav-text">这一步的效果</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第二环：Query-预处理-——-上线后准确率跳水的主因"><span class="nav-number">4.</span> <span class="nav-text">第二环：Query 预处理 —— 上线后准确率跳水的主因</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#真实用户的提问会比较离谱"><span class="nav-number">4.1.</span> <span class="nav-text">真实用户的提问会比较离谱</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#标准做法：Query-扩写"><span class="nav-number">4.2.</span> <span class="nav-text">标准做法：Query 扩写</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#巨坑：改写模型的幻觉"><span class="nav-number">4.3.</span> <span class="nav-text">巨坑：改写模型的幻觉</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#兜底机制：余弦相似度校验"><span class="nav-number">4.4.</span> <span class="nav-text">兜底机制：余弦相似度校验</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#这一步的价值"><span class="nav-number">4.5.</span> <span class="nav-text">这一步的价值</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第三环：混合检索与重排序-——-解决量纲冲突"><span class="nav-number">5.</span> <span class="nav-text">第三环：混合检索与重排序 —— 解决量纲冲突</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#问题：两个维度的分数怎么合并"><span class="nav-number">5.1.</span> <span class="nav-text">问题：两个维度的分数怎么合并</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#工业界解法：LambdaMART-排序学习"><span class="nav-number">5.2.</span> <span class="nav-text">工业界解法：LambdaMART 排序学习</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#为什么是-LambdaMART"><span class="nav-number">5.2.1.</span> <span class="nav-text">为什么是 LambdaMART</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#实操代码"><span class="nav-number">5.2.2.</span> <span class="nav-text">实操代码</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#这一步的效果-1"><span class="nav-number">5.3.</span> <span class="nav-text">这一步的效果</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第四环：评估指标拆解-——-不做”笼统评分”"><span class="nav-number">6.</span> <span class="nav-text">第四环：评估指标拆解 —— 不做”笼统评分”</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#为什么”准确率-85-”没有说服力"><span class="nav-number">6.1.</span> <span class="nav-text">为什么”准确率 85%”没有说服力</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#两个核心指标"><span class="nav-number">6.2.</span> <span class="nav-text">两个核心指标</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#指标一：Context-Recall（上下文召回率）"><span class="nav-number">6.2.1.</span> <span class="nav-text">指标一：Context Recall（上下文召回率）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#指标二：Faithfulness（忠实度）"><span class="nav-number">6.2.2.</span> <span class="nav-text">指标二：Faithfulness（忠实度）</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#用指标拆解驱动优化"><span class="nav-number">6.3.</span> <span class="nav-text">用指标拆解驱动优化</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#效果总结：四步优化的累计收益"><span class="nav-number">7.</span> <span class="nav-text">效果总结：四步优化的累计收益</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#总结"><span class="nav-number">8.</span> <span class="nav-text">总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">100</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">60</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:zrsnews@126.com" title="E-Mail → mailto:zrsnews@126.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
