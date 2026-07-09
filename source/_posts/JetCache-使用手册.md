@@ -22,7 +22,7 @@ JetCache 是阿里巴巴开源的通用缓存访问框架（[开源地址](https
 |统计监控|需第三方|**内置** 命中率、加载次数等统计|
 |更新/删除缓存注解|有但功能弱|`@CacheUpdate` / `@CacheInvalidate` 支持 SpEL|
 
-![alt text](../img/jetcache-final.png)
+![alt text](/img/jetcache-final.png)
 
 # 二、核心概念
 

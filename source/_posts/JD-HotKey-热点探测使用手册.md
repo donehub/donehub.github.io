@@ -30,9 +30,9 @@ JD-HotKey 是京东开源的**实时热点 key 探测与缓存中间件**（[开
 
 ## 2.1 整体架构
 ### 2.1.1 综合架构
-![alt text](../img/jdhotkey1.png)
+![alt text](/img/jdhotkey1.png)
 ### 2.1.2 分层架构
-![alt text](../img/jdhotkey2.png)
+![alt text](/img/jdhotkey2.png)
 系统由四个核心组件构成：
 
 |组件|职责|说明|
