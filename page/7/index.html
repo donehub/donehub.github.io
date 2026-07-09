@@ -195,6 +195,167 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2022/11/11/multi_db_page_query/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/11/11/multi_db_page_query/" class="post-title-link" itemprop="url">分库分表-跨库分页查询</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-11-11 22:57:01" itemprop="dateCreated datePublished" datetime="2022-11-11T22:57:01+08:00">2022-11-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/" itemprop="url" rel="index"><span itemprop="name">数据库</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2022/11/11/multi_db_page_query/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2022/11/11/multi_db_page_query/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <hr>
+<h4 id="一、跨库分页查询"><a href="#一、跨库分页查询" class="headerlink" title="一、跨库分页查询"></a>一、跨库分页查询</h4><p>对于一定数量级的表，如订单表，通常采用分库分表的方式保存数据。根据指定字段，如果用户ID，散列数据到不同的库中。那么，如果需要按照下单时间分页查询订单信息，就涉及到跨库查询。</p>
+<p>假设有45笔订单，存于三个库中，散列算法是 OrderID % 3，则数据分布为：</p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_21_32_38_origin.png" alt=""></p>
+<p>如果以每页五个订单，查询第二页的所有订单，则单库查询 sql 为：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> order_info <span class="keyword">order</span> <span class="keyword">by</span> <span class="keyword">id</span> <span class="keyword">limit</span> <span class="number">5</span> <span class="keyword">offset</span> <span class="number">5</span>;</span><br></pre></td></tr></table></figure>
+<p>但跨库查询就行不通了。下面，主要有三种方案可以用于跨库分页查询：</p>
+<ul>
+<li>全局查询法</li>
+<li>禁止跳页查询法</li>
+<li>二次查询法</li>
+</ul>
+<h4 id="二、全局查询法"><a href="#二、全局查询法" class="headerlink" title="二、全局查询法"></a>二、全局查询法</h4><p>全局查询法，需要在每个分库中执行查询语句，然后再程序中排序，再定位切割到指定的数据段。</p>
+<p>如果需要查询第二页订单，需要查询每个库的前二页数据：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> order_info_1 <span class="keyword">order</span> <span class="keyword">by</span> <span class="keyword">id</span> <span class="keyword">limit</span> <span class="number">10</span>;</span><br><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> order_info_2 <span class="keyword">order</span> <span class="keyword">by</span> <span class="keyword">id</span> <span class="keyword">limit</span> <span class="number">10</span>;</span><br><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> order_info_3 <span class="keyword">order</span> <span class="keyword">by</span> <span class="keyword">id</span> <span class="keyword">limit</span> <span class="number">10</span>;</span><br></pre></td></tr></table></figure>
+<p>结果为：<img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_21_33_7_quanjuchaxunfa.png" alt=""></p>
+<p>将以上三个库的查询结果排序：</p>
+<p>1，2，3，4，5，6，7，8，9，10，11，12，13，14，15，16，17，18，19，20，21，22，23，24，25，26，27，28，29，30</p>
+<p>那么第二页的订单列表为：</p>
+<p>6，7，8，9，10</p>
+<p><strong>小结：</strong>对于低页码查询，全局查询法是可以应付的，但是，当页码越来越大，查出来的数据也就越来越多，需要排序的数据也越来越多，查询效率也就会越来越慢。</p>
+<h4 id="三、禁止跳页查询法"><a href="#三、禁止跳页查询法" class="headerlink" title="三、禁止跳页查询法"></a>三、禁止跳页查询法</h4><p>全局查询法的一个显著缺陷，就是随着页码越来越大，查询的数据量也越来越大。那么，如果禁止跳页查询，且每次查询都以上次查询的最大ID为基点，就可以保证每次查询的数据量都是相同的。</p>
+<p><strong>查询第一页数据：</strong><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_21_40_36_firstpage.png" alt=""></p>
+<p>将以上三个库的查询结果排序：</p>
+<p>1，2，3，4，5，6，7，8，9，10，11，12，13，14，15</p>
+<p>那么第一页的订单列表为：</p>
+<p>1，2，3，4，5</p>
+<p><strong>查询第二页数据：</strong></p>
+<p>第一页的订单ID最大值为5，因此第二页的订单ID起始值应大于5，查询得到：</p>
+<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_21_44_37_secondpage.png" alt=""></p>
+<p>将以上三个库的查询结果排序：</p>
+<p>6，7，8，9，10，11，12，13，14，15，16，17，18，19，20</p>
+<p>那么第二页的订单列表为：</p>
+<p>6，7，8，9，10</p>
+<p><strong>小结：</strong>禁止跳页查询法，保证每次查询的数据量是相同的，避免了分页查询带来的性能衰减问题；但禁止跳页也是功能缺陷，没法一步定位到指定数据段。</p>
+<h4 id="四、二次查询法"><a href="#四、二次查询法" class="headerlink" title="四、二次查询法"></a>四、二次查询法</h4><p>二次查找法，既满足跳页查询，也能避免分页查询性能衰减。为了解释这一思想，我们以查询第三页订单数据为例。单库查询语句：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> order_info <span class="keyword">order</span> <span class="keyword">by</span> <span class="keyword">id</span> <span class="keyword">limit</span> <span class="number">5</span> <span class="keyword">offset</span> <span class="number">10</span>;</span><br></pre></td></tr></table></figure>
+<p>之所以叫二次查询法，当然需要查询两次。这两次查询有什么不同，希望通过以下四个步骤说清楚：</p>
+<p><strong>第一步：语句改写</strong></p>
+<p>将 <code>select * from order_info order by id limit 5 offset 10</code> 改写成 <code>select * from order_info order by id limit 5 offset 3</code>。偏移量10变成3，是基于10/3计算得出的。将语句在三个库分别执行，得到数据：<img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_22_14_21_first_rewrite_1.png" alt=""></p>
+<p><strong>第二步：找最小值</strong></p>
+<ul>
+<li>第一个库：最小数据为8</li>
+<li>第二个库：最小数据为11</li>
+<li>第三个库：最小数据为12</li>
+</ul>
+<p>因此，从三个库中拿到的最小数据为8。</p>
+<p><strong>第三步：第二次语句改写</strong></p>
+<p>这次需要把 <code>select * from order_info order by id limit 5 offset 3</code> 改写成一个between语句，起点是最小的OrderID，终点是原来每个分库各自返回数据的最大值：</p>
+<ul>
+<li>第一个分库改写为: select * from order_info order by id where id between id_min and 22</li>
+<li>第二个分库改写为: select * from order_info order by id where id between id_min and 23</li>
+<li>第三个分库改写为: select * from order_info order by id where id between id_min and 24</li>
+</ul>
+<p>查询结果如下：<img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2023/04/11_22_20_40_sencond_rewrite.png" alt=""></p>
+<p><strong>第四步：找到id_min的全局偏移量</strong></p>
+<p>第一次查询的偏移量为3，那么每一个库的第一个目标数据的偏移量应该都是4。因此可知每个库的id_min的偏移量：</p>
+<ul>
+<li>第一个库：8就是id_min，偏移量为4；</li>
+<li>第二个库：11的偏移量为4，那么id_min的偏移量就是1；</li>
+<li>第三个库：12的偏移量为4，那么id_min的偏移量就是3；</li>
+</ul>
+<p>因此id_min的全局偏移量为：4 + 1 + 3 = 8。</p>
+<p><strong>第五步：定位目标数据</strong></p>
+<ul>
+<li>第一个库：8，13，14，19，22</li>
+<li>第二个库：9，10，11，16，17，18，23</li>
+<li>第三个库：12，15，20，21，24</li>
+</ul>
+<p>经过排序，得到：</p>
+<p>8，9，10，11，12，13，14，15，16，17，18，19，20，21，22，23，24</p>
+<p>因为id_min的全局偏移量为8，最终结果需要 limit 5 offset 10，因此需要向后推移10 - 8 = 2 位，然后再取5位，得到：</p>
+<p>11，12，13，14，15</p>
+<p><strong>小结：</strong>二次查找法，既避免了数据越处理越多，也支持跳转查询。但其也存在短板，需要查询两次，才能拿到目标数据。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2022/08/15/zero_copy/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1340,158 +1501,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2022/01/30/spring_batch_introduction/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/01/30/spring_batch_introduction/" class="post-title-link" itemprop="url">Spring Batch 基础介绍</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-01-30 22:48:01" itemprop="dateCreated datePublished" datetime="2022-01-30T22:48:01+08:00">2022-01-30</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%90%8E%E7%AB%AF/" itemprop="url" rel="index"><span itemprop="name">后端</span></a>
-                </span>
-            </span>
-
-          
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2022/01/30/spring_batch_introduction/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2022/01/30/spring_batch_introduction/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <hr>
-<h4 id="一、简介"><a href="#一、简介" class="headerlink" title="一、简介"></a>一、简介</h4><p>Spring Batch 是一款轻量级批处理框架，主要用于构建高容量、高性能的批处理应用。作为 Spring 的子项目，Spring Batch 基于 Spring 框架，已进化出一套完备的企业级解决方案。借助良好的 Spring 生态，被广泛应用于批处理领域。</p>
-<p>Spring Batch 拥有强大的组件库，包括任务重启、任务跳过、任务统计、日志追踪、事务管理、资源管理等。此外，对于大批量数据处理任务，通过分区和优化技术，实现高性能作业。总之，Spring Batch 有着良好的可扩展性，既可以处理简单的任务，也可以处理复杂的、高容量的任务。</p>
-<h4 id="二、基础架构"><a href="#二、基础架构" class="headerlink" title="二、基础架构"></a>二、基础架构</h4><p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/27_21_7_30_spring-batch-flow.png" alt=""></p>
-<p>看图可知：</p>
-<ul>
-<li>一个  <code>Job</code> 可以有一个或多个 <code>Step</code>；</li>
-<li>每个 <code>Step</code> 都有一个 <code>ItemReader</code>、一个 <code>ItemProcessor</code> 和一个 <code>ItemWriter</code>；</li>
-<li><code>Job</code> 需要 <code>JobLauncher</code> 发起；</li>
-<li>批处理过程中的元数据存在 <code>JobRepository</code> 中；</li>
-</ul>
-<hr>
-<h5 id="Job"><a href="#Job" class="headerlink" title="Job"></a>Job</h5><p> <code>Job</code> 封装了整个批处理所需要的数据，可以通过 <code>xml</code> 或 <code>Java Bean</code> 注解配置。<code>Job</code> 的继承链：</p>
-<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/27_21_38_32_job_detail.png" alt=""></p>
-<p><code>JobInstance</code> 是 <code>Job</code> 的运行实例，就像同一个 <code>Java</code> 类可以实例化出不同的对象， <code>Job</code> 也可以有不同的 <code>JobInstance</code>。因此可以说，<code>JobInstance</code> = <code>Job</code> + <code>JobParameters</code>。<code>JobExecution</code>是 <code>JobInstance</code> 的一次执行，包括要做什么、怎么做、执行结果等。</p>
-<hr>
-<h5 id="Step"><a href="#Step" class="headerlink" title="Step"></a>Step</h5><p>看图可知，一个 <code>Step</code> 包含输入、处理、输出这样一种模型，说明在批处理框架中， <code>Step</code> 是最小的执行单元。<code>Step</code> 的继承链：</p>
-<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/04/27_22_7_8_step_detail.png" alt=""></p>
-<p><code>StepExecution</code> 是 <code>Step</code> 的一次执行，包含 <code>Step</code> 、<code>JobExecution</code> 以及事务相关数据的引用，比如提交和回滚次数、开始和结束时间等。</p>
-<p><code>ItemReader</code>、<code>ItemProcessor</code> 和 <code>ItemWriter</code>，是顶级接口。基于此，Spring Batch 已实现常用组件，如文件数据存取器、数据库数据存取器等，功能完备，开箱即用。</p>
-<hr>
-<h5 id="JobLauncher"><a href="#JobLauncher" class="headerlink" title="JobLauncher"></a>JobLauncher</h5><p><code>JobLauncher</code> 负责在指定的 <code>JobParameters</code> 下，启动 <code>Job</code>。</p>
-<hr>
-<h5 id="JobRepository"><a href="#JobRepository" class="headerlink" title="JobRepository"></a>JobRepository</h5><p><code>JobRepository</code> 专门负责与数据库打交道，记录整个批处理中的增加、检索、更新、删除动作。在 Java 应用中，使用注解 <code>@EnableBatchProcessing</code> 即可完成配置。此外，Spring Batch 是依赖数据库进行管理的。相关表的<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/schema-appendix.html#metaDataSchema" target="_blank" rel="noopener">功能简介</a>如下：</p>
-<ul>
-<li><code>BATCH_JOB_INSTANCE</code>：储存 <code>JobInstance</code> 相关的所有信息；</li>
-<li><code>BATCH_JOB_EXECUTION_PARAMS</code>： 储存 <code>JobParameters</code> 相关的所有信息；</li>
-<li><code>BATCH_JOB_EXECUTION</code>：储存 <code>JobExecution</code> 相关的所有信息；</li>
-<li><code>BATCH_STEP_EXECUTION</code>：存储 <code>StepExecution</code> 相关的所有信息；</li>
-<li><code>BATCH_JOB_EXECUTION_CONTEXT</code>：存储 <code>Job</code> - <code>ExecutionContext</code> 相关的所有信息；</li>
-<li><code>BATCH_STEP_EXECUTION_CONTEXT</code>：存储 <code>Step</code> - <code>ExecutionContext</code> 相关的所有信息；</li>
-</ul>
-<h4 id="三、设计原则"><a href="#三、设计原则" class="headerlink" title="三、设计原则"></a>三、设计原则</h4><p>只需简单配置，Spring Batch 即可内嵌 Spring 应用中，小巧而强大。其<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/spring-batch-intro.html#springBatchUsageScenarios" target="_blank" rel="noopener">设计原则</a>如下：</p>
-<ul>
-<li><p>继承 Spring 编程模型，开发者只需专注于业务逻辑，将基础实现交由框架负责；</p>
-</li>
-<li><p>解耦基础架构、执行环境和批处理应用之间的关注点；</p>
-</li>
-<li><p>抽取核心服务，设计顶层接口；</p>
-</li>
-<li><p>实现热门组件，开箱即用；</p>
-</li>
-<li>增强核心服务的可拓展性；</li>
-<li>通过 <code>Maven</code> 构建简单的部署模型，独立于应用程序；</li>
-</ul>
-<h4 id="四、使用原则"><a href="#四、使用原则" class="headerlink" title="四、使用原则"></a>四、使用原则</h4><p>开发者在构建批处理方案时，应考虑以下<a href="https://docs.spring.io/spring-batch/docs/current/reference/html/spring-batch-intro.html#springBatchArchitecture" target="_blank" rel="noopener">原则</a>：</p>
-<ul>
-<li><p>搭建架构和环境，尽量使用通用的构建块，因为批处理架构与在线框架之间会相互影响；</p>
-</li>
-<li><p>避免在单机应用中构建复杂的逻辑结构；</p>
-</li>
-<li>尽可能多地在内存中处理任务，尽可能少地使用系统资源，尤其是物理 <code>IO</code>：<ul>
-<li>缓存常用数据，避免在同一事务或不同事务中重复读取数据；</li>
-<li>全表扫描或索引扫描；</li>
-</ul>
-</li>
-<li>不做重复的任务（记录已处理的任务，对于相同的后续任务，直接跳过）；</li>
-<li>合理分配初始内存，防止处理任务中多次分配内存，耗费时间；</li>
-<li>设定足够的校验和记录，保证数据的完整性；</li>
-<li>模拟生产环境和数据量，尽早压测；</li>
-<li>注重数据备份；</li>
-</ul>
-<h4 id="五、总结"><a href="#五、总结" class="headerlink" title="五、总结"></a>五、总结</h4><p>Spring Batch 是一款优秀的批处理框架，其良好的可扩展性和性能天花板，让批处理工作不再头疼。</p>
-<p>一方面，Spring Batch 可以完全解耦批处理任务。原本复杂且庞大的一条龙任务，现在可以拆解为若干个 <code>Step</code>，各司其职。同时，每个 <code>Step</code> 都有自己的输入、处理、输出模型，高度规范，高度内聚，超级简单。</p>
-<p>另一方面，Spring Batch 可以让项目设计更加科学合理。首先，任务拆解更加细致，工作量预估更加准确。其次，各个环节清晰明了，降低沟通成本。最后，也是最重要的，开发者不用在一个任务中从头磕到尾，头晕眼花，bug 爆炸。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1564,7 +1573,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">102</span>
+          <span class="site-state-item-count">103</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1577,7 +1586,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">62</span>
+        <span class="site-state-item-count">63</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

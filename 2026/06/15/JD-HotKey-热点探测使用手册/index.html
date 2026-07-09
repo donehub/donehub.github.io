@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="一、组件介绍JD-HotKey 是京东开源的实时热点 key 探测与缓存中间件（开源地址），它做了一件事：在高并发场景下，自动发现热点 key，毫秒级推送到所有应用节点的 JVM 内存中，让热点请求直接在本地内存响应，不再打到 Redis 和数据库。 经典场景：某明星突然官宣，相关商品瞬间涌入海量请求。你事先根本不知道这个商品 ID 会变热，Redis 某个节点被这些请求打得 CPU 飙升——这就">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JD-HotKey 使用手册">
+<meta property="og:url" content="https://donehub.github.io/2026/06/15/JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="一、组件介绍JD-HotKey 是京东开源的实时热点 key 探测与缓存中间件（开源地址），它做了一件事：在高并发场景下，自动发现热点 key，毫秒级推送到所有应用节点的 JVM 内存中，让热点请求直接在本地内存响应，不再打到 Redis 和数据库。 经典场景：某明星突然官宣，相关商品瞬间涌入海量请求。你事先根本不知道这个商品 ID 会变热，Redis 某个节点被这些请求打得 CPU 飙升——这就">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://donehub.github.io/2026/06/15/img/jdhotkey1.png">
+<meta property="og:image" content="https://donehub.github.io/2026/06/15/img/jdhotkey2.png">
+<meta property="article:published_time" content="2026-06-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-07-09T06:46:23.546Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="JD-HotKey">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://donehub.github.io/2026/06/15/img/jdhotkey1.png">
+
+<link rel="canonical" href="https://donehub.github.io/2026/06/15/JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>JD-HotKey 使用手册 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/06/15/JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          JD-HotKey 使用手册
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-06-15 00:00:00" itemprop="dateCreated datePublished" datetime="2026-06-15T00:00:00+08:00">2026-06-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-07-09 14:46:23" itemprop="dateModified" datetime="2026-07-09T14:46:23+08:00">2026-07-09</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E4%B8%AD%E9%97%B4%E4%BB%B6/" itemprop="url" rel="index"><span itemprop="name">中间件</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/06/15/JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/06/15/JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="一、组件介绍"><a href="#一、组件介绍" class="headerlink" title="一、组件介绍"></a>一、组件介绍</h1><p>JD-HotKey 是京东开源的<strong>实时热点 key 探测与缓存中间件</strong>（<a href="https://gitee.com/jd-platform-opensource/hotkey" target="_blank" rel="noopener">开源地址</a>），它做了一件事：在高并发场景下，<strong>自动发现热点 key，毫秒级推送到所有应用节点的 JVM 内存中</strong>，让热点请求直接在本地内存响应，不再打到 Redis 和数据库。</p>
+<p>经典场景：某明星突然官宣，相关商品瞬间涌入海量请求。你事先根本不知道这个商品 ID 会变热，Redis 某个节点被这些请求打得 CPU 飙升——这就是典型的<strong>不可预知突发热点</strong>。</p>
+<p>这时候你就需要 JD-HotKey：它能自动发现这类热点，把数据”镜像”到每台应用服务器的本地内存里，后续请求直接从内存读，<strong>RT 从几十毫秒降到 &lt; 1ms</strong>。</p>
+<p>和直接用本地缓存（比如 Caffeine）比，JD-HotKey 的核心优势：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>Caffeine 本地缓存</th>
+<th>JD-HotKey</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>热点发现</td>
+<td><strong>手动配置</strong>，你得提前知道哪些 key 要缓存</td>
+<td><strong>自动探测</strong>，根据访问量实时判定</td>
+</tr>
+<tr>
+<td>动态性</td>
+<td>静态的，配了就一直在</td>
+<td><strong>自动加入 / 退出热点</strong>，冷了自动释放内存</td>
+</tr>
+<tr>
+<td>多节点一致性</td>
+<td>各节点独立，互不知情</td>
+<td><strong>全局统一判定</strong>，所有节点同步感知</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td>已知高频数据（如字典、配置）</td>
+<td><strong>不可预知的突发热点</strong>（如秒杀、热搜）</td>
+</tr>
+<tr>
+<td>部署复杂度</td>
+<td>低（纯 SDK）</td>
+<td>中等（需要 etcd + worker）</td>
+</tr>
+<tr>
+<td>热用户 / 热接口探测</td>
+<td>不支持</td>
+<td><strong>支持</strong>（不只限 key，接口、用户也能探）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>简单总结：<strong>已知的热点用本地缓存就够了，不可预知的热点用 JD-HotKey</strong>。</p>
+<h1 id="二、核心架构"><a href="#二、核心架构" class="headerlink" title="二、核心架构"></a>二、核心架构</h1><h2 id="2-1-整体架构"><a href="#2-1-整体架构" class="headerlink" title="2.1 整体架构"></a>2.1 整体架构</h2><h3 id="2-1-1-综合架构"><a href="#2-1-1-综合架构" class="headerlink" title="2.1.1 综合架构"></a>2.1.1 综合架构</h3><p><img data-src="../img/jdhotkey1.png" alt="alt text"></p>
+<h3 id="2-1-2-分层架构"><a href="#2-1-2-分层架构" class="headerlink" title="2.1.2 分层架构"></a>2.1.2 分层架构</h3><p><img data-src="../img/jdhotkey2.png" alt="alt text"><br>系统由四个核心组件构成：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>职责</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>etcd 集群</strong></td>
+<td>配置中心 + 注册中心</td>
+<td>存储热点规则、worker 节点注册、热点 key 的推送中转</td>
+</tr>
+<tr>
+<td><strong>worker</strong></td>
+<td>聚合计算节点</td>
+<td>接收所有客户端的访问统计，执行热点判定，推送热点通知</td>
+</tr>
+<tr>
+<td><strong>client SDK</strong></td>
+<td>嵌入业务应用的客户端</td>
+<td>收集访问数据、上报统计、接收热点通知、本地缓存热点数据</td>
+</tr>
+<tr>
+<td><strong>dashboard</strong></td>
+<td>可视化管理控制台</td>
+<td>配置规则、查看热点、管理应用</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="2-2-数据流转过程"><a href="#2-2-数据流转过程" class="headerlink" title="2.2 数据流转过程"></a>2.2 数据流转过程</h2><p>整个热点探测的过程就像一条流水线：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">1. 业务请求打到 app，client SDK 对 key 做访问计数</span><br><span class="line">        ↓</span><br><span class="line">   ┌─────────────────────────────────────────────┐</span><br><span class="line">   │  TurnKeyCollector（双 Map 无锁化收集）       │</span><br><span class="line">   │                                             │</span><br><span class="line">   │  Map[0]  ← 偶数次调用写入                    │</span><br><span class="line">   │  Map[1]  ← 奇数次调用写入                    │</span><br><span class="line">   │  AtomicLong 递增 → % 2 → 决定写哪个 Map     │</span><br><span class="line">   │  读写完全隔离，不阻塞业务线程                  │</span><br><span class="line">   └─────────────────────────────────────────────┘</span><br><span class="line">        ↓</span><br><span class="line">2. client 每隔 500ms 将其中一个 Map 的数据批量上报给 worker</span><br><span class="line">   （读一个 Map 时，写操作在另一个 Map 进行，互不影响）</span><br><span class="line">        ↓</span><br><span class="line">3. worker 汇聚所有 app 节点的数据，执行热点判定算法</span><br><span class="line">        ↓</span><br><span class="line">4. 某 key 在时间窗口内的总访问次数 &gt;&#x3D; 阈值 → 判定为热点</span><br><span class="line">        ↓</span><br><span class="line">5. worker 通过 etcd watch 机制，将热点 key 实时推送给所有客户端</span><br><span class="line">        ↓</span><br><span class="line">6. 客户端收到通知，将热点数据缓存到本地内存（Caffeine）</span><br><span class="line">        ↓</span><br><span class="line">7. 后续请求直接走本地缓存，不再访问 Redis &#x2F; DB</span><br><span class="line">        ↓</span><br><span class="line">8. 当 key 不再热门 → worker 通知客户端移除本地缓存，释放内存</span><br></pre></td></tr></table></figure>
+<p><strong>关键设计：集中计算</strong>。你可能会想，为什么不直接在每个客户端本地判断热点？因为分布式场景下，单机请求是分散的——一个 key 在 100 台机器上每台只被访问了 5 次，单看任何一台都不算热，但汇总起来有 500 次。<strong>必须由 worker 集中汇总计算，才能准确识别全局热点</strong>。</p>
+<p><strong>Worker 内部处理流程</strong>：worker 收到 client 上报的数据后，经过一条<strong>责任链</strong>处理：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">Netty 收到消息</span><br><span class="line">    ↓</span><br><span class="line">HeartBeatFilter（心跳消息直接处理）</span><br><span class="line">    ↓</span><br><span class="line">AppNameFilter（解析客户端 App 名称）</span><br><span class="line">    ↓</span><br><span class="line">HotKeyFilter（排除白名单 key，有效数据入队）</span><br><span class="line">    ↓</span><br><span class="line">KeyCounterFilter（统计数据处理）</span><br><span class="line">    ↓</span><br><span class="line">LinkedBlockingQueue（容量 200 万，削峰缓冲）</span><br><span class="line">    ↓</span><br><span class="line">KeyConsumer 多线程消费 → SlidingWindow.addCount() → 判定热点</span><br><span class="line">    ↓</span><br><span class="line">热点 key → 写入 etcd + 推送到所有 Client（每 10ms 批量推送）</span><br></pre></td></tr></table></figure>
+<p>Worker 内部还有一个 <code>hotCache</code>（Caffeine 实现，<strong>5 秒 TTL</strong>），用来<strong>防抖</strong>——同一个 key 在 5 秒内不会重复推送，避免热点持续触发时产生大量无效推送。</p>
+<h2 id="2-3-etcd-的角色"><a href="#2-3-etcd-的角色" class="headerlink" title="2.3 etcd 的角色"></a>2.3 etcd 的角色</h2><p>etcd 在这个系统里承担了三个职责：</p>
+<ol>
+<li><p><strong>规则存储</strong>：你在 dashboard 配置的热点规则（哪个 key 前缀、阈值多少、窗口多大），都持久化在 etcd 中。worker 和 client 通过 watch etcd 来感知规则变化。</p>
+</li>
+<li><p><strong>worker 注册</strong>：每个 worker 启动时把自己的 IP 注册到 etcd，client 通过读 etcd 知道该连哪些 worker。</p>
+</li>
+<li><p><strong>热点推送中转</strong>：worker 判定出热点 key 后，写入 etcd 并设置 TTL 过期时间；客户端 watch 对应的 etcd 路径，收到变更事件后立即更新本地缓存。</p>
+</li>
+</ol>
+<p><strong>一个巧妙的设计</strong>：etcd 原生支持 key 的 TTL 自动过期删除。热点 key 写入 etcd 时设一个过期时间（比如 60 秒），过期后 etcd 自动删除，删除事件通过 watch 回调通知所有 client 清除本地缓存。这样就实现了<strong>热点 key 的自动淘汰</strong>，不需要额外的清理逻辑。</p>
+<p><strong>为什么选 etcd 而不是 ZooKeeper？</strong> etcd 原生支持 key TTL 自动删除（ZooKeeper 不支持），性能更高，资源占用更少，API 风格也更现代（基于 gRPC）。</p>
+<p><strong>etcd 版本要求</strong>：3.4.x 及以上。</p>
+<h2 id="2-4-滑动窗口算法"><a href="#2-4-滑动窗口算法" class="headerlink" title="2.4 滑动窗口算法"></a>2.4 滑动窗口算法</h2><p>这是热点判定的核心算法。JD-HotKey 用的是<strong>双缓冲 Map</strong>实现滑动窗口：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">Worker 内部的双 Map 机制：</span><br><span class="line"></span><br><span class="line">  ┌─────────────────────────────────────────────────┐</span><br><span class="line">  │  Map[0]（写 Map） ← 当前时间片，接收新 key 上报   │</span><br><span class="line">  │  Map[1]（读 Map） ← 上一时间片，被消费线程读取统计 │</span><br><span class="line">  │                                                 │</span><br><span class="line">  │  AtomicLong 递增 → % 2 → 决定当前写哪个 Map      │</span><br><span class="line">  │  读写分离 → 永不阻塞 → 高并发吞吐                 │</span><br><span class="line">  └─────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<ul>
+<li><strong>双 Map 交替</strong>：一个 Map 负责写入新上报的数据，另一个负责读取统计和清理。通过 <code>AtomicLong</code> 取模 2 切换读写对象，完全无锁设计</li>
+<li><strong>读写不阻塞</strong>：消费线程在统计 Map[0] 时，写入线程往 Map[1] 写数据，互不干扰</li>
+<li><strong>演进历史</strong>：最初用的是 Disruptor，但在实际高并发中发现会导致个别数据延迟且空耗 CPU，后来换成了 <code>LinkedBlockingQueue</code> + 读写分离锁的方案，性能反而更稳定</li>
+</ul>
+<p><strong>Key 的 Hash 分发</strong>：client 上报数据时，会对 key 做 Hash 计算（<code>hash(key) % workerCount</code>），<strong>同一个 key 始终路由到同一个 worker</strong>。这样保证了某个 key 的所有统计数据集中在一个 worker 上，不需要跨 worker 聚合。worker 之间也互不通信，各自独立计算。</p>
+<h2 id="2-5-JdHotKeyStore-—-核心-API"><a href="#2-5-JdHotKeyStore-—-核心-API" class="headerlink" title="2.5 JdHotKeyStore — 核心 API"></a>2.5 JdHotKeyStore — 核心 API</h2><p><code>JdHotKeyStore</code> 是 client SDK 提供的核心操作类，只有 4 个静态方法：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>作用</th>
+<th>使用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>isHotKey(key)</code></td>
+<td>判断 key 是否热点，<strong>同时上报该 key 的访问</strong></td>
+<td>最常用，适用于只需拦截或限流的场景</td>
+</tr>
+<tr>
+<td><code>get(key)</code></td>
+<td>从本地内存读取热点 key 缓存的<strong>值</strong></td>
+<td>配合 <code>smartSet</code> 使用</td>
+</tr>
+<tr>
+<td><code>smartSet(key, value)</code></td>
+<td>为热点 key 设置本地缓存值</td>
+<td>key 已被判定为热点时，存入真实数据</td>
+</tr>
+<tr>
+<td><code>getValue(key)</code></td>
+<td>综合查询：本地有值返回值，无值返回 null <strong>并自动上报</strong></td>
+<td>一步到位的查询方式</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>注意区分这几个方法的行为差异</strong>，很多人刚接触时会搞混：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">isHotKey(key)  → 返回 true&#x2F;false，同时上报 key 的访问量（计数 +1）</span><br><span class="line">get(key)       → 只从本地缓存读值，不上报</span><br><span class="line">smartSet(key, value) → 只在该 key 是热点时才写入本地缓存（非热点写入会被忽略）</span><br><span class="line">getValue(key)  → 读值 + 上报（如果本地没值，返回 null，同时上报）</span><br></pre></td></tr></table></figure>
+<p><strong>一个内部细节</strong>：当 worker 推送热点通知到 client 时，client 会先在 Caffeine 中存入一个<strong>魔术值</strong>（<code>0x12fcf76</code>）作为占位标记，表示”这个 key 已经是热点了，但还没填入实际业务数据”。所以 <code>get(key)</code> 可能返回这个魔术值或者 null——说明热点标记已生效，但数据还没被 <code>smartSet</code> 填进去，你需要自己加载数据并写入。</p>
+<p><strong>Caffeine 分桶设计</strong>：client 内部不是用一个 Caffeine 实例存所有热点 key，而是按<strong>过期时间（duration）分桶</strong>——相同过期时间的 key 共享同一个 Caffeine 实例。这样不同规则下的热点 key 可以有不同的 TTL，互不干扰。</p>
+<hr>
+<h1 id="三、快速接入（Spring-Boot）"><a href="#三、快速接入（Spring-Boot）" class="headerlink" title="三、快速接入（Spring Boot）"></a>三、快速接入（Spring Boot）</h1><h2 id="第一步：部署基础环境"><a href="#第一步：部署基础环境" class="headerlink" title="第一步：部署基础环境"></a>第一步：部署基础环境</h2><p>JD-HotKey 依赖 etcd，部署前需要先准备好 etcd 集群。</p>
+<h3 id="安装-etcd（开发环境）"><a href="#安装-etcd（开发环境）" class="headerlink" title="安装 etcd（开发环境）"></a>安装 etcd（开发环境）</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Docker 方式（快速启动单节点）</span></span><br><span class="line">docker run -d --name etcd \</span><br><span class="line">  -p 2379:2379 \</span><br><span class="line">  -e ALLOW_NONE_AUTHENTICATION=yes \</span><br><span class="line">  bitnami/etcd:3.4</span><br><span class="line"></span><br><span class="line"><span class="comment"># 验证连接</span></span><br><span class="line">docker <span class="built_in">exec</span> etcd etcdctl endpoint health</span><br></pre></td></tr></table></figure>
+<h3 id="部署-worker"><a href="#部署-worker" class="headerlink" title="部署 worker"></a>部署 worker</h3><p>worker 是独立部署的 Java 进程，负责聚合计算。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 从源码编译</span></span><br><span class="line"><span class="built_in">cd</span> worker</span><br><span class="line">mvn clean package -DskipTests</span><br><span class="line"></span><br><span class="line"><span class="comment"># 启动 worker（关键参数）</span></span><br><span class="line">java -jar worker/target/worker.jar \</span><br><span class="line">  --etcd=http://127.0.0.1:2379 \</span><br><span class="line">  --threads=16 \</span><br><span class="line">  --workerPath=/jd/hotkey/worker</span><br></pre></td></tr></table></figure>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>etcd</code></td>
+<td>etcd 集群地址</td>
+</tr>
+<tr>
+<td><code>threads</code></td>
+<td>工作线程数，建议根据 CPU 核数调整</td>
+</tr>
+<tr>
+<td><code>workerPath</code></td>
+<td>worker 在 etcd 中的注册路径</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="部署-dashboard"><a href="#部署-dashboard" class="headerlink" title="部署 dashboard"></a>部署 dashboard</h3><p>dashboard 是 Web 管理控制台，需要连接 MySQL 和 etcd。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1. 创建数据库，执行 db.sql 初始化脚本</span></span><br><span class="line"><span class="comment"># 2. 修改 application.yml 中的数据库和 etcd 配置</span></span><br><span class="line"><span class="comment"># 3. 启动</span></span><br><span class="line">java -jar dashboard.jar</span><br><span class="line"></span><br><span class="line"><span class="comment"># 访问 http://localhost:8081</span></span><br><span class="line"><span class="comment"># 默认管理员账号按 README 说明配置</span></span><br></pre></td></tr></table></figure>
+<h2 id="第二步：引入-Maven-依赖"><a href="#第二步：引入-Maven-依赖" class="headerlink" title="第二步：引入 Maven 依赖"></a>第二步：引入 Maven 依赖</h2><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>com.jd.platform.hotkey<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>hotkey-client<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">version</span>&gt;</span>0.0.4-SNAPSHOT<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<p><strong>依赖冲突注意</strong>：</p>
+<ul>
+<li>如果项目中有 guava，需要升级到 <strong>28.2-jre</strong> 以上</li>
+<li>如果项目中有 fastjson，需要降到 <strong>1.2.70</strong>（hotkey-client 内部使用的版本）</li>
+<li>通信协议用的 <strong>protobuf</strong>，注意版本兼容</li>
+</ul>
+<h2 id="第三步：初始化客户端"><a href="#第三步：初始化客户端" class="headerlink" title="第三步：初始化客户端"></a>第三步：初始化客户端</h2><p>在 Spring Boot 启动时初始化 client，连接到 etcd 并启动数据管道：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">HotKeyConfig</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Value</span>(<span class="string">"$&#123;etcd.server&#125;"</span>)</span><br><span class="line">    <span class="keyword">private</span> String etcdServer;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Value</span>(<span class="string">"$&#123;spring.application.name&#125;"</span>)</span><br><span class="line">    <span class="keyword">private</span> String appName;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@PostConstruct</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">init</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        ClientStarter starter = <span class="keyword">new</span> ClientStarter.Builder()</span><br><span class="line">                .setAppName(appName)          <span class="comment">// 应用名，和 dashboard 中的配置对应</span></span><br><span class="line">                .setEtcdServer(etcdServer)    <span class="comment">// etcd 集群地址</span></span><br><span class="line">                .build();</span><br><span class="line">        starter.startPipeline();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>ClientStarter.Builder</code> 支持的配置项：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>setAppName</code></td>
+<td>无（必填）</td>
+<td>应用名称，用于匹配 dashboard 中的规则</td>
+</tr>
+<tr>
+<td><code>setEtcdServer</code></td>
+<td>无（必填）</td>
+<td>etcd 集群地址，多个用逗号分隔</td>
+</tr>
+<tr>
+<td><code>setCaffeineSize</code></td>
+<td>200000</td>
+<td>本地 Caffeine 缓存最大容量</td>
+</tr>
+<tr>
+<td><code>setPushPeriod</code></td>
+<td>500ms</td>
+<td>批量上报统计数据的时间间隔（最小 50ms）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="第四步：配置热点规则"><a href="#第四步：配置热点规则" class="headerlink" title="第四步：配置热点规则"></a>第四步：配置热点规则</h2><p>在 dashboard 中配置你的热点规则。规则以 JSON 格式存储，支持以下参数：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="attr">"desc"</span>: <span class="string">"商品信息热点规则"</span>,</span><br><span class="line">    <span class="attr">"key"</span>: <span class="string">"goods:"</span>,</span><br><span class="line">    <span class="attr">"prefix"</span>: <span class="literal">true</span>,</span><br><span class="line">    <span class="attr">"threshold"</span>: <span class="number">100</span>,</span><br><span class="line">    <span class="attr">"duration"</span>: <span class="number">5</span>,</span><br><span class="line">    <span class="attr">"interval"</span>: <span class="number">1</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>key</code></td>
+<td>String</td>
+<td>key 匹配规则。<code>prefix = true</code> 时作为前缀匹配</td>
+</tr>
+<tr>
+<td><code>prefix</code></td>
+<td>boolean</td>
+<td>是否前缀匹配。<code>true</code> 表示匹配 <code>key</code> 开头的所有 key</td>
+</tr>
+<tr>
+<td><code>threshold</code></td>
+<td>int</td>
+<td>热点阈值——时间窗口内总访问次数超过此值判定为热点</td>
+</tr>
+<tr>
+<td><code>duration</code></td>
+<td>int</td>
+<td>滑动窗口大小（秒）</td>
+</tr>
+<tr>
+<td><code>interval</code></td>
+<td>int</td>
+<td>窗口滑动步长（秒）</td>
+</tr>
+<tr>
+<td><code>desc</code></td>
+<td>String</td>
+<td>规则描述，方便管理</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>上面的配置含义：<strong>以 <code>goods:</code> 开头的 key，在 5 秒内被访问超过 100 次，判定为热点</strong>。</p>
+<hr>
+<h1 id="四、使用介绍"><a href="#四、使用介绍" class="headerlink" title="四、使用介绍"></a>四、使用介绍</h1><h2 id="4-1-场景一：热点拦截-限流"><a href="#4-1-场景一：热点拦截-限流" class="headerlink" title="4.1 场景一：热点拦截 + 限流"></a>4.1 场景一：热点拦截 + 限流</h2><p>最简单的用法——判断是否热点，是的话做特殊处理（降级、限流或直接返回）：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@RestController</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">GoodsController</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@GetMapping</span>(<span class="string">"/goods/&#123;id&#125;"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Object <span class="title">getGoods</span><span class="params">(@PathVariable String id)</span> </span>&#123;</span><br><span class="line">        String key = <span class="string">"goods:"</span> + id;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// isHotKey 会同时上报 key 的访问量</span></span><br><span class="line">        <span class="keyword">if</span> (JdHotKeyStore.isHotKey(key)) &#123;</span><br><span class="line">            <span class="comment">// 热点 key 的降级处理：直接返回缓存数据或友好提示</span></span><br><span class="line">            <span class="keyword">return</span> <span class="string">"当前访问量大，请稍后再试"</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 非热点 key 走正常流程</span></span><br><span class="line">        <span class="keyword">return</span> goodsService.getGoodsDetail(id);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="4-2-场景二：热点数据本地缓存（推荐）"><a href="#4-2-场景二：热点数据本地缓存（推荐）" class="headerlink" title="4.2 场景二：热点数据本地缓存（推荐）"></a>4.2 场景二：热点数据本地缓存（推荐）</h2><p>更实用的方式——检测到热点后，把数据缓存到本地内存，后续请求直接从内存读：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">GoodsService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> RedisTemplate&lt;String, Object&gt; redisTemplate;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> GoodsMapper goodsMapper;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> GoodsDetail <span class="title">getGoodsDetail</span><span class="params">(String goodsId)</span> </span>&#123;</span><br><span class="line">        String key = <span class="string">"goods:"</span> + goodsId;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 1. 判断是否热点</span></span><br><span class="line">        <span class="keyword">if</span> (JdHotKeyStore.isHotKey(key)) &#123;</span><br><span class="line">            <span class="comment">// 2. 先尝试从本地缓存读取</span></span><br><span class="line">            GoodsDetail cached = (GoodsDetail) JdHotKeyStore.get(key);</span><br><span class="line">            <span class="keyword">if</span> (cached != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span> cached;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 3. 本地没有，从 Redis 加载</span></span><br><span class="line">            GoodsDetail goods = loadFromRedis(goodsId);</span><br><span class="line">            <span class="keyword">if</span> (goods != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="comment">// 4. 写入本地热点缓存（只有 key 是热点时才会写入成功）</span></span><br><span class="line">                JdHotKeyStore.smartSet(key, goods);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> goods;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 5. 非热点 key，正常走 Redis</span></span><br><span class="line">        <span class="keyword">return</span> loadFromRedis(goodsId);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> GoodsDetail <span class="title">loadFromRedis</span><span class="params">(String goodsId)</span> </span>&#123;</span><br><span class="line">        GoodsDetail goods = (GoodsDetail) redisTemplate.opsForValue().get(<span class="string">"goods:"</span> + goodsId);</span><br><span class="line">        <span class="keyword">if</span> (goods == <span class="keyword">null</span>) &#123;</span><br><span class="line">            goods = goodsMapper.selectById(goodsId);</span><br><span class="line">            <span class="keyword">if</span> (goods != <span class="keyword">null</span>) &#123;</span><br><span class="line">                redisTemplate.opsForValue().set(<span class="string">"goods:"</span> + goodsId, goods, <span class="number">300</span>, TimeUnit.SECONDS);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> goods;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>这里的 <code>smartSet</code> 很巧妙</strong>：它只在 key 已被判定为热点时才写入本地缓存。如果 key 不是热点，写入会被忽略——不用担心内存被非热点数据撑爆。</p>
+<h2 id="4-3-场景三：用-getValue-简化逻辑"><a href="#4-3-场景三：用-getValue-简化逻辑" class="headerlink" title="4.3 场景三：用 getValue 简化逻辑"></a>4.3 场景三：用 getValue 简化逻辑</h2><p><code>getValue</code> 把”查本地缓存 + 上报”合并成了一步，代码更简洁：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> GoodsDetail <span class="title">getGoodsDetail</span><span class="params">(String goodsId)</span> </span>&#123;</span><br><span class="line">    String key = <span class="string">"goods:"</span> + goodsId;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// getValue 自动处理：本地有值返回值 + 上报访问量</span></span><br><span class="line">    GoodsDetail cached = (GoodsDetail) JdHotKeyStore.getValue(key);</span><br><span class="line">    <span class="keyword">if</span> (cached != <span class="keyword">null</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> cached;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 本地没有（可能刚变热点还没缓存数据），从 Redis 加载并写入</span></span><br><span class="line">    GoodsDetail goods = loadFromRedis(goodsId);</span><br><span class="line">    <span class="keyword">if</span> (goods != <span class="keyword">null</span>) &#123;</span><br><span class="line">        JdHotKeyStore.smartSet(key, goods);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> goods;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="4-4-场景四：热用户-热接口探测"><a href="#4-4-场景四：热用户-热接口探测" class="headerlink" title="4.4 场景四：热用户 / 热接口探测"></a>4.4 场景四：热用户 / 热接口探测</h2><p>JD-HotKey 不只局限于数据 key，也能探测热用户和热接口：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 热用户探测（防爬虫 / 防刷子）</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">handleRequest</span><span class="params">(String userId)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (JdHotKeyStore.isHotKey(<span class="string">"hot:user:"</span> + userId)) &#123;</span><br><span class="line">        <span class="comment">// 该用户访问频率异常，触发限流或验证码</span></span><br><span class="line">        log.warn(<span class="string">"检测到异常高频用户: &#123;&#125;"</span>, userId);</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> RateLimitException(<span class="string">"访问过于频繁，请稍后再试"</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 正常业务逻辑...</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 热接口探测</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">handleApiCall</span><span class="params">(String apiPath)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (JdHotKeyStore.isHotKey(<span class="string">"hot:api:"</span> + apiPath)) &#123;</span><br><span class="line">        <span class="comment">// 接口被大量请求，触发熔断或降级</span></span><br><span class="line">        log.warn(<span class="string">"接口被高频访问: &#123;&#125;"</span>, apiPath);</span><br><span class="line">        <span class="keyword">return</span> fallbackResponse;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 正常业务逻辑...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在 dashboard 中配置对应的规则就行：<code>key = &quot;hot:user:&quot;</code> 和 <code>key = &quot;hot:api:&quot;</code>。</p>
+<hr>
+<h1 id="五、性能数据"><a href="#五、性能数据" class="headerlink" title="五、性能数据"></a>五、性能数据</h1><h2 id="5-1-Worker-性能演进"><a href="#5-1-Worker-性能演进" class="headerlink" title="5.1 Worker 性能演进"></a>5.1 Worker 性能演进</h2><p>JD-HotKey 的性能不是一蹴而就的，从初版到最终版经历了 <strong>17 倍</strong> 的提升：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>版本</th>
+<th>QPS</th>
+<th>CPU</th>
+<th>关键优化</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>V1（初版）</td>
+<td>~2 万</td>
+<td>&gt;20%</td>
+<td>Disruptor + Fastjson，遇到 JDK 线程 bug 导致大量线程创建</td>
+</tr>
+<tr>
+<td>V2</td>
+<td>~10 万</td>
+<td>7-10%</td>
+<td>换掉 Disruptor，改用 <code>LinkedBlockingQueue</code></td>
+</tr>
+<tr>
+<td>V3</td>
+<td>~16 万</td>
+<td>~40%</td>
+<td>8 核单机调优</td>
+</tr>
+<tr>
+<td>V4</td>
+<td>25-30 万</td>
+<td>~70%</td>
+<td>8 生产 + 8 消费线程</td>
+</tr>
+<tr>
+<td><strong>V5（最终版）</strong></td>
+<td><strong>稳定 30 万，极限 37 万</strong></td>
+<td><strong>~50%</strong></td>
+<td>序列化从 Fastjson 换为 <strong>Protobuf</strong>，16 核</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>最大的性能跃升来自序列化方案的切换</strong>：从 Fastjson 换为 Protobuf 后，序列化效率显著提升，CPU 使用率反而下降了。</p>
+<h2 id="5-2-推送性能"><a href="#5-2-推送性能" class="headerlink" title="5.2 推送性能"></a>5.2 推送性能</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>推送速率</th>
+<th>延迟表现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10-12 万/秒</td>
+<td><strong>即时送达，无延迟</strong></td>
+</tr>
+<tr>
+<td>20 万/秒</td>
+<td>约 1 秒延迟</td>
+</tr>
+<tr>
+<td>40-60 万/秒（8 IO 线程）</td>
+<td>稳定推送</td>
+</tr>
+<tr>
+<td><strong>70 万/秒（16 IO 线程）</strong></td>
+<td><strong>稳定推送</strong></td>
+</tr>
+<tr>
+<td>80 万/秒（极限）</td>
+<td>频繁 GC，最终 OOM</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="5-3-生产实战数据"><a href="#5-3-生产实战数据" class="headerlink" title="5.3 生产实战数据"></a>5.3 生产实战数据</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>数据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>大促期间集群总吞吐</td>
+<td><strong>1500 万/秒</strong></td>
+</tr>
+<tr>
+<td>本地缓存命中占总流量</td>
+<td><strong>&gt;50%</strong></td>
+</tr>
+<tr>
+<td>日探测 Key 数量</td>
+<td><strong>数十亿</strong></td>
+</tr>
+<tr>
+<td>1 台 Worker（16 核）可支撑</td>
+<td><strong>~1000 台业务服务</strong></td>
+</tr>
+<tr>
+<td>扛住百万级热 key 所需 Worker</td>
+<td><strong>~30 台</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>对比一下</strong>：普通请求访问 Redis 的 RT 通常在 1-5ms，访问数据库 5-50ms。JD-HotKey 让热点请求直接从 JVM 内存读取，<strong>RT 降到纳秒级</strong>。</p>
+<hr>
+<h1 id="六、与同类方案对比"><a href="#六、与同类方案对比" class="headerlink" title="六、与同类方案对比"></a>六、与同类方案对比</h1><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>JD-HotKey</th>
+<th>Caffeine 本地缓存</th>
+<th>Redis 热点 key 探测</th>
+<th>JetCache BOTH</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>热点发现</td>
+<td><strong>自动探测</strong></td>
+<td>手动配置</td>
+<td><code>redis-cli --hotkeys</code>（采样）</td>
+<td>手动配置</td>
+</tr>
+<tr>
+<td>实时性</td>
+<td>秒级自动感知</td>
+<td>静态，需手动更新</td>
+<td>实时但精度受限</td>
+<td>广播通知</td>
+</tr>
+<tr>
+<td>动态性</td>
+<td><strong>自动加入 / 退出</strong></td>
+<td>不变化，配了就一直有</td>
+<td>需手动清理</td>
+<td>广播失效</td>
+</tr>
+<tr>
+<td>多节点一致性</td>
+<td><strong>全局统一判定</strong></td>
+<td>各节点独立</td>
+<td>Redis 层面</td>
+<td>广播通知</td>
+</tr>
+<tr>
+<td>探测范围</td>
+<td>key / 用户 / 接口</td>
+<td>仅配置的 key</td>
+<td>仅 Redis key</td>
+<td>仅配置的 key</td>
+</tr>
+<tr>
+<td>部署复杂度</td>
+<td>中等（etcd + worker）</td>
+<td>低（纯 SDK）</td>
+<td>低（Redis 自带）</td>
+<td>低（纯 SDK）</td>
+</tr>
+<tr>
+<td>运维成本</td>
+<td>中（etcd 集群维护）</td>
+<td>无</td>
+<td>无</td>
+<td>无</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td><strong>不可预知的突发热点</strong></td>
+<td>已知高频数据</td>
+<td>Redis 热点节点排查</td>
+<td>已知高频读数据</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="什么时候该用-JD-HotKey？"><a href="#什么时候该用-JD-HotKey？" class="headerlink" title="什么时候该用 JD-HotKey？"></a>什么时候该用 JD-HotKey？</h3><ul>
+<li><strong>突发热点</strong>：热搜、突发新闻、秒杀商品——你没法提前知道哪些 key 会变热</li>
+<li><strong>大促场景</strong>：618、双11，热点模式不可预测</li>
+<li><strong>全站热点保护</strong>：不想人工分析哪些 key 是热点，交给系统自动发现</li>
+<li><strong>热用户 / 热接口探测</strong>：防爬虫、防刷子</li>
+</ul>
+<h3 id="什么时候不需要-JD-HotKey？"><a href="#什么时候不需要-JD-HotKey？" class="headerlink" title="什么时候不需要 JD-HotKey？"></a>什么时候不需要 JD-HotKey？</h3><ul>
+<li><strong>热点数据固定且已知</strong>：直接用 Caffeine 或 JetCache BOTH 就够了</li>
+<li><strong>数据量不大，Redis 压力不大</strong>：没必要引入额外组件</li>
+<li><strong>团队运维能力有限</strong>：etcd 集群的部署和维护有学习成本</li>
+</ul>
+<hr>
+<h1 id="七、最佳实践与注意事项"><a href="#七、最佳实践与注意事项" class="headerlink" title="七、最佳实践与注意事项"></a>七、最佳实践与注意事项</h1><h2 id="7-1-阈值调优"><a href="#7-1-阈值调优" class="headerlink" title="7.1 阈值调优"></a>7.1 阈值调优</h2><p>阈值设太低 → 太多 key 被判定为热点 → 本地内存撑爆；阈值设太高 → 热点漏判 → Redis 被打。</p>
+<p><strong>建议</strong>：</p>
+<ul>
+<li>核心业务（如商品详情）：阈值设低一点（如 5 秒内 50 次）</li>
+<li>边缘业务：阈值设高一点（如 5 秒内 200 次）</li>
+<li>通过 dashboard 配置<strong>分级阈值</strong>，不同业务用不同规则</li>
+</ul>
+<h2 id="7-2-内存控制"><a href="#7-2-内存控制" class="headerlink" title="7.2 内存控制"></a>7.2 内存控制</h2><p><code>smartSet</code> 存入的热点数据占用的是应用 JVM 内存。注意：</p>
+<ul>
+<li><code>CaffeineSize</code> 默认 200000，根据单机内存和数据大小调整</li>
+<li>大对象场景下（如完整的商品详情 JSON），适当减小容量</li>
+<li>热点 key 过期后会自动从本地缓存移除，不需要手动清理</li>
+</ul>
+<h2 id="7-3-etcd-集群容灾"><a href="#7-3-etcd-集群容灾" class="headerlink" title="7.3 etcd 集群容灾"></a>7.3 etcd 集群容灾</h2><p>etcd 是核心依赖，但 client 有容灾设计：</p>
+<ul>
+<li>etcd 短暂不可用时，<strong>已推送的热点数据仍然在本地缓存中正常工作</strong></li>
+<li>只是新的热点判定和规则变更无法生效</li>
+<li>建议 etcd 至少 3 节点部署，保证高可用</li>
+</ul>
+<h2 id="7-4-依赖冲突处理"><a href="#7-4-依赖冲突处理" class="headerlink" title="7.4 依赖冲突处理"></a>7.4 依赖冲突处理</h2><p>这是接入时最常踩的坑：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>冲突依赖</th>
+<th>解决方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>guava</td>
+<td>升级到 <strong>28.2-jre</strong> 以上</td>
+</tr>
+<tr>
+<td>fastjson</td>
+<td>降到 <strong>1.2.70</strong>（hotkey-client 内部使用的版本）</td>
+</tr>
+<tr>
+<td>protobuf</td>
+<td>注意版本兼容，参考 hotkey-client 的 pom</td>
+</tr>
+<tr>
+<td>Netty</td>
+<td>确保不与业务中的 Netty 版本冲突</td>
+</tr>
+<tr>
+<td>JDK 版本</td>
+<td>建议使用 <strong>JDK 1.8.0_191+</strong>（早期版本在容器环境下 <code>availableProcessors()</code> 返回宿主机核数而非容器限制核数，导致线程配置异常）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>建议</strong>：引入依赖后先跑一遍单元测试，确认没有类冲突。特别注意 guava 和 fastjson 版本，这两个最容易出问题。</p>
+<h2 id="7-5-配合降级策略"><a href="#7-5-配合降级策略" class="headerlink" title="7.5 配合降级策略"></a>7.5 配合降级策略</h2><p>热点探测不是万能的，建议配合降级策略：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> GoodsDetail <span class="title">getGoodsDetail</span><span class="params">(String goodsId)</span> </span>&#123;</span><br><span class="line">    String key = <span class="string">"goods:"</span> + goodsId;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">if</span> (JdHotKeyStore.isHotKey(key)) &#123;</span><br><span class="line">            GoodsDetail cached = (GoodsDetail) JdHotKeyStore.get(key);</span><br><span class="line">            <span class="keyword">if</span> (cached != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span> cached;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">        <span class="comment">// hotkey 组件异常时降级到普通流程</span></span><br><span class="line">        log.warn(<span class="string">"hotkey 判断异常，降级处理"</span>, e);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 正常流程：Redis → DB</span></span><br><span class="line">    <span class="keyword">return</span> loadFromRedis(goodsId);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="7-6-监控告警"><a href="#7-6-监控告警" class="headerlink" title="7.6 监控告警"></a>7.6 监控告警</h2><p>建议监控以下指标：</p>
+<ul>
+<li><strong>热点 key 数量</strong>：突增可能意味着异常流量</li>
+<li><strong>热点 key 变化趋势</strong>：发现异常模式</li>
+<li><strong>worker 健康状态</strong>：etcd 中 worker 注册是否正常</li>
+<li><strong>client 上报延迟</strong>：是否因为网络问题导致上报积压</li>
+</ul>
+<hr>
+<h1 id="八、FAQ"><a href="#八、FAQ" class="headerlink" title="八、FAQ"></a>八、FAQ</h1><h2 id="Q-worker-和-server-是什么关系？"><a href="#Q-worker-和-server-是什么关系？" class="headerlink" title="Q: worker 和 server 是什么关系？"></a>Q: worker 和 server 是什么关系？</h2><p>JD-HotKey 中，worker 就是实际干活的服务节点。有些文章叫它”server”，其实是一个东西。worker 接收 client 上报的数据，执行热点判定，推送结果。它独立部署，不依赖 Spring Boot，是个纯 Java 进程。</p>
+<h2 id="Q-一个-etcd-集群可以支撑多少个应用？"><a href="#Q-一个-etcd-集群可以支撑多少个应用？" class="headerlink" title="Q: 一个 etcd 集群可以支撑多少个应用？"></a>Q: 一个 etcd 集群可以支撑多少个应用？</h2><p>理论上不限，但建议按业务域隔离。不同应用用不同的 <code>appName</code>，规则互不影响。大规模场景下建议 etcd 独立集群部署。</p>
+<h2 id="Q-isHotKey-每次调用都会上报吗？"><a href="#Q-isHotKey-每次调用都会上报吗？" class="headerlink" title="Q: isHotKey 每次调用都会上报吗？"></a>Q: isHotKey 每次调用都会上报吗？</h2><p>是的，<code>isHotKey</code> 每次调用都会在 client 本地的双 Map 中计数 +1。client 每隔 <code>pushPeriod</code>（默认 500ms）将聚合后的数据批量上报给 worker。所以不是每次调用都发网络请求，是<strong>批量聚合后上报</strong>，开销很小。</p>
+<h2 id="Q-worker-的吞吐量怎么评估？"><a href="#Q-worker-的吞吐量怎么评估？" class="headerlink" title="Q: worker 的吞吐量怎么评估？"></a>Q: worker 的吞吐量怎么评估？</h2><p>worker 内部用 <code>LinkedBlockingQueue</code>（容量 <strong>200 万</strong>）做消息缓冲，多线程消费。经验数据：<strong>1 台 16 核 worker 可以支撑约 1000 台业务服务</strong>。大促期间如果需要扛百万级热 key，大约需要 30 台 worker。</p>
+<h2 id="Q-smartSet-和直接用-Caffeine-存有什么区别？"><a href="#Q-smartSet-和直接用-Caffeine-存有什么区别？" class="headerlink" title="Q: smartSet 和直接用 Caffeine 存有什么区别？"></a>Q: smartSet 和直接用 Caffeine 存有什么区别？</h2><p><code>smartSet</code> 内部用的也是 Caffeine，但它有个关键区别：<strong>只有 key 被判定为热点时才会写入成功</strong>。如果你直接用 Caffeine，所有 key 都会缓存，内存可能被非热点数据占满。<code>smartSet</code> 帮你做了这个过滤。</p>
+<p>另外还有个 <code>forceSet</code> 方法可以强制设置缓存值（不管 key 是否热点），一般用不到。</p>
+<h2 id="Q-热点-key-被判定后，数据怎么填充到本地缓存？"><a href="#Q-热点-key-被判定后，数据怎么填充到本地缓存？" class="headerlink" title="Q: 热点 key 被判定后，数据怎么填充到本地缓存？"></a>Q: 热点 key 被判定后，数据怎么填充到本地缓存？</h2><p>JD-HotKey <strong>只负责告诉你”这个 key 是热点”和”管理本地缓存的存取”</strong>，不负责帮你从数据库加载数据。你需要在代码中自己实现数据加载逻辑（见场景二的示例代码）。</p>
+<p>完整流程是这样的：</p>
+<ol>
+<li>worker 判定热点 → 推送通知到所有 client</li>
+<li>client 在 Caffeine 中存入<strong>魔术值</strong>（<code>0x12fcf76</code>）作为占位</li>
+<li>业务代码调用 <code>isHotKey(key)</code> 返回 <code>true</code></li>
+<li>业务代码调用 <code>get(key)</code> → 返回 null（因为是魔术值占位，还没填实际数据）</li>
+<li>业务代码从 Redis / DB 加载真实数据</li>
+<li>调用 <code>smartSet(key, value)</code> 写入本地缓存</li>
+<li>后续请求直接命中本地缓存</li>
+</ol>
+<h2 id="Q-和-Redis-Cluster-的热点-key-问题有什么关系？"><a href="#Q-和-Redis-Cluster-的热点-key-问题有什么关系？" class="headerlink" title="Q: 和 Redis Cluster 的热点 key 问题有什么关系？"></a>Q: 和 Redis Cluster 的热点 key 问题有什么关系？</h2><p>Redis Cluster 的热点 key 问题是：某个 key 的访问量集中到一个分片节点，导致该节点 CPU / 带宽打满。JD-HotKey 的解决思路是<strong>在应用层就把热点请求拦截掉</strong>——数据缓存在 JVM 内存中，根本不会打到 Redis。两者是不同层面的解决方案。</p>
+<h2 id="Q-生产环境怎么部署？"><a href="#Q-生产环境怎么部署？" class="headerlink" title="Q: 生产环境怎么部署？"></a>Q: 生产环境怎么部署？</h2><p>推荐架构：</p>
+<ul>
+<li><strong>etcd</strong>：3 节点集群（奇数，容忍 1 节点故障）</li>
+<li><strong>worker</strong>：至少 2 个实例（worker 之间不通信，各自独立计算。client 通过 Hash 将不同 key 路由到不同 worker，天然负载均衡）</li>
+<li><strong>dashboard</strong>：1-2 个实例（Web 控制台，不承载核心流量）</li>
+<li><strong>client</strong>：嵌入每个业务应用实例</li>
+</ul>
+<h2 id="Q-和-JetCache-的两级缓存（BOTH）怎么配合？"><a href="#Q-和-JetCache-的两级缓存（BOTH）怎么配合？" class="headerlink" title="Q: 和 JetCache 的两级缓存（BOTH）怎么配合？"></a>Q: 和 JetCache 的两级缓存（BOTH）怎么配合？</h2><p>它们不冲突，可以一起用：</p>
+<ul>
+<li><strong>JetCache BOTH</strong>：适用于已知的高频读数据，提供 L1 + L2 两级缓存 + 自动刷新</li>
+<li><strong>JD-HotKey</strong>：适用于不可预知的突发热点，自动发现并缓存</li>
+</ul>
+<p>配合方式：JetCache 负责常规缓存，JD-HotKey 负责突发热点保护。当 JD-HotKey 判定某 key 为热点时，数据直接走 JVM 内存，连 JetCache 的 L2（Redis）都不需要访问。</p>
+<hr>
+<h1 id="九、总结"><a href="#九、总结" class="headerlink" title="九、总结"></a>九、总结</h1><p>JD-HotKey 的核心价值在于<strong>自动发现热点</strong>——这是它区别于其他缓存方案的最大优势。你不需要提前知道哪些 key 会变热，系统会根据实际访问量自动判定、自动推送、自动过期释放。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>推荐方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>已知的固定高频数据</td>
+<td>Caffeine 或 JetCache BOTH</td>
+</tr>
+<tr>
+<td>不可预知的突发热点</td>
+<td><strong>JD-HotKey</strong></td>
+</tr>
+<tr>
+<td>Redis 热点节点保护</td>
+<td>JD-HotKey（应用层拦截）或 Redis 热点分片</td>
+</tr>
+<tr>
+<td>热用户 / 热接口探测</td>
+<td><strong>JD-HotKey</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>如果你的业务中存在”不知道什么时候会突然变热”的场景（电商秒杀、热搜话题、突发新闻），JD-HotKey 能帮你自动识别并保护这些热点 key，将请求拦截在 JVM 内存中，避免打垮 Redis 和数据库。</p>
+<p>但它也不是万能的——etcd 的部署运维、依赖冲突的处理、阈值的调优，都需要一定的投入。建议先在非核心业务上试水，验证效果后再推广到核心链路。</p>
+
+    </div>
+
+    
+    
+    
+        
+
+  <div class="followme">
+    <p>欢迎关注我的其它发布渠道</p>
+
+    <div class="social-list">
+
+        <div class="social-item">
+          <a target="_blank" class="social-link" href="/atom.xml">
+            <span class="icon">
+              <i class="fa fa-rss"></i>
+            </span>
+
+            <span class="label">RSS</span>
+          </a>
+        </div>
+    </div>
+  </div>
+
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/JD-HotKey/" rel="tag"><i class="fa fa-tag"></i> JD-HotKey</a>
+          </div>
+
+        
+<div class="post-share">
+  <div class="share-title">分享到</div>
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+
+<style>
+.post-share {
+  margin: 20px 0;
+  padding: 15px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+}
+.post-share .share-title {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 10px;
+}
+.post-share .social-share {
+  text-align: center;
+}
+.post-share .social-share a {
+  margin: 0 8px;
+}
+/* 微信二维码样式优化 */
+.social-share .wechat-qrcode {
+  border: 1px solid #eee;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+.social-share .wechat-qrcode h4 {
+  color: #333;
+  font-weight: normal;
+}
+</style>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/05/30/multi-agent-communication-deep-dive/" rel="prev" title="Multi-Agent 通信深度解析">
+      <i class="fa fa-chevron-left"></i> Multi-Agent 通信深度解析
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/06/17/JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C/" rel="next" title="JetCache 使用手册">
+      JetCache 使用手册 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#一、组件介绍"><span class="nav-number">1.</span> <span class="nav-text">一、组件介绍</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#二、核心架构"><span class="nav-number">2.</span> <span class="nav-text">二、核心架构</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-整体架构"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 整体架构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-1-综合架构"><span class="nav-number">2.1.1.</span> <span class="nav-text">2.1.1 综合架构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-2-分层架构"><span class="nav-number">2.1.2.</span> <span class="nav-text">2.1.2 分层架构</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-数据流转过程"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 数据流转过程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-etcd-的角色"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 etcd 的角色</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-4-滑动窗口算法"><span class="nav-number">2.4.</span> <span class="nav-text">2.4 滑动窗口算法</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-5-JdHotKeyStore-—-核心-API"><span class="nav-number">2.5.</span> <span class="nav-text">2.5 JdHotKeyStore — 核心 API</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#三、快速接入（Spring-Boot）"><span class="nav-number">3.</span> <span class="nav-text">三、快速接入（Spring Boot）</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#第一步：部署基础环境"><span class="nav-number">3.1.</span> <span class="nav-text">第一步：部署基础环境</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#安装-etcd（开发环境）"><span class="nav-number">3.1.1.</span> <span class="nav-text">安装 etcd（开发环境）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#部署-worker"><span class="nav-number">3.1.2.</span> <span class="nav-text">部署 worker</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#部署-dashboard"><span class="nav-number">3.1.3.</span> <span class="nav-text">部署 dashboard</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第二步：引入-Maven-依赖"><span class="nav-number">3.2.</span> <span class="nav-text">第二步：引入 Maven 依赖</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第三步：初始化客户端"><span class="nav-number">3.3.</span> <span class="nav-text">第三步：初始化客户端</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第四步：配置热点规则"><span class="nav-number">3.4.</span> <span class="nav-text">第四步：配置热点规则</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#四、使用介绍"><span class="nav-number">4.</span> <span class="nav-text">四、使用介绍</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-场景一：热点拦截-限流"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 场景一：热点拦截 + 限流</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-场景二：热点数据本地缓存（推荐）"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 场景二：热点数据本地缓存（推荐）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-3-场景三：用-getValue-简化逻辑"><span class="nav-number">4.3.</span> <span class="nav-text">4.3 场景三：用 getValue 简化逻辑</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-4-场景四：热用户-热接口探测"><span class="nav-number">4.4.</span> <span class="nav-text">4.4 场景四：热用户 &#x2F; 热接口探测</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#五、性能数据"><span class="nav-number">5.</span> <span class="nav-text">五、性能数据</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-Worker-性能演进"><span class="nav-number">5.1.</span> <span class="nav-text">5.1 Worker 性能演进</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-2-推送性能"><span class="nav-number">5.2.</span> <span class="nav-text">5.2 推送性能</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-3-生产实战数据"><span class="nav-number">5.3.</span> <span class="nav-text">5.3 生产实战数据</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#六、与同类方案对比"><span class="nav-number">6.</span> <span class="nav-text">六、与同类方案对比</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#什么时候该用-JD-HotKey？"><span class="nav-number">6.0.1.</span> <span class="nav-text">什么时候该用 JD-HotKey？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#什么时候不需要-JD-HotKey？"><span class="nav-number">6.0.2.</span> <span class="nav-text">什么时候不需要 JD-HotKey？</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#七、最佳实践与注意事项"><span class="nav-number">7.</span> <span class="nav-text">七、最佳实践与注意事项</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#7-1-阈值调优"><span class="nav-number">7.1.</span> <span class="nav-text">7.1 阈值调优</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-2-内存控制"><span class="nav-number">7.2.</span> <span class="nav-text">7.2 内存控制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-3-etcd-集群容灾"><span class="nav-number">7.3.</span> <span class="nav-text">7.3 etcd 集群容灾</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-4-依赖冲突处理"><span class="nav-number">7.4.</span> <span class="nav-text">7.4 依赖冲突处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-5-配合降级策略"><span class="nav-number">7.5.</span> <span class="nav-text">7.5 配合降级策略</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-6-监控告警"><span class="nav-number">7.6.</span> <span class="nav-text">7.6 监控告警</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#八、FAQ"><span class="nav-number">8.</span> <span class="nav-text">八、FAQ</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-worker-和-server-是什么关系？"><span class="nav-number">8.1.</span> <span class="nav-text">Q: worker 和 server 是什么关系？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-一个-etcd-集群可以支撑多少个应用？"><span class="nav-number">8.2.</span> <span class="nav-text">Q: 一个 etcd 集群可以支撑多少个应用？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-isHotKey-每次调用都会上报吗？"><span class="nav-number">8.3.</span> <span class="nav-text">Q: isHotKey 每次调用都会上报吗？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-worker-的吞吐量怎么评估？"><span class="nav-number">8.4.</span> <span class="nav-text">Q: worker 的吞吐量怎么评估？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-smartSet-和直接用-Caffeine-存有什么区别？"><span class="nav-number">8.5.</span> <span class="nav-text">Q: smartSet 和直接用 Caffeine 存有什么区别？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-热点-key-被判定后，数据怎么填充到本地缓存？"><span class="nav-number">8.6.</span> <span class="nav-text">Q: 热点 key 被判定后，数据怎么填充到本地缓存？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-和-Redis-Cluster-的热点-key-问题有什么关系？"><span class="nav-number">8.7.</span> <span class="nav-text">Q: 和 Redis Cluster 的热点 key 问题有什么关系？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-生产环境怎么部署？"><span class="nav-number">8.8.</span> <span class="nav-text">Q: 生产环境怎么部署？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-和-JetCache-的两级缓存（BOTH）怎么配合？"><span class="nav-number">8.9.</span> <span class="nav-text">Q: 和 JetCache 的两级缓存（BOTH）怎么配合？</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#九、总结"><span class="nav-number">9.</span> <span class="nav-text">九、总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">103</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">63</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
