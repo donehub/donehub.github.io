@@ -7,7 +7,7 @@ categories: 中间件
 
 # 一、组件介绍
 
-JetCache 是阿里巴巴开源的通用缓存访问框架（[开源地址](https://github.com/alibaba/jetcache)），它做了一件事：**用统一的 ****`Cache<K, V>`**** 接口，把本地内存缓存和远程 Redis 缓存无缝组合起来**，再通过注解、API 两种方式定义出标准的缓存协议接入层，让业务代码以最简洁的方式使用缓存。
+JetCache 是阿里巴巴开源的通用缓存访问框架（[开源地址](https://github.com/alibaba/jetcache)），它做了一件事：用统一的 `Cache<K, V>`接口，把本地内存缓存和远程 Redis 缓存无缝组合起来，再通过注解、API 两种方式定义出标准的缓存协议接入层，让业务代码以最简洁的方式使用缓存。
 
 和 Spring Cache 比，JetCache 的核心优势：
 
@@ -22,9 +22,11 @@ JetCache 是阿里巴巴开源的通用缓存访问框架（[开源地址](https
 |统计监控|需第三方|**内置** 命中率、加载次数等统计|
 |更新/删除缓存注解|有但功能弱|`@CacheUpdate` / `@CacheInvalidate` 支持 SpEL|
 
+![](https://gitee.com/donehub/imagebed/raw/master/whiteboard_exported_image (1).png)
+
 # 二、核心概念
 
-## 2\.1 Cache\<K, V\> 接口
+## 2.1 Cache<K, V> 接口
 
 不管你底层用的是 Caffeine（本地内存）、Redis（远程）还是两级缓存组合，业务代码面对的都是同一个接口：
 
@@ -40,7 +42,7 @@ public interface Cache<K, V> {
 
 用起来就像一个 `Map`，非常直观。
 
-## 2\.2 CacheType — 缓存类型
+## 2.2 CacheType — 缓存类型
 
 |类型|含义|适用场景|备注|
 |---|---|---|---|
@@ -48,7 +50,7 @@ public interface Cache<K, V> {
 |`CacheType.REMOTE`|纯远程缓存（Redis）|一般业务场景，数据统一存 Redis|我们目前的使用场景<br>|
 |`CacheType.BOTH`|两级缓存：本地 \+ 远程|高频读取，本地扛量 \+ Redis 兜底|目前没有使用多级缓存的诉求|
 
-## 2\.3 Key 的生成规则
+## 2.3 Key 的生成规则
 
 最终在 Redis 里存的 key 格式是：
 
@@ -62,7 +64,7 @@ Redis key = keyPrefix + keyConvertor(K)；
 
 举个例子：`@Cached(name = "toc:user:info:", key = "#userId")` ，userId = 12345，最终 Redis 里的 key 就是 `toc:user:info:12345`。
 
-## 2\.4 Area — 缓存区域
+## 2.4 Area — 缓存区域
 
 Area 是 JetCache 的多租户机制。默认有一个 `"default"` area，对应配置里的 `jetcache.local.default` 和 `jetcache.remote.default`。如果你的项目需要连多个 Redis 实例，可以配多个 area，然后在注解里通过 `area = "otherArea"` 指定。大多数场景用默认的就行。
 
@@ -144,7 +146,7 @@ jetcache:
 ```Java
 @SpringBootApplication
 @EnableMethodCache(basePackages = "com.remotecarter")// 激活 @Cached 等注解
-@EnableCreateCacheAnnotation                      // 激活 @CreateCache 注解(Deprecated可以不加）
+@EnableCreateCacheAnnotation                      // 激活 @CreateCache 注解(2.7+ Deprecated可以不加）
 public class MyApplication {
     public static void main(String[] args) {
         SpringApplication.run(MyApplication.class, args);
@@ -160,7 +162,7 @@ public class MyApplication {
 
 # 四、使用介绍
 
-## 4\.1 注解驱动缓存（声明式）
+## 4.1 注解驱动缓存（声明式）
 
 这是最常用的方式。在 Service 接口（或实现类）的方法上加注解，JetCache 通过 Spring AOP 代理自动处理缓存的读、写、删。
 
@@ -181,7 +183,7 @@ public interface UserService {
 }
 ```
 
-### **@Cached**** — ****属性详解**
+### @Cached — 属性详解
 
 |属性|默认值|说明|
 |---|---|---|
@@ -273,7 +275,7 @@ User getUserById(String uuid);
 
 每 30 分钟自动刷新（集群唯一），30 分钟没人访问就停止刷新，万一缓存未命中还有穿透保护。
 
-## 4\.2 编程式缓存（Cache API）
+## 4.2 编程式缓存（Cache API）
 
 注解方式虽然简洁，但灵活性有限——比如你需要在运行时动态决定 key，或者想在非 Spring 管理的类中使用缓存。这时候就用 **Cache API**。
 
@@ -409,7 +411,7 @@ future.thenRun(() -> {
 
 JetCache 的 key 是怎么生成和处理的，搞清楚这个才能在 Redis 里看到符合预期的 key。
 
-## 5\.1 Redis Key 的拼接规则
+## 5.1 Redis Key 的拼接规则
 
 ```Java
 Redis 中的 key = keyPrefix + keyConvertor(Java Key 对象)
@@ -431,7 +433,7 @@ Redis 中的 key = keyPrefix + keyConvertor(Java Key 对象)
 
 - 最终 Redis key = `toc:user:info:X123456`
 
-## 5\.2 支持的 Key 类型
+## 5.2 支持的 Key 类型
 
 从 `ExternalKeyUtil.buildKeyAfterConvert` 源码可知，JetCache 支持以下 key 类型：
 
@@ -446,7 +448,7 @@ Redis 中的 key = keyPrefix + keyConvertor(Java Key 对象)
 
 **实践建议**：**推荐使用 String 类型的 key**。如果你用 Long/Integer 类型的 key，最终 Redis 里会带个 `Long`/`Integer` 前缀，虽然不影响功能，但看起来不直观。在 SpEL 里做一下转换就行：`key = "'' + #userId"` 或 `key = "#userId.toString()"`。
 
-## 5\.3 keyConvertor 机制
+## 5.3 keyConvertor 机制
 
 keyConvertor 负责把 Java 对象转成 Redis 能存的 String：
 
@@ -457,7 +459,7 @@ keyConvertor 负责把 Java 对象转成 Redis 能存的 String：
 |`jackson3`|Jackson 3\.x 版本|
 |`none`|不转换，直接 `equals` 比较。仅用于 `@CreateCache` 且 `cacheType = LOCAL` 的场景|
 
-## 5\.4 SpEL 表达式指定 Key
+## 5.4 SpEL 表达式指定 Key
 
 `@Cached` 的 `key` 属性支持 Spring 的 SpEL 表达式：
 
@@ -495,7 +497,7 @@ List<Archives> getArchives(String appId, String uuid);
 
 **IntelliJ IDEA 配置**：Settings → Build → Compiler → Java Compiler → Additional command\-line parameters，填入 `-parameters`。
 
-## 5\.5 单值 vs 多值缓存场景
+## 5.5 单值 vs 多值缓存场景
 
 JetCache 是纯 KV 模型（底层用 Redis STRING 类型），**不支持 Redis HASH 的子字段操作**（HGET/HSET）。如果你之前用 Redisson 的 `RMap` 做过 Hash 缓存，迁移到 JetCache 时需要调整思路。
 
@@ -537,7 +539,7 @@ JetCache 无法做 Hash 字段级操作，需要把「uuid 对应的全部数据
 
 两级缓存是 JetCache 的一大亮点，虽然我们暂时用不到。简单来说就是：**本地内存缓存（L1）\+ Redis（L2）组合使用，读的时候先查 L1 再查 L2，写的时候两级都写。**
 
-## 6\.1 工作原理
+## 6.1 工作原理
 
 ```Plaintext
 读取流程：
@@ -554,7 +556,7 @@ JetCache 无法做 Hash 字段级操作，需要把「uuid 对应的全部数据
   1. 同时删除本地缓存和 Redis 中的 key
 ```
 
-## 6\.2 配置使用
+## 6.2 配置使用
 
 ### 注解方式：
 
@@ -581,7 +583,7 @@ QuickConfig qc = QuickConfig.newBuilder("userCache")
 Cache<Long, User> userCache = cacheManager.getOrCreateCache(qc);
 ```
 
-## 6\.3 syncLocal — 跨节点同步失效
+## 6.3 syncLocal — 跨节点同步失效
 
 这是两级缓存的关键配置。加入你有 3 台服务器，每台都有本地缓存。如果节点 A 更新了某个用户数据，节点 B 和 C 的本地缓存还是旧值，这就出现了不一致。
 
@@ -604,7 +606,7 @@ jetcache:
 
 **注意**：多个服务共用同一个 Redis 时，不同服务请使用不同的 `broadcastChannel`，否则一个服务的缓存更新会触发其他服务的本地缓存全部失效，造成广播风暴。
 
-## 6\.4 localExpire — 本地和远程过期时间分离
+## 6.4 localExpire — 本地和远程过期时间分离
 
 两级缓存场景下，本地缓存的过期时间通常应该 **小于** 远程缓存。比如远程设 1 小时，本地设 1 分钟，这样即使广播消息丢失，本地最多 1 分钟后也会自动过期重新从 Redis 拉取。
 
@@ -621,7 +623,7 @@ jetcache:
 
 远程缓存（Redis）里的数据是字节流，存入时需要 **序列化（encode）**，取出时需要 **反序列化（decode）**。JetCache 提供了三种序列化方式：
 
-## 7\.1 valueEncoder / valueDecoder 选择
+## 7.1 valueEncoder / valueDecoder 选择
 
 |方式|优点|缺点|
 |---|---|---|
@@ -638,7 +640,7 @@ jetcache:
 
 这里不建议自定义编解码实现，存在造成多级缓存不一致的风险。因为编解码器不一致，会导致 jetcache 广播 start 异常。
 
-## 7\.2 反序列化安全过滤器（2\.8\+）
+## 7.2 反序列化安全过滤器（2.8+）
 
 JetCache 2\.8\.x 默认开启了反序列化安全过滤器，**只允许白名单中的类被反序列化**。这是为了防止反序列化漏洞攻击。默认白名单包含：`java.lang`、`java.util.`、`java.time.`、`java.math`、`com.alicp.jetcache.`。
 
@@ -800,11 +802,11 @@ interface UserInfoDetailDTO queryUserDetail(String uuid);
 
 ## 最佳实践与注意事项
 
-### 1\. TTL 必须设置
+### 1. TTL 必须设置
 
 `@CacheUpdate` 和 `@CacheInvalidate` 可能因为网络波动失败。如果没有设置 TTL，失败的删除/更新操作就会导致缓存永远不一致。**一定要设置合理的 expire 作为最终一致性的兜底**。
 
-### 2\. 序列化选择
+### 2. 序列化选择
 
 - **开发阶段 / 不确定选啥**：用 `java`，兼容性最好;
 
@@ -812,11 +814,11 @@ interface UserInfoDetailDTO queryUserDetail(String uuid);
 
 - **JSON 序列化**：不推荐。JSON 不是专门的 Java 序列化工具，反射无法识别类型时会反序列化为 JSONObject，兼容性差;
 
-### 3\. broadcastChannel 隔离
+### 3. broadcastChannel 隔离
 
 多个服务共用同一个 Redis 实例时，不同服务一定要用不同的 `broadcastChannel`。否则 A 服务更新了缓存，广播消息会触发 B 服务的本地缓存失效——虽然看起来没啥问题，但当广播量大的时候就是灾难。
 
-### 4\. AOP 代理陷阱
+### 4. AOP 代理陷阱
 
 JetCache 的注解通过 Spring AOP 代理实现。**同一个类内部的方法调用不经过代理，缓存不会生效**：
 
@@ -852,11 +854,11 @@ public class UserServiceImpl implements UserService {
 }
 ```
 
-### 5\. \-parameters 编译参数
+### 5. -parameters 编译参数
 
 如果想在 SpEL 中用参数名（如 `#uuid`），编译时必须加 `-parameters` 参数。否则只能用 `args[0]` 按下标访问。
 
-### 6\. name 命名规范
+### 6. name 命名规范
 
 `name` 会作为 Redis key 的前缀，建议：
 
@@ -866,7 +868,7 @@ public class UserServiceImpl implements UserService {
 
 - 不要给不同的 `@Cached` 注解分配相同的 `name + area`
 
-### 7\. 本地缓存的内存控制
+### 7. 本地缓存的内存控制
 
 `localLimit` 是**每个缓存实例**的限制，不是全部。如果有 10 个 `@CreateCache` 创建的缓存实例，每个 limit 100，那本地总共可能有 1000 个元素。大对象场景下要注意控制。
 
@@ -880,9 +882,9 @@ Spring AOP 基于代理实现，同类内部的方法调用不经过代理。解
 
 检查是否配置了 `-parameters` 编译参数。没有配置的话改用 `args[0]` 按下标访问。
 
-## Q: 升级到 2\.8 后反序列化报错？
+## Q: 升级到 2.8 后反序列化报错？
 
-2\.8\+ 默认开启了反序列化安全过滤器。需要在 yml 中配置 `decodeFilterAllowPatterns` 添加你的自定义类所在的包。
+2.8+ 默认开启了反序列化安全过滤器。需要在 yml 中配置 `decodeFilterAllowPatterns` 添加你的自定义类所在的包。
 
 ## Q: 如何同时连接多个 Redis 实例？
 
