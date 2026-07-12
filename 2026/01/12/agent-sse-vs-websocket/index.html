@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="背景做 Agent 应用，前后端之间的实时通信协议选择是一个绕不开的工程设计问题。目前主流的技术方案有两种：SSE（Server-Sent Events）和 WebSocket。 实际项目中，不少团队一开始选了 WebSocket，运行一段时间后发现连接管理复杂、运维成本高，最终又切回了 SSE。这不是说 WebSocket 不好，而是在 Agent 这个特定场景下，两者的适配度有明显差异。 本文">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Agent 应用中 SSE vs WebSocket 实时通信选型分析">
+<meta property="og:url" content="https://donehub.github.io/2026/01/12/agent-sse-vs-websocket/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="背景做 Agent 应用，前后端之间的实时通信协议选择是一个绕不开的工程设计问题。目前主流的技术方案有两种：SSE（Server-Sent Events）和 WebSocket。 实际项目中，不少团队一开始选了 WebSocket，运行一段时间后发现连接管理复杂、运维成本高，最终又切回了 SSE。这不是说 WebSocket 不好，而是在 Agent 这个特定场景下，两者的适配度有明显差异。 本文">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-01-11T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-07-12T13:44:00.489Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Agent">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/2026/01/12/agent-sse-vs-websocket/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Agent 应用中 SSE vs WebSocket 实时通信选型分析 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/01/12/agent-sse-vs-websocket/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Agent 应用中 SSE vs WebSocket 实时通信选型分析
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-01-12 00:00:00" itemprop="dateCreated datePublished" datetime="2026-01-12T00:00:00+08:00">2026-01-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-07-12 21:44:00" itemprop="dateModified" datetime="2026-07-12T21:44:00+08:00">2026-07-12</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/01/12/agent-sse-vs-websocket/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/01/12/agent-sse-vs-websocket/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>做 Agent 应用，前后端之间的实时通信协议选择是一个绕不开的工程设计问题。目前主流的技术方案有两种：SSE（Server-Sent Events）和 WebSocket。</p>
+<p>实际项目中，不少团队一开始选了 WebSocket，运行一段时间后发现连接管理复杂、运维成本高，最终又切回了 SSE。这不是说 WebSocket 不好，而是在 Agent 这个特定场景下，两者的适配度有明显差异。</p>
+<p>本文从协议原理、Agent 通信模式、工程实践三个层面做分析，把选型的判断依据讲清楚。</p>
+<hr>
+<h2 id="一、Agent-的通信模式"><a href="#一、Agent-的通信模式" class="headerlink" title="一、Agent 的通信模式"></a>一、Agent 的通信模式</h2><p>讨论协议选型之前，需要先理解 Agent 应用的通信模式。协议为场景服务，脱离场景谈选型没有意义。</p>
+<h3 id="1-1-典型的-Agent-交互流程"><a href="#1-1-典型的-Agent-交互流程" class="headerlink" title="1.1 典型的 Agent 交互流程"></a>1.1 典型的 Agent 交互流程</h3><p>一次典型的 Agent 对话流程如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">用户发消息 ──→ 服务端接收请求</span><br><span class="line">                 │</span><br><span class="line">                 ↓</span><br><span class="line">          LLM 开始推理（可能几十秒）</span><br><span class="line">                 │</span><br><span class="line">                 ↓</span><br><span class="line">          逐 token 生成内容（流式输出）</span><br><span class="line">                 │</span><br><span class="line">                 ↓</span><br><span class="line">          一边生成一边推给前端（打字机效果）</span><br><span class="line">                 │</span><br><span class="line">                 ↓</span><br><span class="line">          生成完毕，关闭连接</span><br><span class="line">                 │</span><br><span class="line">                 ↓</span><br><span class="line">          等待用户发下一条消息</span><br></pre></td></tr></table></figure>
+<p>这个流程有几个关键特征：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>特征</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>一问一答</strong></td>
+<td>用户发一条消息，Agent 回一段话，天然轮次制</td>
+</tr>
+<tr>
+<td><strong>服务端慢、客户端快</strong></td>
+<td>LLM 推理可能 10-60 秒，用户只发几个字</td>
+</tr>
+<tr>
+<td><strong>流式输出</strong></td>
+<td>内容逐 token 生成，需要实时推送给前端</td>
+</tr>
+<tr>
+<td><strong>单向推送为主</strong></td>
+<td>推理期间客户端只需接收数据，不需要中途发送</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>这四个特征直接决定了协议选型的方向。</p>
+<h3 id="1-2-通信的不对称性"><a href="#1-2-通信的不对称性" class="headerlink" title="1.2 通信的不对称性"></a>1.2 通信的不对称性</h3><p>Agent 交互中，客户端和服务端的通信量是<strong>不对称</strong>的。客户端发送的内容很短（一条用户消息），服务端返回的内容很长（可能几千个 token），而且是一个一个 token 持续推送过来的。</p>
+<p>在推理进行的过程中，客户端除了等待和渲染，不需要向服务端发送任何数据。这种<strong>“发一次请求，持续接收响应”</strong>的模式，是理解后续选型的关键。</p>
+<hr>
+<h2 id="二、SSE-协议原理"><a href="#二、SSE-协议原理" class="headerlink" title="二、SSE 协议原理"></a>二、SSE 协议原理</h2><h3 id="2-1-基本概念"><a href="#2-1-基本概念" class="headerlink" title="2.1 基本概念"></a>2.1 基本概念</h3><p>SSE（Server-Sent Events）是一种基于 HTTP 的服务器推送技术。它允许服务端在建立 HTTP 响应后，不立即关闭连接，而是持续向客户端推送数据。</p>
+<h3 id="2-2-协议格式"><a href="#2-2-协议格式" class="headerlink" title="2.2 协议格式"></a>2.2 协议格式</h3><p>请求是普通的 HTTP 请求，响应头中通过 <code>Content-Type: text/event-stream</code> 标识这是一个 SSE 流：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">HTTP&#x2F;1.1 200 OK</span><br><span class="line">Content-Type: text&#x2F;event-stream</span><br><span class="line">Cache-Control: no-cache</span><br><span class="line">Connection: keep-alive</span><br></pre></td></tr></table></figure>
+<p>响应体是一个持续的数据流，每条消息以 <code>data:</code> 开头，以两个换行符 <code>\n\n</code> 结尾：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">data: &#123;&quot;content&quot;: &quot;你&quot;&#125;</span><br><span class="line"></span><br><span class="line">data: &#123;&quot;content&quot;: &quot;好&quot;&#125;</span><br><span class="line"></span><br><span class="line">data: &#123;&quot;content&quot;: &quot;，&quot;&#125;</span><br><span class="line"></span><br><span class="line">data: &#123;&quot;content&quot;: &quot;我是&quot;&#125;</span><br><span class="line"></span><br><span class="line">data: &#123;&quot;content&quot;: &quot;AI&quot;&#125;</span><br><span class="line"></span><br><span class="line">data: &#123;&quot;content&quot;: &quot;助手&quot;&#125;</span><br><span class="line"></span><br><span class="line">data: [DONE]</span><br></pre></td></tr></table></figure>
+<p>前端逐条接收这些消息，拼接渲染到界面上，形成”打字机”效果。</p>
+<h3 id="2-3-前端使用方式"><a href="#2-3-前端使用方式" class="headerlink" title="2.3 前端使用方式"></a>2.3 前端使用方式</h3><p>浏览器提供了 <code>EventSource</code> API：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> eventSource = <span class="keyword">new</span> EventSource(<span class="string">'/api/chat/stream?message=你好'</span>);</span><br><span class="line"></span><br><span class="line">eventSource.onmessage = <span class="function">(<span class="params">event</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (event.data === <span class="string">'[DONE]'</span>) &#123;</span><br><span class="line">    eventSource.close();</span><br><span class="line">    <span class="keyword">return</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">const</span> data = <span class="built_in">JSON</span>.parse(event.data);</span><br><span class="line">  appendToChat(data.content);</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">eventSource.onerror = <span class="function"><span class="params">()</span> =&gt;</span> &#123;</span><br><span class="line">  <span class="comment">// 浏览器会自动尝试重连</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>没有握手过程，没有帧解析，没有心跳维护。断线重连和事件 ID 追踪由浏览器内置处理。</p>
+<h3 id="2-4-核心特性"><a href="#2-4-核心特性" class="headerlink" title="2.4 核心特性"></a>2.4 核心特性</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>单向通信</strong></td>
+<td>只能服务端向客户端推送</td>
+</tr>
+<tr>
+<td><strong>基于 HTTP</strong></td>
+<td>跑在标准 HTTP 上，兼容现有基础设施</td>
+</tr>
+<tr>
+<td><strong>自动重连</strong></td>
+<td>浏览器原生支持</td>
+</tr>
+<tr>
+<td><strong>轻量</strong></td>
+<td>不需要协议升级和握手</td>
+</tr>
+<tr>
+<td><strong>文本格式</strong></td>
+<td>只支持 UTF-8 文本，不支持二进制</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="三、WebSocket-协议原理"><a href="#三、WebSocket-协议原理" class="headerlink" title="三、WebSocket 协议原理"></a>三、WebSocket 协议原理</h2><h3 id="3-1-基本概念"><a href="#3-1-基本概念" class="headerlink" title="3.1 基本概念"></a>3.1 基本概念</h3><p>WebSocket 通过 HTTP 握手”升级”出一条全双工通信通道，客户端和服务端可以随时互发消息。</p>
+<h3 id="3-2-协议格式"><a href="#3-2-协议格式" class="headerlink" title="3.2 协议格式"></a>3.2 协议格式</h3><p>WebSocket 的连接建立分两步。</p>
+<p><strong>第一步：HTTP 升级握手</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; 客户端发起</span><br><span class="line">GET &#x2F;chat HTTP&#x2F;1.1</span><br><span class="line">Upgrade: websocket</span><br><span class="line">Connection: Upgrade</span><br><span class="line">Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ&#x3D;&#x3D;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 服务端确认</span><br><span class="line">HTTP&#x2F;1.1 101 Switching Protocols</span><br><span class="line">Upgrade: websocket</span><br><span class="line">Connection: Upgrade</span><br><span class="line">Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo&#x3D;</span><br></pre></td></tr></table></figure>
+<p>握手完成后，HTTP 连接升级为 WebSocket 连接，后续数据通过 WebSocket 帧传输。</p>
+<p><strong>第二步：全双工通信</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; 客户端可以随时发</span><br><span class="line">→ &#123;&quot;type&quot;: &quot;message&quot;, &quot;content&quot;: &quot;你好&quot;&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 服务端也可以随时发</span><br><span class="line">← &#123;&quot;type&quot;: &quot;message&quot;, &quot;content&quot;: &quot;你好，有什么可以帮你的？&quot;&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 双方同时发送，互不阻塞</span><br></pre></td></tr></table></figure>
+<h3 id="3-3-前端使用方式"><a href="#3-3-前端使用方式" class="headerlink" title="3.3 前端使用方式"></a>3.3 前端使用方式</h3><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> ws = <span class="keyword">new</span> WebSocket(<span class="string">'wss://example.com/chat'</span>);</span><br><span class="line"></span><br><span class="line">ws.onopen = <span class="function"><span class="params">()</span> =&gt;</span> &#123;</span><br><span class="line">  ws.send(<span class="built_in">JSON</span>.stringify(&#123; <span class="attr">message</span>: <span class="string">'你好'</span> &#125;));</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">ws.onmessage = <span class="function">(<span class="params">event</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> data = <span class="built_in">JSON</span>.parse(event.data);</span><br><span class="line">  appendToChat(data.content);</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">ws.onclose = <span class="function">(<span class="params">event</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="comment">// 需要自行实现重连逻辑</span></span><br><span class="line">  reconnect();</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">ws.onerror = <span class="function">(<span class="params">err</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="built_in">console</span>.error(<span class="string">'WebSocket error:'</span>, err);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>相比 SSE，需要自行处理连接生命周期管理、断线重连、心跳保活等逻辑。</p>
+<h3 id="3-4-核心特性"><a href="#3-4-核心特性" class="headerlink" title="3.4 核心特性"></a>3.4 核心特性</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>全双工通信</strong></td>
+<td>双方可以同时互发消息</td>
+</tr>
+<tr>
+<td><strong>独立协议</strong></td>
+<td>握手后脱离 HTTP，使用自己的帧格式（RFC 6455）</td>
+</tr>
+<tr>
+<td><strong>低开销</strong></td>
+<td>帧头 2-14 字节，比 HTTP 头部小</td>
+</tr>
+<tr>
+<td><strong>无自动重连</strong></td>
+<td>断线后需要自行实现</td>
+</tr>
+<tr>
+<td><strong>支持二进制</strong></td>
+<td>可传输文本和二进制数据</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="四、SSE-与-WebSocket-对比"><a href="#四、SSE-与-WebSocket-对比" class="headerlink" title="四、SSE 与 WebSocket 对比"></a>四、SSE 与 WebSocket 对比</h2><h3 id="4-1-协议特性对比"><a href="#4-1-协议特性对比" class="headerlink" title="4.1 协议特性对比"></a>4.1 协议特性对比</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>对比维度</th>
+<th>SSE</th>
+<th>WebSocket</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>通信方向</strong></td>
+<td>单向（服务端→客户端）</td>
+<td>全双工</td>
+</tr>
+<tr>
+<td><strong>协议基础</strong></td>
+<td>标准 HTTP</td>
+<td>HTTP 升级后的独立协议</td>
+</tr>
+<tr>
+<td><strong>连接方式</strong></td>
+<td>普通 HTTP 长连接</td>
+<td>需要协议升级握手</td>
+</tr>
+<tr>
+<td><strong>自动重连</strong></td>
+<td>浏览器原生支持</td>
+<td>需要自行实现</td>
+</tr>
+<tr>
+<td><strong>数据格式</strong></td>
+<td>纯文本（UTF-8）</td>
+<td>文本 + 二进制</td>
+</tr>
+<tr>
+<td><strong>防火墙穿透</strong></td>
+<td>极好（走 HTTP 通道）</td>
+<td>一般（可能被代理拦截）</td>
+</tr>
+<tr>
+<td><strong>负载均衡</strong></td>
+<td>普通 HTTP LB 即可</td>
+<td>需要 sticky session</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="4-2-开发复杂度对比"><a href="#4-2-开发复杂度对比" class="headerlink" title="4.2 开发复杂度对比"></a>4.2 开发复杂度对比</h3><p>同一个”流式聊天”功能，两种方案的实现差异比较大。</p>
+<p><strong>SSE 后端（Spring Boot）：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@GetMapping</span>(value = <span class="string">"/chat/stream"</span>, produces = MediaType.TEXT_EVENT_STREAM_VALUE)</span><br><span class="line"><span class="keyword">public</span> Flux&lt;ServerSentEvent&lt;String&gt;&gt; stream(<span class="meta">@RequestParam</span> String message) &#123;</span><br><span class="line">    <span class="keyword">return</span> chatService.streamResponse(message)</span><br><span class="line">        .map(content -&gt; ServerSentEvent.&lt;String&gt;builder()</span><br><span class="line">            .data(content)</span><br><span class="line">            .build());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>SSE 前端：</strong></p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> es = <span class="keyword">new</span> EventSource(<span class="string">`/api/chat/stream?message=<span class="subst">$&#123;msg&#125;</span>`</span>);</span><br><span class="line">es.onmessage = <span class="function">(<span class="params">e</span>) =&gt;</span> appendToChat(e.data);</span><br></pre></td></tr></table></figure>
+<p><strong>WebSocket 后端（Spring Boot）：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@ServerEndpoint</span>(<span class="string">"/chat"</span>)</span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ChatWebSocket</span> </span>&#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Map&lt;String, Session&gt; sessions = <span class="keyword">new</span> ConcurrentHashMap&lt;&gt;();</span><br><span class="line"></span><br><span class="line">    <span class="meta">@OnOpen</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onOpen</span><span class="params">(Session session)</span> </span>&#123;</span><br><span class="line">        sessions.put(session.getId(), session);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@OnMessage</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onMessage</span><span class="params">(String message, Session session)</span> </span>&#123;</span><br><span class="line">        chatService.streamResponse(message).subscribe(content -&gt; &#123;</span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                session.getBasicRemote().sendText(content);</span><br><span class="line">            &#125; <span class="keyword">catch</span> (IOException e) &#123;</span><br><span class="line">                <span class="comment">// 需要自行处理异常</span></span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@OnClose</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onClose</span><span class="params">(Session session)</span> </span>&#123;</span><br><span class="line">        sessions.remove(session.getId());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@OnError</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onError</span><span class="params">(Session session, Throwable error)</span> </span>&#123;</span><br><span class="line">        sessions.remove(session.getId());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>WebSocket 前端：</strong></p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> ws = <span class="keyword">new</span> WebSocket(<span class="string">'wss://example.com/chat'</span>);</span><br><span class="line">ws.onopen = <span class="function"><span class="params">()</span> =&gt;</span> ws.send(<span class="built_in">JSON</span>.stringify(&#123; <span class="attr">message</span>: msg &#125;));</span><br><span class="line">ws.onmessage = <span class="function">(<span class="params">e</span>) =&gt;</span> appendToChat(e.data);</span><br><span class="line">ws.onclose = <span class="function"><span class="params">()</span> =&gt;</span> &#123;</span><br><span class="line">    setTimeout(<span class="function"><span class="params">()</span> =&gt;</span> reconnect(), <span class="number">3000</span>);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>SSE 方案中，后端是一个标准的 HTTP 接口，前端使用 <code>EventSource</code>。WebSocket 方案需要管理 Session 生命周期、处理连接状态、实现重连逻辑。代码量差异明显。</p>
+<h3 id="4-3-运维复杂度对比"><a href="#4-3-运维复杂度对比" class="headerlink" title="4.3 运维复杂度对比"></a>4.3 运维复杂度对比</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>运维维度</th>
+<th>SSE</th>
+<th>WebSocket</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Nginx 配置</strong></td>
+<td>几乎不用改</td>
+<td>需要配置 <code>Upgrade</code> 头</td>
+</tr>
+<tr>
+<td><strong>负载均衡</strong></td>
+<td>普通 HTTP 均衡即可</td>
+<td>需要 sticky session</td>
+</tr>
+<tr>
+<td><strong>CDN 支持</strong></td>
+<td>原生支持</td>
+<td>不支持</td>
+</tr>
+<tr>
+<td><strong>监控</strong></td>
+<td>与 HTTP 接口一致</td>
+<td>需要专门的监控方案</td>
+</tr>
+<tr>
+<td><strong>水平扩展</strong></td>
+<td>无状态，直接扩展</td>
+<td>有状态连接，需要 session 同步</td>
+</tr>
+<tr>
+<td><strong>调试</strong></td>
+<td>DevTools Network 面板直接查看</td>
+<td>需要专用调试工具</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>SSE 的运维成本基本等同于一个普通 HTTP 接口。WebSocket 需要维护一套长连接基础设施。</p>
+<hr>
+<h2 id="五、LLM-场景下-SSE-成为主流的原因"><a href="#五、LLM-场景下-SSE-成为主流的原因" class="headerlink" title="五、LLM 场景下 SSE 成为主流的原因"></a>五、LLM 场景下 SSE 成为主流的原因</h2><p>OpenAI、Anthropic、Google、阿里、字节等厂商的大模型 API，在流式输出上全部选择了 SSE。这个选择背后有清晰的技术逻辑。</p>
+<h3 id="5-1-LLM-推理是单向数据流"><a href="#5-1-LLM-推理是单向数据流" class="headerlink" title="5.1 LLM 推理是单向数据流"></a>5.1 LLM 推理是单向数据流</h3><p>LLM 生成文本是一个<strong>自回归（auto-regressive）</strong>过程：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">输入 prompt ──→ 推理 ──→ 生成 token₁ ──→ 拼上 token₁ 再推理 ──→ 生成 token₂ ──→ ...</span><br></pre></td></tr></table></figure>
+<p>每个 token 的生成依赖前面所有 token。这个过程是单向的、顺序的。从通信角度看，这就是一个单向数据流——服务端持续产生数据，客户端持续接收。SSE 的设计目标恰好是服务端向客户端的单向推送。</p>
+<h3 id="5-2-双向通道在推理期间是闲置的"><a href="#5-2-双向通道在推理期间是闲置的" class="headerlink" title="5.2 双向通道在推理期间是闲置的"></a>5.2 双向通道在推理期间是闲置的</h3><p>WebSocket 的核心优势是全双工通信。在 LLM 推理过程中：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">用户发消息 ──→ 推理开始 ──→ token₁ token₂ token₃ ... ──→ 推理结束 ──→ 用户发下一条</span><br><span class="line">                ↑                                                    ↑</span><br><span class="line">                │                                                    │</span><br><span class="line">           推理期间客户端                                    推理结束后才能</span><br><span class="line">           不需要发送任何数据                                  发送下一条消息</span><br></pre></td></tr></table></figure>
+<p>推理可能持续数十秒，这段时间内客户端不需要向服务端发送任何数据。WebSocket 的双向通道在大部分时间里处于半闲置状态。</p>
+<h3 id="5-3-SSE-继承了-HTTP-生态的全部基础设施"><a href="#5-3-SSE-继承了-HTTP-生态的全部基础设施" class="headerlink" title="5.3 SSE 继承了 HTTP 生态的全部基础设施"></a>5.3 SSE 继承了 HTTP 生态的全部基础设施</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>优势</th>
+<th>来源</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>自动重连</td>
+<td><code>EventSource</code> 内置</td>
+</tr>
+<tr>
+<td>穿透防火墙</td>
+<td>走 HTTP 通道，不需要额外端口</td>
+</tr>
+<tr>
+<td>水平扩展</td>
+<td>本质是 HTTP 请求，无状态</td>
+</tr>
+<tr>
+<td>CDN 加速</td>
+<td>标准 HTTP 响应</td>
+</tr>
+<tr>
+<td>监控运维</td>
+<td>复用现有 HTTP 监控体系</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>这些不是 SSE 本身的设计优势，而是因为它<strong>就是 HTTP</strong>，天然继承了 HTTP 生态 30 年积累的基础设施。</p>
+<h3 id="5-4-主流厂商的协议选择"><a href="#5-4-主流厂商的协议选择" class="headerlink" title="5.4 主流厂商的协议选择"></a>5.4 主流厂商的协议选择</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>服务商</th>
+<th>流式输出协议</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OpenAI (GPT-4o)</td>
+<td>SSE</td>
+</tr>
+<tr>
+<td>Anthropic (Claude)</td>
+<td>SSE</td>
+</tr>
+<tr>
+<td>Google (Gemini)</td>
+<td>SSE</td>
+</tr>
+<tr>
+<td>阿里 (通义千问)</td>
+<td>SSE</td>
+</tr>
+<tr>
+<td>字节 (豆包)</td>
+<td>SSE</td>
+</tr>
+<tr>
+<td>Meta (Llama)</td>
+<td>SSE</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>主流厂商的一致性选择，从工程实践层面验证了 SSE 在 LLM 流式输出场景下的适用性。</p>
+<hr>
+<h2 id="六、分层选型建议"><a href="#六、分层选型建议" class="headerlink" title="六、分层选型建议"></a>六、分层选型建议</h2><p>SSE 在 LLM 流式输出场景下是最优选择，但 WebSocket 在其他场景中仍然有不可替代的价值。选型的依据是通信模式，不是协议的”先进程度”。</p>
+<h3 id="6-1-场景分层"><a href="#6-1-场景分层" class="headerlink" title="6.1 场景分层"></a>6.1 场景分层</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                     场景分层选型模型                           │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│   第三层：点对点音视频    ──────→  WebRTC                    │</span><br><span class="line">│   （视频通话、屏幕共享）                                    │</span><br><span class="line">│                                                             │</span><br><span class="line">│   ────────────────────────────────────────────────────────  │</span><br><span class="line">│                                                             │</span><br><span class="line">│   第二层：双向实时互动    ──────→  WebSocket                 │</span><br><span class="line">│   （多人协作、实时游戏、语音助手）                            │</span><br><span class="line">│                                                             │</span><br><span class="line">│   ────────────────────────────────────────────────────────  │</span><br><span class="line">│                                                             │</span><br><span class="line">│   第一层：流式文本输出    ──────→  SSE                      │</span><br><span class="line">│   （AI 对话、通知推送、数据流）                              │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<h3 id="6-2-SSE-适用场景"><a href="#6-2-SSE-适用场景" class="headerlink" title="6.2 SSE 适用场景"></a>6.2 SSE 适用场景</h3><p>AI 对话流式输出、实时通知、日志流、数据推送。</p>
+<p>共同特征：客户端发请求，服务端持续推送数据，推理/处理期间客户端不需要中途发送数据。单向数据流即可满足需求。</p>
+<p>代表产品：ChatGPT、Claude、通义千问、Copilot。</p>
+<h3 id="6-3-WebSocket-适用场景"><a href="#6-3-WebSocket-适用场景" class="headerlink" title="6.3 WebSocket 适用场景"></a>6.3 WebSocket 适用场景</h3><p>多人协作编辑、在线游戏、语音助手、实时仪表盘。</p>
+<p>共同特征：客户端和服务端需要同时、随时互发消息，多方状态需要实时同步。</p>
+<p>以多人协作文档为例：A 在打字的同时 B 也在打字，双方都需要实时看到对方的操作。这种场景下双方都在持续发送数据，必须使用 WebSocket。</p>
+<h3 id="6-4-WebRTC-适用场景"><a href="#6-4-WebRTC-适用场景" class="headerlink" title="6.4 WebRTC 适用场景"></a>6.4 WebRTC 适用场景</h3><p>视频通话、屏幕共享、P2P 文件传输。</p>
+<p>共同特征：需要极低延迟的点对点传输，涉及音视频媒体流。这一层与 LLM 应用关系不大。</p>
+<h3 id="6-5-混合方案"><a href="#6-5-混合方案" class="headerlink" title="6.5 混合方案"></a>6.5 混合方案</h3><p>在复杂的 Agent 应用中，可以同时使用两种协议：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">┌──────────────┐         SSE（流式输出）          ┌──────────────┐</span><br><span class="line">│              │ ◄────────────────────────────── │              │</span><br><span class="line">│   前端 UI    │                                  │   Agent 后端  │</span><br><span class="line">│              │ ◄──────────────────────────────► │              │</span><br><span class="line">└──────────────┘    WebSocket（控制指令）          └──────────────┘</span><br></pre></td></tr></table></figure>
+<p>SSE 负责 LLM 推理结果的流式推送（占大部分数据量），WebSocket 负责用户中途取消推理、切换模型、调整参数等控制指令。各取所长，但架构复杂度会上升。</p>
+<hr>
+<h2 id="七、实战：SSE-流式对话接口实现"><a href="#七、实战：SSE-流式对话接口实现" class="headerlink" title="七、实战：SSE 流式对话接口实现"></a>七、实战：SSE 流式对话接口实现</h2><h3 id="7-1-后端：Spring-Boot-WebFlux"><a href="#7-1-后端：Spring-Boot-WebFlux" class="headerlink" title="7.1 后端：Spring Boot + WebFlux"></a>7.1 后端：Spring Boot + WebFlux</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@RestController</span></span><br><span class="line"><span class="meta">@RequestMapping</span>(<span class="string">"/api/chat"</span>)</span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ChatController</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> ChatService chatService;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@GetMapping</span>(value = <span class="string">"/stream"</span>, produces = MediaType.TEXT_EVENT_STREAM_VALUE)</span><br><span class="line">    <span class="keyword">public</span> Flux&lt;ServerSentEvent&lt;ChatStreamResponse&gt;&gt; stream(</span><br><span class="line">            <span class="meta">@RequestParam</span> String message,</span><br><span class="line">            <span class="meta">@RequestParam</span>(required = <span class="keyword">false</span>) String sessionId) &#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> chatService.streamChat(message, sessionId)</span><br><span class="line">            .map(content -&gt; ServerSentEvent.&lt;ChatStreamResponse&gt;builder()</span><br><span class="line">                .event(<span class="string">"message"</span>)</span><br><span class="line">                .data(<span class="keyword">new</span> ChatStreamResponse(content))</span><br><span class="line">                .build())</span><br><span class="line">            .concatWith(Flux.just(</span><br><span class="line">                ServerSentEvent.&lt;ChatStreamResponse&gt;builder()</span><br><span class="line">                    .event(<span class="string">"done"</span>)</span><br><span class="line">                    .data(<span class="keyword">new</span> ChatStreamResponse(<span class="string">"[DONE]"</span>))</span><br><span class="line">                    .build()</span><br><span class="line">            ));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Nginx 配置，确保不会缓冲 SSE 响应：</p>
+<figure class="highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">location</span> /api/chat/stream &#123;</span><br><span class="line">    <span class="attribute">proxy_pass</span> http://backend;</span><br><span class="line">    <span class="attribute">proxy_set_header</span> Connection <span class="string">''</span>;</span><br><span class="line">    <span class="attribute">proxy_http_version</span> <span class="number">1</span>.<span class="number">1</span>;</span><br><span class="line">    <span class="attribute">chunked_transfer_encoding</span> <span class="literal">off</span>;</span><br><span class="line">    <span class="attribute">proxy_buffering</span> <span class="literal">off</span>;</span><br><span class="line">    <span class="attribute">proxy_cache</span> <span class="literal">off</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="7-2-前端：fetch-ReadableStream"><a href="#7-2-前端：fetch-ReadableStream" class="headerlink" title="7.2 前端：fetch + ReadableStream"></a>7.2 前端：fetch + ReadableStream</h3><p>实际业务中用 <code>fetch</code> + <code>ReadableStream</code> 比 <code>EventSource</code> 更灵活，因为 <code>EventSource</code> 只支持 GET 请求，而用户消息可能很长，POST 更合适。</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">ChatStream</span> </span>&#123;</span><br><span class="line">  <span class="keyword">constructor</span>() &#123;</span><br><span class="line">    <span class="keyword">this</span>.abortController = <span class="literal">null</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">async</span> sendMessage(message, onChunk, onDone) &#123;</span><br><span class="line">    <span class="keyword">this</span>.abortController = <span class="keyword">new</span> AbortController();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">const</span> response = <span class="keyword">await</span> fetch(<span class="string">`/api/chat/stream?message=<span class="subst">$&#123;<span class="built_in">encodeURIComponent</span>(message)&#125;</span>`</span>, &#123;</span><br><span class="line">      signal: <span class="keyword">this</span>.abortController.signal,</span><br><span class="line">    &#125;);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">const</span> reader = response.body.getReader();</span><br><span class="line">    <span class="keyword">const</span> decoder = <span class="keyword">new</span> TextDecoder();</span><br><span class="line">    <span class="keyword">let</span> buffer = <span class="string">''</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">      <span class="keyword">const</span> &#123; done, value &#125; = <span class="keyword">await</span> reader.read();</span><br><span class="line">      <span class="keyword">if</span> (done) <span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">      buffer += decoder.decode(value, &#123; <span class="attr">stream</span>: <span class="literal">true</span> &#125;);</span><br><span class="line">      <span class="keyword">const</span> lines = buffer.split(<span class="string">'\n'</span>);</span><br><span class="line">      buffer = lines.pop();</span><br><span class="line"></span><br><span class="line">      <span class="keyword">for</span> (<span class="keyword">const</span> line <span class="keyword">of</span> lines) &#123;</span><br><span class="line">        <span class="keyword">if</span> (line.startsWith(<span class="string">'data:'</span>)) &#123;</span><br><span class="line">          <span class="keyword">const</span> data = line.slice(<span class="number">5</span>).trim();</span><br><span class="line">          <span class="keyword">if</span> (data === <span class="string">'[DONE]'</span>) &#123;</span><br><span class="line">            onDone?.();</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">          &#125;</span><br><span class="line">          <span class="keyword">const</span> parsed = <span class="built_in">JSON</span>.parse(data);</span><br><span class="line">          onChunk?.(parsed.content);</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  cancel() &#123;</span><br><span class="line">    <span class="keyword">this</span>.abortController?.abort();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 使用示例</span></span><br><span class="line"><span class="keyword">const</span> chat = <span class="keyword">new</span> ChatStream();</span><br><span class="line">chat.sendMessage(<span class="string">'介绍一下你自己'</span>,</span><br><span class="line">  (chunk) =&gt; &#123;</span><br><span class="line">    <span class="built_in">document</span>.getElementById(<span class="string">'chat-box'</span>).innerText += chunk;</span><br><span class="line">  &#125;,</span><br><span class="line">  () =&gt; &#123;</span><br><span class="line">    <span class="built_in">console</span>.log(<span class="string">'生成完毕'</span>);</span><br><span class="line">  &#125;</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="八、常见问题"><a href="#八、常见问题" class="headerlink" title="八、常见问题"></a>八、常见问题</h2><h3 id="SSE-有连接数限制"><a href="#SSE-有连接数限制" class="headerlink" title="SSE 有连接数限制"></a>SSE 有连接数限制</h3><p>浏览器对同一域名的 HTTP 连接数有限制，Chrome 是 6 个。如果同时开多个 SSE 连接，可能占满配额。</p>
+<p>解决方案：使用 HTTP/2（多路复用，无连接数限制），或合并多个 SSE 流为一个（通过事件类型区分）。</p>
+<h3 id="SSE-只能-GET-请求"><a href="#SSE-只能-GET-请求" class="headerlink" title="SSE 只能 GET 请求"></a>SSE 只能 GET 请求</h3><p><code>EventSource</code> API 只支持 GET。使用 <code>fetch</code> + <code>ReadableStream</code> 解析 SSE 格式数据可以支持 POST。大部分 Agent 应用实际采用这种方式。</p>
+<h3 id="SSE-断线处理"><a href="#SSE-断线处理" class="headerlink" title="SSE 断线处理"></a>SSE 断线处理</h3><p><code>EventSource</code> 会自动重连。<code>fetch</code> 方案需要自行实现重连逻辑，使用指数退避策略即可。</p>
+<h3 id="WebSocket-传输性能更优"><a href="#WebSocket-传输性能更优" class="headerlink" title="WebSocket 传输性能更优"></a>WebSocket 传输性能更优</h3><p>WebSocket 帧开销确实更小（2-14 字节 vs HTTP chunked 编码），但在 LLM 流式场景下，瓶颈在推理速度（几十毫秒到几秒一个 token），网络传输的开销差异可以忽略。</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>Agent 应用中 SSE 和 WebSocket 的选型，核心判断依据是通信模式：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>推荐协议</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AI 对话流式输出</td>
+<td>SSE</td>
+<td>单向推送，简单高效</td>
+</tr>
+<tr>
+<td>实时通知推送</td>
+<td>SSE</td>
+<td>天然适合服务端推送</td>
+</tr>
+<tr>
+<td>数据流/日志流</td>
+<td>SSE</td>
+<td>持续单向数据流</td>
+</tr>
+<tr>
+<td>多人协作编辑</td>
+<td>WebSocket</td>
+<td>需要双向实时同步</td>
+</tr>
+<tr>
+<td>在线游戏</td>
+<td>WebSocket</td>
+<td>需要低延迟双向通信</td>
+</tr>
+<tr>
+<td>语音/视频通话</td>
+<td>WebRTC</td>
+<td>需要 P2P 媒体流</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>LLM 推理是单向数据流，客户端在推理期间不需要发送数据。SSE 的单向推送模型与这个通信模式天然匹配，同时继承了 HTTP 生态的全部基础设施，开发和运维成本都远低于 WebSocket。</p>
+<p>在不需要双向实时通信的场景下，SSE 是更合适的选择。</p>
+
+    </div>
+
+    
+    
+    
+        
+
+  <div class="followme">
+    <p>欢迎关注我的其它发布渠道</p>
+
+    <div class="social-list">
+
+        <div class="social-item">
+          <a target="_blank" class="social-link" href="/atom.xml">
+            <span class="icon">
+              <i class="fa fa-rss"></i>
+            </span>
+
+            <span class="label">RSS</span>
+          </a>
+        </div>
+    </div>
+  </div>
+
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"><i class="fa fa-tag"></i> Agent</a>
+          </div>
+
+        
+<div class="post-share">
+  <div class="share-title">分享到</div>
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+
+<style>
+.post-share {
+  margin: 20px 0;
+  padding: 15px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+}
+.post-share .share-title {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 10px;
+}
+.post-share .social-share {
+  text-align: center;
+}
+.post-share .social-share a {
+  margin: 0 8px;
+}
+/* 微信二维码样式优化 */
+.social-share .wechat-qrcode {
+  border: 1px solid #eee;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+.social-share .wechat-qrcode h4 {
+  color: #333;
+  font-weight: normal;
+}
+</style>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/01/05/spring-ai-deep-analysis/" rel="prev" title="Spring AI 学习与使用">
+      <i class="fa fa-chevron-left"></i> Spring AI 学习与使用
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/02/01/agent-context-compression-deep-analysis/" rel="next" title="Agent 上下文压缩：长任务状态治理的工程全景">
+      Agent 上下文压缩：长任务状态治理的工程全景 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#背景"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、Agent-的通信模式"><span class="nav-number">2.</span> <span class="nav-text">一、Agent 的通信模式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-典型的-Agent-交互流程"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 典型的 Agent 交互流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-通信的不对称性"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 通信的不对称性</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、SSE-协议原理"><span class="nav-number">3.</span> <span class="nav-text">二、SSE 协议原理</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-基本概念"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 基本概念</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-协议格式"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 协议格式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-前端使用方式"><span class="nav-number">3.3.</span> <span class="nav-text">2.3 前端使用方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-核心特性"><span class="nav-number">3.4.</span> <span class="nav-text">2.4 核心特性</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、WebSocket-协议原理"><span class="nav-number">4.</span> <span class="nav-text">三、WebSocket 协议原理</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-基本概念"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 基本概念</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-协议格式"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 协议格式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-前端使用方式"><span class="nav-number">4.3.</span> <span class="nav-text">3.3 前端使用方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-核心特性"><span class="nav-number">4.4.</span> <span class="nav-text">3.4 核心特性</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、SSE-与-WebSocket-对比"><span class="nav-number">5.</span> <span class="nav-text">四、SSE 与 WebSocket 对比</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-协议特性对比"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 协议特性对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-开发复杂度对比"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 开发复杂度对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-运维复杂度对比"><span class="nav-number">5.3.</span> <span class="nav-text">4.3 运维复杂度对比</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、LLM-场景下-SSE-成为主流的原因"><span class="nav-number">6.</span> <span class="nav-text">五、LLM 场景下 SSE 成为主流的原因</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-LLM-推理是单向数据流"><span class="nav-number">6.1.</span> <span class="nav-text">5.1 LLM 推理是单向数据流</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-双向通道在推理期间是闲置的"><span class="nav-number">6.2.</span> <span class="nav-text">5.2 双向通道在推理期间是闲置的</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-SSE-继承了-HTTP-生态的全部基础设施"><span class="nav-number">6.3.</span> <span class="nav-text">5.3 SSE 继承了 HTTP 生态的全部基础设施</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-4-主流厂商的协议选择"><span class="nav-number">6.4.</span> <span class="nav-text">5.4 主流厂商的协议选择</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、分层选型建议"><span class="nav-number">7.</span> <span class="nav-text">六、分层选型建议</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-场景分层"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 场景分层</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-SSE-适用场景"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 SSE 适用场景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-WebSocket-适用场景"><span class="nav-number">7.3.</span> <span class="nav-text">6.3 WebSocket 适用场景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-4-WebRTC-适用场景"><span class="nav-number">7.4.</span> <span class="nav-text">6.4 WebRTC 适用场景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-5-混合方案"><span class="nav-number">7.5.</span> <span class="nav-text">6.5 混合方案</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、实战：SSE-流式对话接口实现"><span class="nav-number">8.</span> <span class="nav-text">七、实战：SSE 流式对话接口实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-后端：Spring-Boot-WebFlux"><span class="nav-number">8.1.</span> <span class="nav-text">7.1 后端：Spring Boot + WebFlux</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-2-前端：fetch-ReadableStream"><span class="nav-number">8.2.</span> <span class="nav-text">7.2 前端：fetch + ReadableStream</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、常见问题"><span class="nav-number">9.</span> <span class="nav-text">八、常见问题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#SSE-有连接数限制"><span class="nav-number">9.1.</span> <span class="nav-text">SSE 有连接数限制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SSE-只能-GET-请求"><span class="nav-number">9.2.</span> <span class="nav-text">SSE 只能 GET 请求</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SSE-断线处理"><span class="nav-number">9.3.</span> <span class="nav-text">SSE 断线处理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#WebSocket-传输性能更优"><span class="nav-number">9.4.</span> <span class="nav-text">WebSocket 传输性能更优</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#总结"><span class="nav-number">10.</span> <span class="nav-text">总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">104</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">64</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
