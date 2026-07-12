@@ -195,6 +195,358 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/02/01/agent-context-compression-deep-analysis/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/02/01/agent-context-compression-deep-analysis/" class="post-title-link" itemprop="url">Agent 上下文压缩：长任务状态治理的工程全景</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-02-01 00:00:00" itemprop="dateCreated datePublished" datetime="2026-02-01T00:00:00+08:00">2026-02-01</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-07-01 19:35:34" itemprop="dateModified" datetime="2026-07-01T19:35:34+08:00">2026-07-01</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/02/01/agent-context-compression-deep-analysis/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/02/01/agent-context-compression-deep-analysis/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>构建 Agent 过程中，都会遇到上下文窗口不够用的问题。</p>
+<p>很多人觉得这不是事儿——现在模型上下文窗口动辄 128K、200K，塞就完了。但我们做 Agent 的人都知道，<strong>窗口大不等于能用得久</strong>。原因很直接：</p>
+<ul>
+<li><strong>成本</strong>：token 是按量计费的，200K 上下文跑一轮可能就要几毛钱，一天跑几百轮，月底账单能吓死人</li>
+<li><strong>延迟</strong>：上下文越长，首 token 延迟越高，用户体验直线下降</li>
+<li><strong>噪声</strong>：塞进去的信息越多，模型越容易”走神”，关键指令被淹没在历史对话的海洋里</li>
+</ul>
+<p>所以上下文压缩不是”要不要做”的问题，而是”怎么做好”的问题。</p>
+<p>这篇文章从工程视角系统拆解 Agent 上下文压缩这件事——不是简单做摘要，而是一套完整的<strong>长任务状态治理体系</strong>。</p>
+<hr>
+<h2 id="一、核心矛盾：信息保真-vs-窗口有限"><a href="#一、核心矛盾：信息保真-vs-窗口有限" class="headerlink" title="一、核心矛盾：信息保真 vs 窗口有限"></a>一、核心矛盾：信息保真 vs 窗口有限</h2><h3 id="1-1-一个形象的比喻"><a href="#1-1-一个形象的比喻" class="headerlink" title="1.1 一个形象的比喻"></a>1.1 一个形象的比喻</h3><p>想象你是一个项目经理，工位上只有一张 1 米宽的桌子。桌上要放：当前任务的资料、历史沟通记录、团队通讯录、公司规章制度、客户反馈……</p>
+<p>桌子就这么大，你不可能把所有东西都摊开。你的做法是：</p>
+<ul>
+<li><strong>手边</strong>放当前正在处理的文件</li>
+<li><strong>抽屉里</strong>放最近几天的沟通记录</li>
+<li><strong>文件柜</strong>存历史项目档案</li>
+<li><strong>脑子里</strong>记着关键决策和客户偏好</li>
+</ul>
+<p>桌子就是你的<strong>上下文窗口</strong>，你的信息管理策略就是<strong>上下文压缩</strong>。</p>
+<h3 id="1-2-Agent-面临同样的困境"><a href="#1-2-Agent-面临同样的困境" class="headerlink" title="1.2 Agent 面临同样的困境"></a>1.2 Agent 面临同样的困境</h3><p>Agent 的”桌子”就是模型的上下文窗口，需要同时容纳：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>信息类型</th>
+<th>说明</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>系统指令</td>
+<td>角色定义、行为约束、工具描述</td>
+<td>“你是一个代码助手，不要执行删除操作”</td>
+</tr>
+<tr>
+<td>用户目标</td>
+<td>当前任务、约束条件、截止时间</td>
+<td>“在今天 5 点前完成用户模块重构”</td>
+</tr>
+<tr>
+<td>对话历史</td>
+<td>多轮交互的上下文</td>
+<td>用户之前的提问和纠正</td>
+</tr>
+<tr>
+<td>工具结果</td>
+<td>API 返回、文件内容、搜索结果</td>
+<td>数据库查询结果、文件读取内容</td>
+</tr>
+<tr>
+<td>中间状态</td>
+<td>已完成的步骤、待办事项、中间结论</td>
+<td>“已完成身份验证模块，还差权限校验”</td>
+</tr>
+<tr>
+<td>外部知识</td>
+<td>RAG 召回的文档片段、参考资料</td>
+<td>相关技术文档、历史 case</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>当任务只有 2-3 轮对话时，全部塞进去毫无压力。但当任务进行到 50 轮、100 轮时，这些信息的总量会远超窗口限制。</p>
+<p><strong>核心矛盾就在这里：长任务需要的信息量 &gt; 模型能装下的信息量。</strong></p>
+<p>压缩的本质，就是在有限的窗口里，<strong>最大化当前决策所需的信息密度</strong>。</p>
+<hr>
+<h2 id="二、分层架构：不是所有信息都值得同等对待"><a href="#二、分层架构：不是所有信息都值得同等对待" class="headerlink" title="二、分层架构：不是所有信息都值得同等对待"></a>二、分层架构：不是所有信息都值得同等对待</h2><p>最直觉的做法是”全塞进去”——把历史对话、工具结果、外部知识一股脑丢给模型。这种做法的结局我们在前面已经说了：成本高、延迟大、噪声多。</p>
+<p>正确的思路是<strong>分层管理</strong>——不同信息有不同的保留策略，就像项目经理不会把所有文件都摊在桌上一样。</p>
+<h3 id="2-1-四层信息架构"><a href="#2-1-四层信息架构" class="headerlink" title="2.1 四层信息架构"></a>2.1 四层信息架构</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">┌───────────────────────────────────────────────────────┐</span><br><span class="line">│                  上下文窗口（有限空间）                  │</span><br><span class="line">│                                                       │</span><br><span class="line">│  ┌─────────────────────────────────────────────────┐  │</span><br><span class="line">│  │ L1：热区 — 原文保留                              │  │</span><br><span class="line">│  │   最近 N 轮对话、当前任务状态、未完成步骤          │  │</span><br><span class="line">│  │   特点：一字不改，完整保留                        │  │</span><br><span class="line">│  └─────────────────────────────────────────────────┘  │</span><br><span class="line">│                                                       │</span><br><span class="line">│  ┌─────────────────────────────────────────────────┐  │</span><br><span class="line">│  │ L2：温区 — 结构化摘要                            │  │</span><br><span class="line">│  │   早期对话摘要、已完成任务的关键结论               │  │</span><br><span class="line">│  │   特点：保留决策和结论，丢弃过程                   │  │</span><br><span class="line">│  └─────────────────────────────────────────────────┘  │</span><br><span class="line">│                                                       │</span><br><span class="line">│  ┌─────────────────────────────────────────────────┐  │</span><br><span class="line">│  │ L3：冷区 — 按需召回                              │  │</span><br><span class="line">│  │   历史工具结果、旧文件内容、早期搜索结果            │  │</span><br><span class="line">│  │   特点：只存索引和引用，需要时再拉取                │  │</span><br><span class="line">│  └─────────────────────────────────────────────────┘  │</span><br><span class="line">│                                                       │</span><br><span class="line">│  ┌─────────────────────────────────────────────────┐  │</span><br><span class="line">│  │ L4：冻结区 — 外部记忆                            │  │</span><br><span class="line">│  │   用户偏好、项目规范、历史经验教训                  │  │</span><br><span class="line">│  │   特点：持久化存储，跨会话可用                     │  │</span><br><span class="line">│  └─────────────────────────────────────────────────┘  │</span><br><span class="line">└───────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p>每层的”温度”不同，访问频率不同，保留策略也不同。热区信息每次都完整进模型，冷区信息只带一个索引，冻结区信息需要显式召回。</p>
+<h3 id="2-2-层间流转"><a href="#2-2-层间流转" class="headerlink" title="2.2 层间流转"></a>2.2 层间流转</h3><p>信息不是静态分层的，它会随着任务推进<strong>从热变冷</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">第 1 轮对话 → 在热区（原文保留）</span><br><span class="line">第 5 轮对话 → 还在热区</span><br><span class="line">第 20 轮对话 → 移入温区（摘要化）</span><br><span class="line">第 50 轮对话 → 移入冷区（只存引用）</span><br><span class="line">用户偏好 → 写入冻结区（持久化记忆）</span><br></pre></td></tr></table></figure>
+<p>这个流转过程是<strong>自动的、渐进的</strong>，不是一刀切地截断。</p>
+<hr>
+<h2 id="三、压缩的五种武器"><a href="#三、压缩的五种武器" class="headerlink" title="三、压缩的五种武器"></a>三、压缩的五种武器</h2><p>有了分层架构，接下来要解决具体问题：怎么压？针对不同类型的信息，有不同的压缩策略。</p>
+<h3 id="3-1-对话摘要：把过程变成结论"><a href="#3-1-对话摘要：把过程变成结论" class="headerlink" title="3.1 对话摘要：把过程变成结论"></a>3.1 对话摘要：把过程变成结论</h3><p>最基础的压缩手段——对早期对话生成摘要。</p>
+<p>但这里有个常见误区：摘要不是”缩短版的对话”，而是<strong>提取决策链</strong>。</p>
+<p>差的摘要：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">用户问了怎么实现登录功能，助手建议使用 JWT，</span><br><span class="line">然后讨论了 token 过期时间，最后决定设为 24 小时。</span><br></pre></td></tr></table></figure>
+<p>好的摘要：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">## 已完成决策</span><br><span class="line">- 认证方案：JWT（原因：无状态，适合微服务架构）</span><br><span class="line">- Token 过期时间：24 小时（原因：平衡安全性和用户体验）</span><br><span class="line"></span><br><span class="line">## 待完成</span><br><span class="line">- 邮箱验证功能</span><br><span class="line">- 刷新 token 机制</span><br></pre></td></tr></table></figure>
+<p>区别在哪？差的摘要在讲故事，好的摘要在<strong>保存状态</strong>。Agent 拿着好的摘要能直接继续工作，拿着差的摘要还得重新理解一遍来龙去脉。</p>
+<p><strong>摘要的原则：记结论，不记过程；记决策，不记讨论。</strong></p>
+<h3 id="3-2-工具结果裁剪：只留有用的部分"><a href="#3-2-工具结果裁剪：只留有用的部分" class="headerlink" title="3.2 工具结果裁剪：只留有用的部分"></a>3.2 工具结果裁剪：只留有用的部分</h3><p>Agent 调用工具后，返回结果往往很长。一个数据库查询可能返回几千行，一个文件读取可能上万字。全部塞进上下文，一两轮就把窗口吃光了。</p>
+<p>工具结果压缩的核心思路是<strong>结构化裁剪</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">原始返回（5000 行）</span><br><span class="line">    │</span><br><span class="line">    ├── 提取字段名和类型 ──── 保留</span><br><span class="line">    ├── 提取关键值&#x2F;异常值 ─── 保留</span><br><span class="line">    ├── 列表类结果 Top-K ──── 只保留前 10 条 + 聚合统计</span><br><span class="line">    ├── 错误码和错误信息 ──── 保留</span><br><span class="line">    └── 其余数据 ──────────── 丢弃（存对象存储，带引用 ID）</span><br></pre></td></tr></table></figure>
+<p>举个例子，Agent 查了一下用户表：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> <span class="keyword">users</span> <span class="keyword">WHERE</span> create_time &gt; <span class="string">'2026-01-01'</span>;</span><br><span class="line"><span class="comment">-- 返回 3000 条记录</span></span><br></pre></td></tr></table></figure>
+<p>压缩后不是把 3000 条记录全塞进去，而是：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">查询结果：共 3000 条用户记录</span><br><span class="line">字段：id, name, email, status, create_time</span><br><span class="line">状态分布：active&#x3D;2400, inactive&#x3D;500, banned&#x3D;100</span><br><span class="line">最近 10 条：[前 10 条记录的摘要]</span><br><span class="line">引用 ID：result_20260701_001（需要完整数据时可通过此 ID 回溯）</span><br></pre></td></tr></table></figure>
+<p>从 5000 行压缩到不到 20 行，关键信息没丢。</p>
+<h3 id="3-3-重复检测：同样的内容不出现两次"><a href="#3-3-重复检测：同样的内容不出现两次" class="headerlink" title="3.3 重复检测：同样的内容不出现两次"></a>3.3 重复检测：同样的内容不出现两次</h3><p>Agent 在处理文件时，经常多次读取同一个文件。如果不做处理，同一个文件的内容会在上下文里出现好几次。</p>
+<p>解决方式很直觉：<strong>去重</strong>。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">第 3 轮：读取了 src&#x2F;auth.ts 的内容（完整展示）</span><br><span class="line">第 8 轮：再次读取 src&#x2F;auth.ts 的内容</span><br><span class="line">  → 压缩为：[文件 src&#x2F;auth.ts 内容已在第 3 轮展示，此处省略]</span><br></pre></td></tr></table></figure>
+<p>这看起来简单，但在实际工程中非常有效。据 Claude Code 的实现（参考本博客之前的文章 <a href="/claude-code-context-compression/">Context 管理：四级压缩与无限对话的秘密</a>），仅去重这一步就能节省大量 token。</p>
+<h3 id="3-4-状态提取：把”隐性知识”变成”显性清单”"><a href="#3-4-状态提取：把”隐性知识”变成”显性清单”" class="headerlink" title="3.4 状态提取：把”隐性知识”变成”显性清单”"></a>3.4 状态提取：把”隐性知识”变成”显性清单”</h3><p>这是最容易被忽略、但最关键的压缩手段。</p>
+<p>在多轮任务中，有很多关键约束是散落在对话各处的：</p>
+<ul>
+<li>第 2 轮用户提到”数据库用的是 PostgreSQL”</li>
+<li>第 5 轮确认了”接口格式用 REST，不用 GraphQL”</li>
+<li>第 8 轮说了”部署环境是 K8s，注意内存限制”</li>
+</ul>
+<p>这些信息如果不显式提取出来，一旦被摘要化就可能丢失。而它们是<strong>硬约束</strong>，丢了就会导致后续工作做错方向。</p>
+<p>所以压缩前要做一件事：<strong>状态提取</strong>。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────┐</span><br><span class="line">│ 当前任务状态（每轮自动更新）              │</span><br><span class="line">├─────────────────────────────────────────┤</span><br><span class="line">│ 目标：重构用户模块                        │</span><br><span class="line">│ 约束：                                   │</span><br><span class="line">│   - 数据库：PostgreSQL 15                │</span><br><span class="line">│   - 接口风格：RESTful                    │</span><br><span class="line">│   - 部署：K8s，内存限制 512Mi            │</span><br><span class="line">│   - 截止时间：今天 17:00                 │</span><br><span class="line">│ 已完成：                                 │</span><br><span class="line">│   - ✅ 身份验证模块 (auth.service.ts)    │</span><br><span class="line">│   - ✅ 密码重置功能                      │</span><br><span class="line">│ 进行中：                                 │</span><br><span class="line">│   - 🔄 权限校验逻辑                      │</span><br><span class="line">│ 待办：                                   │</span><br><span class="line">│   - ⏳ 邮箱验证                          │</span><br><span class="line">│   - ⏳ 接口限流                          │</span><br><span class="line">│ 风险和阻塞：                             │</span><br><span class="line">│   - ⚠️ Redis 集群今天维护，session 方案   │</span><br><span class="line">│      需要临时调整为 DB session           │</span><br><span class="line">└─────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p><strong>摘要负责背景，状态面板负责保存关键约束。</strong> 两者分离，才能保证压缩后不丢关键信息。</p>
+<h3 id="3-5-渐进式折叠：不要一刀切"><a href="#3-5-渐进式折叠：不要一刀切" class="headerlink" title="3.5 渐进式折叠：不要一刀切"></a>3.5 渐进式折叠：不要一刀切</h3><p>最后要强调的是，压缩不应该是一次性完成的，而是<strong>渐进式</strong>的。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">上下文用量 60%  → 不做压缩，原文保留</span><br><span class="line">上下文用量 75%  → 去重 + 工具结果裁剪（无损压缩）</span><br><span class="line">上下文用量 85%  → 早期对话摘要化（有损压缩，但保留状态面板）</span><br><span class="line">上下文用量 95%  → 全面压缩，只保留最近 3 轮 + 状态面板 + 摘要</span><br></pre></td></tr></table></figure>
+<p>这就像手机存储空间管理：空间充足时什么照片都留着；空间紧张时先删视频（占空间大但信息密度低）；快满时才删不重要的截图。</p>
+<p><strong>越紧急，压缩越激进，但状态面板始终保留。</strong></p>
+<hr>
+<h2 id="四、最难的问题：压缩后怎么知道没丢关键信息？"><a href="#四、最难的问题：压缩后怎么知道没丢关键信息？" class="headerlink" title="四、最难的问题：压缩后怎么知道没丢关键信息？"></a>四、最难的问题：压缩后怎么知道没丢关键信息？</h2><p>前面的策略都是”怎么压”，但真正的工程难题是”怎么保证压完之后信息没丢”。</p>
+<h3 id="4-1-状态验证机制"><a href="#4-1-状态验证机制" class="headerlink" title="4.1 状态验证机制"></a>4.1 状态验证机制</h3><p>每次压缩完成后，不应该直接把压缩结果丢给模型，而是要做一次<strong>状态验证</strong>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">压缩前：提取关键约束清单</span><br><span class="line">    ↓</span><br><span class="line">执行压缩：生成摘要</span><br><span class="line">    ↓</span><br><span class="line">验证：摘要中是否包含了所有关键约束？</span><br><span class="line">    ├── 是 → 继续使用</span><br><span class="line">    └── 否 → 补拉原文，修正摘要</span><br></pre></td></tr></table></figure>
+<p>验证什么呢？主要是检查：</p>
+<ul>
+<li>用户目标是否还在</li>
+<li>硬约束（数据库类型、部署环境等）有没有丢</li>
+<li>未完成的步骤清单是否完整</li>
+<li>有没有跟原始记录矛盾的地方</li>
+</ul>
+<h3 id="4-2-冲突检测"><a href="#4-2-冲突检测" class="headerlink" title="4.2 冲突检测"></a>4.2 冲突检测</h3><p>比丢信息更隐蔽的问题是<strong>摘要跟原始记录矛盾</strong>。</p>
+<p>举个真实场景：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">第 3 轮：用户说&quot;用 MySQL&quot;</span><br><span class="line">第 15 轮：用户改主意了&quot;算了，还是用 PostgreSQL&quot;</span><br><span class="line">压缩摘要：写成了&quot;使用 MySQL&quot;（只摘了第 3 轮，漏了第 15 轮的纠正）</span><br></pre></td></tr></table></figure>
+<p>这时候 Agent 拿着错误摘要继续干活，后面所有关于数据库的操作都会做错。</p>
+<p>更糟糕的是，<strong>错误会累积</strong>。第 20 轮的摘要基于第 15 轮的摘要，如果第 15 轮就错了，第 20 轮会继续错下去，形成<strong>错误链</strong>。</p>
+<p>解决方案：</p>
+<ol>
+<li><strong>原始记录优先</strong>：当摘要和原始记录冲突时，以原始记录为准</li>
+<li><strong>用户确认优先</strong>：用户明确确认过的信息，优先级最高</li>
+<li><strong>标记冲突来源</strong>：发现矛盾时，标记是哪一轮的摘要出了问题</li>
+<li><strong>触发重压缩</strong>：发现错误摘要后，不是简单修补，而是重新压缩</li>
+</ol>
+<p><strong>核心原则：宁可让系统慢一点重新压缩，也不能让错误摘要继续进入后续链路。</strong></p>
+<hr>
+<h2 id="五、可回放性：压缩不能只存结果"><a href="#五、可回放性：压缩不能只存结果" class="headerlink" title="五、可回放性：压缩不能只存结果"></a>五、可回放性：压缩不能只存结果</h2><p>很多系统只做”向前看”的压缩——保留当前状态就够了。但实际工程中，<strong>向后看</strong>同样重要。</p>
+<h3 id="5-1-为什么需要回放？"><a href="#5-1-为什么需要回放？" class="headerlink" title="5.1 为什么需要回放？"></a>5.1 为什么需要回放？</h3><p>考虑这些场景：</p>
+<ul>
+<li>任务执行到一半出了错，需要回溯是哪一步出了问题</li>
+<li>用户说”你刚才那个方案不对，退回到之前的版本”</li>
+<li>Agent 做了一个决策，但结果不好，需要复盘决策过程</li>
+</ul>
+<p>如果压缩后只留了一个摘要，这些场景全玩不转。</p>
+<h3 id="5-2-Checkpoint-机制"><a href="#5-2-Checkpoint-机制" class="headerlink" title="5.2 Checkpoint 机制"></a>5.2 Checkpoint 机制</h3><p>正确的做法是每一步都保存一个轻量级的 checkpoint：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"step"</span>: <span class="number">5</span>,</span><br><span class="line">  <span class="attr">"input"</span>: <span class="string">"用户要求添加邮箱验证功能"</span>,</span><br><span class="line">  <span class="attr">"tool_calls"</span>: [</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">"tool"</span>: <span class="string">"read_file"</span>,</span><br><span class="line">      <span class="attr">"params"</span>: &#123; <span class="attr">"path"</span>: <span class="string">"src/auth/service.ts"</span> &#125;,</span><br><span class="line">      <span class="attr">"result_ref"</span>: <span class="string">"result_005_read_file"</span></span><br><span class="line">    &#125;</span><br><span class="line">  ],</span><br><span class="line">  <span class="attr">"output_summary"</span>: <span class="string">"在 auth service 中添加了邮箱验证逻辑"</span>,</span><br><span class="line">  <span class="attr">"state_delta"</span>: &#123;</span><br><span class="line">    <span class="attr">"completed"</span>: [<span class="string">"邮箱验证逻辑"</span>],</span><br><span class="line">    <span class="attr">"files_modified"</span>: [<span class="string">"src/auth/service.ts"</span>]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>注意这里的关键设计：</p>
+<ul>
+<li><strong>工具调用的原始结果不在 checkpoint 里</strong>，而是存了一个引用 ID（<code>result_ref</code>）</li>
+<li><strong>output_summary</strong> 是这步的摘要，不是完整输出</li>
+<li><strong>state_delta</strong> 记录了这一步对全局状态的改变</li>
+</ul>
+<p>这样做的好处是：需要回放时，可以通过引用 ID 拉回原始数据；正常执行时，只占很少的 token。</p>
+<hr>
+<h2 id="六、与-RAG-的配合"><a href="#六、与-RAG-的配合" class="headerlink" title="六、与 RAG 的配合"></a>六、与 RAG 的配合</h2><p>上下文压缩和 RAG 经常被放在一起讨论，但它们解决的问题不同：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th></th>
+<th>上下文压缩</th>
+<th>RAG</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>解决什么</td>
+<td>控制进入模型的信息量</td>
+<td>提供模型不具备的外部知识</td>
+</tr>
+<tr>
+<td>核心动作</td>
+<td>裁剪、摘要、分层</td>
+<td>检索、重排、注入</td>
+</tr>
+<tr>
+<td>信息来源</td>
+<td>对话本身的历史</td>
+<td>外部知识库</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>但在实际系统中，两者必须配合工作。</p>
+<h3 id="6-1-配合模式"><a href="#6-1-配合模式" class="headerlink" title="6.1 配合模式"></a>6.1 配合模式</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">用户提问</span><br><span class="line">    ↓</span><br><span class="line">RAG 检索 → 召回 20 个文档片段</span><br><span class="line">    ↓</span><br><span class="line">重排序 → 按相关性排序</span><br><span class="line">    ↓</span><br><span class="line">裁剪 → 只保留 Top-5 片段（上下文压缩介入）</span><br><span class="line">    ↓</span><br><span class="line">注入上下文 → 连同对话摘要一起进入模型</span><br></pre></td></tr></table></figure>
+<p>关键点在于：RAG 召回的结果也要经过压缩处理。如果召回了 20 个片段，每个 2000 token，那就是 40K token，可能直接把窗口吃满。</p>
+<h3 id="6-2-保留可追踪性"><a href="#6-2-保留可追踪性" class="headerlink" title="6.2 保留可追踪性"></a>6.2 保留可追踪性</h3><p>压缩后还有一个容易丢的东西：<strong>引用来源</strong>。</p>
+<p>RAG 注入的信息如果没有标注来源，模型可能会出现幻觉——把检索到的知识说成是自己”知道”的，用户也无法验证信息的可靠性。</p>
+<p>正确做法是在压缩后的片段上保留元数据：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">[来源：技术文档 v2.3，第 5 章，2026-03-15 更新，权限：内部公开]</span><br><span class="line">PostgreSQL 的连接池默认最大连接数为 100，建议在高并发场景下调整至 200...</span><br></pre></td></tr></table></figure>
+<p><strong>压缩的是内容，不是来源。</strong> 每条注入的信息都应该能追溯到原始出处。</p>
+<hr>
+<h2 id="七、评估体系：怎么衡量压缩效果？"><a href="#七、评估体系：怎么衡量压缩效果？" class="headerlink" title="七、评估体系：怎么衡量压缩效果？"></a>七、评估体系：怎么衡量压缩效果？</h2><p>做了这么多优化，怎么知道效果好不好？</p>
+<h3 id="7-1-不能只看-Token-压缩率"><a href="#7-1-不能只看-Token-压缩率" class="headerlink" title="7.1 不能只看 Token 压缩率"></a>7.1 不能只看 Token 压缩率</h3><p>最常见的错误指标是”Token 减少了多少”。压缩 90% 但任务失败了，那不叫优化，叫丢信息。</p>
+<h3 id="7-2-正确的评估维度"><a href="#7-2-正确的评估维度" class="headerlink" title="7.2 正确的评估维度"></a>7.2 正确的评估维度</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>说明</th>
+<th>怎么测</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>任务成功率</td>
+<td>压缩后 Agent 能不能正确完成任务</td>
+<td>端到端测试</td>
+</tr>
+<tr>
+<td>约束保留率</td>
+<td>用户提出的约束条件在压缩后还剩多少</td>
+<td>标注测试集 + 人工检查</td>
+</tr>
+<tr>
+<td>答案一致性</td>
+<td>同一个问题，压缩前后的回答是否一致</td>
+<td>对比测试</td>
+</tr>
+<tr>
+<td>延迟变化</td>
+<td>压缩前后的首 token 延迟对比</td>
+<td>性能监控</td>
+</tr>
+<tr>
+<td>成本变化</td>
+<td>压缩前后的 token 消耗对比</td>
+<td>成本统计</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="7-3-重点测试的边界场景"><a href="#7-3-重点测试的边界场景" class="headerlink" title="7.3 重点测试的边界场景"></a>7.3 重点测试的边界场景</h3><p>常规对话的压缩效果通常不错，真正拉开差距的是边界场景：</p>
+<ul>
+<li><strong>长对话（50 轮以上）</strong>：压缩系统能不能保持状态连贯</li>
+<li><strong>工具调用失败</strong>：失败信息是否被正确保留（而不是被压缩掉）</li>
+<li><strong>用户纠正</strong>：用户说”不对，应该是 XXX”，这个纠正有没有被保留</li>
+<li><strong>约束变更</strong>：用户中途改了需求，压缩后是否反映了最新需求</li>
+<li><strong>冲突场景</strong>：摘要和原始记录矛盾时，系统怎么处理</li>
+</ul>
+<p><strong>边界场景才是压缩系统的试金石。</strong></p>
+<hr>
+<h2 id="八、工程实践：一个完整的压缩流水线"><a href="#八、工程实践：一个完整的压缩流水线" class="headerlink" title="八、工程实践：一个完整的压缩流水线"></a>八、工程实践：一个完整的压缩流水线</h2><p>把前面的内容串起来，一个完整的 Agent 上下文压缩系统长这样：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">每轮对话开始时：</span><br><span class="line">    │</span><br><span class="line">    ├── 1. 计算当前上下文用量</span><br><span class="line">    │      └── token 计数 → 确定当前处于哪个压缩阶段</span><br><span class="line">    │</span><br><span class="line">    ├── 2. 状态面板更新</span><br><span class="line">    │      └── 从最近对话中提取关键约束、更新待办清单</span><br><span class="line">    │</span><br><span class="line">    ├── 3. 按需执行压缩</span><br><span class="line">    │      ├── 去重（移除重复文件内容、工具结果）</span><br><span class="line">    │      ├── 工具结果裁剪（只保留关键字段 + 引用 ID）</span><br><span class="line">    │      ├── 对话摘要化（渐进式，先摘要最旧的）</span><br><span class="line">    │      └── 全面压缩（仅在极端情况下触发）</span><br><span class="line">    │</span><br><span class="line">    ├── 4. 状态验证</span><br><span class="line">    │      └── 对比压缩前后的约束清单，检查是否有遗漏或矛盾</span><br><span class="line">    │</span><br><span class="line">    ├── 5. Checkpoint 保存</span><br><span class="line">    │      └── 记录本轮的输入、工具调用、输出摘要、状态变化</span><br><span class="line">    │</span><br><span class="line">    └── 6. 组装最终上下文</span><br><span class="line">           └── 状态面板 + 最近 N 轮原文 + 历史摘要 + RAG 注入 → 送入模型</span><br></pre></td></tr></table></figure>
+<p>这套流水线在每轮对话时都会执行，但大部分步骤是轻量级的——只有上下文用量超过阈值时才会触发重度压缩。</p>
+<hr>
+<h2 id="九、总结"><a href="#九、总结" class="headerlink" title="九、总结"></a>九、总结</h2><p>上下文压缩，不是简单的”做摘要”，而是一套完整的长任务状态治理体系。</p>
+<p>核心要点：</p>
+<ol>
+<li><strong>分层管理</strong>：热区原文保留、温区摘要化、冷区按需召回、冻结区持久化</li>
+<li><strong>多种武器</strong>：对话摘要、工具裁剪、重复检测、状态提取、渐进折叠</li>
+<li><strong>状态优先</strong>：摘要负责背景，状态面板负责保存关键约束，两者分离</li>
+<li><strong>安全网</strong>：状态验证 + 冲突检测 + 原始记录优先</li>
+<li><strong>可回放</strong>：每步保存 checkpoint，能回溯、能还原</li>
+<li><strong>配合 RAG</strong>：压缩控制信息量，RAG 提供外部证据，引用来源不能丢</li>
+<li><strong>全面评估</strong>：不看压缩率，看任务成功率、约束保留率、答案一致性</li>
+</ol>
+<p>能压的是过程、是冗余、是重复。不能压的是决策、是约束、是用户意图。把这条线划清楚，压缩系统就不会出大问题。</p>
+<hr>
+<p><strong>系列文章导航：</strong></p>
+<ul>
+<li><a href="/claude-code-context-compression/">Context 管理：四级压缩与无限对话的秘密</a> — Claude Code 的具体压缩实现</li>
+<li><a href="/agent-memory-what-to-store/">Agent 记忆系统设计规范</a> — 冻结区（外部记忆）的设计详解</li>
+<li><a href="/multi-agent-system-design/">Multi-Agent 系统设计原理</a> — 多 Agent 协作下的上下文管理</li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/01/12/agent-sse-vs-websocket/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -3517,103 +3869,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2025/09/11/cloudcli-ui-guide/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/09/11/cloudcli-ui-guide/" class="post-title-link" itemprop="url">CloudCLI UI - Claude Code 的 Web GUI 与云端方案</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-09-11 00:00:00" itemprop="dateCreated datePublished" datetime="2025-09-11T00:00:00+08:00">2025-09-11</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-12 22:52:05" itemprop="dateModified" datetime="2026-04-12T22:52:05+08:00">2026-04-12</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
-                </span>
-            </span>
-
-          
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2025/09/11/cloudcli-ui-guide/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2025/09/11/cloudcli-ui-guide/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>CloudCLI UI（又名 Claude Code UI）是一款基于 Node.js + React 的 Web 应用，为 Claude Code、Cursor CLI、Codex 和 Gemini CLI 提供统一的图形化界面。与桌面应用不同，它可以通过浏览器访问，支持移动端使用，并提供云端托管选项。本文将详细介绍其功能特性、安装配置和使用方法。</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2025/09/11/cloudcli-ui-guide/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -3686,7 +3941,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">104</span>
+          <span class="site-state-item-count">105</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -3699,7 +3954,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">64</span>
+        <span class="site-state-item-count">65</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
