@@ -86,6 +86,7 @@ DeepSeek Harness 的架构设计围绕一个核心原则：一切皆插件。
 4. **类型化事件（Typed Events）**——插件之间的通信机制
 5. **可撤销的副作用（Revocable Side Effects）**——操作的回滚能力
 ![alt text](/img/deepseek-harness-usage.png)
+
 ### 4.3 四种运行模式
 
 DeepSeek Harness 提供了四种运行模式。它们并非独立的系统，而是同一底座上不同的默认插件配置。
