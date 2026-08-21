@@ -7,6 +7,7 @@ categories: 中间件
 
 -----
 
+<!-- more -->
 #### 一、 NexT 集成第三方搜索服务
 
 根据[官方文档](http://theme-next.iissnan.com/third-party-services.html#search-system)， NexT 主题框架集成的搜索方式有四种：

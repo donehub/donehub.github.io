@@ -7,6 +7,7 @@ categories: 后端
 
 -----
 
+<!-- more -->
 #### 一、Spring Batch 监听器
 
 在批处理过程中，需要对一些关键节点，如启动、结束、抛异常等，添加额外的处理。关注节点，需要借助 Spring Batch 监听器。Spring Batch 提供了两个维度的监听器：

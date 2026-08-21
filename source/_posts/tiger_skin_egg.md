@@ -11,6 +11,7 @@ categories: 吃货
 
 又是个美好的周末，照例要吃点好的。今天做了虎皮蛋和红烧鱼。老是写技术博客也没啥意思，不如放点食谱上来吧，毕竟饮食男女嘛。这里先说虎皮蛋的制法。
 
+<!-- more -->
 ##### 制作流程
 
 ![](http://www.plantuml.com/plantuml/png/SoWkIImgAStDuKfCJyqhKNZUkkx5x6uevsddKWJdUTCE99dU9GZEYzOU48SBebT1rmwc4KX1162QWHH406O0a888m0nnICrB0Re60000)

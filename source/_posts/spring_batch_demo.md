@@ -7,6 +7,7 @@ categories: 后端
 
 -----
 
+<!-- more -->
 #### 一、项目简介
 
 上一节介绍了 Spring Batch 的基础架构和设计原理，本节将通过一个简单的批处理任务来学习如何使用 Spring Batch。

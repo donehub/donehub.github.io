@@ -16,6 +16,7 @@ categories: AI
 
 **Chrome DevTools MCP** 就是解决这些问题的神器。它让 AI 助手（如 Claude Code、Cursor、Copilot）能够直接操控浏览器，像一个真正的开发者一样干活。
 
+<!-- more -->
 ---
 
 ## 二、核心概念：MCP 是什么？

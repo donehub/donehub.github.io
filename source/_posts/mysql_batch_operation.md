@@ -7,6 +7,7 @@ categories: 数据库
 
 -----
 
+<!-- more -->
 #### 一、MySQL 批处理介绍
 
 执行多条增、删、改语句，`mysql-connector-java`  支持两种模式：

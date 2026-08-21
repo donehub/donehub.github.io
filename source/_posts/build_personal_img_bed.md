@@ -7,6 +7,7 @@ categories: 中间件
 
 ------
 
+<!-- more -->
 ##### 1、拥有个人图床的必要性
 
 图床是存储图片的服务器，可以生成外链供在线加载，被广泛用于网站建设。目前市面上主流的图床有 [`ImgURL`](https://imgurl.org/)、[`SM.MS`](https://sm.ms/)、[新浪微博](https://weibo.com/)、[路过图床](https://imgtu.com/)、[七牛云](https://www.qiniu.com/)等，主要有两个特点：免费图床广告多、不稳定；收费图床不适合打工人。作为搞技术的人，我们拥有开源精神的同时，也要利用好开源技术。[`GitHub`](https://github.com/)、[`GitLab`](https://gitlab.com/)、[`Gitee`](https://gitee.com/) 就是最干净的、最稳定的图床。由于`GitHub`、`GitLab` 在国内的访问速度远不如 `Gitee`，所以我们选择搭建 `Gitee` 图床。 

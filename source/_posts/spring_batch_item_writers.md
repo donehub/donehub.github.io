@@ -7,6 +7,7 @@ categories: 后端
 
 -----
 
+<!-- more -->
 #### 一、Spring Batch 数据输出器
 
 Spring Batch 的数据输出器，是通过接口 `ItemWriter` 来实现的。针对常用的数据输出场景，Spring Batch 提供了丰富的组件支持（[查看所有组件](https://docs.spring.io/spring-batch/docs/current/reference/html/appendix.html#itemWritersAppendix)），本文介绍最常用的五个组件：

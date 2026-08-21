@@ -7,6 +7,7 @@ categories: 后端
 
 -----
 
+<!-- more -->
 #### 一、@Retention 简介
 
 @Retention 是用来定义注解的注解，这类注解也叫 元注解。@Retention 定义了注解的生命周期，生命周期的长短取决于 `RetentionPolicy` 属性值。

@@ -9,6 +9,7 @@ categories: [AI]
 
 ---
 
+<!-- more -->
 ## 一、什么是 Flipbook？
 
 最近刷到 Shopify CEO Tobi Lütke 转发了一条动态，引起了我的注意。一个叫 [flipbook.page](https://flipbook.page/) 的平台，被描述为：

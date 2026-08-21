@@ -7,6 +7,7 @@ categories: 后端
 
 -----
 
+<!-- more -->
 #### 一、背景介绍
 
 `Spring` 容器是 `Spring` 框架的核心。容器负责配置对象，注入对象，管理对象，并完成整个生命周期。`Spring` 容器依赖控制反转（`Inversion of Control`），也即依赖注入（`Dependency Injection`）来配置并注入对象。这样的对象被成为 `Bean`。具体过程可抽象为：`Spring` 读取程序中的 `Bean` 配置信息，并据此在容器中生成一份 `Bean` 配置注册表，然后再根据注册表实例化 `Bean` ，装配好待用。

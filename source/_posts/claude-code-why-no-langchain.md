@@ -9,6 +9,7 @@ categories: Claude Code
 
 ---
 
+<!-- more -->
 ## 一、先说结论
 
 Claude Code 不用 LangChain/LangGraph，原因有四个：

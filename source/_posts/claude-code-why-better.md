@@ -22,6 +22,7 @@ categories: Claude Code
 
 **Claude Code 与 Codex CLI 是同类型产品**——都是终端型 CLI 工具，直接操作文件系统。其他产品则是 IDE 形态，交互方式不同。
 
+<!-- more -->
 ---
 
 ### 核心体验差异

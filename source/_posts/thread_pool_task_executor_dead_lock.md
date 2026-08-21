@@ -8,6 +8,7 @@ categories: 后端
 
 -----
 
+<!-- more -->
 #### 一、 `Spring` 线程池
 
 `Spring` 自带的线程池 `ThreadPoolTaskExecutor` ，本质上是对 `ThreadPoolExecutor` 的包装。一方面，基于 `SpringBoot` 的项目可以通过 `yaml` 或 `properties` 文件快速配置线程池，并借助 `@RefreshScope` 实现线程池的热部署；另一方面，通过`@EnableAsync`、`@Async`配置，可以方便地执行异步并发任务，无需编写异步调用代码。 凭借 `Spring` 生态圈，`ThreadPoolTaskExecutor` 因其良好的设计感和兼容性而被广泛使用。

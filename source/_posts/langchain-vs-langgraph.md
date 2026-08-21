@@ -9,6 +9,7 @@ categories: AI
 
 ---
 
+<!-- more -->
 ## 一、先说结论
 
 **LangChain 是"零件库"，LangGraph 是"组装图纸"。**

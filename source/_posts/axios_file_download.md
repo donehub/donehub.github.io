@@ -7,6 +7,7 @@ categories: 前端
 
 -----
 
+<!-- more -->
 #### 一、背景介绍
 
 `Axios` 是一个基于 [`Promise`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) 的 `HTTP` 库，可以用在浏览器和 `node.js` 中。与传统的 `Ajax` 相比，`Axios` 的优势主要体现在: 支持 `Promise API` 、支持并发、支持请求与响应拦截、自动转换 `JSON` 数据、支持防御 `XSRF`、符合 `MVVM` 设计理念。在目前大火的前端框架 `Vue` 中也内置了 [`Axios 框架`](<http://www.axios-js.com/zh-cn/docs/>) 。

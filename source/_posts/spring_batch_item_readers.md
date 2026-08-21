@@ -7,6 +7,7 @@ categories: 后端
 
 -----
 
+<!-- more -->
 #### 一、Spring Batch 数据读取器
 
 Spring Batch 的数据读取器，是通过接口 `ItemReader` 来实现的。针对常用的数据读取场景，Spring Batch 提供了丰富的组件支持（[查看所有组件](https://docs.spring.io/spring-batch/docs/current/reference/html/appendix.html#itemReadersAppendix)），本文介绍最常用的五个组件：

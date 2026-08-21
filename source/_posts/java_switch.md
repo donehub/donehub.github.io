@@ -7,6 +7,7 @@ categories: 后端
 
 -----
 
+<!-- more -->
 #### 一、Swicth 关键字
 
 `switch` 是 `Java` 中的选择语句，与 `if/else` 不同的是，`switch` 只支持常量表达式，包括 byte、short、int、char、枚举常量和字符串常量(From jdk1.7)。

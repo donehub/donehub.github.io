@@ -11,6 +11,7 @@ HTTP 为请求-响应式协议，指客户端先向服务器发送请求，然�
 
 在以 Java 语言为服务的响应中，消息报头是存储在 Header 属性中的。主要实现方法有两种：`HttpServletResponse.setHeader(name, MIME)` 和 `HttpServletResponse.addHeader(name, MIME)`。下面详细介绍两种方法的底层实现原理及其区别。参考 Tomcat 源码版本8.5.31。
 
+<!-- more -->
 -----
 
 #### 二、底层实现

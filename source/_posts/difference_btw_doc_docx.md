@@ -7,6 +7,7 @@ categories: MSOffice
 
 -----
 
+<!-- more -->
 ##### 一、`doc` 与 `docx` 简介
 
 `doc` 全程为 `document`，是常见的文件扩展名，也是 `Word2003` 及之前版本的文本文档格式，其基于二进制形式存储；`docx` 是 `Word2007` 及之后版本的文本文档格式，其基于 `Office Open XML` 标准的压缩文件格式。

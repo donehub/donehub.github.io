@@ -9,6 +9,7 @@ categories: AI
 
 ---
 
+<!-- more -->
 ## 一、Hermes Agent 是什么？
 
 简单说，它是一个**可以自我进化的 AI Agent 框架**。
