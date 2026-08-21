@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="一、背景2026年8月13日，DeepSeek 正式开源了 Harness 开发者预览版。项目在 GitHub 上线一个多小时便突破 2 万 Star，一天后即突破 92 万 Star，影响广泛。从 5 月份组建 Harness 团队，到 7 月开启内测，再到 8 月以 MIT 协议完全开源，前后不到 3 个月。这个节奏表明，DeepSeek 此次并非只是发布一个新工具，而是在产品战略上进行了一次">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DeepSeek Harness 深度解析">
+<meta property="og:url" content="https://donehub.github.io/2026/08/14/105_deepseek-harness-deep-analysis/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="一、背景2026年8月13日，DeepSeek 正式开源了 Harness 开发者预览版。项目在 GitHub 上线一个多小时便突破 2 万 Star，一天后即突破 92 万 Star，影响广泛。从 5 月份组建 Harness 团队，到 7 月开启内测，再到 8 月以 MIT 协议完全开源，前后不到 3 个月。这个节奏表明，DeepSeek 此次并非只是发布一个新工具，而是在产品战略上进行了一次">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://donehub.github.io/img/deepseek-harness-star-changes.png">
+<meta property="og:image" content="https://donehub.github.io/img/deepseek-harness-introduction.png">
+<meta property="og:image" content="https://donehub.github.io/img/prompt-context-harness.png">
+<meta property="og:image" content="https://donehub.github.io/img/deepseek-harness-usage.png">
+<meta property="og:image" content="https://donehub.github.io/img/deepseek-harness-changes.png">
+<meta property="article:published_time" content="2026-08-13T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-08-15T04:33:05.768Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Harness Engineering">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://donehub.github.io/img/deepseek-harness-star-changes.png">
+
+<link rel="canonical" href="https://donehub.github.io/2026/08/14/105_deepseek-harness-deep-analysis/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>DeepSeek Harness 深度解析 | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/08/14/105_deepseek-harness-deep-analysis/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          DeepSeek Harness 深度解析
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-08-14 00:00:00" itemprop="dateCreated datePublished" datetime="2026-08-14T00:00:00+08:00">2026-08-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-08-15 12:33:05" itemprop="dateModified" datetime="2026-08-15T12:33:05+08:00">2026-08-15</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/08/14/105_deepseek-harness-deep-analysis/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/08/14/105_deepseek-harness-deep-analysis/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="一、背景"><a href="#一、背景" class="headerlink" title="一、背景"></a>一、背景</h2><p>2026年8月13日，DeepSeek 正式开源了 Harness 开发者预览版。项目在 GitHub 上线一个多小时便突破 2 万 Star，一天后即突破 92 万 Star，影响广泛。<br><img data-src="/img/deepseek-harness-star-changes.png" alt="alt text"><br>从 5 月份组建 Harness 团队，到 7 月开启内测，再到 8 月以 MIT 协议完全开源，前后不到 3 个月。这个节奏表明，DeepSeek 此次并非只是发布一个新工具，而是在产品战略上进行了一次方向性调整。</p>
+<hr>
+<a id="more"></a>
+<h2 id="二、Harness-Engineering-概念"><a href="#二、Harness-Engineering-概念" class="headerlink" title="二、Harness Engineering 概念"></a>二、Harness Engineering 概念</h2><p><img data-src="/img/deepseek-harness-introduction.png" alt="alt text"><br>Harness 这个单词的本义是”马具”，指缰绳、鞍具、辔头等控马装备的总称。马的能力再强，缺少 harness，骑手无法控制方向，更无法完成具体的工作。</p>
+<p>在 AI 智能体的语境中，DeepSeek 这样定义两者的关系：<strong>Agent = Model + Harness</strong></p>
+<p>Model 负责思考、推理和内容生成。Harness 负责让模型的能力落地——调用外部工具、管理上下文状态、执行代码、维护对话记忆、协调多个子任务.</p>
+<p>模型决定了系统的推理上限，Harness 决定了系统的执行下限。过去两年行业的注意力集中在模型能力的提升上——更大的参数量、更高的 benchmark 分数、更快的推理速度。但当开发者真正将模型部署到生产环境中时会发现，模型本身在整个系统中占比有限。绝大部分工程工作，比如工具集成、安全管控、状态管理、异常处理等，都属于 Harness 的范畴。</p>
+<hr>
+<h2 id="三、AI-工程的三次范式演进"><a href="#三、AI-工程的三次范式演进" class="headerlink" title="三、AI 工程的三次范式演进"></a>三、AI 工程的三次范式演进</h2><p>Harness 的兴起并非偶然。回顾过去几年 AI 工程领域的发展，可以看到一条清晰的演进路径。<br><img data-src="/img/prompt-context-harness.png" alt="alt text"></p>
+<h3 id="3-1-Prompt-Engineering（2022-2023）"><a href="#3-1-Prompt-Engineering（2022-2023）" class="headerlink" title="3.1 Prompt Engineering（2022-2023）"></a>3.1 Prompt Engineering（2022-2023）</h3><p>这一阶段的核心目标是让模型正确理解任务指令。典型做法包括调整措辞、添加 few-shot 示例、指定输出格式等。本质上是在解决”如何把需求表达清楚”的问题。甚至在一段时间，Prompt 工程师成了热门岗位。</p>
+<p>这种方式在简单任务上效果良好。但当任务复杂度上升，例如要求模型分析整个代码仓库的安全漏洞并生成修复方案，单靠一段 prompt 便无法胜任。模型需要读取代码文件、调用分析工具、记住已检查的模块。单次输入的信息承载量存在天花板。</p>
+<h3 id="3-2-Context-Engineering（2024-2025）"><a href="#3-2-Context-Engineering（2024-2025）" class="headerlink" title="3.2 Context Engineering（2024-2025）"></a>3.2 Context Engineering（2024-2025）</h3><p>行业随之意识到，让模型在正确的时机看到正确的信息，同样关键。这一阶段的核心是上下文工程，即通过 RAG 检索相关文档、管理记忆系统、压缩历史对话、将关键信息注入模型的上下文窗口。</p>
+<p>一个直观的类比：Prompt 是给新员工的任务简报，Context 是他手边的参考资料。简报写得再清楚，资料没到位，任务也难以完成。</p>
+<p>Context Engineering 解决了信息供给的问题，但它只管”模型看到什么”，不干预”模型做什么”。如果模型决定执行一条危险的系统命令，Context Engineering 本身无法拦截。</p>
+<h3 id="3-3-Harness-Engineering（2026-）"><a href="#3-3-Harness-Engineering（2026-）" class="headerlink" title="3.3 Harness Engineering（2026-）"></a>3.3 Harness Engineering（2026-）</h3><p>Harness Engineering 的关注点进一步上移到系统层面：不是模型说了什么、看到了什么，而是整个执行环境能做什么、怎么做、出错后如何处理。</p>
+<p>它覆盖的核心领域包括：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>领域</th>
+<th>具体内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>工具编排</strong></td>
+<td>模型可调用哪些工具，调用顺序如何安排，失败后的重试或跳过策略</td>
+</tr>
+<tr>
+<td><strong>安全护栏</strong></td>
+<td>禁止执行的命令列表，文件操作的人工确认机制</td>
+</tr>
+<tr>
+<td><strong>上下文管理</strong></td>
+<td>对话历史的压缩策略，关键信息的持久化方案</td>
+</tr>
+<tr>
+<td><strong>任务规划</strong></td>
+<td>复杂任务的拆解方式，子任务之间的协调机制</td>
+</tr>
+<tr>
+<td><strong>记忆系统</strong></td>
+<td>短期工作记忆的维护，长期记忆的检索策略</td>
+</tr>
+<tr>
+<td><strong>执行沙箱</strong></td>
+<td>代码执行的隔离环境，资源限制与超时控制</td>
+</tr>
+<tr>
+<td><strong>可观测性</strong></td>
+<td>执行过程的日志记录，问题出现后的轨迹回放能力</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Prompt 解决”怎么说”，Context 解决”怎么看”，Harness 解决”怎么干”。</p>
+<hr>
+<h2 id="四、DeepSeek-Harness-的架构与特性"><a href="#四、DeepSeek-Harness-的架构与特性" class="headerlink" title="四、DeepSeek Harness 的架构与特性"></a>四、DeepSeek Harness 的架构与特性</h2><h3 id="4-1-发展时间线"><a href="#4-1-发展时间线" class="headerlink" title="4.1 发展时间线"></a>4.1 发展时间线</h3><ul>
+<li><strong>2026年5月</strong>：DeepSeek 在招聘平台发布 Agent Harness 相关岗位，明确对标 Claude Code</li>
+<li><strong>2026年7月</strong>：开启小范围内测</li>
+<li><strong>2026年8月13日</strong>：发布开发者预览版，采用 <strong>MIT 协议开源</strong></li>
+</ul>
+<h3 id="4-2-核心设计理念：一切皆插件"><a href="#4-2-核心设计理念：一切皆插件" class="headerlink" title="4.2 核心设计理念：一切皆插件"></a>4.2 核心设计理念：一切皆插件</h3><p>DeepSeek Harness 的架构设计围绕一个核心原则：一切皆插件。</p>
+<p>模型、工具、技能、会话管理、沙箱、存储、Agent 主循环（Agent Loop），所有能力单元都以插件形式存在。这些插件通过一个名为 Cordis 的插件元框架组装在一起，开发者可以在配置文件中自由替换任意组件，无需修改源码。</p>
+<p>这种设计的好处在于：需要更换底层模型、增加自定义工具、或替换执行沙箱时，只需调整配置，不需要重写系统。Cordis 框架本身建立在五个关键概念之上：</p>
+<ol>
+<li><strong>插件（Plugin）</strong>——每个独立的能力单元</li>
+<li><strong>上下文（Context）</strong>——插件之间共享的状态空间</li>
+<li><strong>服务依赖（Service Dependency）</strong>——插件之间的调用与依赖关系</li>
+<li><strong>类型化事件（Typed Events）</strong>——插件之间的通信机制</li>
+<li><strong>可撤销的副作用（Revocable Side Effects）</strong>——操作的回滚能力<br><img data-src="/img/deepseek-harness-usage.png" alt="alt text"></li>
+</ol>
+<h3 id="4-3-四种运行模式"><a href="#4-3-四种运行模式" class="headerlink" title="4.3 四种运行模式"></a>4.3 四种运行模式</h3><p>DeepSeek Harness 提供了四种运行模式。它们并非独立的系统，而是同一底座上不同的默认插件配置。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>定位</th>
+<th>工具集</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>标准模式</strong></td>
+<td>日常开发</td>
+<td>文件编辑、Shell、搜索、Skills、子代理等完整工具集</td>
+<td>常规编码与项目管理</td>
+</tr>
+<tr>
+<td><strong>PTC 模式</strong></td>
+<td>程序化工具调用</td>
+<td>标准模式全部能力 + Code Mode SDK</td>
+<td>复杂多步自动化流程</td>
+</tr>
+<tr>
+<td><strong>极简模式</strong></td>
+<td>基准测试</td>
+<td>仅 bash + str_replace_editor</td>
+<td>模型能力评测与对照实验</td>
+</tr>
+<tr>
+<td><strong>创造模式</strong></td>
+<td>动态扩展</td>
+<td>Agent 可在运行时动态生成新工具</td>
+<td>需要高度灵活性的创新任务</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>其中 PTC 模式（Programmatic Tool Calling）值得重点说明。</p>
+<p>传统 Agent 调用工具的方式是逐步进行：推理→调用工具→读取结果→再次推理→再次调用。面对复杂任务，这个循环需要执行多次，每次交互都消耗 token。</p>
+<p>PTC 模式的做法是让模型编写一段 TypeScript 程序，将多步操作编排在同一段代码中，然后一次性提交执行。程序内部支持循环、条件判断和多工具组合调用。这种方式大幅减少了模型与执行环境之间的往返次数，在降低 token 消耗的同时提升了复杂任务的执行效率。</p>
+<h3 id="4-4-轨迹回放机制"><a href="#4-4-轨迹回放机制" class="headerlink" title="4.4 轨迹回放机制"></a>4.4 轨迹回放机制</h3><p>DeepSeek Harness 内置了<strong>全程轨迹追踪与回放</strong>功能。Agent 运行过程中的每一步操作都会被记录为 JSON 格式的 trajectory log，支持以下操作：</p>
+<ul>
+<li><strong>回放</strong>：完整复现某次执行过程，用于调试和问题定位</li>
+<li><strong>恢复</strong>：从任意历史节点重新执行</li>
+<li><strong>分叉</strong>：基于已有轨迹创建分支，探索不同的执行路径</li>
+<li><strong>检索</strong>：搜索和分析历史轨迹数据</li>
+</ul>
+<p>这些轨迹数据的用途不止于调试。它们可以作为 demonstration 数据用于后续的模型训练，也就是说，Agent 在实际使用中产生的执行记录，反过来为模型优化提供训练信号。这构成了一个数据飞轮：使用量越大，轨迹数据越多，模型能力越强。</p>
+<hr>
+<h2 id="五、与-Claude-Code-的对比分析"><a href="#五、与-Claude-Code-的对比分析" class="headerlink" title="五、与 Claude Code 的对比分析"></a>五、与 Claude Code 的对比分析</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>DeepSeek Harness</th>
+<th>Claude Code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>开发者</strong></td>
+<td>DeepSeek</td>
+<td>Anthropic</td>
+</tr>
+<tr>
+<td><strong>产品定位</strong></td>
+<td>Agent Runtime / Agent 平台</td>
+<td>AI 编程助手</td>
+</tr>
+<tr>
+<td><strong>开源策略</strong></td>
+<td>MIT 协议，完全开源</td>
+<td>闭源商业产品</td>
+</tr>
+<tr>
+<td><strong>架构理念</strong></td>
+<td>插件化架构，组件可自由组合</td>
+<td>一体化设计，深度绑定自家模型</td>
+</tr>
+<tr>
+<td><strong>模型绑定</strong></td>
+<td>不绑定特定模型，支持切换</td>
+<td>深度绑定 Claude 系列模型，但也支持其他模型</td>
+</tr>
+<tr>
+<td><strong>运行模式</strong></td>
+<td>四种模式可选</td>
+<td>单一模式</td>
+</tr>
+<tr>
+<td><strong>特色功能</strong></td>
+<td>轨迹回放、PTC 模式、Cordis 插件框架</td>
+<td>成熟的 IDE 集成、Hooks 系统</td>
+</tr>
+<tr>
+<td><strong>生态成熟度</strong></td>
+<td>刚开源，生态处于建设初期</td>
+<td>社区和工具链相对成熟</td>
+</tr>
+<tr>
+<td><strong>使用成本</strong></td>
+<td>DeepSeek 模型调用成本较低</td>
+<td>依赖 Claude API，成本相对较高</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>两者的设计取向有明显差异。Claude Code 采用一体化设计，开箱即用体验较好，但组件不可替换，且与 Claude 模型深度绑定。DeepSeek Harness 采用插件化架构，灵活度更高，支持模型切换和自定义组件，但上手门槛也相应更高。</p>
+<p>对于需要快速使用的开发者，Claude Code 的成熟度更有优势。对于需要深度定制 Agent 系统、或希望避免单一模型厂商锁定的场景，DeepSeek Harness 的开源方案提供了更大的设计空间。</p>
+<hr>
+<h2 id="六、DeepSeek-产品结构变化"><a href="#六、DeepSeek-产品结构变化" class="headerlink" title="六、DeepSeek 产品结构变化"></a>六、DeepSeek 产品结构变化</h2><p><img data-src="/img/deepseek-harness-changes.png" alt="alt text"></p>
+<h3 id="6-1-竞争焦点的转移"><a href="#6-1-竞争焦点的转移" class="headerlink" title="6.1 竞争焦点的转移"></a>6.1 竞争焦点的转移</h3><p>过去两年，AI 行业的竞争焦点集中在模型能力上——参数规模、benchmark 分数、推理速度。DeepSeek Harness 的发布反映了一个趋势：竞争焦点正在向执行层迁移。</p>
+<p>模型的推理能力再强，缺少完善的执行框架，依然无法在生产环境中稳定输出。有内测数据显示，同一个模型在不同 Harness 下的任务完成率差距可达53个百分点。执行框架的质量对最终效果的影响，在某些场景下已经超过了模型本身的选择。</p>
+<h3 id="6-2-落地能力的关键瓶颈"><a href="#6-2-落地能力的关键瓶颈" class="headerlink" title="6.2 落地能力的关键瓶颈"></a>6.2 落地能力的关键瓶颈</h3><p>模型升级提升的是能力天花板，Harness 决定的是落地能力。大多数企业在将 AI 模型投入生产时遇到的真实困难，往往不是模型不够强，而是工具链不完整、上下文管理混乱、异常处理缺失、缺乏监控和调试手段。这些问题都属于 Harness 的范畴。</p>
+<h3 id="6-3-开源策略的考量"><a href="#6-3-开源策略的考量" class="headerlink" title="6.3 开源策略的考量"></a>6.3 开源策略的考量</h3><p>DeepSeek 选择以 MIT 协议完全开源，而非做成闭源商业产品，这一决策可以从两个维度理解。</p>
+<p>生态维度：Agent 框架的竞争本质是开发者生态的竞争。开源允许开发者和工具提供商自由使用、修改和扩展框架，是吸引外部参与者、建立插件生态最高效的方式。</p>
+<p>数据维度：轨迹回放功能可以将执行记录转化为训练数据。用户规模越大，积累的轨迹数据越多，模型优化就越有针对性。用开源换取用户规模，用用户规模换取数据积累，用数据积累驱动模型进化——这与 Android 早期通过开源建立市场份额、再通过生态规模巩固地位的逻辑有相似之处。</p>
+<hr>
+<h2 id="七、当前的局限与约束"><a href="#七、当前的局限与约束" class="headerlink" title="七、当前的局限与约束"></a>七、当前的局限与约束</h2><p>作为开发者预览版，DeepSeek Harness 目前存在几个明确的约束：</p>
+<ol>
+<li>缺少 CLI 工具：当前仅提供 Web UI，习惯使用终端的开发者需要等待后续版本补充命令行工具。</li>
+<li>插件生态处于早期：架构设计支持灵活的插件替换，但可供选择的第三方插件数量有限，生态丰富度需要时间积累。</li>
+<li>文档覆盖不完整：特别是 Cordis 插件框架的开发指南，部分实现细节需要参考源码才能确认。</li>
+<li>API 稳定性不足：v0.x 阶段，插件接口和 API 存在破坏性变更的可能，不建议直接用于生产环境。</li>
+</ol>
+<hr>
+<h2 id="八、总结"><a href="#八、总结" class="headerlink" title="八、总结"></a>八、总结</h2><p>DeepSeek Harness 的定位不是一个新的聊天机器人，也不是一个套壳 Agent 产品。它是 DeepSeek 从模型供应商向 AI 执行层基础设施拓展的战略产物。</p>
+<p>2026 年 AI 领域的竞争，正在从”谁的模型更强”转向”谁的执行框架更成熟”。DeepSeek Harness 在这条赛道上率先交出了开源方案，其”一切皆插件”的架构设计和轨迹回放的数据飞轮机制，代表了 Agent 工程化落地的一个值得关注的技术方向。</p>
+<p>至于能否在生态建设和持续迭代中保持领先，还需要后续观察。从 2026 春节开始，时间好像按了加速键，我每个月都在见证 AI 的飞速发展，DeepSeek 对新产品的探索，我非常期待。</p>
+<hr>
+<p><strong>参考资料：</strong></p>
+<ul>
+<li><a href="https://www.deepseek.com/harness/?utm_source=chatgpt.com" target="_blank" rel="noopener">DeepSeek Harness 官网</a></li>
+<li><a href="https://finance.sina.com.cn/tech/roll/2026-08-13/doc-inineuqe4558061.shtml" target="_blank" rel="noopener">DeepSeek Harness 开发者预览版发布 - 新浪</a></li>
+<li><a href="https://www.21jingji.com/article/20260521/herald/d706e7b6130739114b8761d933f7e546.html" target="_blank" rel="noopener">DeepSeek正在组建Harness团队，对标Claude Code - 甲子光年</a></li>
+<li><a href="https://www.qbitai.com/2026/08/472208.html" target="_blank" rel="noopener">深度体验DeepSeek Harness，我原谅它涨价了 - 量子位</a></li>
+<li><a href="https://zhuanlan.zhihu.com/p/2036738130649330427" target="_blank" rel="noopener">一文读懂Harness Engineering - 知乎</a></li>
+<li><a href="https://cloud.tencent.com/developer/article/2655114" target="_blank" rel="noopener">Prompt、Context、Harness：AI Agent 工程的三层架构解析 - 腾讯云</a></li>
+<li><a href="https://www.mittrchina.com/news/detail/16781" target="_blank" rel="noopener">DeepSeek正式开源Harness - MIT Technology Review 中国</a></li>
+<li><a href="https://www.36kr.com/p/3935871461916035" target="_blank" rel="noopener">Harness正式浮出水面 - 36氪</a></li>
+<li><a href="https://hub.baai.ac.cn/view/57048" target="_blank" rel="noopener">缓存命中率99.93%！DeepSeek最适合的Harness来了 - 智源社区</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Harness-Engineering/" rel="tag"><i class="fa fa-tag"></i> Harness Engineering</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/07/12/104_chatgpt-5.6-introduction/" rel="prev" title="GPT-5.6 来了">
+      <i class="fa fa-chevron-left"></i> GPT-5.6 来了
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#一、背景"><span class="nav-number">1.</span> <span class="nav-text">一、背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、Harness-Engineering-概念"><span class="nav-number">2.</span> <span class="nav-text">二、Harness Engineering 概念</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、AI-工程的三次范式演进"><span class="nav-number">3.</span> <span class="nav-text">三、AI 工程的三次范式演进</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-Prompt-Engineering（2022-2023）"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 Prompt Engineering（2022-2023）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-Context-Engineering（2024-2025）"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 Context Engineering（2024-2025）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-Harness-Engineering（2026-）"><span class="nav-number">3.3.</span> <span class="nav-text">3.3 Harness Engineering（2026-）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、DeepSeek-Harness-的架构与特性"><span class="nav-number">4.</span> <span class="nav-text">四、DeepSeek Harness 的架构与特性</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-发展时间线"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 发展时间线</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-核心设计理念：一切皆插件"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 核心设计理念：一切皆插件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-四种运行模式"><span class="nav-number">4.3.</span> <span class="nav-text">4.3 四种运行模式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-轨迹回放机制"><span class="nav-number">4.4.</span> <span class="nav-text">4.4 轨迹回放机制</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、与-Claude-Code-的对比分析"><span class="nav-number">5.</span> <span class="nav-text">五、与 Claude Code 的对比分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、DeepSeek-产品结构变化"><span class="nav-number">6.</span> <span class="nav-text">六、DeepSeek 产品结构变化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-竞争焦点的转移"><span class="nav-number">6.1.</span> <span class="nav-text">6.1 竞争焦点的转移</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-落地能力的关键瓶颈"><span class="nav-number">6.2.</span> <span class="nav-text">6.2 落地能力的关键瓶颈</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-开源策略的考量"><span class="nav-number">6.3.</span> <span class="nav-text">6.3 开源策略的考量</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、当前的局限与约束"><span class="nav-number">7.</span> <span class="nav-text">七、当前的局限与约束</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、总结"><span class="nav-number">8.</span> <span class="nav-text">八、总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">106</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">66</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
