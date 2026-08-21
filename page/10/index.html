@@ -226,7 +226,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+                <time title="修改时间：2026-08-22 00:24:52" itemprop="dateModified" datetime="2026-08-22T00:24:52+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -264,29 +264,14 @@
 
       
           <hr>
-<h4 id="一、InnoDB-索引"><a href="#一、InnoDB-索引" class="headerlink" title="一、InnoDB 索引"></a>一、InnoDB 索引</h4><p>索引是数据库应用中非常重要的组成部分，可以提升数据检索效率，减轻服务引擎的压力。InnoDB 服务引擎，支持哈希索引和B+Tree索引。其中，B+Tree 是默认选择，也是最常用的索引结构。普通索引和唯一索引是最常用的两种索引类型，本文详细介绍一下两者的区别。</p>
-<h4 id="二、普通索引与唯一索引的作用"><a href="#二、普通索引与唯一索引的作用" class="headerlink" title="二、普通索引与唯一索引的作用"></a>二、普通索引与唯一索引的作用</h4><p>普通索引，规律分布在叶子节点上，唯一的目的就是方便随机查找和范围查找，提升检索效率。</p>
-<p>唯一索引，不仅要实现普通索引的功能，还要保证值的唯一性。</p>
-<h4 id="三、普通索引与唯一索引的区别"><a href="#三、普通索引与唯一索引的区别" class="headerlink" title="三、普通索引与唯一索引的区别"></a>三、普通索引与唯一索引的区别</h4><h5 id="change-buffer"><a href="#change-buffer" class="headerlink" title="change buffer"></a>change buffer</h5><p>探讨两者的区别，需要从它们的作用机制入手。对于普通索引，change buffer 的作用至关重要，这也是其与唯一索引区别最大的地方。至于 change buffer 是什么，要从 MySQL  的数据管理机制说起。</p>
-<p>为了减少 IO 读的次数，MySQL 将数据分别存在磁盘和内存中，磁盘中是原始数据，内存（buffer pool）中是缓存的数据页和索引页。可以说，buffer pool 是缓解磁盘读的一种手段。当然，MySQL 不会单单研究出来一个缓解磁盘读的机制，毕竟磁盘读和写都是十分消耗的操作，而 change buffer 就是缓解磁盘写的一种手段。</p>
-<p>当需要更新一个数据页时，如果数据页在 buffer pool 中，则直接更新；如果不在缓存中，InnoDB 就会把更新操作缓存在 change buffer 中，而不会从磁盘中读取数据页到 buffer pool。在合适的时机，如再次访问这个数据页时，InnoDB 便会将数据页读入内存，然后执行 change buffer 中的相关操作。总之，在不影响数据逻辑正确性的前提下，减少了磁盘写的次数。</p>
-<p>对于 InnoDB 数据引擎，将 change buffer 的操作应用到数据页的过程，叫 merge。以下场景会触发 merge 操作：</p>
-<ul>
-<li>访问这个数据页；</li>
-<li>系统后台线程定期 merge；</li>
-<li>change buffer 容量不够用时；</li>
-<li>数据库正常关闭时；</li>
-<li>redo log 写满时（固定大小，循环写）；</li>
-</ul>
-<p>此外，虽然 change buffer 看起来像是一个临时缓存，但它却是可持久化的数据，不仅存于内存，也被写到磁盘上。这样的设计才是合理的，当出现突发状况时，可以通过磁盘上的 change buffer 恢复逻辑操作，保证数据的正确性和系统的容灾能力。</p>
-<hr>
-<h5 id="3-1-在查询方面的差异"><a href="#3-1-在查询方面的差异" class="headerlink" title="3.1 在查询方面的差异"></a>3.1 在查询方面的差异</h5><p>id 是聚簇索引，k 是二级索引。可以看出，这是一个典型的索引覆盖场景。</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="keyword">id</span> <span class="keyword">from</span> T <span class="keyword">where</span> k = <span class="number">10</span>;</span><br></pre></td></tr></table></figure>
-<p>如果给 k 加上普通索引，那么随机查询将根据二分法找到第一个目标数据，然后再沿着叶子节点查找下一个数据，判断是否为 10，如果不是，则返回查询结果。</p>
-<p>如果给 k 加上唯一索引，那么随机查询将根据二分法找到第一个目标数据，然后返回查询结果，因为这个目标数据一定是唯一的。</p>
-<p>所以，在查询数据方面，普通索引比唯一索引多一个向下一个节点查找的步骤。如果下一个节点在同一个数据页，通过指针直接就可以拿到；如果下一个节点不在当前数据页，那么将会发生一次 IO 读。就是说，普通索引的查询性能弱于唯一索引。</p>
-<h5 id="3-2-在更新方面的差异"><a href="#3-2-在更新方面的差异" class="headerlink" title="3.2 在更新方面的差异"></a>3.2 在更新方面的差异</h5><p>从 change buffer 的介绍可知，当数据页不在内存中，使用普通索引会将更新操作缓存在 change buffer 中，然后在适当的时机 merge 到原数据页中，从而减少 IO 次数；而使用唯一索引，为了保证数据的唯一性，需要将数据页读到内存中来，进行更新操作，再写回磁盘。就是说，普通索引的更新性能强于唯一索引。</p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/13/normal_unique_index/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -336,7 +321,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+                <time title="修改时间：2026-08-22 00:24:52" itemprop="dateModified" datetime="2026-08-22T00:24:52+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -374,50 +359,14 @@
 
       
           <hr>
-<h4 id="一、-Retention-简介"><a href="#一、-Retention-简介" class="headerlink" title="一、@Retention 简介"></a>一、@Retention 简介</h4><p>@Retention 是用来定义注解的注解，这类注解也叫 元注解。@Retention 定义了注解的生命周期，生命周期的长短取决于 <code>RetentionPolicy</code> 属性值。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Documented</span></span><br><span class="line"><span class="meta">@Retention</span>(RetentionPolicy.RUNTIME)</span><br><span class="line"><span class="meta">@Target</span>(ElementType.ANNOTATION_TYPE)</span><br><span class="line"><span class="keyword">public</span> <span class="meta">@interface</span> Retention &#123;</span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Returns the retention policy.</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> the retention policy</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function">RetentionPolicy <span class="title">value</span><span class="params">()</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">enum</span> RetentionPolicy &#123;</span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Annotations are to be discarded by the compiler.</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    SOURCE,</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Annotations are to be recorded in the class file by the compiler</span></span><br><span class="line"><span class="comment">     * but need not be retained by the VM at run time.  This is the default</span></span><br><span class="line"><span class="comment">     * behavior.</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    CLASS,</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Annotations are to be recorded in the class file by the compiler and</span></span><br><span class="line"><span class="comment">     * retained by the VM at run time, so they may be read reflectively.</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@see</span> java.lang.reflect.AnnotatedElement</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    RUNTIME</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>归纳如下：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th style="text-align:center">属性值</th>
-<th style="text-align:center">描述</th>
-<th style="text-align:center">使用场景</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:center">RetentionPolicy.SOURCE</td>
-<td style="text-align:center">注解只保留在源文件，当被编译成class文件，注解就会消失</td>
-<td style="text-align:center">代码预检，如 @Override、@SuppressWarnings</td>
-</tr>
-<tr>
-<td style="text-align:center">RetentionPolicy.CLASS</td>
-<td style="text-align:center">注解被保留到class文件，但当jvm加载class文件时被遗弃</td>
-<td style="text-align:center">编译时进行一些预处理操作，如生成辅助信息（META-INF/services）</td>
-</tr>
-<tr>
-<td style="text-align:center">RetentionPolicy.RUNTIME</td>
-<td style="text-align:center">注解不仅被保存到class文件中，jvm加载class文件之后，仍然存在</td>
-<td style="text-align:center">运行时动态获取注解信息，如 @Autowired、@Required</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h4 id="二、通过字节码认识-Retention"><a href="#二、通过字节码认识-Retention" class="headerlink" title="二、通过字节码认识 @Retention"></a>二、通过字节码认识 @Retention</h4><h5 id="定义三种生命周期的注解：SourcePolicy、ClassPolicy、RuntimePolicy"><a href="#定义三种生命周期的注解：SourcePolicy、ClassPolicy、RuntimePolicy" class="headerlink" title="定义三种生命周期的注解：SourcePolicy、ClassPolicy、RuntimePolicy"></a>定义三种生命周期的注解：SourcePolicy、ClassPolicy、RuntimePolicy</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Retention</span>(RetentionPolicy.SOURCE)</span><br><span class="line"><span class="meta">@Target</span>(ElementType.METHOD)</span><br><span class="line"><span class="keyword">public</span> <span class="meta">@interface</span> SourcePolicy &#123;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Retention</span>(RetentionPolicy.CLASS)</span><br><span class="line"><span class="meta">@Target</span>(ElementType.METHOD)</span><br><span class="line"><span class="keyword">public</span> <span class="meta">@interface</span> ClassPolicy &#123;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Retention</span>(RetentionPolicy.RUNTIME)</span><br><span class="line"><span class="meta">@Target</span>(ElementType.METHOD)</span><br><span class="line"><span class="keyword">public</span> <span class="meta">@interface</span> RuntimePolicy &#123;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>使用以上注解：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">RetentionPolicyTest</span> </span>&#123;</span><br><span class="line">    <span class="meta">@SourcePolicy</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">sourcePolicy</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@ClassPolicy</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">classPolicy</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@RuntimePolicy</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">runtimePolicy</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><code>javap -v RetentionPolicyTest</code> 查看字节码：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="title">RetentionPolicyTest</span><span class="params">()</span></span>;</span><br><span class="line">    flags: ACC_PUBLIC</span><br><span class="line">    Code:</span><br><span class="line">      stack=<span class="number">1</span>, locals=<span class="number">1</span>, args_size=<span class="number">1</span></span><br><span class="line">         <span class="number">0</span>: aload_0</span><br><span class="line">         1: invokespecial #1                  // Method java/lang/Object."&lt;init&gt;":()V</span><br><span class="line">         <span class="number">4</span>: <span class="keyword">return</span></span><br><span class="line">      LineNumberTable:</span><br><span class="line">        line <span class="number">3</span>: <span class="number">0</span></span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">sourcePolicy</span><span class="params">()</span></span>;</span><br><span class="line">    flags: ACC_PUBLIC</span><br><span class="line">    Code:</span><br><span class="line">      stack=<span class="number">0</span>, locals=<span class="number">1</span>, args_size=<span class="number">1</span></span><br><span class="line">         <span class="number">0</span>: <span class="keyword">return</span></span><br><span class="line">      LineNumberTable:</span><br><span class="line">        line <span class="number">7</span>: <span class="number">0</span></span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">classPolicy</span><span class="params">()</span></span>;</span><br><span class="line">    flags: ACC_PUBLIC</span><br><span class="line">    Code:</span><br><span class="line">      stack=<span class="number">0</span>, locals=<span class="number">1</span>, args_size=<span class="number">1</span></span><br><span class="line">         <span class="number">0</span>: <span class="keyword">return</span></span><br><span class="line">      LineNumberTable:</span><br><span class="line">        line <span class="number">11</span>: <span class="number">0</span></span><br><span class="line">    RuntimeInvisibleAnnotations:</span><br><span class="line">      0: #11()</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">runtimePolicy</span><span class="params">()</span></span>;</span><br><span class="line">    flags: ACC_PUBLIC</span><br><span class="line">    Code:</span><br><span class="line">      stack=<span class="number">0</span>, locals=<span class="number">1</span>, args_size=<span class="number">1</span></span><br><span class="line">         <span class="number">0</span>: <span class="keyword">return</span></span><br><span class="line">      LineNumberTable:</span><br><span class="line">        line <span class="number">15</span>: <span class="number">0</span></span><br><span class="line">    RuntimeVisibleAnnotations:</span><br><span class="line">      0: #14()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>可以看到：</p>
-<ul>
-<li>编译之后，@SourcePolicy 信息不存在；</li>
-<li>编译之后，@ClassPolicy 具有属性：RuntimeInvisibleAnnotations；</li>
-<li>编译之后，@RuntimePolicy 具有属性：RuntimeVisibleAnnotations；</li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/10/11/@interface_retention/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -467,7 +416,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+                <time title="修改时间：2026-08-22 00:24:52" itemprop="dateModified" datetime="2026-08-22T00:24:52+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -507,30 +456,14 @@
           <hr>
 <p>自从国内猪肉紧俏以来，市面上就经常买到进口猪肉。外国人养猪比较人性化，不给小猪做阉割，所以猪肉又腥又骚。今天抱着踩雷的心态，买了一份肉，并在叮咚上特意备注道：“只要中国猪肉！”。</p>
 <p>今天来做个狮子头。</p>
-<h5 id="一、食材准备"><a href="#一、食材准备" class="headerlink" title="一、食材准备"></a>一、食材准备</h5><p>五花肉（肥瘦比: 6:4），山药（马蹄/萝卜）、老豆腐、红薯淀粉、辣椒、葱姜蒜、生抽、老抽、蚝油、料酒、八角、鸡蛋。</p>
-<p><img data-src="https://s1.ax1x.com/2020/09/15/wyDNmd.jpg" alt="wyDNmd.jpg"></p>
-<p>辅料我用的是山药，大家可以根据自己的口味调整。辅料添加要适量，否则可能团不成肉丸子。</p>
-<h5 id="二、制作流程"><a href="#二、制作流程" class="headerlink" title="二、制作流程"></a>二、制作流程</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">graph LR</span><br><span class="line">A[拌料] --&gt; B(成型)</span><br><span class="line">B --&gt; C(煎炸)</span><br><span class="line">C --&gt; D(红烧)</span><br><span class="line">D --&gt; E(勾芡)</span><br></pre></td></tr></table></figure>
-<h5 id="三、操作步骤"><a href="#三、操作步骤" class="headerlink" title="三、操作步骤"></a>三、操作步骤</h5><ol>
-<li><p>将五花肉，山药、老豆腐、葱姜蒜、生抽、老抽、蚝油、料酒、鸡蛋依次放入碗中，用手沿着一个方向搅拌上劲，待拌料可以黏在手上，加入少量淀粉后继续搅拌摔打；</p>
-<p><img data-src="https://s1.ax1x.com/2020/09/15/wyD8SO.jpg" alt="wyD8SO.jpg"></p>
-</li>
-<li><p>将拌料团成你喜欢的大小；</p>
-<p><img data-src="https://s1.ax1x.com/2020/09/15/wyDJ6e.jpg" alt="wyDJ6e.jpg"></p>
-</li>
-<li><p>热锅冷油，煎炸二十分钟；油热6分可入锅，全程小火；这一步的主要目的是定型，口味清淡的朋友也可以用沸水来操作；</p>
-<p><img data-src="https://s1.ax1x.com/2020/09/15/wyDGlD.jpg" alt="wyDGlD.jpg"></p>
-</li>
-<li><p>将辣椒、葱姜蒜、八角炒香，再加入生抽、老抽、蚝油、料酒，添2/3锅水，加入肉丸子小火慢煮30分钟；</p>
-<p><img data-src="https://s1.ax1x.com/2020/09/15/wyDYOH.jpg" alt="wyDYOH.jpg"></p>
-</li>
-<li><p>勾芡 ；待锅内汤汁不多时，盛出肉丸子，然后加入水淀粉熬制挂锅，然后将红烧汁浇在狮子头上；</p>
-<p><img data-src="https://s1.ax1x.com/2020/09/15/wygNnS.jpg" alt="wygNnS.jpg"></p>
-<p><img data-src="https://s1.ax1x.com/2020/09/15/wygwkj.jpg" alt="wygwkj.jpg"></p>
-</li>
-</ol>
-<h5 id="四、多说一句"><a href="#四、多说一句" class="headerlink" title="四、多说一句"></a>四、多说一句</h5><p>做狮子头比较耗时耗力，只能在周末享用。相比来说，我更喜欢老家的肉丸子。材料比较简单，猪肉、馒头渣、黑胡椒。团成丸子，再兑上半锅水，炖煮一个小时。味浓又不油腻！</p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/13/tiger-head/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -580,7 +513,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+                <time title="修改时间：2026-08-22 00:28:07" itemprop="dateModified" datetime="2026-08-22T00:28:07+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -618,34 +551,14 @@
 
       
           <h4 id="一、应用背景"><a href="#一、应用背景" class="headerlink" title="一、应用背景"></a>一、应用背景</h4><p>在支付系统中，线程池在批量支付中有着十分重要的作用。随着业务量的增多，支付接口的处理能力越来越弱，甚至出现一个支付批次的处理时间超过5分钟的情况。这对于调用方来说，是无法容忍的。最简单粗暴的解决办法，便是增加线程数和阻塞队列容量。但至于怎么调整，才能做到既保证接口对支付请求的处理能力，又不浪费系统资源，好像只能凭感觉来了。<code>Prometheus</code> + <code>Grafana</code> 是目前比较流行的监控体系，在管理线程池方面的表现也十分出色。</p>
-<h4 id="二、线程池配置"><a href="#二、线程池配置" class="headerlink" title="二、线程池配置"></a>二、线程池配置</h4><p>采用 <code>Spring</code> 提供的 <code>ThreadPoolTaskExecutor</code> 来完成线程池的配置。根据业务需要，创建两个线程池：同步线程池和异步线程池。具体配置如下：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ExecutorPoolConfig</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">    * 线程池参数配置</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">    <span class="meta">@Resource</span></span><br><span class="line">    <span class="keyword">private</span> ExecutorProperties executorProperties;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String ASYNC_EXECUTOR = <span class="string">"asyncExecutor"</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> String SYNC_EXECUTOR = <span class="string">"syncExecutor"</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">    * <span class="doctag">@return</span> 同步线程池</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">    <span class="meta">@RefreshScope</span></span><br><span class="line">    <span class="meta">@Bean</span>(SYNC_EXECUTOR)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> ThreadPoolTaskExecutor <span class="title">serviceExecutor</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        ThreadPoolTaskExecutor executor = <span class="keyword">new</span> ThreadPoolTaskExecutor();</span><br><span class="line">        executor.setCorePoolSize(executorProperties.getSync().getCorePoolSize());</span><br><span class="line">        executor.setMaxPoolSize(executorProperties.getSync().getMaxPoolSize());</span><br><span class="line">        executor.setQueueCapacity(executorProperties.getSync().getQueueCapacity());</span><br><span class="line">        executor.setKeepAliveSeconds((<span class="keyword">int</span>)executorProperties.getSync()</span><br><span class="line">                                     .getKeepAlive().getSeconds());</span><br><span class="line">        executor.setThreadNamePrefix(<span class="string">"executor-sync-service-"</span>);</span><br><span class="line">        executor.setRejectedExecutionHandler(<span class="keyword">new</span> ThreadPoolExecutor.CallerRunsPolicy());</span><br><span class="line">        executor.setWaitForTasksToCompleteOnShutdown(<span class="keyword">true</span>);</span><br><span class="line">        executor.setAwaitTerminationSeconds(executorProperties.getSync()</span><br><span class="line">                                            .getAwaitTerminationSeconds());</span><br><span class="line">        <span class="keyword">return</span> executor;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@Async</span> 注解默认走该线程池</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 异步处理线程池</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="meta">@RefreshScope</span></span><br><span class="line">    <span class="meta">@Bean</span>(ASYNC_EXECUTOR)</span><br><span class="line">	<span class="function"><span class="keyword">public</span> ThreadPoolTaskExecutor <span class="title">taskExecutor</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        ThreadPoolTaskExecutor executor = <span class="keyword">new</span> ThreadPoolTaskExecutor();</span><br><span class="line">        executor.setCorePoolSize(executorProperties.getAsync().getCorePoolSize());</span><br><span class="line">        executor.setMaxPoolSize(executorProperties.getAsync().getMaxPoolSize());</span><br><span class="line">        executor.setQueueCapacity(executorProperties.getAsync().getQueueCapacity());</span><br><span class="line">        executor.setKeepAliveSeconds((<span class="keyword">int</span>)executorProperties.getAsync()</span><br><span class="line">                                     .getKeepAlive().getSeconds());</span><br><span class="line">        executor.setThreadNamePrefix(<span class="string">"common-async-executor-"</span>);</span><br><span class="line">        executor.setRejectedExecutionHandler(<span class="keyword">new</span> ThreadPoolExecutor.CallerRunsPolicy());</span><br><span class="line">        executor.setWaitForTasksToCompleteOnShutdown(<span class="keyword">true</span>);</span><br><span class="line">        executor.setAwaitTerminationSeconds(executorProperties.getAsync()</span><br><span class="line">                                            .getAwaitTerminationSeconds());</span><br><span class="line">        <span class="keyword">return</span> executor;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h4 id="三、监控指标"><a href="#三、监控指标" class="headerlink" title="三、监控指标"></a>三、监控指标</h4><p>综合线程池的核心要素和生产业务的关键要素，提出以下几种监控指标:</p>
-<ul>
-<li>核心线程数;</li>
-<li>最大线程数；</li>
-<li>活跃线程数；</li>
-<li>当前线程数；</li>
-<li>队列中任务数；</li>
-<li><p>已完成任务数； </p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> io.micrometer.core.instrument.Gauge;</span><br><span class="line"><span class="keyword">import</span> io.micrometer.core.instrument.MeterRegistry;</span><br><span class="line"><span class="keyword">import</span> io.micrometer.core.instrument.Metrics;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ExecutorMetricsSupport</span> <span class="keyword">implements</span> <span class="title">InitializingBean</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">    * Prometheus 数据采集中心</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">    <span class="meta">@Resource</span></span><br><span class="line">    <span class="keyword">private</span> MeterRegistry meterRegistry;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(SYNC_EXECUTOR)</span><br><span class="line">    <span class="keyword">private</span> ThreadPoolTaskExecutor syncExecutor;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="meta">@Qualifier</span>(ASYNC_EXECUTOR)</span><br><span class="line">    <span class="keyword">private</span> ThreadPoolTaskExecutor asyncExecutor;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">afterPropertiesSet</span><span class="params">()</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">        initServiceExecutorMetrics(syncExecutor, <span class="string">"executor.sync"</span>);</span><br><span class="line">        initServiceExecutorMetrics(asyncExecutor, <span class="string">"executor.async"</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 线程池metrics指标监控</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> serviceExecutor 线程池</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> namePrefix 指标名称前缀</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">initServiceExecutorMetrics</span><span class="params">(ThreadPoolTaskExecutor serviceExecutor, String namePrefix)</span> </span>&#123;</span><br><span class="line">        Gauge</span><br><span class="line">            .builder(namePrefix.concat(<span class="string">".active"</span>),</span><br><span class="line">                     serviceExecutor, ThreadPoolTaskExecutor::getActiveCount)</span><br><span class="line">            .register(meterRegistry);</span><br><span class="line">        </span><br><span class="line">        Gauge</span><br><span class="line">            .builder(namePrefix.concat(<span class="string">".core"</span>),</span><br><span class="line">                     serviceExecutor, ThreadPoolTaskExecutor::getCorePoolSize)</span><br><span class="line">            .register(meterRegistry);</span><br><span class="line">        </span><br><span class="line">        Gauge</span><br><span class="line">            .builder(namePrefix.concat(<span class="string">".max"</span>),</span><br><span class="line">                      serviceExecutor, ThreadPoolTaskExecutor::getMaxPoolSize)</span><br><span class="line">            .register(meterRegistry);</span><br><span class="line">        </span><br><span class="line">        Gauge</span><br><span class="line">            .builder(namePrefix.concat(<span class="string">".pool"</span>),</span><br><span class="line">                     serviceExecutor, ThreadPoolTaskExecutor::getPoolSize)</span><br><span class="line">            .register(meterRegistry);</span><br><span class="line">        </span><br><span class="line">        Gauge</span><br><span class="line">            .builder(namePrefix.concat(<span class="string">".queue"</span>), serviceExecutor,</span><br><span class="line">                     executor -&gt; executor.getThreadPoolExecutor().getQueue().size())</span><br><span class="line">            .register(meterRegistry);</span><br><span class="line">        </span><br><span class="line">        Gauge</span><br><span class="line">            .builder(namePrefix.concat(<span class="string">".completetask"</span>), serviceExecutor,</span><br><span class="line">                     executor -&gt; executor.getThreadPoolExecutor().getCompletedTaskCount())</span><br><span class="line">            .register(meterRegistry);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-</li>
-</ul>
-<h4 id="四、指标分析"><a href="#四、指标分析" class="headerlink" title="四、指标分析"></a>四、指标分析</h4><p>通过 <code>PSQL</code> 将以上各项指标展示在 <code>Grafana</code> 中。 <code>Prometheus</code> 默认 <code>15s</code> 拉取一次数据，对于线程池这种波定性较大的指标，建议将拉取时间调整至 <code>10s</code>，以便灵活且准确地反应线程池的运行情况。</p>
-<ul>
-<li>异步线程池</li>
-</ul>
-<p><img data-src="https://s1.ax1x.com/2020/08/24/dDNE9g.png" alt="dDNE9g.png"></p>
-<ul>
-<li>同步线程池</li>
-</ul>
-<p><a href="https://imgchr.com/i/dDN6vd" target="_blank" rel="noopener"><img data-src="https://s1.ax1x.com/2020/08/24/dDN6vd.png" alt="dDN6vd.png"></a></p>
-<p>由监控结果可以作出以下分析：</p>
-<ul>
-<li>异步线程池的负担非常小，目前还没出现过队列积压的情况，可以适当减少核心线程和最大线程数；</li>
-<li>同步线程池配置较为妥当，峰值期间未启用非核心线程，队列积压任务量在合理区间，请求处理效率非常高。</li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/08/17/metrics_in_thread_pool/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -695,7 +608,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+                <time title="修改时间：2026-08-22 00:28:07" itemprop="dateModified" datetime="2026-08-22T00:28:07+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -735,20 +648,14 @@
           <h4 id="一、需求背景"><a href="#一、需求背景" class="headerlink" title="一、需求背景"></a>一、需求背景</h4><p>本周负责做调账线上化，其中一个业务需求比较棘手：提交调账申请后，需在数据表记录对应的调账类型；而在调账复核页面，列表筛选项-调账类型，需支持多选。简单枚举如下:</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">enum</span> AdjustTypeEnum &#123;</span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 调账类型枚举; 一次调账申请可能对应多种调账类型，在数据表中枚举值之间以英文 , 分隔</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    FINE(<span class="number">0</span>, <span class="string">"应还罚息"</span>),</span><br><span class="line">    TOTAL_REPAYMENT(<span class="number">1</span>, <span class="string">"应还总额"</span>),</span><br><span class="line">    FACT_REPAYMENT(<span class="number">2</span>, <span class="string">"实还总额"</span>),</span><br><span class="line">    FACT_PAYMENT_DATE(<span class="number">3</span>, <span class="string">"实还日期"</span>),</span><br><span class="line">    OVERDUE_DAYS(<span class="number">4</span>, <span class="string">"逾期天数"</span>),</span><br><span class="line">    PAYMENT_STATUS(<span class="number">5</span>, <span class="string">"还款状态"</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>假如调账申请A的调账类型包括应还罚息和应还总额，则数据表相应字段值为<code>0,1</code>。在复核页面，若调账类型复选项中包含应还罚息或应还总额，则需查询到该申请。此时，我们发现<code>SQL</code>内置函数<code>FIND_IN_SET</code>只支持单选项查询，而无法灵活拆分筛选条件和存储数据。因此，有必要调整一下数据的存储规则和查询规则。</p>
-<h4 id="二、位与运算的妙用"><a href="#二、位与运算的妙用" class="headerlink" title="二、位与运算的妙用"></a>二、位与运算的妙用</h4><p>首先，我们需要进一步抽象：一方面，为了不浪费存储空间，科学地设计数据表，我们需要将目标数据列表整合存储在一个字段中；另一方面，数据库引擎需要灵活使用整合后的字段，以执行相应的查询语句。说白了，就是看起来像做了整合，实际上还是原始的目标数据列表。</p>
-<p>事实证明，上面提出的方案根本满足不了业务需求，是一个非常差的设计。除了以逗号分隔枚举值的存储方式，还有一种更为科学的存储方式——二进制。简单做几个位与运算：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 存储值: 3; 查询条件: 1</span></span><br><span class="line"><span class="comment">// 3 == 2 + 1</span></span><br><span class="line"><span class="comment">// 1 &amp; 3 == 1</span></span><br><span class="line"><span class="number">0001</span></span><br><span class="line">&amp;</span><br><span class="line"><span class="number">0011</span></span><br><span class="line">=</span><br><span class="line"><span class="number">0001</span></span><br></pre></td></tr></table></figure>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 存储值: 7; 查询条件: 1</span></span><br><span class="line"><span class="comment">// 7 == 1 + 2 + 4</span></span><br><span class="line"><span class="comment">// 1 &amp; 7 == 1</span></span><br><span class="line"><span class="number">0111</span></span><br><span class="line">&amp;</span><br><span class="line"><span class="number">0001</span></span><br><span class="line">=</span><br><span class="line"><span class="number">0001</span></span><br></pre></td></tr></table></figure>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 存储值: 7; 查询条件: 3</span></span><br><span class="line"><span class="comment">// 7 == 1 + 2 + 4</span></span><br><span class="line"><span class="comment">// 3 == 1 + 2</span></span><br><span class="line"><span class="comment">// 3 &amp; 7 == 3</span></span><br><span class="line"><span class="number">0111</span></span><br><span class="line">&amp;</span><br><span class="line"><span class="number">0011</span></span><br><span class="line">=</span><br><span class="line"><span class="number">0011</span></span><br></pre></td></tr></table></figure>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 存储值: 7; 查询条件: 15</span></span><br><span class="line"><span class="comment">// 7 == 1 + 2 + 4</span></span><br><span class="line"><span class="comment">// 15 == 1 + 2 + 4 + 8</span></span><br><span class="line"><span class="comment">// 15 &amp; 7 == 7</span></span><br><span class="line"><span class="number">0111</span></span><br><span class="line">&amp;</span><br><span class="line"><span class="number">1111</span></span><br><span class="line">=</span><br><span class="line"><span class="number">0111</span></span><br></pre></td></tr></table></figure>
-<p>从以上位与运算实例，可以发现一个有趣的现象：若将枚举值设置为<code>2</code>的<code>n</code>次幂，则只需将目标数据列表加合，即可保证每一个目标数据对应到二进制中的一位。</p>
-<p><img data-src="http://www.plantuml.com/plantuml/png/TP9TIyCm58Rl-oj2hsTf-j7fjfGL5q6OcwoPC8QCQjArMBkHLhrG_xinSP14xSKBvpbFtuj3fbrVyFxbkN4SMkzvSQn0n_Whu-3T0UBZHVj4QmuGcA_6ZaJjWR9jLnL79YXdZmTE1-2jfdqbPWyEGCNgVTNBuLxxnzysnGDh17SdfPzwdlSnAM4AHGOoGvcHp5Xcaa9Nwxxujnl-wdR5-hGDpEtLzG8Zg0kXAP0boUQx5RxDDZTuGL2Wkv5LbbqIJOrqDVv3_H5tiunWTAxRYMalx_1gjiP2tEG89hevDCrJPKuoiivH6BZ6sKTbSfRACunAVwppMF7Gvf7YaSr3nMER1uedDeUA3stkAmub_tIchANVB_0B" alt=""></p>
-<p>此时，对于任何一个查询条件，只需要将其与整合值进行位与运算，即可得到匹配的值。</p>
-<p>由此，我们调整枚举为：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">enum</span> AdjustTypeEnum &#123;</span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 调账类型枚举; 一次调账申请可能对应多种调账类型，在数据表中存储各值之和</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    FINE(<span class="number">1</span>, <span class="string">"应还罚息"</span>),</span><br><span class="line">    TOTAL_REPAYMENT(<span class="number">2</span>, <span class="string">"应还总额"</span>),</span><br><span class="line">    FACT_REPAYMENT(<span class="number">4</span>, <span class="string">"实还总额"</span>),</span><br><span class="line">    FACT_PAYMENT_DATE(<span class="number">8</span>, <span class="string">"实还日期"</span>),</span><br><span class="line">    OVERDUE_DAYS(<span class="number">16</span>, <span class="string">"逾期天数"</span>),</span><br><span class="line">    PAYMENT_STATUS(<span class="number">32</span>, <span class="string">"还款状态"</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>调整<code>SQL</code>为：</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span></span><br><span class="line">*</span><br><span class="line"><span class="keyword">FROM</span> <span class="string">`boss-account`</span>.acct_adjust_account_record</span><br><span class="line"><span class="keyword">WHERE</span></span><br><span class="line">adjust_type_sum &amp; <span class="comment">#&#123;调账类型筛选条件值之和&#125; &gt; 0</span></span><br></pre></td></tr></table></figure>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/07/19/bitwise_and_in_sql/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -798,7 +705,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+                <time title="修改时间：2026-08-22 00:28:07" itemprop="dateModified" datetime="2026-08-22T00:28:07+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -836,39 +743,14 @@
 
       
           <h4 id="一、技术背景"><a href="#一、技术背景" class="headerlink" title="一、技术背景"></a>一、技术背景</h4><p>实现发布订阅的中间件有许多，包括时下最热的<code>Kafka</code>、<code>RabbitMQ</code>、<code>ActiveMQ</code>，不太常见的<code>Guava</code>下的<code>EventBus</code>，以及<code>Redis</code>等。关于<code>MQ</code>之流的分析已经够多了，今天详细介绍下<code>Redis</code>的发布订阅机制及其实现。事实上，<code>Redis</code>的发布订阅机制在具体项目中的应用非常少，主要有两方面原因：其一，<code>Redis</code>的可靠性比较差，一旦出现断网等情况，则发布的消息便全部丢失；其二，<code>Redis</code>的消息处理方式是通过单线程循环遍历实现的，若存在大量的消息发布，则可能导致输出缓冲区膨胀，甚至服务崩溃。但对数据安全性和稳定性要求不高的场景来说，<code>Redis</code>不失为最佳的选择。</p>
-<h4 id="二、基本操作"><a href="#二、基本操作" class="headerlink" title="二、基本操作"></a>二、基本操作</h4><p><code>Redis</code> 的发布订阅模式包括普通订阅，普通订阅取消，模式订阅，模式订阅取消这四个场景。用命令实现如下：</p>
-<ul>
-<li><p>启动 <code>Redis</code> 服务（以 <code>Windows</code> 平台为例）</p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">C:\<span class="title">Tools</span>\<span class="title">Redis</span>&gt;<span class="title">redis</span>-<span class="title">server.exe</span> <span class="title">redis.windows.conf</span></span></span><br><span class="line"><span class="function">...</span></span><br><span class="line"><span class="function"><span class="title">The</span> <span class="title">server</span> <span class="title">is</span> <span class="title">now</span> <span class="title">ready</span> <span class="title">to</span> <span class="title">accept</span> <span class="title">connections</span> <span class="title">on</span> <span class="title">port</span> 6379</span></span><br></pre></td></tr></table></figure>
-</li>
-<li><p>创建客户端<code>client1</code>，并以普通订阅渠道<code>channel1</code></p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">redis-cli.exe -h <span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span> -p <span class="number">6379</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt; SUBSCRIBE channel1</span><br><span class="line">Reading messages... (press Ctrl-C to quit)</span><br><span class="line"><span class="number">1</span>) "subscribe"</span><br><span class="line"><span class="number">2</span>) "channel1"</span><br><span class="line"><span class="number">3</span>) (integer) <span class="number">1</span></span><br></pre></td></tr></table></figure>
-</li>
-<li><p>创建客户端<code>client2</code>，并普通订阅渠道<code>channel2</code></p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">redis-cli.exe -h <span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span> -p <span class="number">6379</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt; SUBSCRIBE channel2</span><br><span class="line">Reading messages... (press Ctrl-C to quit)</span><br><span class="line"><span class="number">1</span>) "subscribe"</span><br><span class="line"><span class="number">2</span>) "channel2"</span><br><span class="line"><span class="number">3</span>) (integer) <span class="number">1</span></span><br></pre></td></tr></table></figure>
-</li>
-<li><p>创建客户端<code>client3</code>，并模式订阅渠道<code>channel*</code></p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">redis-cli.exe -h <span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span> -p <span class="number">6379</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt; PSUBSCRIBE channel*</span><br><span class="line">Reading messages... (press Ctrl-C to quit)</span><br><span class="line"><span class="number">1</span>) "psubscribe"</span><br><span class="line"><span class="number">2</span>) "channel*"</span><br><span class="line"><span class="number">3</span>) (integer) <span class="number">1</span></span><br></pre></td></tr></table></figure>
-</li>
-<li><p>向渠道<code>channel2</code>发布一条消息</p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">redis-cli.exe -h <span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span> -p <span class="number">6379</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt; PUBLISH channel2 "msg from channel2"</span><br><span class="line">(integer) <span class="number">2</span></span><br><span class="line"><span class="number">127</span>.<span class="number">0</span>.<span class="number">0</span>.<span class="number">1</span>:<span class="number">6379</span>&gt;</span><br></pre></td></tr></table></figure>
-</li>
-<li><p><code>client2</code> 、<code>client3</code> 接收到消息</p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"># ----------client2---------</span><br><span class="line"><span class="number">1</span>) "message"</span><br><span class="line"><span class="number">2</span>) "channel2"</span><br><span class="line"><span class="number">3</span>) "msg from channel2"</span><br><span class="line"></span><br><span class="line"># ----------client3---------</span><br><span class="line"><span class="number">1</span>) "pmessage"</span><br><span class="line"><span class="number">2</span>) "channel*"</span><br><span class="line"><span class="number">3</span>) "channel2"</span><br><span class="line"><span class="number">4</span>) "msg from channel2"</span><br></pre></td></tr></table></figure>
-</li>
-</ul>
-<p>因此，我们可以猜测，消息发布者与消息订阅者之间是通过渠道连接的，包括精准匹配（普通订阅）和模糊匹配（模式订阅）。经过分析其结构设计，可表示为用例：</p>
-<p><img data-src="http://www.plantuml.com/plantuml/png/SoWkIImgAStDuU8gIaqkISnBpqbLA4fDoIoEBoXDYYykJLAevk9I08ASrBGIXP9yXQBCz8mIXPHCaFBC_3omN69oINwHmjF-YKztDBzeQ4KIUx5kqSiPhK0nGso2HjW4ZI7sbHQd9YSMfog4EXig91OhA3tRiU1bu-IOlEICnBoyr9oOl8B4afBKeZmbi7A4vGgwkdOWJLPG8R0qI00iWN2F5PIDNTe8lxGnNBgMoo4rBmKOW000" alt=""></p>
-<h4 id="三、原理分析"><a href="#三、原理分析" class="headerlink" title="三、原理分析"></a>三、原理分析</h4><p><code>Redis</code>发布订阅的核心实现在<code>pubsub.c</code>文件。从头文件<code>server.h</code>中可以读取相关函数声明：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">void subscribeCommand(client *c);      &#x2F;* 普通订阅 *&#x2F;</span><br><span class="line">void unsubscribeCommand(client *c);    &#x2F;* 普通订阅取消 *&#x2F;</span><br><span class="line">void psubscribeCommand(client *c);     &#x2F;* 模式订阅 *&#x2F;</span><br><span class="line">void punsubscribeCommand(client *c);   &#x2F;* 模式订阅取消 *&#x2F;</span><br><span class="line">void publishCommand(client *c);</span><br><span class="line">void pubsubCommand(client *c);</span><br></pre></td></tr></table></figure>
-<ul>
-<li>普通订阅模式：</li>
-</ul>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> CLIENT_PUBSUB (1&lt;&lt;18)      <span class="comment">/* Client is in Pub/Sub mode. */</span></span></span><br><span class="line"><span class="comment">/*-----------------------------------------------------------------------------</span></span><br><span class="line"><span class="comment"> * Pubsub commands implementation</span></span><br><span class="line"><span class="comment"> *----------------------------------------------------------------------------*/</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">subscribeCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> j;</span><br><span class="line">	<span class="comment">/* 分析client结构，c-&gt;argv[0]为命令本身，第2位开始为渠道参数 */</span></span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">1</span>; j &lt; c-&gt;argc; j++)</span><br><span class="line">        <span class="comment">/* 订阅一个渠道 */</span></span><br><span class="line">        pubsubSubscribeChannel(c,c-&gt;argv[j]);</span><br><span class="line">    <span class="comment">/* 设置客户端为发布订阅模式，此模式在processCommand中为校验值 */</span></span><br><span class="line">    c-&gt;flags |= CLIENT_PUBSUB;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* 一个客户端订阅一个渠道。若返回 1，则订阅成功；若返回 0，则该客户端已订阅该渠道 */</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">pubsubSubscribeChannel</span><span class="params">(client *c, robj *channel)</span> </span>&#123;</span><br><span class="line">    dictEntry *de;</span><br><span class="line">    <span class="built_in">list</span> *clients = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="keyword">int</span> retval = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 将该渠道添加到该客户端的pubsub_channels哈希表中； key: channel，value: NULL*/</span></span><br><span class="line">    <span class="keyword">if</span> (dictAdd(c-&gt;pubsub_channels,channel,<span class="literal">NULL</span>) == DICT_OK) &#123;</span><br><span class="line">        retval = <span class="number">1</span>;</span><br><span class="line">        <span class="comment">/* 引用自增 1 */</span></span><br><span class="line">        incrRefCount(channel);</span><br><span class="line">        <span class="comment">/* 在服务端pubsub_channels中查找该channel */</span></span><br><span class="line">        de = dictFind(server.pubsub_channels,channel);</span><br><span class="line">        <span class="comment">/* 若该channel不存在，则新建 */</span></span><br><span class="line">        <span class="keyword">if</span> (de == <span class="literal">NULL</span>) &#123;</span><br><span class="line">            clients = listCreate();</span><br><span class="line">            <span class="comment">/* 将该客户端添加到该服务端的pubsub_channels哈希表中; key: channel，value: client*/</span></span><br><span class="line">            dictAdd(server.pubsub_channels,channel,clients);</span><br><span class="line">             <span class="comment">/* 引用自增 1 */</span></span><br><span class="line">            incrRefCount(channel);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            clients = dictGetVal(de);</span><br><span class="line">        &#125;</span><br><span class="line">         <span class="comment">/* 将客户端c记录在订阅客户端列表 */</span></span><br><span class="line">        listAddNodeTail(clients,c);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">/* 通知客户端订阅结果 */</span></span><br><span class="line">    addReplyPubsubSubscribed(c,channel);</span><br><span class="line">    <span class="keyword">return</span> retval;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>普通订阅模式主要做了两件事：将订阅渠道添加至客户端<code>pubsub_channels</code>哈希表中；将订阅客户端添加至服务端的<code>pubsub_channels</code>哈希表中。可如下表示：</p>
-<p><img data-src="http://www.plantuml.com/plantuml/png/VP5FJyCW6CRFurEGdcjJ_kpYjcRHws8yw6anXXOwYCWMIgE9-jrz1Tk5Is_yVW_mFeJz48GFuxj524bpykAYSMUDSW5_ePKNxaqQZtVuwMw3qCgTfJeEMbmKAA-wivSb_Z0oQE2Ab5WhSz8Xmijqe3vQqIeBijZsTTDfuPoov7lRamae09s00R09E01lggegIlmPxzaLzwdVuzWEO_lwlt4eve4a7_ZmV3X0c3AwaB65Z2zawooBPQ-Fl-thcoQsWjLcbYH9cacQ9CiaIv9daYUvZl87eRroykyJVm40" alt=""></p>
-<p><img data-src="http://www.plantuml.com/plantuml/png/RL9TJuCm57tlhsXuHa8_W4mtikZhOapKfyMOifQLYDrIG4tK_-uT26ipUBhduvnxcx1kMc7Rxhr6I5PxAuuQDyf-A8k_4ORF2lCcAujN-Eds1lMKEKYrRRGuAc2jsXsi3F5d9LiDE28XrghQwxO7BquctjQYK3NmmRACyvqMngYQ_2nBCW8AW8w00M0Zu01u7aLHuEpYtguGV_KBLi7Zy8A7hcYwulM_eGdSOuX_p5rTATCIi4mEwZlkdpSRLsPp1THry3a7Tns9xu3NUJUcSmNCBSZc78bNifYpf9ublYxZg_mq4PZExMJYKvZy01a4UY7GGM1U4vkQiei06mG-1aQU3tpY1xAfQT4BlmYjbP6d7_WF" alt=""></p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/07/06/redis_pubsub/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -918,7 +800,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+                <time title="修改时间：2026-08-22 00:24:52" itemprop="dateModified" datetime="2026-08-22T00:24:52+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -959,26 +841,14 @@
 <hr>
 <p>今天特别想吃我妈做的油馍，也就是大家常说的葱油饼。虽然出租屋的条件有限，但我打算尝试一次。</p>
 <hr>
-<h4 id="一、原料"><a href="#一、原料" class="headerlink" title="一、原料"></a>一、原料</h4><p>小麦粉，小香葱，香油，花生油，食盐，佐料（看个人喜好选择添加）。</p>
-<h4 id="二、步骤"><a href="#二、步骤" class="headerlink" title="二、步骤"></a>二、步骤</h4><h6 id="1-和面"><a href="#1-和面" class="headerlink" title="1. 和面"></a>1. 和面</h6><p>加入适量面粉（尽量选高筋粉），边用筷子搅拌边兑温水，待面结成絮状，手动和成面团。建议面团和软一点，保证很好的延展性。和好后，套上保鲜膜，醒面20分钟。</p>
-<p><img data-src="https://s1.ax1x.com/2020/06/20/N1pDh9.jpg" alt="N1pDh9.jpg"></p>
-<h6 id="2-擀面"><a href="#2-擀面" class="headerlink" title="2. 擀面"></a>2. 擀面</h6><p>面醒好后，揉捏成条状。</p>
-<p><img data-src="https://s1.ax1x.com/2020/06/20/N19cCj.jpg" alt="N19cCj.jpg"></p>
-<p>葱油饼是多层叠加起来的，所以需要尽可能地将面擀薄。</p>
-<p><img data-src="https://s1.ax1x.com/2020/06/20/N1C3Mq.jpg" alt="N1C3Mq.jpg"></p>
-<h5 id="3-加料"><a href="#3-加料" class="headerlink" title="3. 加料"></a>3. 加料</h5><p>将适量香油滴在面皮上，然后不断对折面皮，直至香油全部铺开。</p>
-<p><img data-src="https://s1.ax1x.com/2020/06/20/N1PkY4.jpg" alt="N1PkY4.jpg"></p>
-<p>然后，均匀撒上葱花，食盐少量。</p>
-<p><img data-src="https://s1.ax1x.com/2020/06/20/N1P4NF.jpg" alt="N1P4NF.jpg"></p>
-<h5 id="4-成型"><a href="#4-成型" class="headerlink" title="4. 成型"></a>4. 成型</h5><p>将铺满葱花的面从一边角叠起。</p>
-<p><img data-src="https://s1.ax1x.com/2020/06/20/N1ZtPK.jpg" alt="N1ZtPK.jpg"></p>
-<p>将面擀平实。</p>
-<p><img data-src="https://s1.ax1x.com/2020/06/20/N1VM7t.jpg" alt="N1VM7t.jpg"></p>
-<h5 id="5-煎饼"><a href="#5-煎饼" class="headerlink" title="5. 煎饼"></a>5. 煎饼</h5><p>注意控制油温。家用燃气灶，小火慢热即可。</p>
-<p><img data-src="https://s1.ax1x.com/2020/06/20/N1VaBn.jpg" alt="N1VaBn.jpg"></p>
-<p><img data-src="https://s1.ax1x.com/2020/06/20/N1VUns.jpg" alt="N1VUns.jpg"></p>
-<p><img data-src="https://s1.ax1x.com/2020/06/20/N1VtXj.jpg" alt="N1VtXj.jpg"></p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/06/20/scallionPancake/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1028,7 +898,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+                <time title="修改时间：2026-08-22 00:24:52" itemprop="dateModified" datetime="2026-08-22T00:24:52+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -1066,29 +936,14 @@
 
       
           <hr>
-<h4 id="一、线程的使用"><a href="#一、线程的使用" class="headerlink" title="一、线程的使用"></a>一、线程的使用</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">    Thread thread1 = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            System.out.println(<span class="string">"执行线程1"</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">    thread1.start();</span><br><span class="line"></span><br><span class="line">    Thread thread2 = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            System.out.println(<span class="string">"执行线程2"</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">    thread2.run();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>创建以上两个线程，执行结果：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">执行线程<span class="number">1</span></span><br><span class="line">执行线程<span class="number">2</span></span><br></pre></td></tr></table></figure>
-<p>线程1与线程2都执行了 run()，但线程1是通过 start() 执行的，线程2是直接调用 run() 执行的。</p>
-<h4 id="二、start-与-run-的区别"><a href="#二、start-与-run-的区别" class="headerlink" title="二、start() 与 run() 的区别"></a>二、start() 与 run() 的区别</h4><p>为了更精准地找到两种调用之间的区别，需要打印线程相关的信息：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">    Thread thread1 = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            Thread currentThread = Thread.currentThread();</span><br><span class="line">            System.out.println(<span class="string">"执行线程1; 线程名称："</span> + currentThread.getName());</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">    thread1.start();</span><br><span class="line"></span><br><span class="line">    Thread thread2 = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            Thread currentThread = Thread.currentThread();</span><br><span class="line">            System.out.println(<span class="string">"执行线程2; 线程名称："</span> + currentThread.getName());</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">    thread2.run();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>执行结果：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">执行线程<span class="number">1</span>; 线程名称：Thread-<span class="number">0</span></span><br><span class="line">执行线程<span class="number">2</span>; 线程名称：main</span><br></pre></td></tr></table></figure>
-<p>从执行结果来看，start() 调用，是通过开启一个新线程来执行 run() 的；而直接调用 run()，是主线程直接执行方法内容的。</p>
-<p>此外，我们还可以做另一种尝试：多次执行 run() 方法：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">    Thread thread1 = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            Thread currentThread = Thread.currentThread();</span><br><span class="line">            System.out.println(<span class="string">"执行线程1; 线程名称："</span> + currentThread.getName());</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">    thread1.run();</span><br><span class="line">    thread1.run();</span><br><span class="line"></span><br><span class="line">    Thread thread2 = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            Thread currentThread = Thread.currentThread();</span><br><span class="line">            System.out.println(<span class="string">"执行线程2; 线程名称："</span> + currentThread.getName());</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line"></span><br><span class="line">    thread2.start();</span><br><span class="line">    thread2.start();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>执行结果：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">执行线程<span class="number">1</span>; 线程名称：main</span><br><span class="line">执行线程<span class="number">1</span>; 线程名称：main</span><br><span class="line">执行线程<span class="number">2</span>; 线程名称：Thread-<span class="number">1</span></span><br><span class="line">Exception in thread <span class="string">"main"</span> java.lang.IllegalThreadStateException</span><br><span class="line">	at java.lang.Thread.start(Thread.java:<span class="number">708</span>)</span><br><span class="line">	at com.example.springbatchdemo.job.Test.main(Test.java:<span class="number">29</span>)</span><br></pre></td></tr></table></figure>
-<p>从执行结果可知，可以多次调用 run()，而 start() 只能被执行一次，这是为什么呢？我们看下 start 方法说明：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">void</span> <span class="title">start</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">    * This method is not invoked for the main method thread or "system"</span></span><br><span class="line"><span class="comment">    * group threads created/set up by the VM. Any new functionality added</span></span><br><span class="line"><span class="comment">    * to this method in the future may have to also be added to the VM.</span></span><br><span class="line"><span class="comment">    *</span></span><br><span class="line"><span class="comment">    * A zero status value corresponds to state "NEW".</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">    <span class="keyword">if</span> (threadStatus != <span class="number">0</span>)</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> IllegalThreadStateException();</span><br></pre></td></tr></table></figure>
-<p>调用 start()，首先需要判断当前线程的状态是否为 0 （NEW），如果不是，则抛异常。当第一次调用 start() 时，线程状态从 NEW （新建）变为 RUNNABLE（就绪），当第二次调用 start() 时，线程状态肯定不是 NEW。</p>
-<h4 id="三、总结"><a href="#三、总结" class="headerlink" title="三、总结"></a>三、总结</h4><p>Thread 的 start() 与 run() 都可以完成任务执行，主要区别在：</p>
-<ul>
-<li>作用机制不同：直接调用 run()，相当于在当前线程中执行普通方法；调用 start()，是开启一个新的线程来执行 run()；</li>
-<li>执行速度不同：调用 run() 会立即执行任务，调用 start() 是将线程的状态改为就绪状态，等待空闲 CPU，不会立即执行；</li>
-<li>调用次数不同：run() 可以被重复调用，而 start() 只能被调用一次。</li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/06/07/thread_start_run/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1138,7 +993,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+                <time title="修改时间：2026-08-22 00:24:52" itemprop="dateModified" datetime="2026-08-22T00:24:52+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -1176,31 +1031,14 @@
 
       
           <hr>
-<h4 id="一、-NexT-集成第三方搜索服务"><a href="#一、-NexT-集成第三方搜索服务" class="headerlink" title="一、 NexT 集成第三方搜索服务"></a>一、 NexT 集成第三方搜索服务</h4><p>根据<a href="http://theme-next.iissnan.com/third-party-services.html#search-system" target="_blank" rel="noopener">官方文档</a>， NexT 主题框架集成的搜索方式有四种：</p>
-<ul>
-<li>SwiftType</li>
-<li>微搜索</li>
-<li>Local Search</li>
-<li>Algolia</li>
-</ul>
-<p>其中，Local Search 最为简单方便，本文将进一步介绍其配置与使用。</p>
-<h4 id="二、配置-Local-Search"><a href="#二、配置-Local-Search" class="headerlink" title="二、配置 Local Search"></a>二、配置 Local Search</h4><ul>
-<li><p>安装插件 <code>hexo-generator-searchdb</code>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install hexo-generator-searchdb --save</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>编辑站点配置文件，新增以下配置：</p>
-<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">search:</span><br><span class="line">  path: search.xml</span><br><span class="line">  field: post</span><br><span class="line">  format: html</span><br><span class="line">  limit: 10000</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>编辑主题配置文件，启用本地搜索功能：</p>
-<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"># Local Search</span><br><span class="line"># Dependencies: https://github.com/theme-next/hexo-generator-searchdb</span><br><span class="line">local_search:</span><br><span class="line">  enable: true</span><br></pre></td></tr></table></figure>
-</li>
-</ul>
-<h4 id="三、使用-Local-Search"><a href="#三、使用-Local-Search" class="headerlink" title="三、使用 Local Search"></a>三、使用 Local Search</h4><p>部署博客，访问首页，可以看到新增一个搜索控件：</p>
-<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/06/18_20_56_47_NexT-Search-Button.png" alt=""></p>
-<p>使用搜索功能，查看所有跟 Spring 相关的博客：</p>
-<p><img data-src="https://gitlab.com/donelab/img-bed/-/raw/main/pictures/2022/06/18_20_58_23_NexT-Search-Demo.png" alt=""></p>
-<p>可以看到，Local Search 不仅支持标题检索，还支持内容检索，十分好用。</p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/05/03/next_search_service/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1250,7 +1088,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-03 22:46:23" itemprop="dateModified" datetime="2026-04-03T22:46:23+08:00">2026-04-03</time>
+                <time title="修改时间：2026-08-22 00:28:07" itemprop="dateModified" datetime="2026-08-22T00:28:07+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -1289,18 +1127,14 @@
       
           <h5 id="食材准备"><a href="#食材准备" class="headerlink" title="食材准备"></a>食材准备</h5><p>鱼，玉米油，佐料（大葱、姜、蒜头、生抽、老抽、醋、料酒、蚝油、豉油、花椒、八角、桂树皮、黄豆酱）</p>
 <p><img data-src="https://s1.ax1x.com/2020/04/12/GO4pTK.jpg" alt="GO4pTK.jpg"></p>
-<h5 id="1-煎鱼"><a href="#1-煎鱼" class="headerlink" title="1. 煎鱼"></a>1. 煎鱼</h5><p><img data-src="https://s1.ax1x.com/2020/04/12/GO4kSH.jpg" alt="GO4kSH.jpg"></p>
-<p>为了不糊锅，建议事先在鱼的身上糊上一层面粉。入锅之前，需要提起鱼来，把多余的面粉抖掉，防止热油变苦。煎鱼的目的有两个：高油温可以锁住水分，使鱼肉外焦里嫩；鱼本身的腥味主要来自于表皮和腹腔，高油温可以迅速使鱼皮和腹腔角质化，起到去腥的作用。</p>
-<p><img data-src="https://s1.ax1x.com/2020/04/12/GO4MtS.jpg" alt="GO4MtS.jpg"></p>
-<p>待鱼炸至两面金黄后捞出，放凉备用。</p>
-<p><img data-src="https://s1.ax1x.com/2020/04/12/GO4t00.jpg" alt="GO4t00.jpg"></p>
-<h5 id="2-烧鱼"><a href="#2-烧鱼" class="headerlink" title="2. 烧鱼"></a>2. 烧鱼</h5><p><img data-src="https://s1.ax1x.com/2020/04/12/GO4g76.jpg" alt="GO4g76.jpg"></p>
-<p>热油锅将佐料翻炒出味，兑水至 2/3 满锅。</p>
-<p><img data-src="https://s1.ax1x.com/2020/04/12/GO4ojA.jpg" alt="GO4ojA.jpg"></p>
-<p>大火烧开，约 10 分钟后转至文火慢炖。约 1 小时后，大火收汁，出锅。</p>
-<p><img data-src="https://s1.ax1x.com/2020/04/12/GO5VCF.jpg" alt="GO5VCF.jpg"></p>
-<h5 id="3-心得"><a href="#3-心得" class="headerlink" title="3. 心得"></a>3. 心得</h5><p>红烧鱼是我最常做的荤菜，我也试过很多做法，有的味道很好，有的就做砸了。综合实操经验来看，我觉得做鱼的关键，并不是那盘佐料，也不是热油锅炸至两面金黄，而是时间———煮鱼的时间。我试过将一条鲜鱼直接放入一锅水中，然后只加入油盐酱醋，慢煮 2 小时后，别是一番风味———鱼的原味。所以，以上很多步骤可能只是花拳绣腿，关键还是在 2/3 满锅的水和 1 小时的文火慢炖。大家都可以尝试下，感受下那 1 小时内到底发生了什么。</p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/04/12/braise_fish/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 

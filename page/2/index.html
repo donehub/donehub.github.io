@@ -218,10 +218,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2026-04-30 00:00:00 / 修改时间：23:19:12" itemprop="dateCreated datePublished" datetime="2026-04-30T00:00:00+08:00">2026-04-30</time>
+              <time title="创建时间：2026-04-30 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-30T00:00:00+08:00">2026-04-30</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-08-22 00:24:32" itemprop="dateModified" datetime="2026-08-22T00:24:32+08:00">2026-08-22</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="fa fa-folder-o"></i>
@@ -261,229 +267,14 @@
 <p>“任务越复杂越该用多Agent”——听起来好像没毛病，但这句话背后藏着一个巨大的陷阱。很多人一拍脑袋就上多Agent，结果延迟爆表、成本失控、日志一团浆糊，最后发现单Agent加个工具调用就能搞定。上一篇我们聊了 Multi-Agent 系统的设计原理，今天换个角度：什么时候该用多Agent？用完之后，怎么评判这套设计到底好不好？</p>
 </blockquote>
 <hr>
-<h2 id="一、先破一个误区：复杂度不是决策标准"><a href="#一、先破一个误区：复杂度不是决策标准" class="headerlink" title="一、先破一个误区：复杂度不是决策标准"></a>一、先破一个误区：复杂度不是决策标准</h2><p>很多人一听到”多Agent”，脑子里的画面是这样的：一个主控 Agent 坐镇中央，下面挂着写代码的、做测试的、写文档的，各司其职，特别壮观。</p>
-<p>但壮观不等于好用。</p>
-<p><strong>复杂度从来不是选择多Agent的理由。</strong> 真正的决策标准只有两个维度：<strong>并发收益</strong>和<strong>上下文约束</strong>。</p>
-<p>用一张表说清楚：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>场景特征</th>
-<th>单Agent够用吗</th>
-<th>要不要上多Agent</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>步骤严格串行，后一步依赖前一步结果</td>
-<td>够用</td>
-<td>不要，纯浪费</td>
-</tr>
-<tr>
-<td>多个子任务互相独立，可以同时跑</td>
-<td>不够</td>
-<td>要，并行收益明显</td>
-</tr>
-<tr>
-<td>单个任务的上下文撑爆模型窗口</td>
-<td>不够</td>
-<td>要，必须切分</td>
-</tr>
-<tr>
-<td>子任务之间需要频繁交换中间状态</td>
-<td>勉强</td>
-<td>谨慎，通信开销可能吃掉收益</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>但这张表太粗了，真实决策远比这复杂。下面我们拆开来讲。</p>
-<hr>
-<h2 id="二、决策框架：四把尺子量出答案"><a href="#二、决策框架：四把尺子量出答案" class="headerlink" title="二、决策框架：四把尺子量出答案"></a>二、决策框架：四把尺子量出答案</h2><h3 id="2-1-第一把尺子：任务依赖图是线性的还是扇出的？"><a href="#2-1-第一把尺子：任务依赖图是线性的还是扇出的？" class="headerlink" title="2.1 第一把尺子：任务依赖图是线性的还是扇出的？"></a>2.1 第一把尺子：任务依赖图是线性的还是扇出的？</h3><p>这是最核心的判断依据。</p>
-<p><strong>线性依赖</strong>是指任务之间有严格的先后顺序：A 的输出是 B 的输入，B 的输出是 C 的输入。比如用户问”我的退款到哪一步了”——先识别意图，再查订单库，最后组织回复。这三步必须串行，中间插不进任何并行操作。</p>
-<p><strong>扇出依赖</strong>是指一个任务可以拆成多个互不相关的子任务同时执行。比如”帮我审查这个代码仓库的安全性”——注入漏洞扫描、内存泄漏检测、代码风格检查，这三件事之间没有任何数据依赖，完全可以同时开工。</p>
-<p>画成图就是这样的区别：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">线性依赖（单Agent）：</span><br><span class="line">意图识别 → 查数据库 → 组织回复</span><br><span class="line">  A    →    B     →    C</span><br><span class="line"></span><br><span class="line">扇出依赖（多Agent）：</span><br><span class="line">            ┌→ 安全检测 ──┐</span><br><span class="line">主控规划 ──→├→ 性能分析 ──├→ 汇总合并</span><br><span class="line">            └→ 规范检查 ──┘</span><br></pre></td></tr></table></figure>
-<p><strong>判断标准</strong>：如果你的任务依赖图画出来是一条直线，用单Agent。如果画出来像一把扇子，考虑多Agent。</p>
-<h3 id="2-2-第二把尺子：上下文窗口是不是硬瓶颈？"><a href="#2-2-第二把尺子：上下文窗口是不是硬瓶颈？" class="headerlink" title="2.2 第二把尺子：上下文窗口是不是硬瓶颈？"></a>2.2 第二把尺子：上下文窗口是不是硬瓶颈？</h3><p>有些任务看起来是线性的，但数据量大到单个模型根本吃不下。这时候即使任务是串行的，你也得想办法切分。</p>
-<p>举个例子：给你一个 50 万行的代码仓库，要求生成完整的 API 文档。这不是并行任务——你需要理解全局架构才能写好文档。但问题是，50 万行代码塞不进任何模型的上下文窗口。</p>
-<p>这时候多Agent的价值不是并行加速，而是<strong>上下文切片</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Agent-1：扫描 controller 层，提取接口定义</span><br><span class="line">Agent-2：扫描 service 层，提取业务逻辑</span><br><span class="line">Agent-3：扫描 entity 层，提取数据模型</span><br><span class="line">主控 Agent：拿到三份切片报告，合并生成文档</span><br></pre></td></tr></table></figure>
-<p>每个 Agent 只需要处理自己那一层的代码，上下文压力骤降。最后主控 Agent 拿到的是三份精炼过的报告，而不是几十万行原始代码。</p>
-<p><strong>判断标准</strong>：估算一下任务需要的上下文 token 量。如果超过模型窗口的 60%，就要考虑切分了。留 40% 的余量给系统 Prompt、工具调用和中间推理。</p>
-<h3 id="2-3-第三把尺子：延迟预算够不够？"><a href="#2-3-第三把尺子：延迟预算够不够？" class="headerlink" title="2.3 第三把尺子：延迟预算够不够？"></a>2.3 第三把尺子：延迟预算够不够？</h3><p>这是最容易被忽略的一把尺子。</p>
-<p>多Agent系统的延迟公式非常残酷：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">总延迟 &#x3D; max(各子Agent延迟) + 主控规划延迟 + 主控汇总延迟 + 通信开销</span><br></pre></td></tr></table></figure>
-<p>注意这里用的是 <code>max</code> 不是 <code>sum</code>——因为子 Agent 是并行的，总延迟取决于最慢的那个。听起来不错对吧？但别忘了后面还有三项固定开销。</p>
-<p>在真实的线上环境里，大模型的一次调用延迟通常在 2-8 秒。一个三层架构的多Agent系统，光是规划和汇总就要各调一次模型，加上子 Agent 的执行时间，端到端延迟很容易突破 15 秒。</p>
-<p>对比一下单Agent方案：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">单Agent：意图识别(2s) → 工具调用(1s) → 总结回复(2s) &#x3D; 5s</span><br><span class="line">多Agent：规划(3s) + max(子Agent×3)(4s) + 汇总(3s) + 通信(1s) &#x3D; 11s</span><br></pre></td></tr></table></figure>
-<p><strong>判断标准</strong>：如果你的场景是面向用户的实时交互（聊天机器人、客服系统），延迟预算通常在 5 秒以内。这种场景下多Agent几乎一定会超时，单Agent + 工具调用是更务实的选择。如果是后台批处理任务（代码审计、报告生成），延迟预算宽松，多Agent才有发挥空间。</p>
-<h3 id="2-4-第四把尺子：Token-预算能不能扛得住？"><a href="#2-4-第四把尺子：Token-预算能不能扛得住？" class="headerlink" title="2.4 第四把尺子：Token 预算能不能扛得住？"></a>2.4 第四把尺子：Token 预算能不能扛得住？</h3><p>多Agent系统的 Token 消耗不是线性增长，而是<strong>阶梯式跳涨</strong>。</p>
-<p>每一次 Agent 调用，你都要支付：</p>
-<ul>
-<li>系统 Prompt（每次都一样，但每次都要算钱）</li>
-<li>上下文注入（任务描述、历史信息）</li>
-<li>模型推理（输出 token）</li>
-</ul>
-<p>假设你有一个主控 Agent + 5 个子 Agent，每个 Agent 的系统 Prompt 是 2000 token，任务描述平均 1000 token，输出平均 1500 token。那么一轮完整执行的 Token 消耗大约是：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">主控：2000 + 1000 + 1500 &#x3D; 4500</span><br><span class="line">子Agent×5：(2000 + 1000 + 1500) × 5 &#x3D; 22500</span><br><span class="line">汇总：2000 + 3000(子Agent结果) + 2000 &#x3D; 7000</span><br><span class="line">总计：约 34000 token</span><br></pre></td></tr></table></figure>
-<p>而单Agent完成同样任务，可能只需要 5000-8000 token。</p>
-<p><strong>判断标准</strong>：如果你的系统要处理高并发请求（比如每秒几百个），Token 成本的差异会被放大几百倍。在做架构选型时，先算一笔账：多Agent方案的 Token 成本是单Agent的几倍？这个倍数你的预算扛不扛得住？</p>
-<hr>
-<h2 id="三、四个典型场景的决策推演"><a href="#三、四个典型场景的决策推演" class="headerlink" title="三、四个典型场景的决策推演"></a>三、四个典型场景的决策推演</h2><p>光讲理论不过瘾，我们拿四个真实场景来跑一遍决策流程。</p>
-<h3 id="3-1-场景一：智能客服（结论：单Agent）"><a href="#3-1-场景一：智能客服（结论：单Agent）" class="headerlink" title="3.1 场景一：智能客服（结论：单Agent）"></a>3.1 场景一：智能客服（结论：单Agent）</h3><p>用户问：”我的订单 #12345 退款到哪一步了？”</p>
-<p><strong>依赖图分析</strong>：识别意图 → 查订单 → 回复。严格线性，没有并行空间。</p>
-<p><strong>上下文分析</strong>：一次对话的上下文很小，远不到窗口极限。</p>
-<p><strong>延迟分析</strong>：用户在等回复，延迟预算 3 秒。</p>
-<p><strong>Token 分析</strong>：高并发场景（成千上万用户同时咨询），成本敏感。</p>
-<p>四把尺子量完，全部指向单Agent。上多Agent就是过度设计。</p>
-<h3 id="3-2-场景二：企业级代码安全审计（结论：多Agent）"><a href="#3-2-场景二：企业级代码安全审计（结论：多Agent）" class="headerlink" title="3.2 场景二：企业级代码安全审计（结论：多Agent）"></a>3.2 场景二：企业级代码安全审计（结论：多Agent）</h3><p>需求：扫描一个 10 万行代码仓库，输出安全漏洞报告。</p>
-<p><strong>依赖图分析</strong>：注入扫描、内存泄漏检测、依赖漏洞检查、代码规范审查——四个子任务完全独立。</p>
-<p><strong>上下文分析</strong>：10 万行代码远超单模型窗口，必须切片。</p>
-<p><strong>延迟分析</strong>：后台批处理，用户可以等几分钟，延迟预算宽松。</p>
-<p><strong>Token 分析</strong>：低并发（一天可能就跑几次），成本可控。</p>
-<p>四把尺子量完，全部指向多Agent。</p>
-<h3 id="3-3-场景三：长文档摘要生成（结论：伪多Agent-单Agent-分段策略）"><a href="#3-3-场景三：长文档摘要生成（结论：伪多Agent-单Agent-分段策略）" class="headerlink" title="3.3 场景三：长文档摘要生成（结论：伪多Agent / 单Agent + 分段策略）"></a>3.3 场景三：长文档摘要生成（结论：伪多Agent / 单Agent + 分段策略）</h3><p>需求：把一份 200 页的技术文档浓缩成 5 页摘要。</p>
-<p>乍一看，200 页文档肯定塞不进上下文，应该用多Agent切分对吧？</p>
-<p>但仔细想想：文档摘要是<strong>有全局连贯性要求</strong>的。你不能让 Agent-A 总结第 1-50 页、Agent-B 总结第 51-100 页，然后拼在一起——这样出来的摘要会有大量重复、遗漏和逻辑断裂。</p>
-<p>更好的方案是<strong>单Agent + 分段迭代策略</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">第一轮：单Agent处理第1-50页，产出中间摘要A</span><br><span class="line">第二轮：单Agent带着摘要A处理第51-100页，产出中间摘要B</span><br><span class="line">第三轮：单Agent带着摘要B处理第101-150页，产出中间摘要C</span><br><span class="line">第四轮：单Agent带着摘要C处理第151-200页，产出最终摘要</span><br></pre></td></tr></table></figure>
-<p>每一轮都保留了前序上下文的精华，保证了连贯性。这比多Agent并行切分效果好得多。</p>
-<p><strong>教训</strong>：上下文超限不等于必须上多Agent。有时候<strong>串行分段 + 状态传递</strong>比并行切分更适合有连贯性要求的任务。</p>
-<h3 id="3-4-场景四：多语言翻译流水线（结论：看情况）"><a href="#3-4-场景四：多语言翻译流水线（结论：看情况）" class="headerlink" title="3.4 场景四：多语言翻译流水线（结论：看情况）"></a>3.4 场景四：多语言翻译流水线（结论：看情况）</h3><p>需求：把一份技术文档翻译成英、日、韩三种语言。</p>
-<p><strong>表面分析</strong>：三种语言互不依赖，可以并行——看起来应该用多Agent。</p>
-<p><strong>深层分析</strong>：翻译的前置步骤（术语提取、风格统一）是共享的。如果三个 Agent 各自提取术语，出来的译文风格会不一致。</p>
-<p><strong>最优方案</strong>：混合架构。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">阶段一（单Agent）：提取术语表 + 定义翻译风格指南</span><br><span class="line">阶段二（多Agent并行）：三个Agent分别翻译三种语言，共享术语表</span><br><span class="line">阶段三（单Agent）：审校三份译文的一致性</span><br></pre></td></tr></table></figure>
-<p><strong>教训</strong>：很多任务不是纯粹的”该用”或”不该用”多Agent，而是<strong>在流水线的某些阶段用、某些阶段不用</strong>。混合架构才是最常见的生产形态。</p>
-<hr>
-<h2 id="四、怎么评估一个多Agent系统设计得好不好？"><a href="#四、怎么评估一个多Agent系统设计得好不好？" class="headerlink" title="四、怎么评估一个多Agent系统设计得好不好？"></a>四、怎么评估一个多Agent系统设计得好不好？</h2><p>选对了场景只是第一步。就算你决策正确，多Agent系统仍然可能设计得很烂。下面是一套评估框架，从五个维度给系统打分。</p>
-<h3 id="4-1-评估维度一：任务分解的合理性"><a href="#4-1-评估维度一：任务分解的合理性" class="headerlink" title="4.1 评估维度一：任务分解的合理性"></a>4.1 评估维度一：任务分解的合理性</h3><p>这是最基础也最关键的维度。分解不合理，后面的一切都是空中楼阁。</p>
-<p><strong>好的分解</strong>有三个特征：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>特征</th>
-<th>说明</th>
-<th>反例</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>子任务之间低耦合</td>
-<td>每个子Agent能独立完成自己的工作，不需要等别人的结果</td>
-<td>Agent-A 需要 Agent-B 的输出才能开始</td>
-</tr>
-<tr>
-<td>子任务粒度适中</td>
-<td>不太粗（一个Agent干不完）也不太细（拆太碎通信开销吃掉收益）</td>
-<td>把”查数据库”拆成”建立连接””发送SQL””解析结果”三个Agent</td>
-</tr>
-<tr>
-<td>子任务边界清晰</td>
-<td>每个Agent的职责范围明确，不会出现两个Agent干同一件事</td>
-<td>安全Agent和性能Agent都在扫描同一段代码的同一个函数</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p><strong>快速检验法</strong>：拿一张纸，把每个子Agent的任务写下来。如果你发现两个子Agent的任务描述有超过 30% 的重叠，分解就有问题。</p>
-<h3 id="4-2-评估维度二：通信开销占比"><a href="#4-2-评估维度二：通信开销占比" class="headerlink" title="4.2 评估维度二：通信开销占比"></a>4.2 评估维度二：通信开销占比</h3><p>多Agent系统的总成本 = 计算成本 + 通信成本。</p>
-<p>通信成本包括：</p>
-<ul>
-<li>主控 Agent 向子 Agent 传递任务描述的 Token</li>
-<li>子 Agent 向主控 Agent 返回结果的 Token</li>
-<li>主控 Agent 汇总所有结果的 Token</li>
-<li>如果子 Agent 之间需要通信（不推荐），还有交叉通信的 Token</li>
-</ul>
-<p><strong>健康的系统</strong>：通信开销占总 Token 消耗的 20% 以内。</p>
-<p><strong>有问题的系统</strong>：通信开销超过 40%。这意味着你在花大量 Token 让 Agent 之间”传纸条”，而不是干实事。</p>
-<p>计算公式：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">通信开销占比 &#x3D; (任务传递Token + 结果回传Token + 汇总Token) &#x2F; 总Token消耗 × 100%</span><br></pre></td></tr></table></figure>
-<p>如果你算出来这个比例很高，说明要么子任务拆得太碎（太多小Agent在传话），要么结果压缩做得不好（子Agent带回来的信息太冗余）。</p>
-<h3 id="4-3-评估维度三：并行效率"><a href="#4-3-评估维度三：并行效率" class="headerlink" title="4.3 评估维度三：并行效率"></a>4.3 评估维度三：并行效率</h3><p>多Agent的核心价值是并行。如果并行效率低，用多Agent就没有意义。</p>
-<p><strong>并行效率</strong>的定义：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">并行效率 &#x3D; 单Agent串行完成时间 &#x2F; 多Agent并行完成时间</span><br></pre></td></tr></table></figure>
-<p>理论上，N 个 Agent 并行，效率应该接近 N。但实际上很难达到，因为：</p>
-<ul>
-<li>子 Agent 的任务量不均衡（最慢的那个决定了总时间）</li>
-<li>主控 Agent 的规划和汇总有固定延迟</li>
-<li>通信有网络开销</li>
-</ul>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>并行效率</th>
-<th>评价</th>
-<th>建议</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>&gt; 2.0x</td>
-<td>优秀</td>
-<td>多Agent方案值得投入</td>
-</tr>
-<tr>
-<td>1.5x - 2.0x</td>
-<td>一般</td>
-<td>看场景，如果成本敏感可以考虑单Agent</td>
-</tr>
-<tr>
-<td>&lt; 1.5x</td>
-<td>差</td>
-<td>多Agent带来的收益不够覆盖额外开销，回退单Agent</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p><strong>提升并行效率的关键</strong>：让每个子 Agent 的工作量尽量均衡。如果一个子 Agent 1 秒就跑完了，另一个要跑 10 秒，那你的并行效率就被拖后腿了。</p>
-<h3 id="4-4-评估维度四：容错与可观测性"><a href="#4-4-评估维度四：容错与可观测性" class="headerlink" title="4.4 评估维度四：容错与可观测性"></a>4.4 评估维度四：容错与可观测性</h3><p>这是工程落地时最容易翻车的维度。</p>
-<p><strong>容错能力</strong>评估清单：</p>
-<ul>
-<li>一个子 Agent 超时或失败了，系统会怎样？是直接整体失败，还是能降级处理？</li>
-<li>子 Agent 返回了错误结果（幻觉），主控 Agent 能不能识别出来？</li>
-<li>有没有设置最大重试次数？重试的 Token 成本有没有上限？</li>
-</ul>
-<p><strong>可观测性</strong>评估清单：</p>
-<ul>
-<li>出了问题，你能在日志里定位到是哪个 Agent 在哪个环节出错的吗？</li>
-<li>每个 Agent 的输入输出有没有完整记录？</li>
-<li>你能不能回放一次完整的执行过程来做 Debug？</li>
-</ul>
-<p>一个残酷的现实：大部分多Agent系统的日志都是一团浆糊。主控 Agent 调了 5 个子 Agent，每个子 Agent 又调了若干工具，出了问题你只能看到一个笼统的”执行失败”，根本不知道是哪一步在胡说八道。</p>
-<p><strong>好的设计</strong>：给每个 Agent 执行分配一个唯一的 trace ID，所有日志都带上这个 ID，方便链路追踪。</p>
-<h3 id="4-5-评估维度五：边际收益递减点"><a href="#4-5-评估维度五：边际收益递减点" class="headerlink" title="4.5 评估维度五：边际收益递减点"></a>4.5 评估维度五：边际收益递减点</h3><p>这是最需要工程直觉的一个维度。</p>
-<p>多Agent系统的子 Agent 数量不是越多越好。存在一个<strong>边际收益递减点</strong>——超过这个点，增加 Agent 带来的并行收益小于增加的通信开销和协调成本。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">    收益</span><br><span class="line">     ↑</span><br><span class="line">     │        ╭───────── 收益曲线</span><br><span class="line">     │      ╱</span><br><span class="line">     │    ╱</span><br><span class="line">     │  ╱</span><br><span class="line">     │╱</span><br><span class="line">     ├──────────────────→ Agent数量</span><br><span class="line">     ↑</span><br><span class="line">边际收益递减点</span><br></pre></td></tr></table></figure>
-<p><strong>经验值</strong>：在大部分场景下，子 Agent 数量控制在 3-8 个是比较合理的区间。超过 10 个，协调成本会急剧上升。</p>
-<p><strong>怎么找到这个点？</strong> 最靠谱的方法是跑基准测试：</p>
-<ol>
-<li>从 2 个子 Agent 开始，记录执行时间和 Token 消耗</li>
-<li>逐步增加到 3、4、5… 个</li>
-<li>画出”Agent数量 vs 端到端延迟”和”Agent数量 vs Token成本”两条曲线</li>
-<li>找到延迟不再显著下降、但 Token 成本还在上升的那个拐点</li>
-</ol>
-<p>那个拐点就是你的最优 Agent 数量。</p>
-<hr>
-<h2 id="五、一个完整的评估-Checklist"><a href="#五、一个完整的评估-Checklist" class="headerlink" title="五、一个完整的评估 Checklist"></a>五、一个完整的评估 Checklist</h2><p>把上面五个维度浓缩成一份可执行的检查清单。拿到任何一套多Agent系统设计方案，对照这张表打分：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">任务分解合理性                          □ 通过  □ 不通过</span><br><span class="line">├─ 子任务之间是否低耦合？               □ 是    □ 否</span><br><span class="line">├─ 粒度是否适中？                       □ 是    □ 否</span><br><span class="line">└─ 边界是否清晰？                       □ 是    □ 否</span><br><span class="line"></span><br><span class="line">通信开销占比                            □ 通过  □ 不通过</span><br><span class="line">├─ 通信Token占比 &lt; 20%？               □ 是    □ 否</span><br><span class="line">└─ 子Agent结果是否经过压缩？            □ 是    □ 否</span><br><span class="line"></span><br><span class="line">并行效率                                □ 通过  □ 不通过</span><br><span class="line">├─ 并行加速比 &gt; 1.5x？                 □ 是    □ 否</span><br><span class="line">└─ 子Agent工作量是否均衡？              □ 是    □ 否</span><br><span class="line"></span><br><span class="line">容错与可观测性                          □ 通过  □ 不通过</span><br><span class="line">├─ 子Agent失败是否可降级？              □ 是    □ 否</span><br><span class="line">├─ 每个Agent是否有trace ID？            □ 是    □ 否</span><br><span class="line">└─ 能否回放完整执行过程？               □ 是    □ 否</span><br><span class="line"></span><br><span class="line">边际收益                                □ 通过  □ 不通过</span><br><span class="line">├─ 子Agent数量是否在合理区间(3-8)？     □ 是    □ 否</span><br><span class="line">└─ 是否做过基准测试找最优解？           □ 是    □ 否</span><br></pre></td></tr></table></figure>
-<p>5 个维度全部通过，这是一套合格的多Agent系统设计。有 1-2 个不通过，需要针对性优化。3 个以上不通过——回去重新考虑一下，这个场景是不是真的需要多Agent。</p>
-<hr>
-<h2 id="六、总结"><a href="#六、总结" class="headerlink" title="六、总结"></a>六、总结</h2><p>回到文章开头的问题：什么场景下用多Agent系统？</p>
-<p>答案不是”任务越复杂越好”，而是<strong>当你同时撞上了两个天花板时</strong>：</p>
-<ol>
-<li><strong>单一模型的上下文天花板</strong>——数据量大到一个模型吃不下</li>
-<li><strong>串行执行的延迟天花板</strong>——子任务之间没有依赖，串行跑太慢</li>
-</ol>
-<p>只撞上第一个天花板，用单Agent + 分段策略就能解决。只撞上第二个天花板，用单Agent + 异步并发工具调用也能凑合。两个同时撞上，才是多Agent真正不可替代的场景。</p>
-<p>而在评估一套多Agent系统设计时，不要只看架构图好不好看，要拿数据说话：通信开销占比多少？并行效率多少？边际收益递减点在哪？</p>
-<p><strong>用工程的刚性去约束架构的浪漫，这才是做系统设计的正确姿势。</strong></p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/30/multi-agent-decision-and-evaluation/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -525,10 +316,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2026-04-27 00:00:00 / 修改时间：17:56:03" itemprop="dateCreated datePublished" datetime="2026-04-27T00:00:00+08:00">2026-04-27</time>
+              <time title="创建时间：2026-04-27 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-27T00:00:00+08:00">2026-04-27</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-08-22 00:24:32" itemprop="dateModified" datetime="2026-08-22T00:24:32+08:00">2026-08-22</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="fa fa-folder-o"></i>
@@ -568,164 +365,14 @@
 <p>如果你在构建 Agent，一定想过这个问题：怎么让 Agent 跨会话记住用户的偏好、项目的背景、之前犯过的错误？大部分人的做法是搞一个文件，把所有「需要记住的东西」往里塞。文件越来越大，token 成本越来越高，而且大部分内容跟当前对话根本没关系。Claude Code 的记忆系统给出了一个反直觉的设计原则：工程量最大的部分不是「怎么存」，也不是「怎么取」，而是「什么该存、什么不该存」。</p>
 </blockquote>
 <hr>
-<h2 id="一、核心哲学：记忆是代码的补集"><a href="#一、核心哲学：记忆是代码的补集" class="headerlink" title="一、核心哲学：记忆是代码的补集"></a>一、核心哲学：记忆是代码的补集</h2><p>这套记忆系统的设计哲学可以用一句话概括：</p>
-<blockquote>
-<p><strong>记忆是代码的补集。</strong></p>
-</blockquote>
-<p>听起来简单，但这是整个设计里最有启发性的原则。具体来说：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>维度</th>
-<th>代码/工具擅长</th>
-<th>记忆系统擅长</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>时效性</td>
-<td>实时查询、权威来源</td>
-<td>跨会话沉淀、经验积累</td>
-</tr>
-<tr>
-<td>可变性</td>
-<td>随代码更新自动失效</td>
-<td>需要主动维护、可能过时</td>
-</tr>
-<tr>
-<td>粒度</td>
-<td>精确到函数/文件</td>
-<td>模糊的意图、偏好、上下文</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p><strong>该存的</strong>：全部是「关于人和上下文」的信息——人的偏好、纠正、动机、外部资源指针。这些藏在代码之外，不查记忆就无从得知。</p>
-<p><strong>不该存的</strong>：全部是「关于代码和项目状态」的信息——代码是实时的、可查的、权威的。代码能回答的问题，不要让记忆来回答。</p>
-<p>这个分界线一旦清晰，你会发现很多之前觉得「应该记住」的东西，其实根本不该存。</p>
-<hr>
-<h2 id="二、四种该存的记忆"><a href="#二、四种该存的记忆" class="headerlink" title="二、四种该存的记忆"></a>二、四种该存的记忆</h2><h3 id="2-1-用户记忆：记用户是谁"><a href="#2-1-用户记忆：记用户是谁" class="headerlink" title="2.1 用户记忆：记用户是谁"></a>2.1 用户记忆：记用户是谁</h3><p>用户记忆记录的是用户的角色、技术背景、工作习惯、知识水平。</p>
-<p><strong>好的例子</strong>：</p>
-<blockquote>
-<p>「这个用户是数据科学家，目前在做日志系统的调研。」</p>
-<p>「这个用户写了十年 Go，但第一次碰 React。」</p>
-</blockquote>
-<p>这类记忆的设计意图是让 Agent 能调整沟通方式和工作策略。面对一个资深后端工程师，Agent 不需要解释基础概念，可以直接用技术术语；面对一个初学者，Agent 需要更耐心地铺垫背景。</p>
-<p><strong>关键约束</strong>：记忆的目的是「怎么更好地帮这个人」，不是「给这个人画像」。不要记录对用户的负面评价，也不要记录跟工作无关的个人信息。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">❌ 不要记：「这个用户脾气不好，经常发火」</span><br><span class="line">❌ 不要记：「这个用户喜欢喝咖啡」</span><br><span class="line">✅ 要记：「这个用户偏好简洁回复，不需要末尾总结」</span><br></pre></td></tr></table></figure>
-<h3 id="2-2-反馈记忆：记纠正和肯定"><a href="#2-2-反馈记忆：记纠正和肯定" class="headerlink" title="2.2 反馈记忆：记纠正和肯定"></a>2.2 反馈记忆：记纠正和肯定</h3><p>这是四种记忆里设计最精细的一种。源码里对它有三个关键要求。</p>
-<p><strong>要求一：规则 + 原因 + 适用场景</strong></p>
-<p>每条反馈记忆必须包含三个部分：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">规则是什么 → Why → 什么时候该应用</span><br></pre></td></tr></table></figure>
-<p>举个实际例子。用户说：</p>
-<blockquote>
-<p>「测试不要 mock 数据库，上个季度我们就是因为 mock 测试通过了但生产环境迁移失败才出的事故。」</p>
-</blockquote>
-<p>如果只记「不要 mock 数据库」，Agent 在所有测试里都不敢 mock，包括那些跟数据库迁移完全无关的单元测试。</p>
-<p>但如果它知道原因是「mock 和生产环境行为不一致导致迁移失败」，它就能判断：集成测试不该 mock，但纯逻辑的单元测试 mock 是没问题的。</p>
-<p><strong>记原因，是为了让 Agent 能在新场景下做判断，而不是机械地执行规则。</strong></p>
-<p><strong>要求二：不要只记纠正，也要记肯定</strong></p>
-<p>源码注释里说得很直白：</p>
-<blockquote>
-<p>如果你只记录用户说「不要这样做」的时刻，它只知道什么是错的，不知道什么是对的。时间长了，它会回避一切不确定的做法，变得畏手畏脚。</p>
-</blockquote>
-<p>但肯定信号比纠正信号更难捕捉。用户说「不要这样做」很明显，但用户说「对，就是这样」或者默默接受了一个不寻常的方案，需要主动注意这些肯定信号。</p>
-<p><strong>例子</strong>：</p>
-<blockquote>
-<p>用户说：「对，这次用一个大 PR 是对的，拆开反而是无意义的工作量。」</p>
-</blockquote>
-<p>这条记忆的价值是：下次遇到类似的重构场景，Agent 知道这个用户倾向于合并提交，而不是拆成很多小 PR。这不是纠正，是一个被验证过的判断。</p>
-<p><strong>要求三：区分个人偏好和项目规范</strong></p>
-<blockquote>
-<p>「不要在回复末尾加总结」→ 个人偏好，只对这个用户有效</p>
-<p>「集成测试必须用真实数据库」→ 项目规范，对所有协作者有效</p>
-</blockquote>
-<p>源码里用 scope 来区分这两种。个人偏好存在私有目录，项目规范存在团队共享目录。</p>
-<h3 id="2-3-项目记忆：记正在发生什么"><a href="#2-3-项目记忆：记正在发生什么" class="headerlink" title="2.3 项目记忆：记正在发生什么"></a>2.3 项目记忆：记正在发生什么</h3><p>项目记忆记录的是当前项目里正在发生的事：谁在做什么、为什么要做、截止日期是什么。</p>
-<p><strong>例子</strong>：</p>
-<blockquote>
-<p>「本周四之后冻结所有非关键合并，移动端团队要切发布分支。」</p>
-<p>「正在重写认证中间件，原因是法务团队指出旧的 token 存储方式不符合合规要求，所以做决策的时候要优先考虑合规性而不是技术优雅。」</p>
-</blockquote>
-<p><strong>关键规则：相对日期必须转换成绝对日期</strong></p>
-<p>用户说「周四冻结」，记忆里存的是具体的年月日，比如「2026-03-07」。</p>
-<p>为什么？因为记忆是跨会话的。如果存「周四」，下周再看这条记忆就不知道是哪个周四了。</p>
-<p><strong>另一个特点：衰减得很快</strong></p>
-<p>一个月前的项目状态大概率已经过时了。所以源码要求项目记忆必须记录「为什么」。即使事实过时了，背后的动机仍然有参考价值。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">事实过时：「正在重写认证中间件」→ 可能已经写完了</span><br><span class="line">动机仍有效：「合规要求优先于技术优雅」→ 这个决策原则长期有效</span><br></pre></td></tr></table></figure>
-<h3 id="2-4-引用记忆：记外部资源在哪里"><a href="#2-4-引用记忆：记外部资源在哪里" class="headerlink" title="2.4 引用记忆：记外部资源在哪里"></a>2.4 引用记忆：记外部资源在哪里</h3><p>引用记忆记录的是外部资源的位置：bug 在哪个系统里追踪、监控面板的地址是什么、设计文档在哪个平台。</p>
-<p><strong>例子</strong>：</p>
-<blockquote>
-<p>「流水线相关的 bug 都在 Linear 的 INGEST 项目里追踪。」</p>
-<p>「API 延迟的监控面板在 grafana.internal/d/api-latency，值班的时候看这个。」</p>
-</blockquote>
-<p>这是四种里最简单的，但也是最实用的。它本质上是一个「去哪里找信息」的索引。</p>
-<hr>
-<h2 id="三、五种不该存的东西"><a href="#三、五种不该存的东西" class="headerlink" title="三、五种不该存的东西"></a>三、五种不该存的东西</h2><p>这部分才是整个设计里最有启发性的。很多人做记忆系统的第一件事，就是把不该存的东西全存了。</p>
-<h3 id="3-1-代码模式、架构、文件路径、项目结构"><a href="#3-1-代码模式、架构、文件路径、项目结构" class="headerlink" title="3.1 代码模式、架构、文件路径、项目结构"></a>3.1 代码模式、架构、文件路径、项目结构</h3><p>这是最反直觉的。很多人觉得 Agent 应该记住「项目用了什么框架、目录怎么组织、哪个文件负责什么」。</p>
-<p><strong>Claude Code 说：不要存这些。</strong></p>
-<p>为什么？因为这些信息可以直接从代码里读出来。Agent 随时可以通过读代码和搜索来获取当前的项目结构。</p>
-<p>把这些存进记忆有两个问题：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">问题一：浪费空间</span><br><span class="line">每次对话都要加载一堆本来可以实时查的信息</span><br><span class="line"></span><br><span class="line">问题二：过时风险</span><br><span class="line">代码改了但记忆没更新 → Agent 基于过时信息决策 → 很难发现</span><br></pre></td></tr></table></figure>
-<p><strong>背后的原则</strong>：如果一个信息可以从当前项目状态推导出来，就不要存进记忆。记忆只存那些「看代码看不出来」的东西。</p>
-<h3 id="3-2-版本管理历史"><a href="#3-2-版本管理历史" class="headerlink" title="3.2 版本管理历史"></a>3.2 版本管理历史</h3><p>谁改了什么、最近的提交记录——这些用版本管理工具查就行了。</p>
-<p>Git 是实时的、权威的，不需要记忆来存一份可能过时的副本。</p>
-<h3 id="3-3-调试方案和修复方法"><a href="#3-3-调试方案和修复方法" class="headerlink" title="3.3 调试方案和修复方法"></a>3.3 调试方案和修复方法</h3><p>修复已经在代码里了，提交信息里有上下文。存「怎么修的」没有意义，因为代码本身就是最好的参考。</p>
-<h3 id="3-4-配置文件里已经写过的东西"><a href="#3-4-配置文件里已经写过的东西" class="headerlink" title="3.4 配置文件里已经写过的东西"></a>3.4 配置文件里已经写过的东西</h3><p>如果你的项目里有 CLAUDE.md 或其他配置文件已经定义了编码规范，记忆系统不需要再存一份。</p>
-<p>重复存储不仅浪费空间，还会在两份内容不一致的时候制造混乱。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">配置文件说：「使用 pnpm」</span><br><span class="line">记忆文件说：「使用 npm」</span><br><span class="line">→ Agent 该听谁的？</span><br></pre></td></tr></table></figure>
-<h3 id="3-5-临时性的任务细节"><a href="#3-5-临时性的任务细节" class="headerlink" title="3.5 临时性的任务细节"></a>3.5 临时性的任务细节</h3><p>当前正在做什么、对话里的中间状态——这些是短期的，属于当前会话的上下文，不该进入长期记忆。</p>
-<hr>
-<h2 id="四、一条特别重要的规则"><a href="#四、一条特别重要的规则" class="headerlink" title="四、一条特别重要的规则"></a>四、一条特别重要的规则</h2><p>即使用户明确要求你记住某些东西，如果它属于上面五类，也不该记。</p>
-<p><strong>例子</strong>：</p>
-<blockquote>
-<p>用户：「记住这周的 PR 列表」</p>
-</blockquote>
-<p>Agent 不应该直接存 PR 列表，而应该反问：</p>
-<blockquote>
-<p>「这些 PR 里有什么让你意外的或者不明显的？那个部分才值得记。」</p>
-</blockquote>
-<p><strong>活动日志不是记忆，从活动中提炼出的洞察才是。</strong></p>
-<p>用户要求存不该存的内容时，正确的做法是提炼价值点。PR 列表本身不该存，但如果某个 PR 的处理方式让用户觉得「这样做是对的」，那个判断才值得存成反馈记忆。</p>
-<hr>
-<h2 id="五、信息来源决策树"><a href="#五、信息来源决策树" class="headerlink" title="五、信息来源决策树"></a>五、信息来源决策树</h2><p>把上面的原则整理成一个判断流程：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">这条信息能从代码&#x2F;工具实时获取吗？</span><br><span class="line">         │</span><br><span class="line">         ├── 能 → 不存，实时查</span><br><span class="line">         │</span><br><span class="line">         └── 不能 → 属于哪种类型？</span><br><span class="line">                         │</span><br><span class="line">                         ├── 用户特征 → 用户记忆</span><br><span class="line">                         ├── 纠正&#x2F;肯定 → 反馈记忆</span><br><span class="line">                         ├── 项目动态 → 项目记忆</span><br><span class="line">                         └── 外部资源 → 引用记忆</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="六、实践中的常见错误"><a href="#六、实践中的常见错误" class="headerlink" title="六、实践中的常见错误"></a>六、实践中的常见错误</h2><h3 id="错误一：把记忆当成项目文档"><a href="#错误一：把记忆当成项目文档" class="headerlink" title="错误一：把记忆当成项目文档"></a>错误一：把记忆当成项目文档</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">❌ 存储：「src&#x2F;auth 目录负责认证逻辑，包含 middleware.ts 和 token.ts」</span><br><span class="line">✅ 实时查：Glob + Read 工具</span><br></pre></td></tr></table></figure>
-<h3 id="错误二：把记忆当成聊天记录"><a href="#错误二：把记忆当成聊天记录" class="headerlink" title="错误二：把记忆当成聊天记录"></a>错误二：把记忆当成聊天记录</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">❌ 存储：「用户昨天问怎么配置 Redis，我回答了...」</span><br><span class="line">✅ 不存：这是会话上下文，不是长期记忆</span><br></pre></td></tr></table></figure>
-<h3 id="错误三：记了规则但没记原因"><a href="#错误三：记了规则但没记原因" class="headerlink" title="错误三：记了规则但没记原因"></a>错误三：记了规则但没记原因</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">❌ 存储：「不要用 forEach」</span><br><span class="line">✅ 存储：「避免在 async 函数里用 forEach，原因是 forEach 不等待 Promise 完成，</span><br><span class="line">         曾导致批量写入只执行了一半，适用场景是异步批量操作」</span><br></pre></td></tr></table></figure>
-<h3 id="错误四：只记纠正不记肯定"><a href="#错误四：只记纠正不记肯定" class="headerlink" title="错误四：只记纠正不记肯定"></a>错误四：只记纠正不记肯定</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">❌ 只存：「不要在回复末尾加总结」</span><br><span class="line">✅ 也要存：「用户确认：重构时用一个大PR是对的，拆开反而增加工作量」</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="七、记忆系统的质量检验清单"><a href="#七、记忆系统的质量检验清单" class="headerlink" title="七、记忆系统的质量检验清单"></a>七、记忆系统的质量检验清单</h2><p>在写入一条记忆之前，问自己这些问题：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">□ 是否存了代码可查的内容？→ 删除或反问用户</span><br><span class="line">□ 是否包含「为什么」？→ 补充动机</span><br><span class="line">□ 是否指定适用范围？→ 补充项目&#x2F;模块边界</span><br><span class="line">□ 相对时间是否转绝对时间？→ 如「明天」→「2026-03-16」</span><br><span class="line">□ 是否存在相似记忆？→ 合并去重</span><br><span class="line">□ 敏感信息是否过滤？→ 拒绝存储密码、密钥、PII</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="八、总结"><a href="#八、总结" class="headerlink" title="八、总结"></a>八、总结</h2><p>Claude Code 记忆系统的核心设计可以概括为一句话：<strong>少而精</strong>。</p>
-<p>记忆的价值不在于数量，而在于每条记忆都能在关键时刻减少认知负担。</p>
-<p>如果你在给自己的 Agent 做记忆系统，这个分类框架可以直接拿来用：</p>
-<p><strong>四种该存</strong>：</p>
-<ul>
-<li>用户是谁（角色、背景、习惯）</li>
-<li>用户纠正和肯定过什么（含规则、原因、适用场景）</li>
-<li>项目背后的动机和时间线（相对日期→绝对日期）</li>
-<li>外部资源在哪里（索引而非内容）</li>
-</ul>
-<p><strong>五种不该存</strong>：</p>
-<ul>
-<li>代码能告诉你的一切</li>
-<li>版本历史能告诉你的一切</li>
-<li>提交记录能告诉你的一切</li>
-<li>配置文件已经说过的一切</li>
-<li>临时性的中间状态</li>
-</ul>
-<p>这样做的好处是：你的记忆文件会非常精简，每一条都是高价值的、代码里找不到的信息。模型每次加载记忆的时候，看到的全是有用的东西，没有噪声。</p>
-<hr>
-<p><strong>相关文章</strong>：</p>
-<ul>
-<li><a href="/claude-code-memory-system/">Memory 系统：跨会话持久化知识库</a> — Claude Code 记忆系统的技术实现细节</li>
-<li><a href="/categories/Claude-Code/">Claude Code 源码深度解析系列</a> — 更多 Claude Code 架构分析</li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/27/agent-memory-what-to-store/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -808,446 +455,14 @@
           <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>2026年4月24日，DeepSeek 正式发布了 V4 系列模型。这不是一次普通的版本迭代——它解决了一个困扰 AI 行业多年的根本问题：<strong>长上下文的效率瓶颈</strong>。</p>
 <p>本文将深入解读 DeepSeek V4 的核心技术创新，帮助你理解这次发布为何值得关注。</p>
 <hr>
-<h2 id="一、模型规格：更大但不更贵"><a href="#一、模型规格：更大但不更贵" class="headerlink" title="一、模型规格：更大但不更贵"></a>一、模型规格：更大但不更贵</h2><p>DeepSeek V4 发布了两个版本：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>模型</th>
-<th>总参数量</th>
-<th>激活参数量</th>
-<th>上下文长度</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>DeepSeek-V4-Pro</strong></td>
-<td>1.6T</td>
-<td>49B</td>
-<td>100万 tokens</td>
-</tr>
-<tr>
-<td><strong>DeepSeek-V4-Flash</strong></td>
-<td>284B</td>
-<td>13B</td>
-<td>100万 tokens</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>对比上一代 V3.2（671B 总参数，37B 激活），V4-Pro 参数量翻了 2.4 倍，但激活参数仅增加 32%。更重要的是，<strong>两者都原生支持 100万 token 上下文</strong>——这是之前任何开源模型都做不到的。</p>
-<h3 id="为什么”更大但不更贵”？"><a href="#为什么”更大但不更贵”？" class="headerlink" title="为什么”更大但不更贵”？"></a>为什么”更大但不更贵”？</h3><p>得益于 MoE（Mixture-of-Experts）架构，每次推理只激活一小部分参数。V4-Pro 的激活率仅为 <strong>3%</strong>（49B/1.6T），这意味着：</p>
-<ul>
-<li>推理成本接近一个 50B 参数的稠密模型</li>
-<li>但拥有 1.6T 参数的知识容量和表达能力</li>
-</ul>
-<p>这是 DeepSeek 从 V2 开始就坚持的技术路线，V4 把这个策略推向了新高度。</p>
-<hr>
-<h2 id="二、核心架构创新：打破-O-n²-的魔咒"><a href="#二、核心架构创新：打破-O-n²-的魔咒" class="headerlink" title="二、核心架构创新：打破 O(n²) 的魔咒"></a>二、核心架构创新：打破 O(n²) 的魔咒</h2><p>Transformer 的标准注意力机制计算复杂度是 O(n²)——序列长度翻倍，计算量翻四倍。当上下文达到百万级别时，这变成了不可承受之重。</p>
-<p>DeepSeek V4 用<strong>混合注意力架构</strong>彻底解决了这个问题。</p>
-<h3 id="2-1-CSA（Compressed-Sparse-Attention）"><a href="#2-1-CSA（Compressed-Sparse-Attention）" class="headerlink" title="2.1 CSA（Compressed Sparse Attention）"></a>2.1 CSA（Compressed Sparse Attention）</h3><p>CSA 的核心思路是：<strong>压缩 + 稀疏选择</strong>。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">原始序列：n 个 token</span><br><span class="line">     ↓ 压缩（每 m 个 token 合成一个 KV entry）</span><br><span class="line">压缩序列：n&#x2F;m 个 compressed KV entry</span><br><span class="line">     ↓ 稀疏选择（Lightning Indexer 选 top-k）</span><br><span class="line">参与计算的：k 个 compressed KV entry</span><br></pre></td></tr></table></figure>
-<p>具体流程：</p>
-<ol>
-<li><strong>KV Cache 压缩</strong>：将每 m 个 token 的 KV entry 通过加权聚合压缩成一个条目，序列长度降到 1/m</li>
-<li><strong>Lightning Indexer</strong>：为每个 query token 生成 indexer queries，与压缩后的 KV 偂相似度计算，选出 top-k 个最相关的压缩块</li>
-<li><strong>Core Attention</strong>：只在选出的 k 个压缩块上做完整的 attention 计算</li>
-</ol>
-<p>关键参数（V4-Pro）：</p>
-<ul>
-<li>压缩率 m = 4（每 4 个 token 压缩成 1 个）</li>
-<li>Indexer head 数 = 64，head 维度 = 128</li>
-<li>Top-k = 1024（每个 query 只关注 1024 个压缩块）</li>
-</ul>
-<h3 id="2-2-HCA（Heavily-Compressed-Attention）"><a href="#2-2-HCA（Heavily-Compressed-Attention）" class="headerlink" title="2.2 HCA（Heavily Compressed Attention）"></a>2.2 HCA（Heavily Compressed Attention）</h3><p>HCA 是更激进的压缩策略，用于处理”不需要精细关注的历史信息”：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">压缩率 m&#39; &#x3D; 128（每 128 个 token 合成一个 KV entry）</span><br><span class="line">     ↓</span><br><span class="line">直接对压缩后的 KV 做完整 attention（不做稀疏选择）</span><br></pre></td></tr></table></figure>
-<p>HCA 的哲学是：<strong>远处的信息可以”模糊处理”，近处的信息才需要精细关注</strong>。</p>
-<h3 id="2-3-混合架构设计"><a href="#2-3-混合架构设计" class="headerlink" title="2.3 混合架构设计"></a>2.3 混合架构设计</h3><p>V4 不是全用 CSA 或全用 HCA，而是<strong>交替使用</strong>：</p>
-<ul>
-<li><strong>前 2 层</strong>：纯滑动窗口 attention（保留近期信息的精细度）</li>
-<li><strong>后续层</strong>：CSA 和 HCA 交替，形成”粗细结合”的信息处理</li>
-</ul>
-<p>这种设计让模型既能高效处理长上下文，又能保持对关键信息的精确检索能力。</p>
-<h3 id="2-4-效率提升有多夸张？"><a href="#2-4-效率提升有多夸张？" class="headerlink" title="2.4 效率提升有多夸张？"></a>2.4 效率提升有多夸张？</h3><p>官方给出了硬核数据（100万 token 上下文场景）：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>指标</th>
-<th>V4-Pro vs V3.2</th>
-<th>V4-Flash vs V3.2</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>单 token FLOPs</td>
-<td><strong>27%</strong>（节省 3.7×）</td>
-<td><strong>10%</strong>（节省 10×）</td>
-</tr>
-<tr>
-<td>KV Cache 大小</td>
-<td><strong>10%</strong>（节省 9.5×）</td>
-<td><strong>7%</strong>（节省 13.7×）</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>这意味着：以前跑不起的百万级上下文任务，现在<strong>可以在单卡上跑了</strong>。</p>
-<hr>
-<h2 id="三、mHC：残差连接的”数学升级版”"><a href="#三、mHC：残差连接的”数学升级版”" class="headerlink" title="三、mHC：残差连接的”数学升级版”"></a>三、mHC：残差连接的”数学升级版”</h2><p>残差连接 <code>x + F(x)</code> 是 Transformer 的基石，但深层堆叠时会遇到问题：</p>
-<ul>
-<li>信号可能逐层放大 → 数值爆炸</li>
-<li>信号可能逐层衰减 →梯度消失</li>
-</ul>
-<p>DeepSeek V4 引入了 <strong>Manifold-Constrained Hyper-Connections (mHC)</strong>，用数学约束解决这个问题。</p>
-<h3 id="核心思路"><a href="#核心思路" class="headerlink" title="核心思路"></a>核心思路</h3><p>传统残差连接：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">X_next &#x3D; X + F(X)  &#x2F;&#x2F; 简单加法</span><br></pre></td></tr></table></figure></p>
-<p>mHC：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">X_next &#x3D; B·X + C·F(A·X)  &#x2F;&#x2F; A、B、C 是线性映射矩阵</span><br><span class="line">         ↑</span><br><span class="line">      B 约束在双随机矩阵流形上（行和&#x3D;1，列和&#x3D;1，元素≥0）</span><br></pre></td></tr></table></figure></p>
-<p>关键约束：<strong>B 的谱范数 ≤ 1</strong>，这意味着信号传播是”非膨胀的”，不会爆炸。</p>
-<h3 id="为什么叫”流形约束”？"><a href="#为什么叫”流形约束”？" class="headerlink" title="为什么叫”流形约束”？"></a>为什么叫”流形约束”？</h3><p>双随机矩阵构成的空间是一个<strong>流形（Manifold）</strong>——Birkhoff Polytope。mHC 通过 Sinkhorn-Knopp 算法，把矩阵 B 投影到这个流形上：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1. 对 B 取 exponential（保证正元素）</span><br><span class="line">2. 迭代做行归一化、列归一化</span><br><span class="line">3. 收敛到一个双随机矩阵</span><br></pre></td></tr></table></figure>
-<p>这套数学确保了深层堆叠时的稳定性，同时保留了模型的表达能力。</p>
-<hr>
-<h2 id="四、Muon-优化器：万亿参数训练的新配方"><a href="#四、Muon-优化器：万亿参数训练的新配方" class="headerlink" title="四、Muon 优化器：万亿参数训练的新配方"></a>四、Muon 优化器：万亿参数训练的新配方</h2><p>训练万亿参数模型，AdamW 已经不够稳了。V4 引入了 <strong>Muon</strong> 优化器。</p>
-<h3 id="核心算法"><a href="#核心算法" class="headerlink" title="核心算法"></a>核心算法</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">G &#x3D; gradient</span><br><span class="line">M &#x3D; momentum_buffer</span><br><span class="line">M &#x3D; μ·M + G  &#x2F;&#x2F; 动量累积</span><br><span class="line">O &#x3D; HybridNewtonSchulz(μ·M + G)  &#x2F;&#x2F; Nesterov trick + 正交化</span><br><span class="line">W &#x3D; W·(1 - ηλ) - η·O  &#x2F;&#x2F; weight decay + update</span><br></pre></td></tr></table></figure>
-<p>关键步骤是 <strong>Hybrid Newton-Schulz 迭代</strong>，把梯度矩阵正交化：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 10 步迭代，分两阶段</span></span><br><span class="line"><span class="comment"># Stage 1（前 8 步）：快速收敛</span></span><br><span class="line">M_k = <span class="number">3.4445</span>·M_&#123;k<span class="number">-1</span>&#125; - <span class="number">4.7750</span>·(M·M^T)·M + <span class="number">2.0315</span>·(M·M^T)^<span class="number">2</span>·M</span><br><span class="line"></span><br><span class="line"><span class="comment"># Stage 2（后 2 步）：精确定位到正交矩阵</span></span><br><span class="line">M_k = <span class="number">2</span>·M_&#123;k<span class="number">-1</span>&#125; - <span class="number">1.5</span>·(M·M^T)·M + <span class="number">0.5</span>·(M·M^T)^<span class="number">2</span>·M</span><br></pre></td></tr></table></figure>
-<p>正交化的好处：</p>
-<ul>
-<li>避免”跑偏”——梯度方向更明确</li>
-<li>避免”数值爆炸”——矩阵谱范数被约束</li>
-<li>收敛更快——不需要 Adam 的二阶矩估计</li>
-</ul>
-<h3 id="配合稳定性技术"><a href="#配合稳定性技术" class="headerlink" title="配合稳定性技术"></a>配合稳定性技术</h3><p>V4 还用了两招来防止 loss spike：</p>
-<ol>
-<li><strong>Anticipatory Routing</strong>：路由决策用”历史参数”而非”当前参数”，打破 MoE 路由的恶性循环</li>
-<li><strong>SwiGLU Clamping</strong>：把 SwiGLU 的线性分量 clamp 到 [-10, 10]，直接压制异常值</li>
-</ol>
-<hr>
-<h2 id="五、FP4-量化感知训练：天生适应低精度"><a href="#五、FP4-量化感知训练：天生适应低精度" class="headerlink" title="五、FP4 量化感知训练：天生适应低精度"></a>五、FP4 量化感知训练：天生适应低精度</h2><p>以往的量化是”训练后补救”——模型在高精度下训练，推理时强行降精度，性能必然下降。</p>
-<p>V4 的创新：<strong>训练时就让模型适应 FP4</strong>。</p>
-<h3 id="应用范围"><a href="#应用范围" class="headerlink" title="应用范围"></a>应用范围</h3><ul>
-<li><strong>MoE 专家权重</strong>：占模型大部分参数，FP4 压缩节省大量显存</li>
-<li><strong>QK 路径</strong>（Lightning Indexer 的 indexer 部分）：长上下文检索的核心计算，FP4 加速</li>
-</ul>
-<h3 id="关键技术点"><a href="#关键技术点" class="headerlink" title="关键技术点"></a>关键技术点</h3><p><strong>FP4 → FP8 的无损反量化</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">FP4 (E2M1) → FP8 (E4M3)</span><br><span class="line">          ↑</span><br><span class="line">FP8 多 2 个 exponent bit，动态范围更大</span><br><span class="line">只要 block 内的 scale factor 差异不超过阈值，信息完全保留</span><br></pre></td></tr></table></figure>
-<p>这意味着：</p>
-<ul>
-<li>训练时用 FP8 做计算（模拟 FP4）</li>
-<li>推理时直接用 FP4 权重，零性能损失</li>
-<li>整个 pipeline 可以复用现有的 FP8 训练框架</li>
-</ul>
-<hr>
-<h2 id="六、训练基础设施：工程硬核"><a href="#六、训练基础设施：工程硬核" class="headerlink" title="六、训练基础设施：工程硬核"></a>六、训练基础设施：工程硬核</h2><p>V4 的基础设施投入展现了”长期主义”的工程思维。</p>
-<h3 id="6-1-TileLang：Kernel-开发的-DSL"><a href="#6-1-TileLang：Kernel-开发的-DSL" class="headerlink" title="6.1 TileLang：Kernel 开发的 DSL"></a>6.1 TileLang：Kernel 开发的 DSL</h3><p>传统 CUDA Kernel 开发效率低、难迭代。V4 用 <strong>TileLang</strong> 这个 DSL：</p>
-<ul>
-<li>用声明式语法描述 Kernel 逻辑</li>
-<li>Z3 SMT Solver 做形式化分析（证明正确性）</li>
-<li>自动生成高性能 CUDA 代码</li>
-</ul>
-<p>开发效率 + 运行效率，两者兼得。</p>
-<h3 id="6-2-确定性训练"><a href="#6-2-确定性训练" class="headerlink" title="6.2 确定性训练"></a>6.2 确定性训练</h3><p>V4 的 Kernel 全程<strong>批不变（Batch-Invariant）</strong>：</p>
-<ul>
-<li>同一 token 无论在 batch 哪个位置，输出 bitwise 一致</li>
-<li>用特殊设计避免了原子加法带来的不确定性</li>
-<li>训练过程可复现，调试有据可查</li>
-</ul>
-<p>这对大规模训练调试、定位问题至关重要。</p>
-<h3 id="6-3-MoE-EP-的细粒度重叠"><a href="#6-3-MoE-EP-的细粒度重叠" class="headerlink" title="6.3 MoE EP 的细粒度重叠"></a>6.3 MoE EP 的细粒度重叠</h3><p>Expert Parallelism 的通信开销大。V4 把 MoE 层拆成 <strong>4 个阶段</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Dispatch (通信) → Linear-1 (计算) → Activation → Linear-2 (计算) → Combine (通信)</span><br></pre></td></tr></table></figure>
-<p>关键洞察：<strong>计算时间 &gt; 通信时间</strong>，所以通信可以被计算掩盖。</p>
-<p>V4 把专家分成”wave”，每个 wave 的通信和计算流水线化，实现 <strong>1.5-1.96× 加速</strong>。</p>
-<hr>
-<h2 id="七、性能基准：开源模型的新标杆"><a href="#七、性能基准：开源模型的新标杆" class="headerlink" title="七、性能基准：开源模型的新标杆"></a>七、性能基准：开源模型的新标杆</h2><h3 id="知识任务"><a href="#知识任务" class="headerlink" title="知识任务"></a>知识任务</h3><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>Benchmark</th>
-<th>V4-Pro-Max</th>
-<th>K2.6</th>
-<th>GLM-5.1</th>
-<th>Gemini 3.1 Pro</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>SimpleQA Verified</td>
-<td><strong>57.9</strong></td>
-<td>36.9</td>
-<td>38.1</td>
-<td>75.6</td>
-</tr>
-<tr>
-<td>Chinese-SimpleQA</td>
-<td><strong>84.4</strong></td>
-<td>75.9</td>
-<td>75.0</td>
-<td>85.9</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>V4-Pro-Max 在知识任务上<strong>领先开源对手 20+ 百分点</strong>，但距离 Gemini 3.1 Pro 还有一段差距。</p>
-<h3 id="Agent-能力：开源最佳"><a href="#Agent-能力：开源最佳" class="headerlink" title="Agent 能力：开源最佳"></a>Agent 能力：开源最佳</h3><p>这是 V4 最重要的能力跃升之一。官方披露：</p>
-<ul>
-<li><strong>Agentic Coding</strong>：V4-Pro 达到当前开源模型最佳水平</li>
-<li><strong>内部实测</strong>：已成为 DeepSeek 公司内部员工使用的 Agentic Coding 首选模型</li>
-<li><strong>体验对比</strong>：优于 Claude Sonnet 4.5，交付质量接近 Claude Opus 4.6 非思考模式</li>
-</ul>
-<p>V4 针对 <strong>Claude Code、OpenClaw、OpenCode、CodeBuddy</strong> 等主流 Agent 产品进行了专项适配优化，在代码任务、文档生成等场景表现显著提升。</p>
-<h3 id="推理与代码"><a href="#推理与代码" class="headerlink" title="推理与代码"></a>推理与代码</h3><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>Benchmark</th>
-<th>V4-Pro-Max</th>
-<th>GPT-5.4</th>
-<th>Gemini 3.1 Pro</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Codeforces Rating</td>
-<td><strong>3206</strong></td>
-<td>3168</td>
-<td>3052</td>
-</tr>
-<tr>
-<td>Apex Shortlist</td>
-<td><strong>90.2</strong></td>
-<td>78.1</td>
-<td>89.1</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p><strong>这是开源模型首次在代码竞赛上追平闭源模型</strong>。V4-Pro-Max 在 Codeforces 排名第 23 位（人类选手中）。</p>
-<h3 id="长上下文"><a href="#长上下文" class="headerlink" title="长上下文"></a>长上下文</h3><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>Benchmark</th>
-<th>V4-Pro-Max</th>
-<th>Claude Opus 4.6</th>
-<th>Gemini 3.1 Pro</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>MRCR 1M (MMR)</td>
-<td>83.5</td>
-<td><strong>92.9</strong></td>
-<td>76.3</td>
-</tr>
-<tr>
-<td>CorpusQA 1M</td>
-<td><strong>62.0</strong></td>
-<td>71.7</td>
-<td>53.8</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>V4-Pro 在真实场景的 CorpusQA 上超越 Gemini 3.1 Pro，在 MRCR 上接近 Claude Opus 4.6。</p>
-<hr>
-<h2 id="八、V4-Flash：经济高效的选择"><a href="#八、V4-Flash：经济高效的选择" class="headerlink" title="八、V4-Flash：经济高效的选择"></a>八、V4-Flash：经济高效的选择</h2><p>V4-Flash 是一个重要的补充版本，让不同需求的用户都能找到合适的方案。</p>
-<h3 id="与-V4-Pro-的对比"><a href="#与-V4-Pro-的对比" class="headerlink" title="与 V4-Pro 的对比"></a>与 V4-Pro 的对比</h3><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>维度</th>
-<th>V4-Flash</th>
-<th>V4-Pro</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>激活参数</td>
-<td>13B</td>
-<td>49B</td>
-</tr>
-<tr>
-<td>推理速度</td>
-<td>更快</td>
-<td>较慢</td>
-</tr>
-<tr>
-<td>API 成本</td>
-<td>更低</td>
-<td>较高</td>
-</tr>
-<tr>
-<td>世界知识</td>
-<td>稍逊</td>
-<td>大幅领先开源</td>
-</tr>
-<tr>
-<td>推理能力</td>
-<td>接近 Pro</td>
-<td>开源最佳</td>
-</tr>
-<tr>
-<td>Agent 简单任务</td>
-<td>旗鼓相当</td>
-<td>更优</td>
-</tr>
-<tr>
-<td>Agent 高难度任务</td>
-<td>有差距</td>
-<td>最佳</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p><strong>适用场景</strong>：</p>
-<ul>
-<li><strong>V4-Flash</strong>：日常对话、简单代码任务、成本敏感场景</li>
-<li><strong>V4-Pro</strong>：复杂 Agent 任务、深度推理、高质量输出需求</li>
-</ul>
-<hr>
-<h2 id="九、三种推理模式：灵活的推理成本"><a href="#九、三种推理模式：灵活的推理成本" class="headerlink" title="九、三种推理模式：灵活的推理成本"></a>九、三种推理模式：灵活的推理成本</h2><p>V4 支持三种推理模式，让用户按需求选择成本：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>模式</th>
-<th>特点</th>
-<th>适用场景</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Non-Think</strong></td>
-<td>快速直觉响应，无 thinking tokens</td>
-<td>日常对话、低风险决策</td>
-</tr>
-<tr>
-<td><strong>Think</strong></td>
-<td>逻辑分析，中等 thinking budget</td>
-<td>复杂问题、规划任务</td>
-</tr>
-<tr>
-<td><strong>Think Max</strong></td>
-<td>极限推理，长 thinking budget</td>
-<td>数学证明、高难度任务</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>Think Max 模式会在系统 prompt 里注入特殊指令：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Reasoning Effort: Absolute maximum with no shortcuts permitted.</span><br><span class="line">You MUST be very thorough in your thinking...</span><br></pre></td></tr></table></figure>
-<p>这让模型”把推理推到极限”，在 HLE、IMO 等高难度任务上表现最优。</p>
-<hr>
-<h2 id="十、API-使用指南"><a href="#十、API-使用指南" class="headerlink" title="十、API 使用指南"></a>十、API 使用指南</h2><h3 id="模型调用"><a href="#模型调用" class="headerlink" title="模型调用"></a>模型调用</h3><p>DeepSeek API 已同步上线 V4-Pro 与 V4-Flash，支持 OpenAI ChatCompletions 接口与 Anthropic 接口：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># OpenAI 格式</span></span><br><span class="line"><span class="keyword">from</span> openai <span class="keyword">import</span> OpenAI</span><br><span class="line"></span><br><span class="line">client = OpenAI(</span><br><span class="line">    api_key=<span class="string">"your-api-key"</span>,</span><br><span class="line">    base_url=<span class="string">"https://api.deepseek.com"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">response = client.chat.completions.create(</span><br><span class="line">    model=<span class="string">"deepseek-v4-pro"</span>,  <span class="comment"># 或 deepseek-v4-flash</span></span><br><span class="line">    messages=[&#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"你好"</span>&#125;]</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
-<h3 id="关键参数"><a href="#关键参数" class="headerlink" title="关键参数"></a>关键参数</h3><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>参数</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>model</code></td>
-<td><code>deepseek-v4-pro</code> 或 <code>deepseek-v4-flash</code></td>
-</tr>
-<tr>
-<td><code>max_tokens</code></td>
-<td>最大输出长度，默认 8K</td>
-</tr>
-<tr>
-<td><code>reasoning_effort</code></td>
-<td>思考强度：<code>high</code> 或 <code>max</code>（仅思考模式）</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h3 id="思考模式"><a href="#思考模式" class="headerlink" title="思考模式"></a>思考模式</h3><p>对于复杂的 Agent 场景，建议使用思考模式并设置强度为 <code>max</code>：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">response = client.chat.completions.create(</span><br><span class="line">    model=<span class="string">"deepseek-v4-pro"</span>,</span><br><span class="line">    messages=[&#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"复杂任务..."</span>&#125;],</span><br><span class="line">    reasoning_effort=<span class="string">"max"</span>  <span class="comment"># 极限推理</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
-<h3 id="⚠️-重要提示"><a href="#⚠️-重要提示" class="headerlink" title="⚠️ 重要提示"></a>⚠️ 重要提示</h3><p>旧 API 模型名 <code>deepseek-chat</code> 和 <code>deepseek-reasoner</code> 将于 <strong>2026年7月24日</strong> 停止使用：</p>
-<ul>
-<li>当前阶段 <code>deepseek-chat</code> → 指向 V4-Flash 非思考模式</li>
-<li>当前阶段 <code>deepseek-reasoner</code> → 指向 V4-Flash 思考模式</li>
-</ul>
-<p>请尽快迁移到新的模型名称。</p>
-<hr>
-<h2 id="十一、开源与本地部署"><a href="#十一、开源与本地部署" class="headerlink" title="十一、开源与本地部署"></a>十一、开源与本地部署</h2><h3 id="权重下载"><a href="#权重下载" class="headerlink" title="权重下载"></a>权重下载</h3><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>平台</th>
-<th>链接</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>HuggingFace</td>
-<td><a href="https://huggingface.co/collections/deepseek-ai/deepseek-v4" target="_blank" rel="noopener">https://huggingface.co/collections/deepseek-ai/deepseek-v4</a></td>
-</tr>
-<tr>
-<td>ModelScope</td>
-<td><a href="https://modelscope.cn/collections/deepseek-ai/DeepSeek-V4" target="_blank" rel="noopener">https://modelscope.cn/collections/deepseek-ai/DeepSeek-V4</a></td>
-</tr>
-</tbody>
-</table>
-</div>
-<h3 id="本地部署建议"><a href="#本地部署建议" class="headerlink" title="本地部署建议"></a>本地部署建议</h3><p>由于 V4-Pro 参数量达 1.6T，本地部署需要：</p>
-<ul>
-<li><strong>多卡推理</strong>：至少 8× A100 80GB 或同等显存</li>
-<li><strong>量化推理</strong>：FP4 量化后可显著降低显存需求</li>
-<li><strong>V4-Flash</strong>：单卡 A100 80GB 可运行</li>
-</ul>
-<h3 id="技术报告"><a href="#技术报告" class="headerlink" title="技术报告"></a>技术报告</h3><p>完整技术细节请参考官方技术报告：</p>
-<ul>
-<li><a href="https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf" target="_blank" rel="noopener">DeepSeek V4 技术报告（PDF）</a></li>
-</ul>
-<hr>
-<h2 id="十二、行业启示：V4-带来的新范式"><a href="#十二、行业启示：V4-带来的新范式" class="headerlink" title="十二、行业启示：V4 带来的新范式"></a>十二、行业启示：V4 带来的新范式</h2><h3 id="12-1-长上下文不再是奢侈品"><a href="#12-1-长上下文不再是奢侈品" class="headerlink" title="12.1 长上下文不再是奢侈品"></a>12.1 长上下文不再是奢侈品</h3><p>以前，百万级上下文是”理论上可行但经济上不行”。V4 把成本降到 <strong>原来的 10-30%</strong>，让以下场景变得可行：</p>
-<ul>
-<li><strong>Test-time Scaling</strong>：推理阶段可以长时间思考，不受上下文限制</li>
-<li><strong>长 horizon Agent</strong>：复杂多轮任务（如软件工程流水线）有足够”记忆空间”</li>
-<li><strong>在线学习</strong>：持续吸收新信息，无需全量重训练</li>
-</ul>
-<h3 id="12-2-开源-vs-闭源的格局变化"><a href="#12-2-开源-vs-闭源的格局变化" class="headerlink" title="12.2 开源 vs 闭源的格局变化"></a>12.2 开源 vs 闭源的格局变化</h3><p>V4 是一个信号：<strong>开源模型不仅追上了能力，还追上了效率性价比</strong>。</p>
-<ul>
-<li>V4-Flash 用 13B 激活参数，就能达到接近 GPT-5.2 的推理水平</li>
-<li>在代码任务上，开源首次追平闭源</li>
-</ul>
-<p>这意味着闭源模型的”护城河”正在缩小。</p>
-<h3 id="12-3-架构创新的长期价值"><a href="#12-3-架构创新的长期价值" class="headerlink" title="12.3 架构创新的长期价值"></a>12.3 架构创新的长期价值</h3><p>V4 的创新不是”刷榜技巧”，而是<strong>架构层面的根本改进</strong>：</p>
-<ul>
-<li>CSA/HCA 解决了 Transformer 的 O(n²) 瓶颈</li>
-<li>mHC 让残差连接更稳定、可堆叠更深</li>
-<li>Muon 优化器可能成为万亿参数训练的新标配</li>
-</ul>
-<p>这些创新会启发更多研究，推动整个行业向前。</p>
-<hr>
-<h2 id="十三、局限与展望"><a href="#十三、局限与展望" class="headerlink" title="十三、局限与展望"></a>十三、局限与展望</h2><p>官方坦承了几个局限：</p>
-<ol>
-<li><strong>架构相对复杂</strong>：为了降低风险，保留了 V3 的很多验证过的组件，未来会精简</li>
-<li><strong>训练稳定性原理未完全理解</strong>：Anticipatory Routing 和 SwiGLU Clamping 有效，但数学原理还在探索</li>
-<li><strong>多模态尚未集成</strong>：未来版本会加入视觉能力</li>
-</ol>
-<p>展望方向：</p>
-<ul>
-<li>进一步的稀疏化探索（如稀疏 embedding）</li>
-<li>低延迟架构优化（让长上下文交互更流畅）</li>
-<li>长 horizon Agent 的深度优化</li>
-</ul>
-<hr>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>DeepSeek V4 的意义不在于某个具体指标的提升，而在于它<strong>解决了长上下文效率这个根本问题</strong>。</p>
-<p>通过 CSA/HCA 混合注意力、mHC 残差升级、Muon 优化器、FP4 量化训练等一系列创新，V4 让百万级上下文从”理论上可行”变成”经济上可行”。</p>
-<p>这为 AI 的下一阶段——更深的 test-time scaling、更长的 Agent 任务、更灵活的在线学习——铺好了基础设施。</p>
-<p>开源模型第一次在效率和能力的综合维度上，追上了闭源前沿。这是整个行业值得关注的里程碑。</p>
-<hr>
-<p><strong>参考资源</strong>：</p>
-<ul>
-<li><a href="https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf" target="_blank" rel="noopener">DeepSeek V4 技术报告（PDF）</a></li>
-<li><a href="https://huggingface.co/collections/deepseek-ai/deepseek-v4" target="_blank" rel="noopener">模型权重（HuggingFace）</a></li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/24/deepseek-v4-technical-review/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1289,10 +504,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2026-04-19 00:00:00 / 修改时间：09:37:15" itemprop="dateCreated datePublished" datetime="2026-04-19T00:00:00+08:00">2026-04-19</time>
+              <time title="创建时间：2026-04-19 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-19T00:00:00+08:00">2026-04-19</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-08-22 00:24:32" itemprop="dateModified" datetime="2026-08-22T00:24:32+08:00">2026-08-22</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="fa fa-folder-o"></i>
@@ -1332,152 +553,14 @@
 <p>阿里云百炼 Coding Plan 官方宣称”仅限编程工具使用”，但实际上其 endpoint 基于 OpenAI 兼容协议，Java/Python 应用完全可以调用。本文分享如何用 LangChain4j 和 OpenAI SDK 突破这一限制，直接消耗 Coding Plan 额度。</p>
 </blockquote>
 <hr>
-<h2 id="一、背景：一个被”误解”的服务"><a href="#一、背景：一个被”误解”的服务" class="headerlink" title="一、背景：一个被”误解”的服务"></a>一、背景：一个被”误解”的服务</h2><p>阿里云百炼的 <strong>Coding Plan</strong> 是一项面向 AI 编程助手的服务套餐，提供专门的模型调用额度。官方客服的说法是：</p>
-<blockquote>
-<p>“Coding Plan 的专属 API Key（格式为 <code>sk-sp-xxxxx</code>）仅限在支持的编程工具（如 Claude Code、OpenClaw 等）中使用，不能用于 Java 应用直接调用大模型。若您的 Java 应用需要调用百炼大模型，请使用百炼通用 API Key（格式为 <code>sk-xxxxx</code>），该 Key 支持调用包括 Coding 模型在内的所有百炼模型，并按量计费。”</p>
-</blockquote>
-<p>这意味着如果你想在 Java 应用中使用百炼大模型，需要：</p>
-<ol>
-<li>额外开通百炼通用 API Key（格式为 <code>sk-xxxxx</code>）</li>
-<li>按量付费，产生额外费用</li>
-</ol>
-<p><strong>但实际上，Coding Plan 的额度完全可以在 Java/Python 应用中使用！</strong> 本文将分享这个”奇技淫巧”。</p>
-<hr>
-<h2 id="二、问题发现：为什么-Coding-Plan-Key-在-Java-中”失效”？"><a href="#二、问题发现：为什么-Coding-Plan-Key-在-Java-中”失效”？" class="headerlink" title="二、问题发现：为什么 Coding Plan Key 在 Java 中”失效”？"></a>二、问题发现：为什么 Coding Plan Key 在 Java 中”失效”？</h2><h3 id="2-1-错误的调用方式"><a href="#2-1-错误的调用方式" class="headerlink" title="2.1 错误的调用方式"></a>2.1 错误的调用方式</h3><p>很多开发者（包括我）最初使用阿里云官方的 <code>dashscope-sdk-java</code> 调用百炼：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// pom.xml</span></span><br><span class="line">&lt;dependency&gt;</span><br><span class="line">    &lt;groupId&gt;com.alibaba&lt;/groupId&gt;</span><br><span class="line">    &lt;artifactId&gt;dashscope-sdk-java&lt;/artifactId&gt;</span><br><span class="line">    &lt;version&gt;2.22.15&lt;/version&gt;</span><br><span class="line">&lt;/dependency&gt;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Java 代码</span></span><br><span class="line">Generation gen = <span class="keyword">new</span> Generation();</span><br><span class="line">GenerationParam param = GenerationParam.builder()</span><br><span class="line">    .apiKey(<span class="string">"sk-sp-xxxxx"</span>)  <span class="comment">// Coding Plan API Key</span></span><br><span class="line">    .model(<span class="string">"qwen-plus"</span>)</span><br><span class="line">    .messages(messages)</span><br><span class="line">    .build();</span><br><span class="line">GenerationResult result = gen.call(param);</span><br></pre></td></tr></table></figure>
-<p><strong>结果：API 返回 InvalidApiKey 错误，或者即使调通了，消耗的是通用额度而非 Coding Plan 额度！</strong></p>
-<h3 id="2-2-根本原因分析"><a href="#2-2-根本原因分析" class="headerlink" title="2.2 根本原因分析"></a>2.2 根本原因分析</h3><p>Coding Plan 的 API Key 使用的是 <strong>OpenAI 兼容协议</strong>，endpoint 地址不同于通用百炼服务：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>服务类型</th>
-<th>API Key 格式</th>
-<th>Endpoint</th>
-<th>模型名称</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>通用百炼</strong></td>
-<td><code>sk-xxxxx</code></td>
-<td><code>https://dashscope.aliyuncs.com/compatible-mode/v1</code></td>
-<td><code>qwen-plus</code>, <code>qwen-max</code></td>
-</tr>
-<tr>
-<td><strong>Coding Plan</strong></td>
-<td><code>sk-sp-xxxxx</code></td>
-<td><code>https://coding.dashscope.aliyuncs.com/v1</code></td>
-<td><code>多个模型</code> 等</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>官方的 <code>dashscope-sdk-java</code> 只支持通用百炼 endpoint，无法连接 Coding Plan 的 endpoint！</p>
-<hr>
-<h2 id="三、解决方案：使用-OpenAI-兼容模式"><a href="#三、解决方案：使用-OpenAI-兼容模式" class="headerlink" title="三、解决方案：使用 OpenAI 兼容模式"></a>三、解决方案：使用 OpenAI 兼容模式</h2><h3 id="3-1-技术原理"><a href="#3-1-技术原理" class="headerlink" title="3.1 技术原理"></a>3.1 技术原理</h3><p>Coding Plan 的 endpoint 基于 <strong>OpenAI API 兼容协议</strong>，任何支持 OpenAI API 的客户端都可以调用：</p>
-<ol>
-<li><strong>Python</strong>: 使用 <code>openai</code> SDK</li>
-<li><strong>Java</strong>: 使用 LangChain4j 的 <code>langchain4j-open-ai</code> 模块</li>
-</ol>
-<p>只要将 <code>base_url</code> 指向 Coding Plan 的 endpoint，API Key 就能正常工作！</p>
-<hr>
-<h2 id="四、Java-实现：LangChain4j-Coding-Plan"><a href="#四、Java-实现：LangChain4j-Coding-Plan" class="headerlink" title="四、Java 实现：LangChain4j + Coding Plan"></a>四、Java 实现：LangChain4j + Coding Plan</h2><h3 id="4-1-添加依赖"><a href="#4-1-添加依赖" class="headerlink" title="4.1 添加依赖"></a>4.1 添加依赖</h3><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">&lt;!-- pom.xml --&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">properties</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">langchain4j.version</span>&gt;</span>0.35.0<span class="tag">&lt;/<span class="name">langchain4j.version</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">properties</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">dependencies</span>&gt;</span></span><br><span class="line">    <span class="comment">&lt;!-- LangChain4j OpenAI 兼容模块 --&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>dev.langchain4j<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>langchain4j<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">version</span>&gt;</span>$&#123;langchain4j.version&#125;<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>dev.langchain4j<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>langchain4j-open-ai<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">version</span>&gt;</span>$&#123;langchain4j.version&#125;<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependencies</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<h3 id="4-2-配置文件"><a href="#4-2-配置文件" class="headerlink" title="4.2 配置文件"></a>4.2 配置文件</h3><figure class="highlight properties"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># application.properties - Coding Plan 配置</span></span><br><span class="line"><span class="meta">langchain4j.open-ai.chat-model.base-url</span>=<span class="string">https://coding.dashscope.aliyuncs.com/v1</span></span><br><span class="line"><span class="meta">langchain4j.open-ai.chat-model.api-key</span>=<span class="string">sk-sp-xxxxx</span></span><br><span class="line"><span class="meta">langchain4j.open-ai.chat-model.model-name</span>=<span class="string">kimi-k2.5</span></span><br><span class="line"><span class="meta">langchain4j.open-ai.chat-model.temperature</span>=<span class="string">0.3</span></span><br><span class="line"><span class="meta">langchain4j.open-ai.chat-model.max-tokens</span>=<span class="string">4096</span></span><br></pre></td></tr></table></figure>
-<p><strong>关键点：<code>base-url</code> 必须是 <code>coding.dashscope.aliyuncs.com/v1</code>，不是通用的 <code>dashscope.aliyuncs.com</code>！</strong></p>
-<h3 id="4-3-Java-代码实现"><a href="#4-3-Java-代码实现" class="headerlink" title="4.3 Java 代码实现"></a>4.3 Java 代码实现</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> dev.langchain4j.data.message.AiMessage;</span><br><span class="line"><span class="keyword">import</span> dev.langchain4j.data.message.ChatMessage;</span><br><span class="line"><span class="keyword">import</span> dev.langchain4j.data.message.SystemMessage;</span><br><span class="line"><span class="keyword">import</span> dev.langchain4j.data.message.UserMessage;</span><br><span class="line"><span class="keyword">import</span> dev.langchain4j.model.chat.ChatLanguageModel;</span><br><span class="line"><span class="keyword">import</span> dev.langchain4j.model.openai.OpenAiChatModel;</span><br><span class="line"><span class="keyword">import</span> dev.langchain4j.model.output.Response;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.time.Duration;</span><br><span class="line"><span class="keyword">import</span> java.util.Arrays;</span><br><span class="line"><span class="keyword">import</span> java.util.List;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">CodingPlanExample</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> ChatLanguageModel chatModel;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">CodingPlanExample</span><span class="params">(String baseUrl, String apiKey, String modelName)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 使用 OpenAI 兼容模式构建 ChatModel</span></span><br><span class="line">        <span class="keyword">this</span>.chatModel = OpenAiChatModel.builder()</span><br><span class="line">                .baseUrl(baseUrl)  <span class="comment">// Coding Plan endpoint</span></span><br><span class="line">                .apiKey(apiKey)    <span class="comment">// Coding Plan API Key</span></span><br><span class="line">                .modelName(modelName)</span><br><span class="line">                .temperature(<span class="number">0.3</span>)</span><br><span class="line">                .maxTokens(<span class="number">4096</span>)</span><br><span class="line">                .timeout(Duration.ofSeconds(<span class="number">60</span>))</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">chat</span><span class="params">(String systemPrompt, String userMessage)</span> </span>&#123;</span><br><span class="line">        List&lt;ChatMessage&gt; messages = Arrays.asList(</span><br><span class="line">                SystemMessage.from(systemPrompt),</span><br><span class="line">                UserMessage.from(userMessage)</span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        Response&lt;AiMessage&gt; response = chatModel.generate(messages);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (response == <span class="keyword">null</span> || response.content() == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> RuntimeException(<span class="string">"模型返回结果为空"</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> response.content().text();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        CodingPlanExample example = <span class="keyword">new</span> CodingPlanExample(</span><br><span class="line">                <span class="string">"https://coding.dashscope.aliyuncs.com/v1"</span>,</span><br><span class="line">                <span class="string">"sk-sp-xxxxx"</span>,</span><br><span class="line">                <span class="string">"kimi-k2.5"</span></span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        String result = example.chat(</span><br><span class="line">                <span class="string">"你是一位专业的翻译助手"</span>,</span><br><span class="line">                <span class="string">"将以下内容翻译为英文：你好世界"</span></span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        System.out.println(result);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="4-4-Spring-Boot-集成示例"><a href="#4-4-Spring-Boot-集成示例" class="headerlink" title="4.4 Spring Boot 集成示例"></a>4.4 Spring Boot 集成示例</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">LangChain4jConfig</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Value</span>(<span class="string">"$&#123;langchain4j.open-ai.chat-model.base-url&#125;"</span>)</span><br><span class="line">    <span class="keyword">private</span> String baseUrl;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Value</span>(<span class="string">"$&#123;langchain4j.open-ai.chat-model.api-key&#125;"</span>)</span><br><span class="line">    <span class="keyword">private</span> String apiKey;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Value</span>(<span class="string">"$&#123;langchain4j.open-ai.chat-model.model-name&#125;"</span>)</span><br><span class="line">    <span class="keyword">private</span> String modelName;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> ChatLanguageModel <span class="title">chatLanguageModel</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> OpenAiChatModel.builder()</span><br><span class="line">                .baseUrl(baseUrl)</span><br><span class="line">                .apiKey(apiKey)</span><br><span class="line">                .modelName(modelName)</span><br><span class="line">                .timeout(Duration.ofSeconds(<span class="number">60</span>))</span><br><span class="line">                .build();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">TranslationService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> ChatLanguageModel chatModel;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">TranslationService</span><span class="params">(ChatLanguageModel chatModel)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">this</span>.chatModel = chatModel;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">translate</span><span class="params">(String content, String sourceLang, String targetLang)</span> </span>&#123;</span><br><span class="line">        String systemPrompt = String.format(</span><br><span class="line">                <span class="string">"你是翻译专家，将内容从%s翻译为%s，直接输出结果"</span>,</span><br><span class="line">                sourceLang, targetLang</span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        List&lt;ChatMessage&gt; messages = Arrays.asList(</span><br><span class="line">                SystemMessage.from(systemPrompt),</span><br><span class="line">                UserMessage.from(content)</span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> chatModel.generate(messages).content().text();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="五、Python-实现：OpenAI-SDK-Coding-Plan"><a href="#五、Python-实现：OpenAI-SDK-Coding-Plan" class="headerlink" title="五、Python 实现：OpenAI SDK + Coding Plan"></a>五、Python 实现：OpenAI SDK + Coding Plan</h2><h3 id="5-1-安装依赖"><a href="#5-1-安装依赖" class="headerlink" title="5.1 安装依赖"></a>5.1 安装依赖</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pip install openai</span><br></pre></td></tr></table></figure>
-<h3 id="5-2-Python-代码"><a href="#5-2-Python-代码" class="headerlink" title="5.2 Python 代码"></a>5.2 Python 代码</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> openai <span class="keyword">import</span> OpenAI</span><br><span class="line"></span><br><span class="line"><span class="comment"># 使用 Coding Plan endpoint</span></span><br><span class="line">client = OpenAI(</span><br><span class="line">    base_url=<span class="string">"https://coding.dashscope.aliyuncs.com/v1"</span>,</span><br><span class="line">    api_key=<span class="string">"sk-sp-xxxxx"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">response = client.chat.completions.create(</span><br><span class="line">    model=<span class="string">"kimi-k2.5"</span>,</span><br><span class="line">    messages=[</span><br><span class="line">        &#123;<span class="string">"role"</span>: <span class="string">"system"</span>, <span class="string">"content"</span>: <span class="string">"你是一位专业的翻译助手"</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"将以下内容翻译为英文：你好世界"</span>&#125;</span><br><span class="line">    ],</span><br><span class="line">    temperature=<span class="number">0.3</span>,</span><br><span class="line">    max_tokens=<span class="number">4096</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">print(response.choices[<span class="number">0</span>].message.content)</span><br></pre></td></tr></table></figure>
-<h3 id="5-3-异步调用示例"><a href="#5-3-异步调用示例" class="headerlink" title="5.3 异步调用示例"></a>5.3 异步调用示例</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> openai <span class="keyword">import</span> AsyncOpenAI</span><br><span class="line"><span class="keyword">import</span> asyncio</span><br><span class="line"></span><br><span class="line">async_client = AsyncOpenAI(</span><br><span class="line">    base_url=<span class="string">"https://coding.dashscope.aliyuncs.com/v1"</span>,</span><br><span class="line">    api_key=<span class="string">"sk-sp-xxxxx"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">def</span> <span class="title">translate_async</span><span class="params">(content: str)</span> -&gt; str:</span></span><br><span class="line">    response = <span class="keyword">await</span> async_client.chat.completions.create(</span><br><span class="line">        model=<span class="string">"kimi-k2.5"</span>,</span><br><span class="line">        messages=[</span><br><span class="line">            &#123;<span class="string">"role"</span>: <span class="string">"system"</span>, <span class="string">"content"</span>: <span class="string">"你是翻译专家"</span>&#125;,</span><br><span class="line">            &#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: content&#125;</span><br><span class="line">        ]</span><br><span class="line">    )</span><br><span class="line">    <span class="keyword">return</span> response.choices[<span class="number">0</span>].message.content</span><br><span class="line"></span><br><span class="line"><span class="comment"># 批量翻译</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">def</span> <span class="title">batch_translate</span><span class="params">(contents: list[str])</span> -&gt; list[str]:</span></span><br><span class="line">    tasks = [translate_async(c) <span class="keyword">for</span> c <span class="keyword">in</span> contents]</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">await</span> asyncio.gather(*tasks)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 运行示例</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">def</span> <span class="title">main</span><span class="params">()</span>:</span></span><br><span class="line">    results = <span class="keyword">await</span> batch_translate([<span class="string">"你好世界"</span>, <span class="string">"人工智能"</span>])</span><br><span class="line">    print(results)</span><br><span class="line"></span><br><span class="line">asyncio.run(main())</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="六、实际应用场景"><a href="#六、实际应用场景" class="headerlink" title="六、实际应用场景"></a>六、实际应用场景</h2><h3 id="6-1-职位内容翻译"><a href="#6-1-职位内容翻译" class="headerlink" title="6.1 职位内容翻译"></a>6.1 职位内容翻译</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">JobTranslationService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> ChatLanguageModel chatModel;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">translateJobDescription</span><span class="params">(String content, String sourceLang, String targetLang)</span> </span>&#123;</span><br><span class="line">        String systemPrompt = buildTranslationPrompt(sourceLang, targetLang);</span><br><span class="line"></span><br><span class="line">        List&lt;ChatMessage&gt; messages = Arrays.asList(</span><br><span class="line">                SystemMessage.from(systemPrompt),</span><br><span class="line">                UserMessage.from(content)</span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> chatModel.generate(messages).content().text();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> String <span class="title">buildTranslationPrompt</span><span class="params">(String sourceLang, String targetLang)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> String.format(<span class="string">""</span><span class="string">"</span></span><br><span class="line"><span class="string">            你是一位专业的职位内容翻译专家。</span></span><br><span class="line"><span class="string">            请将用户输入的职位描述从%s翻译为%s。</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">            翻译要求：</span></span><br><span class="line"><span class="string">            1. 保持原文的段落结构和格式</span></span><br><span class="line"><span class="string">            2. 专业术语使用行业标准翻译</span></span><br><span class="line"><span class="string">            3. 直接输出翻译结果</span></span><br><span class="line"><span class="string">            "</span><span class="string">""</span>, sourceLang, targetLang);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="6-2-文档内容生成"><a href="#6-2-文档内容生成" class="headerlink" title="6.2 文档内容生成"></a>6.2 文档内容生成</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> String <span class="title">generateDocumentOutline</span><span class="params">(String topic)</span> </span>&#123;</span><br><span class="line">    String prompt = <span class="string">""</span><span class="string">"</span></span><br><span class="line"><span class="string">        根据以下主题，生成一份技术文档大纲：</span></span><br><span class="line"><span class="string">        主题：%s</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">        要求：</span></span><br><span class="line"><span class="string">        1. 结构清晰，层次分明</span></span><br><span class="line"><span class="string">        2. 每个章节要有简要说明</span></span><br><span class="line"><span class="string">        3. 使用 Markdown 格式输出</span></span><br><span class="line"><span class="string">        "</span><span class="string">""</span>.formatted(topic);</span><br><span class="line"></span><br><span class="line">    List&lt;ChatMessage&gt; messages = Arrays.asList(</span><br><span class="line">        SystemMessage.from(<span class="string">"你是技术文档撰写专家"</span>),</span><br><span class="line">        UserMessage.from(prompt)</span><br><span class="line">    );</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> chatModel.generate(messages).content().text();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="6-3-智能客服对话"><a href="#6-3-智能客服对话" class="headerlink" title="6.3 智能客服对话"></a>6.3 智能客服对话</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">CustomerServiceBot</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> ChatLanguageModel chatModel;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">handleUserMessage</span><span class="params">(String userMessage, List&lt;String&gt; history)</span> </span>&#123;</span><br><span class="line">        List&lt;ChatMessage&gt; messages = <span class="keyword">new</span> ArrayList&lt;&gt;();</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 系统提示词</span></span><br><span class="line">        messages.add(SystemMessage.from(<span class="string">""</span><span class="string">"</span></span><br><span class="line"><span class="string">            你是专业的客服助手，帮助用户解答产品相关问题。</span></span><br><span class="line"><span class="string">            回答要求：</span></span><br><span class="line"><span class="string">            1. 语气友好专业</span></span><br><span class="line"><span class="string">            2. 回答简洁明了</span></span><br><span class="line"><span class="string">            3. 如果无法回答，引导用户联系人工客服</span></span><br><span class="line"><span class="string">            "</span><span class="string">""</span>));</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 添加历史对话</span></span><br><span class="line">        <span class="keyword">for</span> (String h : history) &#123;</span><br><span class="line">            messages.add(UserMessage.from(h));</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 当前消息</span></span><br><span class="line">        messages.add(UserMessage.from(userMessage));</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> chatModel.generate(messages).content().text();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="七、关键注意事项"><a href="#七、关键注意事项" class="headerlink" title="七、关键注意事项"></a>七、关键注意事项</h2><h3 id="7-1-Endpoint-不要混用"><a href="#7-1-Endpoint-不要混用" class="headerlink" title="7.1 Endpoint 不要混用"></a>7.1 Endpoint 不要混用</h3><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>Key 类型</th>
-<th>正确 Endpoint</th>
-<th>错误 Endpoint</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>sk-sp-xxxxx</code> (Coding Plan)</td>
-<td><code>coding.dashscope.aliyuncs.com/v1</code></td>
-<td><code>dashscope.aliyuncs.com</code></td>
-</tr>
-<tr>
-<td><code>sk-xxxxx</code> (通用)</td>
-<td><code>dashscope.aliyuncs.com/compatible-mode/v1</code></td>
-<td><code>coding.dashscope.aliyuncs.com</code></td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>混用会导致 <code>InvalidApiKey</code> 错误或消耗错误的额度！</p>
-<h3 id="7-2-模型名称差异"><a href="#7-2-模型名称差异" class="headerlink" title="7.2 模型名称差异"></a>7.2 模型名称差异</h3><p>Coding Plan 支持的模型可能与通用百炼不同：</p>
-<ul>
-<li>Coding Plan: <code>kimi-k2.5</code> 等</li>
-<li>通用百炼: <code>qwen-plus</code>, <code>qwen-max</code>, <code>qwen-turbo</code></li>
-</ul>
-<p>请根据实际账号支持的模型选择。</p>
-<h3 id="7-3-Token-消耗监控"><a href="#7-3-Token-消耗监控" class="headerlink" title="7.3 Token 消耗监控"></a>7.3 Token 消耗监控</h3><p>虽然使用了 Coding Plan 额度，但仍需关注：</p>
-<ul>
-<li>单次调用 Token 数量</li>
-<li>Coding Plan 额度剩余</li>
-<li>设置合理的 <code>max_tokens</code> 防止超限</li>
-</ul>
-<h3 id="7-4-超时设置"><a href="#7-4-超时设置" class="headerlink" title="7.4 超时设置"></a>7.4 超时设置</h3><p>Coding Plan 响应时间可能与通用服务不同，建议设置较长超时：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">.timeout(Duration.ofSeconds(<span class="number">60</span>))  <span class="comment">// 或更长</span></span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="八、总结"><a href="#八、总结" class="headerlink" title="八、总结"></a>八、总结</h2><h3 id="8-1-官方说法-vs-实际实践"><a href="#8-1-官方说法-vs-实际实践" class="headerlink" title="8.1 官方说法 vs 实际实践"></a>8.1 官方说法 vs 实际实践</h3><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>官方说法</th>
-<th>实际实践</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Coding Plan Key 仅限编程工具使用</td>
-<td>Java/Python 应用可正常使用</td>
-</tr>
-<tr>
-<td>需要额外开通通用 Key</td>
-<td>无需额外开通</td>
-</tr>
-<tr>
-<td>按量付费产生额外费用</td>
-<td>直接消耗 Coding Plan 额度</td>
-</tr>
-<tr>
-<td>dashscope-sdk-java 不支持</td>
-<td>LangChain4j/OpenAI SDK 完美支持</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h3 id="8-2-核心原理"><a href="#8-2-核心原理" class="headerlink" title="8.2 核心原理"></a>8.2 核心原理</h3><p>Coding Plan 的 endpoint 基于 <strong>OpenAI API 兼容协议</strong>，这是业界通用的 LLM API 标准。任何支持 OpenAI 协议的客户端都可以调用，不受编程工具限制。</p>
-<h3 id="8-3-适用场景"><a href="#8-3-适用场景" class="headerlink" title="8.3 适用场景"></a>8.3 适用场景</h3><ul>
-<li>✅ Java 后端服务调用 LLM</li>
-<li>✅ Python 应用调用 LLM</li>
-<li>✅ Spring Boot / LangChain4j 集成</li>
-<li>✅ 翻译、生成、对话等各类 NLP 任务</li>
-<li>❌ 直接使用 dashscope-sdk-java（不支持 Coding Plan endpoint）</li>
-</ul>
-<hr>
-<h2 id="九、参考资料"><a href="#九、参考资料" class="headerlink" title="九、参考资料"></a>九、参考资料</h2><ul>
-<li><a href="https://docs.langchain4j.dev/" target="_blank" rel="noopener">LangChain4j 官方文档</a></li>
-<li><a href="https://platform.openai.com/docs/api-reference" target="_blank" rel="noopener">OpenAI API 兼容协议</a></li>
-<li><a href="https://bailian.console.aliyun.com/" target="_blank" rel="noopener">阿里百炼 Coding Plan</a></li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/19/bailian_coding_plan_usage_java_or_python/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1527,7 +610,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-18 18:04:02" itemprop="dateModified" datetime="2026-04-18T18:04:02+08:00">2026-04-18</time>
+                <time title="修改时间：2026-08-22 00:24:32" itemprop="dateModified" datetime="2026-08-22T00:24:32+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -1568,225 +651,14 @@
 <p>如果你最近关注 AI Agent 领域，可能会注意到一个新名字——Hermes Agent。它来自 Nous Research，在短短两个月内从一个小型内部项目成长为功能完备的 AI Agent 平台。这篇文章聊聊它到底有什么不一样，以及为什么值得你花时间了解。</p>
 </blockquote>
 <hr>
-<h2 id="一、Hermes-Agent-是什么？"><a href="#一、Hermes-Agent-是什么？" class="headerlink" title="一、Hermes Agent 是什么？"></a>一、Hermes Agent 是什么？</h2><p>简单说，它是一个<strong>可以自我进化的 AI Agent 框架</strong>。</p>
-<p>市面上大多数 Agent 工具，你用完一次，下次还要重新教它。你说”帮我整理今天的 Git 提交记录”，它执行了。第二天你再说同样的话，它又从头开始理解。对话结束后，一切归零。</p>
-<p>Hermes Agent 不一样。它有个叫”技能系统”的东西。第一次你教它做某件事，完成后它会问自己：这件事我以后是不是经常要做？如果答案是肯定的，它会把整个过程打包成一个技能。下次你只需要说”整理提交”，它就能直接调用这个技能。</p>
-<p>这不是预设好的模板，是 Agent 自己判断、自己创建、自己优化的。用久了，它会越来越懂你的工作习惯。</p>
-<hr>
-<h2 id="二、为什么突然火了？"><a href="#二、为什么突然火了？" class="headerlink" title="二、为什么突然火了？"></a>二、为什么突然火了？</h2><p>翻一下 Hermes Agent 的版本历史，你会发现一个有意思的时间线：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>版本</th>
-<th>发布日期</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>v0.1.0</td>
-<td>2026年2月底</td>
-<td>内部预发布版本</td>
-</tr>
-<tr>
-<td>v0.2.0</td>
-<td>3月12日</td>
-<td>首个公开版本，216个PR，63位贡献者</td>
-</tr>
-<tr>
-<td>v0.3.0</td>
-<td>3月17日</td>
-<td>流式输出、插件架构、Honcho记忆</td>
-</tr>
-<tr>
-<td>v0.4.0</td>
-<td>3月23日</td>
-<td>6个新消息平台、4个新推理提供商</td>
-</tr>
-<tr>
-<td>v0.9.0</td>
-<td>4月13日</td>
-<td>Android支持、iMessage、微信接入</td>
-</tr>
-<tr>
-<td>v0.10.0</td>
-<td>4月16日</td>
-<td>Nous工具网关，订阅用户零额外API</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>从2月底到4月中旬，不到两个月，发布了10个大版本。平均每三四天一个版本。这不是营销驱动的节奏，是真实需求驱动的迭代速度。</p>
-<p>看看 v0.2.0 的发布说明：”In just over two weeks, Hermes Agent went from a small internal project to a full-featured AI agent platform — thanks to an explosion of community contributions.”</p>
-<p>这句话翻译过来：两个星期，从内部小项目变成完整平台，原因是社区贡献爆发。</p>
-<p>为什么爆发？因为 Hermes Agent 解决了一个长期痛点——Agent 的记忆和学习能力。之前大家做 Agent，要么接受”每次对话归零”的现实，要么自己写一套复杂的持久化逻辑。Hermes Agent 把这套逻辑内置了，而且是真正意义上的”学习”，不只是”存储”。</p>
-<hr>
-<h2 id="三、核心特质"><a href="#三、核心特质" class="headerlink" title="三、核心特质"></a>三、核心特质</h2><h3 id="3-1-闭环学习，不是单次执行"><a href="#3-1-闭环学习，不是单次执行" class="headerlink" title="3.1 闭环学习，不是单次执行"></a>3.1 闭环学习，不是单次执行</h3><p>这点前面说了，展开讲一下细节。</p>
-<p>Hermes Agent 的学习机制包含几个层次：</p>
-<p><strong>技能自动创建</strong>：完成复杂任务后，Agent 会分析这个任务是否有重复价值。有，就创建技能。技能里包含了执行步骤、需要的工具、注意事项。</p>
-<p><strong>技能自我改进</strong>：你用某个技能的时候如果给了反馈，比如”这次格式不对”或”下次加上这个字段”，Agent 会把这些反馈写进技能描述里。下一次执行会自动应用。</p>
-<p><strong>定期提醒</strong>：Agent 有个机制叫”periodic nudges”，会周期性地提醒自己把重要信息持久化。不是被动等待你要求，是主动思考”这个信息值得记住吗”。</p>
-<p><strong>跨会话搜索</strong>：你问”上次我们讨论的那个方案是什么”，它会搜索历史对话，用 LLM 做摘要，然后告诉你。这不是简单的关键词搜索，是语义层面的召回。</p>
-<h3 id="3-2-Honcho-用户建模"><a href="#3-2-Honcho-用户建模" class="headerlink" title="3.2 Honcho 用户建模"></a>3.2 Honcho 用户建模</h3><p>Hermes Agent 内置了一个叫 Honcho 的用户建模系统。这个名字来自 plastic-labs 的 Honcho 项目，是一个专门做”AI 理解用户”的框架。</p>
-<p>它的作用是：Agent 会持续观察你的偏好、习惯、工作方式，然后建立一个用户模型。你喜欢简洁回复，它记住；你讨厌某种操作方式，它记住；你对某个项目有特殊约定，它跨会话保持。</p>
-<p>这不是简单的”记住你说过的话”，是”理解你是什么样的人”。</p>
-<h3 id="3-3-多平台统一接入"><a href="#3-3-多平台统一接入" class="headerlink" title="3.3 多平台统一接入"></a>3.3 多平台统一接入</h3><p>这点对实际使用很重要。</p>
-<p>你可以在 Telegram、Discord、Slack、WhatsApp、Signal 这些平台跟 Hermes Agent 对话，也可以在终端用 CLI。同一个 Agent，不同入口，记忆和技能是共享的。</p>
-<p>这意味着你早上在公司电脑用 CLI 让它整理日报，晚上回家用 Telegram 继续讨论，它记得你白天说了什么。</p>
-<h3 id="3-4-定时任务，原生支持"><a href="#3-4-定时任务，原生支持" class="headerlink" title="3.4 定时任务，原生支持"></a>3.4 定时任务，原生支持</h3><p>大多数 Agent 框架没有内置的定时任务系统。你想让 Agent 每天早上自动发日报，要么写外部脚本触发，要么依赖某个外部调度器。</p>
-<p>Hermes Agent 内置了 cron 调度。你用自然语言描述：”每天早上9点，汇总昨天的 Git 提交并发到 Telegram”，它会自动解析、创建任务、按时执行。</p>
-<p>这对于”Agent 作为助手”的场景很重要。真正的助手不只是你叫它才动，是会主动做事情。</p>
-<h3 id="3-5-云端部署，不是本地绑定"><a href="#3-5-云端部署，不是本地绑定" class="headerlink" title="3.5 云端部署，不是本地绑定"></a>3.5 云端部署，不是本地绑定</h3><p>这点是 Hermes Agent 相比很多同类产品的优势。</p>
-<p>它支持六种终端后端：本地、Docker、SSH、Daytona、Singularity、Modal。其中 Modal 和 Daytona 是”无服务器”模式——你的 Agent 环境在云端，空闲时几乎不花钱，有请求时自动唤醒。</p>
-<p>这意味着你可以把 Hermes Agent 部署到云端，然后从 Telegram 发消息触发。不在电脑前的时候，Agent 依然在工作。这对于”随时随地操作”的需求很关键。</p>
-<h3 id="3-6-多模型，随时切换"><a href="#3-6-多模型，随时切换" class="headerlink" title="3.6 多模型，随时切换"></a>3.6 多模型，随时切换</h3><p>Hermes Agent 支持大量 LLM 提供商：</p>
-<ul>
-<li>Nous Portal（官方订阅服务）</li>
-<li>OpenRouter（200+模型）</li>
-<li>Anthropic（Claude 系列）</li>
-<li>OpenAI（GPT 系列）</li>
-<li>Google AI Studio（Gemini）</li>
-<li>阿里云百炼（DashScope）</li>
-<li>智谱 AI（GLM）</li>
-<li>Moonshot（Kimi）</li>
-<li>MiniMax</li>
-<li>小米 MiMo</li>
-<li>NVIDIA NIM</li>
-<li>DeepSeek</li>
-<li>xAI（Grok）</li>
-<li>Hugging Face</li>
-<li>AWS Bedrock</li>
-<li>还有更多…</li>
-</ul>
-<p>切换模型用一个命令：<code>hermes model</code>。不需要改代码，不需要重新部署，运行时切换。</p>
-<p>这对于实际使用很重要。不同的任务适合不同的模型，你可能写代码用 Claude，快速问答用 GPT-mini，中文内容用 Qwen。Hermes Agent 让这种切换变得零成本。</p>
-<hr>
-<h2 id="四、对-OpenClaw-用户的意义"><a href="#四、对-OpenClaw-用户的意义" class="headerlink" title="四、对 OpenClaw 用户的意义"></a>四、对 OpenClaw 用户的意义</h2><p>如果你正在用 OpenClaw，听到 Hermes Agent 可能会想：又一个类似的工具，有必要换吗？</p>
-<p>这里有个事实你可能不知道：<strong>Hermes Agent 是 OpenClaw 的官方进化版本</strong>。</p>
-<p>翻 Hermes Agent 的文档，你会发现专门的迁移章节：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">## Migrating from OpenClaw</span><br><span class="line"></span><br><span class="line">If you&#39;re coming from OpenClaw, Hermes can automatically import your settings, memories, skills, and API keys.</span><br></pre></td></tr></table></figure>
-<p>迁移命令很简单：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">hermes claw migrate --dry-run    <span class="comment"># 先预览会迁移什么</span></span><br><span class="line">hermes claw migrate              <span class="comment"># 执行迁移</span></span><br></pre></td></tr></table></figure>
-<p>迁移内容包括：</p>
-<ul>
-<li>SOUL.md（人格设定）</li>
-<li>已有技能</li>
-<li>命令白名单</li>
-<li>消息平台配置</li>
-<li>API 密钥（Telegram、OpenRouter、OpenAI、Anthropic 等）</li>
-<li>工作空间说明（AGENTS.md）</li>
-</ul>
-<p>这说明 Hermes Agent 的开发团队明确知道 OpenClaw 用户群体，并且专门做了兼容路径。</p>
-<p>那为什么要从 OpenClaw 换到 Hermes Agent？几个实际理由：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>功能</th>
-<th>OpenClaw</th>
-<th>Hermes Agent</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>技能系统</td>
-<td>有，但不自改进</td>
-<td>有，且会自我优化</td>
-</tr>
-<tr>
-<td>定时任务</td>
-<td>无</td>
-<td>内置 cron</td>
-</tr>
-<tr>
-<td>云端部署</td>
-<td>本地运行</td>
-<td>Modal/Daytona 无服务器</td>
-</tr>
-<tr>
-<td>用户建模</td>
-<td>会话级</td>
-<td>Honcho 深度建模</td>
-</tr>
-<tr>
-<td>MCP 协议</td>
-<td>无</td>
-<td>支持</td>
-</tr>
-<tr>
-<td>消息平台</td>
-<td>Telegram、飞书等</td>
-<td>Telegram、Discord、Slack、WhatsApp、Signal</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>如果你需要定时任务、云端部署、Agent 学习能力，Hermes Agent 提供了这些 OpenClaw 没有的东西。</p>
-<hr>
-<h2 id="五、安装和使用指南"><a href="#五、安装和使用指南" class="headerlink" title="五、安装和使用指南"></a>五、安装和使用指南</h2><h3 id="5-1-Mac-用户"><a href="#5-1-Mac-用户" class="headerlink" title="5.1 Mac 用户"></a>5.1 Mac 用户</h3><p>Mac 上安装最简单，一行命令：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash</span><br></pre></td></tr></table></figure>
-<p>安装完成后：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">source</span> ~/.zshrc   <span class="comment"># 或者 source ~/.bashrc</span></span><br><span class="line">hermes            <span class="comment"># 启动</span></span><br></pre></td></tr></table></figure>
-<p>首次运行会引导你配置。按照提示选择 LLM 提供商、设置 API Key 就可以开始使用。</p>
-<h3 id="5-2-Windows-用户"><a href="#5-2-Windows-用户" class="headerlink" title="5.2 Windows 用户"></a>5.2 Windows 用户</h3><p>Windows 原生不支持，需要通过 WSL2。</p>
-<p>先安装 WSL2：</p>
-<figure class="highlight powershell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wsl -<span class="literal">-install</span></span><br></pre></td></tr></table></figure>
-<p>然后进入 WSL2 的 Linux 环境，运行和 Mac 一样的安装命令。</p>
-<p>这步对不熟悉 Linux 的用户可能有点门槛，但设置好后使用体验和 Mac 一样。</p>
-<h3 id="5-3-常用命令"><a href="#5-3-常用命令" class="headerlink" title="5.3 常用命令"></a>5.3 常用命令</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">hermes              <span class="comment"># 启动交互式 CLI</span></span><br><span class="line">hermes model        <span class="comment"># 选择模型提供商和具体模型</span></span><br><span class="line">hermes tools        <span class="comment"># 配置启用的工具</span></span><br><span class="line">hermes gateway      <span class="comment"># 启动消息平台网关（Telegram、Discord 等）</span></span><br><span class="line">hermes setup        <span class="comment"># 完整设置向导</span></span><br><span class="line">hermes doctor       <span class="comment"># 检查配置是否有问题</span></span><br><span class="line">hermes update       <span class="comment"># 更新到最新版本</span></span><br></pre></td></tr></table></figure>
-<p>在对话中使用的斜杠命令：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;new              # 开始新对话</span><br><span class="line">&#x2F;model            # 切换模型</span><br><span class="line">&#x2F;skills           # 浏览可用技能</span><br><span class="line">&#x2F;retry            # 重试上一轮</span><br><span class="line">&#x2F;undo             #撤销上一轮</span><br><span class="line">&#x2F;compress         # 压缩上下文</span><br><span class="line">&#x2F;usage            # 查看用量</span><br></pre></td></tr></table></figure>
-<h3 id="5-4-配置阿里云百炼"><a href="#5-4-配置阿里云百炼" class="headerlink" title="5.4 配置阿里云百炼"></a>5.4 配置阿里云百炼</h3><p>如果你之前用 OpenClaw 配了阿里云百炼的 Coding Plan，在 Hermes Agent 里可以直接用：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 设置环境变量</span></span><br><span class="line"><span class="built_in">export</span> DASHSCOPE_API_KEY=你的API密钥</span><br><span class="line"></span><br><span class="line"><span class="comment"># 如果用国内版，额外设置</span></span><br><span class="line"><span class="built_in">export</span> DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1</span><br></pre></td></tr></table></figure>
-<p>或者在 <code>~/.hermes/.env</code> 文件里写：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">DASHSCOPE_API_KEY&#x3D;sk-xxxxxxxx</span><br></pre></td></tr></table></figure>
-<p>然后用命令切换提供商：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">hermes model alibaba</span><br><span class="line">hermes model qwen3-coder-plus</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="六、OpenClaw-用户迁移指南"><a href="#六、OpenClaw-用户迁移指南" class="headerlink" title="六、OpenClaw 用户迁移指南"></a>六、OpenClaw 用户迁移指南</h2><p>如果你已经有 OpenClaw 的配置，迁移步骤：</p>
-<p><strong>1. 安装 Hermes Agent</strong></p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash</span><br><span class="line"><span class="built_in">source</span> ~/.zshrc</span><br></pre></td></tr></table></figure>
-<p><strong>2. 运行迁移命令</strong></p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hermes setup</span><br></pre></td></tr></table></figure>
-<p>Setup 向导会自动检测 <code>~/.openclaw</code> 目录，提示你是否迁移。</p>
-<p>或者任何时候手动运行：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">hermes claw migrate --dry-run    <span class="comment"># 预览会迁移什么</span></span><br><span class="line">hermes claw migrate              <span class="comment"># 执行迁移</span></span><br></pre></td></tr></table></figure>
-<p><strong>3. 检查迁移结果</strong></p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hermes doctor    <span class="comment"># 检查配置是否正确</span></span><br></pre></td></tr></table></figure>
-<p><strong>4. 开始使用</strong></p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hermes    <span class="comment"># 启动 CLI</span></span><br></pre></td></tr></table></figure>
-<p>迁移后，你的 SOUL.md（人格设定）、已有技能、命令白名单、消息平台配置都会保留。API 密钥会自动迁移到 <code>~/.hermes/.env</code>。</p>
-<p><strong>注意</strong>：OpenClaw 支持 Telegram、飞书等平台，这些配置会直接迁移。</p>
-<hr>
-<h2 id="七、适合什么人用？"><a href="#七、适合什么人用？" class="headerlink" title="七、适合什么人用？"></a>七、适合什么人用？</h2><p>如果你的需求是：</p>
-<ul>
-<li><strong>写代码为主</strong> → 继续用 Claude Code，它在代码理解上更强</li>
-<li><strong>操作电脑、整理文件</strong> → Hermes Agent 或 OpenClaw 都能胜任</li>
-<li><strong>重复性任务多</strong> → Hermes Agent，技能系统会帮你省时间</li>
-<li><strong>需要定时自动化</strong> → Hermes Agent，内置 cron</li>
-<li><strong>离开电脑时也想用</strong> → Hermes Agent，云端部署 + Telegram</li>
-<li><strong>飞书/Telegram 是核心场景</strong> → Hermes Agent 或 OpenClaw 都能胜任</li>
-</ul>
-<p>如果你已经在用 OpenClaw，不需要立即换。两个工具核心功能重叠约 70%，Hermes Agent 新增的是学习能力、定时任务和云端部署。这些对你有没有价值，看你的实际需求。</p>
-<p>但如果你想尝试 Hermes Agent，迁移成本很低。一条命令就能把 OpenClaw 的配置全部导过去，不存在”从头设置”的问题。</p>
-<hr>
-<h2 id="八、总结"><a href="#八、总结" class="headerlink" title="八、总结"></a>八、总结</h2><p>Hermes Agent 的价值不在”功能更多”，在”设计思路不同”。</p>
-<p>大多数 Agent 工具的设计假设是：用户发起对话 → Agent 执行 → 结束。下一次对话从零开始。</p>
-<p>Hermes Agent 的设计假设是：Agent 和用户是长期关系，Agent 应该越来越懂用户，而不是每次都从陌生人开始。</p>
-<p>这个假设的差异，导致了功能设计的差异：技能自动创建、技能自我改进、Honcho 用户建模、跨会话搜索、定期提醒持久化。</p>
-<p>这些功能单独看都不复杂，组合起来形成一个闭环：Agent 做事 → Agent 学习 → Agent 下次做得更好。</p>
-<p>这个闭环是 Hermes Agent 和其他 Agent 工具的本质区别。</p>
-<p>如果你对”Agent 可以学习和进化”这个概念感兴趣，值得花半小时安装试试。不需要完全替换你现有的工具，先体验一下它的学习机制，看看是否符合你的预期。</p>
-<hr>
-<h2 id="九、相关资源"><a href="#九、相关资源" class="headerlink" title="九、相关资源"></a>九、相关资源</h2><ul>
-<li>Hermes Agent GitHub：<a href="https://github.com/NousResearch/hermes-agent" target="_blank" rel="noopener">https://github.com/NousResearch/hermes-agent</a></li>
-<li>官方文档：<a href="https://hermes-agent.nousresearch.com/docs/" target="_blank" rel="noopener">https://hermes-agent.nousresearch.com/docs/</a></li>
-<li>Skills Hub：<a href="https://agentskills.io" target="_blank" rel="noopener">https://agentskills.io</a></li>
-<li>Nous Research Discord：<a href="https://discord.gg/NousResearch" target="_blank" rel="noopener">https://discord.gg/NousResearch</a></li>
-<li>HermesClaw（微信桥接）：<a href="https://github.com/AaronWong1999/hermesclaw" target="_blank" rel="noopener">https://github.com/AaronWong1999/hermesclaw</a></li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/17/hermes-agent-introduction/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1836,7 +708,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-13 09:35:20" itemprop="dateModified" datetime="2026-04-13T09:35:20+08:00">2026-04-13</time>
+                <time title="修改时间：2026-08-22 00:24:32" itemprop="dateModified" datetime="2026-08-22T00:24:32+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -1877,419 +749,14 @@
 <p>LangChain 和 LangGraph 是当下最流行的 Agent 开发框架，但 Anthropic 的 Claude Code 却完全不用它们。这不是傲慢，而是基于技术本质、产品体验、API 特性和工程可控性的四重考量。本文从多个层面剖析 Claude Code 的自研架构选择，以及它用什么技术替代了 LangChain/LangGraph 的能力。</p>
 </blockquote>
 <hr>
-<h2 id="一、先说结论"><a href="#一、先说结论" class="headerlink" title="一、先说结论"></a>一、先说结论</h2><p>Claude Code 不用 LangChain/LangGraph，原因有四个：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>层面</th>
-<th>LangChain/LangGraph 的限制</th>
-<th>Claude Code 的选择</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>架构层面</strong></td>
-<td>ReAct 模式的串行瓶颈</td>
-<td>Async Generator 状态机</td>
-</tr>
-<tr>
-<td><strong>API 层面</strong></td>
-<td>无法充分利用 Anthropic API 特性</td>
-<td>原生 SDK 直接集成</td>
-</tr>
-<tr>
-<td><strong>性能层面</strong></td>
-<td>抽象层增加延迟</td>
-<td>零抽象，直接流式处理</td>
-</tr>
-<tr>
-<td><strong>可控层面</strong></td>
-<td>框架黑盒，难以定制</td>
-<td>全栈自研，精准控制</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p><strong>一句话概括</strong>：LangChain/LangGraph 是”通用框架”，Claude Code 是”专用系统”。通用框架追求易用，专用系统追求极致体验。</p>
-<hr>
-<h2 id="二、架构层面：为什么放弃-ReAct"><a href="#二、架构层面：为什么放弃-ReAct" class="headerlink" title="二、架构层面：为什么放弃 ReAct"></a>二、架构层面：为什么放弃 ReAct</h2><h3 id="2-1-ReAct-模式的根本缺陷"><a href="#2-1-ReAct-模式的根本缺陷" class="headerlink" title="2.1 ReAct 模式的根本缺陷"></a>2.1 ReAct 模式的根本缺陷</h3><p>LangChain 和 LangGraph 的核心都是 <strong>ReAct 模式</strong>（Reasoning + Acting）：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">思考(Thought) → 行动(Action) → 观察(Observation) → 思考 → ...</span><br></pre></td></tr></table></figure>
-<p>这个模式直观易懂，但存在三个根本缺陷：</p>
-<p><strong>缺陷一：串行瓶颈</strong></p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    ReAct 串行流程                            │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  用户输入 → 等待完整响应 → 解析工具调用 → 执行工具 → 等待 →  │</span><br><span class="line">│            └───────────────────────────────────┘            │</span><br><span class="line">│                        用户感知到的延迟                       │</span><br><span class="line">│                                                             │</span><br><span class="line">│  问题：用户要等模型生成完整响应后才能看到工具执行             │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
-<p>在 CLI 交互场景中，这种延迟是致命的——用户盯着屏幕等待，不知道发生了什么。</p>
-<p><strong>缺陷二：无法利用流式传输</strong></p>
-<p>现代 LLM API 都支持流式输出（SSE），但 ReAct 模式下流式的价值被大大削弱：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LangChain 的 Agent 执行</span></span><br><span class="line">agent.run(<span class="string">"帮我分析这个项目"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 内部流程：</span></span><br><span class="line"><span class="comment"># 1. LLM 生成完整响应（即使流式，也要等 action 完整）</span></span><br><span class="line"><span class="comment"># 2. OutputParser 解析响应文本</span></span><br><span class="line"><span class="comment"># 3. 提取工具名称和参数</span></span><br><span class="line"><span class="comment"># 4. 执行工具</span></span><br><span class="line"><span class="comment"># 5. 工具结果返回给 LLM</span></span><br><span class="line"><span class="comment"># 6. 重复...</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 流式输出的价值：实时看到模型"在想什么"</span></span><br><span class="line"><span class="comment"># 但工具执行：必须等完整响应后才能开始</span></span><br><span class="line"><span class="comment"># 两者冲突，流式体验被割裂</span></span><br></pre></td></tr></table></figure>
-<p><strong>缺陷三：状态恢复困难</strong></p>
-<p>ReAct 模式没有统一的状态表示，每一步都是独立的：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Step 1: Thought → Action → Observation  (无状态记忆)</span><br><span class="line">Step 2: Thought → Action → Observation  (重新开始)</span><br><span class="line">Step 3: ...</span><br><span class="line"></span><br><span class="line">当 API 超时、Token 溢出时：</span><br><span class="line">- LangChain：抛出异常，用户需手动处理</span><br><span class="line">- LangGraph：需要显式定义 checkpoint，复杂度高</span><br><span class="line">- Claude Code：State 对象统一承载，自动恢复</span><br></pre></td></tr></table></figure>
-<h3 id="2-2-Claude-Code-的替代方案：Async-Generator-状态机"><a href="#2-2-Claude-Code-的替代方案：Async-Generator-状态机" class="headerlink" title="2.2 Claude Code 的替代方案：Async Generator 状态机"></a>2.2 Claude Code 的替代方案：Async Generator 状态机</h3><p>Claude Code 用一个 <strong>while(true) 循环 + State 赋值</strong> 替代 ReAct：</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/query.ts 核心（简化版）</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">async</span> <span class="function"><span class="keyword">function</span>* <span class="title">query</span>(<span class="params">params: QueryParams</span>): <span class="title">AsyncGenerator</span>&lt;<span class="title">QueryUpdate</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">let</span> state: State = &#123;</span><br><span class="line">    messages: [...],</span><br><span class="line">    toolUseContext: &#123;...&#125;,</span><br><span class="line">    turnCount: <span class="number">0</span>,</span><br><span class="line">    transition: <span class="literal">undefined</span>,</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">    <span class="comment">// 阶段1: 消息压缩（自动处理 Token 溢出）</span></span><br><span class="line">    <span class="comment">// 阶段2: 流式 API 调用（工具即时执行）</span></span><br><span class="line">    <span class="comment">// 阶段3: 决策点（继续还是结束）</span></span><br><span class="line">    <span class="comment">// 阶段4: 工具编排（并行只读，串行写入）</span></span><br><span class="line">    <span class="comment">// 阶段5: 状态更新</span></span><br><span class="line">    </span><br><span class="line">    state = next  <span class="comment">// 通过赋值驱动循环</span></span><br><span class="line">    <span class="keyword">continue</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>核心优势对比</strong>：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>维度</th>
-<th>ReAct</th>
-<th>Async Generator 状态机</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>执行方式</td>
-<td>串行，等待完整响应</td>
-<td>流式，工具即时执行</td>
-</tr>
-<tr>
-<td>状态管理</td>
-<td>无统一状态</td>
-<td>State 对象承载所有信息</td>
-</tr>
-<tr>
-<td>错误恢复</td>
-<td>手动处理</td>
-<td>6 种内置恢复策略</td>
-</tr>
-<tr>
-<td>内存安全</td>
-<td>可能递归溢出</td>
-<td>状态赋值，无递归风险</td>
-</tr>
-<tr>
-<td>可观测性</td>
-<td>需要额外追踪</td>
-<td>transition 字段记录转换原因</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h3 id="2-3-流式即时执行：StreamingToolExecutor"><a href="#2-3-流式即时执行：StreamingToolExecutor" class="headerlink" title="2.3 流式即时执行：StreamingToolExecutor"></a>2.3 流式即时执行：StreamingToolExecutor</h3><p>Claude Code 的关键创新是 <strong>工具在模型生成过程中就开始执行</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                 Claude Code 流式执行流程                      │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                             │</span><br><span class="line">│  模型流式输出：                                              │</span><br><span class="line">│    &quot;我来帮你分析这个项目...&quot;                                 │</span><br><span class="line">│    &quot;首先读取 README...&quot;                                     │</span><br><span class="line">│    [生成 tool_use 块: Read &#123; path: &quot;README.md&quot; &#125;]           │</span><br><span class="line">│                                                             │</span><br><span class="line">│                    ↓ 立即执行                                │</span><br><span class="line">│                                                             │</span><br><span class="line">│  StreamingToolExecutor:                                     │</span><br><span class="line">│    检测到 tool_use → 立即调用 Read 工具                     │</span><br><span class="line">│    工具结果实时返回                                          │</span><br><span class="line">│                                                             │</span><br><span class="line">│  用户感知：                                                  │</span><br><span class="line">│    实时看到模型思考                                          │</span><br><span class="line">│    实时看到工具执行                                          │</span><br><span class="line">│    无需等待完整响应                                          │</span><br><span class="line">│                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
-<p><strong>对比 LangChain</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">LangChain 流程：</span><br><span class="line">  用户输入 → 等待(模型完整响应) → 解析 → 执行工具 → 等待 → ...</span><br><span class="line">  总延迟 &#x3D; 模型生成时间 + 解析时间 + 工具执行时间</span><br><span class="line"></span><br><span class="line">Claude Code 流程：</span><br><span class="line">  用户输入 → 流式生成(工具即时执行) → 流式输出 → ...</span><br><span class="line">  总延迟 &#x3D; max(模型生成时间, 工具执行时间)</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="三、API-层面：原生特性的充分利用"><a href="#三、API-层面：原生特性的充分利用" class="headerlink" title="三、API 层面：原生特性的充分利用"></a>三、API 层面：原生特性的充分利用</h2><h3 id="3-1-LangChain-的”框架税”"><a href="#3-1-LangChain-的”框架税”" class="headerlink" title="3.1 LangChain 的”框架税”"></a>3.1 LangChain 的”框架税”</h3><p>LangChain 作为通用框架，需要在多种模型 API 之间保持一致性。这意味着：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Anthropic API 特性          → LangChain 抽象层 → 用户代码</span><br><span class="line">                                    ↓</span><br><span class="line">                          被抹平或延迟支持</span><br></pre></td></tr></table></figure>
-<p><strong>Anthropic 独有的 API 特性</strong>：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>特性</th>
-<th>说明</th>
-<th>LangChain 支持情况</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Prompt Caching</strong></td>
-<td>提示词缓存，降本 90%</td>
-<td>2024 年后才支持，使用复杂</td>
-</tr>
-<tr>
-<td><strong>Extended Thinking</strong></td>
-<td>思维链输出，推理透明</td>
-<td>LangChain 无原生支持</td>
-</tr>
-<tr>
-<td><strong>Computer Use</strong></td>
-<td>屏幕操作能力</td>
-<td>LangChain 无原生支持</td>
-</tr>
-<tr>
-<td><strong>原生 tool_use</strong></td>
-<td>结构化工具调用块</td>
-<td>LangChain 用 OutputParser 解析文本</td>
-</tr>
-<tr>
-<td><strong>原生流式 tool_use</strong></td>
-<td>流式传输中工具即时触发</td>
-<td>LangChain 需等待完整响应</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h3 id="3-2-Claude-Code-的原生集成"><a href="#3-2-Claude-Code-的原生集成" class="headerlink" title="3.2 Claude Code 的原生集成"></a>3.2 Claude Code 的原生集成</h3><p>Claude Code 直接使用 Anthropic SDK，充分利用所有原生特性：</p>
-<p><strong>示例：Prompt Caching 的利用</strong></p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Claude Code 的提示词组装（src/constants/prompts.ts）</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 静态可缓存区域（scope: 'global'）</span></span><br><span class="line"><span class="keyword">const</span> systemPrompt = &#123;</span><br><span class="line">  <span class="keyword">type</span>: <span class="string">'text'</span>,</span><br><span class="line">  text: <span class="string">`</span></span><br><span class="line"><span class="string">    ## 角色定义</span></span><br><span class="line"><span class="string">    Claude Code 是一个...</span></span><br><span class="line"><span class="string">    </span></span><br><span class="line"><span class="string">    ## 系统规则</span></span><br><span class="line"><span class="string">    你必须遵守...</span></span><br><span class="line"><span class="string">    </span></span><br><span class="line"><span class="string">    ## 工具说明</span></span><br><span class="line"><span class="string">    以下工具可用...</span></span><br><span class="line"><span class="string">  `</span>,</span><br><span class="line">  cache_control: &#123; <span class="keyword">type</span>: <span class="string">'ephemeral'</span> &#125;  <span class="comment">// 缓存标记</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 动态不可缓存区域（scope: 'ephemeral'）</span></span><br><span class="line"><span class="keyword">const</span> dynamicPrompt = &#123;</span><br><span class="line">  <span class="keyword">type</span>: <span class="string">'text'</span>,</span><br><span class="line">  text: <span class="string">`</span></span><br><span class="line"><span class="string">    ## 当前环境</span></span><br><span class="line"><span class="string">    工作目录: <span class="subst">$&#123;cwd&#125;</span></span></span><br><span class="line"><span class="string">    </span></span><br><span class="line"><span class="string">    ## 用户记忆</span></span><br><span class="line"><span class="string">    <span class="subst">$&#123;claudeMdContent&#125;</span></span></span><br><span class="line"><span class="string">  `</span>,</span><br><span class="line">  cache_control: &#123; <span class="keyword">type</span>: <span class="string">'ephemeral'</span> &#125;  <span class="comment">// 独立缓存</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>缓存效果</strong>：</p>
-<ul>
-<li>第一次调用：完整 token 计费</li>
-<li>后续调用：静态部分缓存命中，降本约 <strong>90%</strong></li>
-</ul>
-<p>LangChain 也支持 Prompt Caching，但需要用户手动配置，且无法像 Claude Code 这样精细划分缓存边界。</p>
-<p><strong>示例：原生 tool_use 块</strong></p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Anthropic API 响应格式</span></span><br><span class="line">&#123;</span><br><span class="line">  content: [</span><br><span class="line">    &#123; <span class="keyword">type</span>: <span class="string">'text'</span>, text: <span class="string">'我来帮你...'</span> &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="keyword">type</span>: <span class="string">'tool_use'</span>,</span><br><span class="line">      id: <span class="string">'toolu_01...'</span>,</span><br><span class="line">      name: <span class="string">'Read'</span>,</span><br><span class="line">      input: &#123; file_path: <span class="string">'/path/to/file'</span> &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Claude Code 直接处理</span></span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">const</span> block of response.content) &#123;</span><br><span class="line">  <span class="keyword">if</span> (block.type === <span class="string">'tool_use'</span>) &#123;</span><br><span class="line">    <span class="comment">// 立即执行，无需解析文本</span></span><br><span class="line">    <span class="keyword">await</span> executeTool(block.name, block.input)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>对比 LangChain</strong>：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LangChain 的工具调用</span></span><br><span class="line">response = llm.invoke(prompt)</span><br><span class="line"></span><br><span class="line"><span class="comment"># OutputParser 解析文本</span></span><br><span class="line">parsed = output_parser.parse(response.content)</span><br><span class="line"><span class="comment"># 解析可能失败，格式不固定</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> parsed[<span class="string">'action'</span>]:</span><br><span class="line">    tool_name = parsed[<span class="string">'action'</span>][<span class="string">'tool'</span>]</span><br><span class="line">    tool_input = parsed[<span class="string">'action'</span>][<span class="string">'input'</span>]</span><br><span class="line">    result = tools[tool_name].run(tool_input)</span><br></pre></td></tr></table></figure>
-<p>LangChain 需要 OutputParser 解析模型输出的文本，这是脆弱的——模型格式不固定时解析会失败。</p>
-<hr>
-<h2 id="四、性能层面：零抽象的流式优先"><a href="#四、性能层面：零抽象的流式优先" class="headerlink" title="四、性能层面：零抽象的流式优先"></a>四、性能层面：零抽象的流式优先</h2><h3 id="4-1-LangChain-的抽象层堆叠"><a href="#4-1-LangChain-的抽象层堆叠" class="headerlink" title="4.1 LangChain 的抽象层堆叠"></a>4.1 LangChain 的抽象层堆叠</h3><p>LangChain 的抽象层结构：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">用户代码</span><br><span class="line">  → Chain</span><br><span class="line">    → AgentExecutor</span><br><span class="line">      → LLM</span><br><span class="line">        → Memory</span><br><span class="line">          → Tools</span><br><span class="line">            → OutputParser</span><br><span class="line">              → 实际 API 调用</span><br></pre></td></tr></table></figure>
-<p>每一层都增加处理开销。对于 Web 应用，这些开销可以忽略；但对于 <strong>CLI 交互工具</strong>，延迟是致命的。</p>
-<h3 id="4-2-Claude-Code-的零抽象设计"><a href="#4-2-Claude-Code-的零抽象设计" class="headerlink" title="4.2 Claude Code 的零抽象设计"></a>4.2 Claude Code 的零抽象设计</h3><p>Claude Code 的结构：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">用户输入</span><br><span class="line">  → query() AsyncGenerator</span><br><span class="line">    → Anthropic SDK（直接调用）</span><br><span class="line">      → 工具执行（流式即时）</span><br></pre></td></tr></table></figure>
-<p><strong>没有中间抽象层</strong>，API 响应直接流式传递给用户。</p>
-<h3 id="4-3-工具编排的性能优化"><a href="#4-3-工具编排的性能优化" class="headerlink" title="4.3 工具编排的性能优化"></a>4.3 工具编排的性能优化</h3><p>Claude Code 的工具编排策略：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">工具调用列表</span><br><span class="line">  │</span><br><span class="line">  ├─ 分类：只读 vs 写入</span><br><span class="line">  │</span><br><span class="line">  ├─ 只读工具 ──→ 并行执行（最多 10 个并发）</span><br><span class="line">  │   ├─ Read      ──→ 同时开始</span><br><span class="line">  │   ├─ Grep      ──→ 同时开始</span><br><span class="line">  │   ├─ Glob      ──→ 同时开始</span><br><span class="line">  │   └─ WebFetch  ──→ 同时开始</span><br><span class="line">  │</span><br><span class="line">  └─ 写入工具 ──→ 串行执行（保证顺序）</span><br><span class="line">      ├─ FileEdit  ──→ 等待上一个完成</span><br><span class="line">      ├─ Write     ──→ 等待上一个完成</span><br><span class="line">      └─ Bash      ──→ 等待上一个完成</span><br></pre></td></tr></table></figure>
-<p><strong>LangChain 的工具执行</strong>：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LangChain Agent 默认串行执行</span></span><br><span class="line"><span class="keyword">for</span> tool_call <span class="keyword">in</span> parsed_tool_calls:</span><br><span class="line">    result = tool.run(tool_call.input)  <span class="comment"># 一个一个执行</span></span><br></pre></td></tr></table></figure>
-<p>LangChain 需要显式配置并行，且配置复杂；Claude Code 自动分析工具性质，智能编排。</p>
-<hr>
-<h2 id="五、可控层面：全栈自研的精准控制"><a href="#五、可控层面：全栈自研的精准控制" class="headerlink" title="五、可控层面：全栈自研的精准控制"></a>五、可控层面：全栈自研的精准控制</h2><h3 id="5-1-框架黑盒问题"><a href="#5-1-框架黑盒问题" class="headerlink" title="5.1 框架黑盒问题"></a>5.1 框架黑盒问题</h3><p>使用 LangChain/LangGraph 时，你无法精准控制：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>场景</th>
-<th>LangChain 行为</th>
-<th>你的控制力</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>工具执行顺序</td>
-<td>默认串行</td>
-<td>需要显式配置</td>
-</tr>
-<tr>
-<td>错误恢复</td>
-<td>抛出异常</td>
-<td>需要自己处理</td>
-</tr>
-<tr>
-<td>Token 溢出</td>
-<td>截断或报错</td>
-<td>需要自己检测</td>
-</tr>
-<tr>
-<td>提示词组装</td>
-<td>模板拼接</td>
-<td>无法精细控制</td>
-</tr>
-<tr>
-<td>流式输出</td>
-<td>部分支持</td>
-<td>需要适配框架</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h3 id="5-2-Claude-Code-的精准控制"><a href="#5-2-Claude-Code-的精准控制" class="headerlink" title="5.2 Claude Code 的精准控制"></a>5.2 Claude Code 的精准控制</h3><p>Claude Code 自研每一层，可以精确控制：</p>
-<p><strong>控制一：工具执行权限</strong></p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Claude Code 的权限系统（src/utils/permissions）</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> PermissionResult = &#123;</span><br><span class="line">  behavior: <span class="string">'allow'</span> | <span class="string">'deny'</span> | <span class="string">'ask'</span></span><br><span class="line">  message?: <span class="built_in">string</span></span><br><span class="line">  suggestions?: <span class="built_in">string</span>[]</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 精细的权限检查</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">checkPermissions</span>(<span class="params">tool, input, context</span>) </span>&#123;</span><br><span class="line">  <span class="comment">// 1. deny 规则最高优先级</span></span><br><span class="line">  <span class="keyword">if</span> (matchesDenyRule(tool.name)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; behavior: <span class="string">'deny'</span>, message: <span class="string">'Blocked by deny rule'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 工具自定义检查</span></span><br><span class="line">  <span class="keyword">if</span> (tool.checkPermissions) &#123;</span><br><span class="line">    <span class="keyword">const</span> result = <span class="keyword">await</span> tool.checkPermissions(input, context)</span><br><span class="line">    <span class="keyword">if</span> (result.behavior !== <span class="string">'passthrough'</span>) &#123;</span><br><span class="line">      <span class="keyword">return</span> result</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. allow 规则</span></span><br><span class="line">  <span class="keyword">if</span> (matchesAllowRule(tool.name, input)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 默认询问用户</span></span><br><span class="line">  <span class="keyword">return</span> &#123; behavior: <span class="string">'ask'</span>, message: <span class="string">'Do you want to allow?'</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>控制二：自动压缩策略</strong></p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Claude Code 的四级压缩（src/query）</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Level 1: Snip — 删除旧消息中的冗余 token</span></span><br><span class="line">messages = snipMessages(messages)</span><br><span class="line"></span><br><span class="line"><span class="comment">// Level 2: Micro — 修改已缓存消息的内容</span></span><br><span class="line">messages = microCompact(messages)</span><br><span class="line"></span><br><span class="line"><span class="comment">// Level 3: Collapse — 分阶段摘要历史消息</span></span><br><span class="line">messages = collapseMessages(messages)</span><br><span class="line"></span><br><span class="line"><span class="comment">// Level 4: Auto Compact — 通过 Claude 生成完整摘要</span></span><br><span class="line">messages = <span class="keyword">await</span> autoCompact(messages)</span><br><span class="line"></span><br><span class="line"><span class="comment">// LangChain 的处理方式：</span></span><br><span class="line"><span class="comment">// messages = messages.slice(-max_tokens)  // 简单截断</span></span><br></pre></td></tr></table></figure>
-<p><strong>控制三：钩子扩展系统</strong></p>
-<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// settings.json</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="attr">"hooks"</span>: &#123;</span><br><span class="line">    <span class="attr">"PreToolUse"</span>: [</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="attr">"matcher"</span>: <span class="string">"Bash"</span>,</span><br><span class="line">        <span class="attr">"hooks"</span>: [</span><br><span class="line">          &#123;</span><br><span class="line">            <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">            <span class="attr">"command"</span>: <span class="string">"security-check.sh"</span></span><br><span class="line">          &#125;</span><br><span class="line">        ]</span><br><span class="line">      &#125;</span><br><span class="line">    ],</span><br><span class="line">    <span class="attr">"PostToolUse"</span>: [</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="attr">"matcher"</span>: <span class="string">"FileEdit"</span>,</span><br><span class="line">        <span class="attr">"hooks"</span>: [</span><br><span class="line">          &#123;</span><br><span class="line">            <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">            <span class="attr">"command"</span>: <span class="string">"run-tests.sh"</span></span><br><span class="line">          &#125;</span><br><span class="line">        ]</span><br><span class="line">      &#125;</span><br><span class="line">    ]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>用户可以在工具执行的任意阶段注入自定义逻辑，LangChain 需要继承类或修改源码才能实现类似功能。</p>
-<hr>
-<h2 id="六、能力映射：Claude-Code-用什么替代-LangChain-LangGraph"><a href="#六、能力映射：Claude-Code-用什么替代-LangChain-LangGraph" class="headerlink" title="六、能力映射：Claude Code 用什么替代 LangChain/LangGraph"></a>六、能力映射：Claude Code 用什么替代 LangChain/LangGraph</h2><h3 id="6-1-LangChain-能力-→-Claude-Code-替代方案"><a href="#6-1-LangChain-能力-→-Claude-Code-替代方案" class="headerlink" title="6.1 LangChain 能力 → Claude Code 替代方案"></a>6.1 LangChain 能力 → Claude Code 替代方案</h3><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>LangChain 能力</th>
-<th>Claude Code 替代方案</th>
-<th>实现文件</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>LLM 调用</strong></td>
-<td>Anthropic SDK 直接集成</td>
-<td><code>src/query.ts</code></td>
-</tr>
-<tr>
-<td><strong>工具定义</strong></td>
-<td><code>Tool</code> 类型 + <code>buildTool()</code></td>
-<td><code>src/Tool.ts</code></td>
-</tr>
-<tr>
-<td><strong>工具注册</strong></td>
-<td>三阶段流水线注册</td>
-<td><code>src/tools.ts</code></td>
-</tr>
-<tr>
-<td><strong>Agent 循环</strong></td>
-<td><code>while(true)</code> 状态机</td>
-<td><code>src/query.ts</code></td>
-</tr>
-<tr>
-<td><strong>Memory</strong></td>
-<td>Channel 系统 + 文件记忆</td>
-<td><code>src/state/</code>, <code>src/memdir/</code></td>
-</tr>
-<tr>
-<td><strong>RAG</strong></td>
-<td>文件工具 + 向量工具（可选 MCP）</td>
-<td><code>src/tools/</code></td>
-</tr>
-<tr>
-<td><strong>OutputParser</strong></td>
-<td>原生 <code>tool_use</code> 块解析</td>
-<td>无需解析</td>
-</tr>
-<tr>
-<td><strong>Callbacks</strong></td>
-<td>钩子系统</td>
-<td><code>src/hooks/</code></td>
-</tr>
-</tbody>
-</table>
-</div>
-<h3 id="6-2-LangGraph-能力-→-Claude-Code-替代方案"><a href="#6-2-LangGraph-能力-→-Claude-Code-替代方案" class="headerlink" title="6.2 LangGraph 能力 → Claude Code 替代方案"></a>6.2 LangGraph 能力 → Claude Code 替代方案</h3><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>LangGraph 能力</th>
-<th>Claude Code 替代方案</th>
-<th>实现文件</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>StateGraph</strong></td>
-<td><code>State</code> 对象 + 状态赋值</td>
-<td><code>src/query.ts</code></td>
-</tr>
-<tr>
-<td><strong>节点定义</strong></td>
-<td><code>while</code> 循环的阶段划分</td>
-<td><code>src/query.ts:307-1728</code></td>
-</tr>
-<tr>
-<td><strong>边流转</strong></td>
-<td><code>transition</code> + <code>continue</code></td>
-<td><code>src/query/transitions.ts</code></td>
-</tr>
-<tr>
-<td><strong>条件分支</strong></td>
-<td><code>if/switch</code> + <code>state.transition</code></td>
-<td><code>src/query.ts</code></td>
-</tr>
-<tr>
-<td><strong>Checkpoint</strong></td>
-<td>消息历史 + 文件系统</td>
-<td><code>src/assistant/</code></td>
-</tr>
-<tr>
-<td><strong>多 Agent</strong></td>
-<td><code>AgentTool</code> + 子代理系统</td>
-<td><code>src/tools/AgentTool/</code></td>
-</tr>
-<tr>
-<td><strong>可视化调试</strong></td>
-<td><code>transition</code> 字段追踪</td>
-<td>可观测性设计</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h3 id="6-3-核心代码映射"><a href="#6-3-核心代码映射" class="headerlink" title="6.3 核心代码映射"></a>6.3 核心代码映射</h3><p><strong>LangChain Agent → Claude Code query()</strong></p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LangChain</span></span><br><span class="line">agent = AgentExecutor.from_agent_and_tools(agent, tools)</span><br><span class="line">result = agent.invoke(&#123;<span class="string">"input"</span>: <span class="string">"do something"</span>&#125;)</span><br></pre></td></tr></table></figure>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Claude Code</span></span><br><span class="line"><span class="keyword">for</span> <span class="keyword">await</span> (<span class="keyword">const</span> update of query(&#123; messages, tools, systemPrompt &#125;)) &#123;</span><br><span class="line">  <span class="built_in">console</span>.log(update)  <span class="comment">// 实时输出</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>LangGraph StateGraph → Claude Code while 循环</strong></p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># LangGraph</span></span><br><span class="line">graph = StateGraph(AgentState)</span><br><span class="line">graph.add_node(<span class="string">"agent"</span>, agent_node)</span><br><span class="line">graph.add_node(<span class="string">"tool"</span>, tool_node)</span><br><span class="line">graph.add_conditional_edges(<span class="string">"agent"</span>, should_continue, </span><br><span class="line">    &#123;<span class="string">"continue"</span>: <span class="string">"tool"</span>, <span class="string">"end"</span>: END&#125;)</span><br><span class="line">app = graph.compile()</span><br></pre></td></tr></table></figure>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Claude Code（src/query.ts）</span></span><br><span class="line"><span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">  <span class="comment">// 阶段 2: 流式 API 调用</span></span><br><span class="line">  <span class="keyword">const</span> response = <span class="keyword">await</span> callModel(state)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 阶段 3: 决策点（条件分支）</span></span><br><span class="line">  <span class="keyword">if</span> (hasToolUse(response)) &#123;</span><br><span class="line">    <span class="comment">// 阶段 4: 工具执行</span></span><br><span class="line">    <span class="keyword">const</span> results = <span class="keyword">await</span> executeTools(response.tool_use_blocks)</span><br><span class="line">    state = &#123; ...state, messages: [...messages, results] &#125;</span><br><span class="line">    <span class="keyword">continue</span>  <span class="comment">// 继续循环</span></span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="comment">// 结束</span></span><br><span class="line">    <span class="keyword">yield</span> finalResult</span><br><span class="line">    <span class="keyword">return</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="七、什么时候该用-LangChain-LangGraph"><a href="#七、什么时候该用-LangChain-LangGraph" class="headerlink" title="七、什么时候该用 LangChain/LangGraph"></a>七、什么时候该用 LangChain/LangGraph</h2><p>Claude Code 的自研架构不是所有人的最优解。它们的选择基于：</p>
-<ol>
-<li><strong>顶级工程团队</strong>：有能力自研高性能架构</li>
-<li><strong>单一模型依赖</strong>：只需要支持 Anthropic API</li>
-<li><strong>极致体验追求</strong>：CLI 交互需要零延迟感知</li>
-<li><strong>深度定制需求</strong>：权限、压缩、钩子都需要精准控制</li>
-</ol>
-<p><strong>如果你不具备这些条件，LangChain/LangGraph 仍然是好选择</strong>：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>你的情况</th>
-<th>推荐</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>小团队，快速验证想法</td>
-<td>LangChain</td>
-</tr>
-<tr>
-<td>需要支持多种模型</td>
-<td>LangChain</td>
-</tr>
-<tr>
-<td>需要可视化 Agent 流程</td>
-<td>LangGraph</td>
-</tr>
-<tr>
-<td>需要多 Agent 协作且不想自研</td>
-<td>LangGraph 或 CrewAI</td>
-</tr>
-<tr>
-<td>Web 应用，延迟不敏感</td>
-<td>LangChain/LangGraph</td>
-</tr>
-<tr>
-<td>企业级系统，有专业团队</td>
-<td>LangGraph 或自研</td>
-</tr>
-</tbody>
-</table>
-</div>
-<hr>
-<h2 id="八、总结"><a href="#八、总结" class="headerlink" title="八、总结"></a>八、总结</h2><p>Claude Code 不用 LangChain/LangGraph，不是傲慢，而是<strong>基于产品定位的理性选择</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">LangChain&#x2F;LangGraph 定位：通用框架</span><br><span class="line">  → 易用性优先</span><br><span class="line">  → 支持多种模型</span><br><span class="line">  → 抽象层统一</span><br><span class="line">  → 适合快速原型和通用应用</span><br><span class="line"></span><br><span class="line">Claude Code 定位：专用系统</span><br><span class="line">  → 性能优先</span><br><span class="line">  → 单一模型极致利用</span><br><span class="line">  → 零抽象流式处理</span><br><span class="line">  → 适合 CLI 交互和专业场景</span><br></pre></td></tr></table></figure>
-<p><strong>Claude Code 用什么替代了 LangChain/LangGraph</strong>：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>替代</th>
-<th>技术</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>ReAct 循环</td>
-<td>Async Generator 状态机</td>
-</tr>
-<tr>
-<td>工具定义</td>
-<td>Tool 类型 + buildTool()</td>
-</tr>
-<tr>
-<td>工具执行管道</td>
-<td>七步执行管道</td>
-</tr>
-<tr>
-<td>状态管理</td>
-<td>State 对象 + 状态赋值</td>
-</tr>
-<tr>
-<td>错误恢复</td>
-<td>6 种内置恢复策略</td>
-</tr>
-<tr>
-<td>扩展机制</td>
-<td>钩子系统 + MCP 协议</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p><strong>核心启示</strong>：框架不是必须的，适合自己的才是最好的。LangChain/LangGraph 解决了”怎么快速搭建 Agent”的问题；Claude Code 解决了”怎么搭建极致体验的 Agent”的问题。</p>
-<hr>
-<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
-<li><a href="/claude-code-architecture-overview/">Claude Code 源码揭秘：整体架构概览</a></li>
-<li><a href="/claude-code-async-generator-state-machine/">打破 ReAct 迷思：Async Generator 状态机</a></li>
-<li><a href="/claude-code-tool-system/">工具系统设计：从定义到执行的七步管道</a></li>
-<li><a href="https://docs.anthropic.com/" target="_blank" rel="noopener">Anthropic API 文档</a></li>
-<li><a href="https://python.langchain.com/docs/" target="_blank" rel="noopener">LangChain 官方文档</a></li>
-<li><a href="https://langchain-ai.github.io/langgraph/" target="_blank" rel="noopener">LangGraph 官方文档</a></li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/15/claude-code-why-no-langchain/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -2496,97 +963,6 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-computer-use/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/04/06/claude-code-computer-use/" class="post-title-link" itemprop="url">Computer Use：桌面控制的九层安全关卡</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:39" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
-                </span>
-            </span>
-
-          
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2026/04/06/claude-code-computer-use/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-computer-use/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>Computer Use 是 Claude Code 最具争议也最强大的能力——AI 可以直接操控你的桌面，点击按钮、输入文字、截图分析。这听起来像科幻电影，但 Claude Code 实现了一个九层安全关卡系统，确保每一步操作都在可控范围内。更关键的是，它通过 Python Bridge 实现跨语言通信，让 TypeScript 代理驱动 Python 执行器。</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2026/04/06/claude-code-computer-use/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-async-generator-state-machine/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -2655,6 +1031,97 @@
           <!--noindex-->
             <div class="post-button">
               <a class="btn" href="/2026/04/06/claude-code-async-generator-state-machine/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/claude-code-computer-use/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/04/06/claude-code-computer-use/" class="post-title-link" itemprop="url">Computer Use：桌面控制的九层安全关卡</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-04-06 00:00:00 / 修改时间：14:28:39" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/claude-code-computer-use/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/claude-code-computer-use/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>Computer Use 是 Claude Code 最具争议也最强大的能力——AI 可以直接操控你的桌面，点击按钮、输入文字、截图分析。这听起来像科幻电影，但 Claude Code 实现了一个九层安全关卡系统，确保每一步操作都在可控范围内。更关键的是，它通过 Python Bridge 实现跨语言通信，让 TypeScript 代理驱动 Python 执行器。</p>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/06/claude-code-computer-use/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
