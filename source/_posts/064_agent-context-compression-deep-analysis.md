@@ -194,7 +194,7 @@ Agent 在处理文件时，经常多次读取同一个文件。如果不做处�
   → 压缩为：[文件 src/auth.ts 内容已在第 3 轮展示，此处省略]
 ```
 
-这看起来简单，但在实际工程中非常有效。据 Claude Code 的实现（参考本博客之前的文章 [Context 管理：四级压缩与无限对话的秘密](/claude-code-context-compression/)），仅去重这一步就能节省大量 token。
+这看起来简单，但在实际工程中非常有效。据 Claude Code 的实现（参考本博客之前的文章 [Context 管理：四级压缩与无限对话的秘密](/2026/04/06/080_claude-code-context-compression/)），仅去重这一步就能节省大量 token。
 
 ### 3.4 状态提取：把"隐性知识"变成"显性清单"
 
@@ -481,6 +481,6 @@ PostgreSQL 的连接池默认最大连接数为 100，建议在高并发场景�
 ---
 
 **系列文章导航：**
-- [Context 管理：四级压缩与无限对话的秘密](/claude-code-context-compression/) — Claude Code 的具体压缩实现
+- [Context 管理：四级压缩与无限对话的秘密](/2026/04/06/080_claude-code-context-compression/) — Claude Code 的具体压缩实现
 - [Agent 记忆系统设计规范](/agent-memory-what-to-store/) — 冻结区（外部记忆）的设计详解
 - [Multi-Agent 系统设计原理](/multi-agent-system-design/) — 多 Agent 协作下的上下文管理

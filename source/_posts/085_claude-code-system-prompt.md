@@ -421,5 +421,5 @@ Claude Code 的 System Prompt 工程体现了几个核心设计原则：
 ---
 
 **系列文章导航：**
-- 上一篇：[Context 管理：四级压缩与无限对话的秘密](/claude-code-context-compression/)
-- 下一篇：[Skills 系统：条件激活与动态发现](/claude-code-skills-system/)
+- 上一篇：[Context 管理：四级压缩与无限对话的秘密](/2026/04/06/080_claude-code-context-compression/)
+- 下一篇：[Skills 系统：条件激活与动态发现](/2026/04/06/084_claude-code-skills-system/)

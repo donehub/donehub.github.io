@@ -493,5 +493,5 @@ Claude Code 的 Skills 系统体现了几个核心设计原则：
 ---
 
 **系列文章导航：**
-- 上一篇：[System Prompt 工程：动态组装与缓存优化](/claude-code-system-prompt/)
-- 下一篇：[权限与安全：分层模型与人机协作](/claude-code-permission-security/)
+- 上一篇：[System Prompt 工程：动态组装与缓存优化](/2026/04/06/085_claude-code-system-prompt/)
+- 下一篇：[权限与安全：分层模型与人机协作](/2026/04/06/083_claude-code-permission-security/)

@@ -491,5 +491,5 @@ Claude Code 的四级压缩系统是其"无限对话"承诺的技术基础：
 ---
 
 **系列文章导航：**
-- 上一篇：[多 Agent 编排：四种代理类型与协作机制](/claude-code-multi-agent/)
-- 下一篇：[System Prompt 工程：动态组装与缓存优化](/claude-code-system-prompt/)
+- 上一篇：[多 Agent 编排：四种代理类型与协作机制](/2026/04/06/082_claude-code-multi-agent/)
+- 下一篇：[System Prompt 工程：动态组装与缓存优化](/2026/04/06/085_claude-code-system-prompt/)

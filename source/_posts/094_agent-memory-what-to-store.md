@@ -300,5 +300,5 @@ Claude Code 记忆系统的核心设计可以概括为一句话：**少而精**�
 ---
 
 **相关文章**：
-- [Memory 系统：跨会话持久化知识库](/claude-code-memory-system/) — Claude Code 记忆系统的技术实现细节
+- [Memory 系统：跨会话持久化知识库](/2026/04/06/081_claude-code-memory-system/) — Claude Code 记忆系统的技术实现细节
 - [Claude Code 源码深度解析系列](/categories/Claude-Code/) — 更多 Claude Code 架构分析

@@ -347,5 +347,5 @@ Claude Code 的 Async Generator 状态机设计解决了 ReAct 模式的根本�
 ---
 
 **系列文章导航：**
-- 上一篇：[Claude Code 为什么不用 LangChain：自研架构的技术考量](/claude-code-why-no-langchain/)
-- 下一篇：[工具系统设计：从定义到执行的七步管道](/claude-code-tool-system/)
+- 上一篇：[Claude Code 为什么不用 LangChain：自研架构的技术考量](/2026/04/07/090_claude-code-why-no-langchain/)
+- 下一篇：[工具系统设计：从定义到执行的七步管道](/2026/04/06/087_claude-code-tool-system/)

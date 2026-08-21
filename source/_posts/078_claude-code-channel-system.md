@@ -433,5 +433,5 @@ Channel 系统体现了几个核心设计原则：
 ---
 
 **系列文章导航：**
-- 上一篇：[Memory 系统：跨会话持久化知识库](/claude-code-memory-system/)
-- 下一篇：[Computer Use：桌面控制的九层安全关卡](/claude-code-computer-use/)
+- 上一篇：[Memory 系统：跨会话持久化知识库](/2026/04/06/081_claude-code-memory-system/)
+- 下一篇：[Computer Use：桌面控制的九层安全关卡](/2026/04/06/079_claude-code-computer-use/)

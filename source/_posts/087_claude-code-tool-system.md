@@ -673,5 +673,5 @@ Claude Code 的工具系统设计体现了几个核心原则：
 ---
 
 **系列文章导航：**
-- 上一篇：[打破 ReAct 迷思：Async Generator 状态机](/claude-code-async-generator-state-machine/)
-- 下一篇：[多 Agent 编排：四种代理类型与协作机制](/claude-code-multi-agent/)
+- 上一篇：[打破 ReAct 迷思：Async Generator 状态机](/2026/04/06/077_claude-code-async-generator-state-machine/)
+- 下一篇：[多 Agent 编排：四种代理类型与协作机制](/2026/04/06/082_claude-code-multi-agent/)

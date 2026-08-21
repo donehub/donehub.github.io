@@ -438,5 +438,5 @@ Claude Code 的 Memory 系统体现了几个核心设计原则：
 ---
 
 **系列文章导航：**
-- 上一篇：[权限与安全：分层模型与人机协作](/claude-code-permission-security/)
-- 下一篇：[Channel 系统：IM 远程控制 Agent](/claude-code-channel-system/)
+- 上一篇：[权限与安全：分层模型与人机协作](/2026/04/06/083_claude-code-permission-security/)
+- 下一篇：[Channel 系统：IM 远程控制 Agent](/2026/04/06/078_claude-code-channel-system/)

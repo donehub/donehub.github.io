@@ -232,9 +232,9 @@ Claude Code 不用 LangChain 的核心原因，可以归结为产品形态和框
 
 ## 参考资料
 
-- [Claude Code 源码揭秘：整体架构概览](/claude-code-architecture-overview/)
-- [打破 ReAct 迷思：Async Generator 状态机](/claude-code-async-generator-state-machine/)
-- [工具系统设计：从定义到执行的七步管道](/claude-code-tool-system/)
+- [Claude Code 源码揭秘：整体架构概览](/2026/04/07/089_claude-code-architecture-overview/)
+- [打破 ReAct 迷思：Async Generator 状态机](/2026/04/06/077_claude-code-async-generator-state-machine/)
+- [工具系统设计：从定义到执行的七步管道](/2026/04/06/087_claude-code-tool-system/)
 - [Anthropic API 文档](https://docs.anthropic.com/)
 - [LangChain 官方文档](https://python.langchain.com/docs/)
 - [LangGraph 官方文档](https://langchain-ai.github.io/langgraph/)
@@ -242,5 +242,5 @@ Claude Code 不用 LangChain 的核心原因，可以归结为产品形态和框
 ---
 
 **系列文章导航：**
-- 上一篇：[Claude Code 整体架构概览](/claude-code-architecture-overview/)
-- 下一篇：[打破 ReAct 迷思：Async Generator 状态机](/claude-code-async-generator-state-machine/)
+- 上一篇：[Claude Code 整体架构概览](/2026/04/07/089_claude-code-architecture-overview/)
+- 下一篇：[打破 ReAct 迷思：Async Generator 状态机](/2026/04/06/077_claude-code-async-generator-state-machine/)

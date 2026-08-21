@@ -575,5 +575,5 @@ Claude Code 的多 Agent 系统设计体现了几个核心原则：
 ---
 
 **系列文章导航：**
-- 上一篇：[工具系统设计：从定义到执行的七步管道](/claude-code-tool-system/)
-- 下一篇：[Context 管理：四级压缩与无限对话的秘密](/claude-code-context-compression/)
+- 上一篇：[工具系统设计：从定义到执行的七步管道](/2026/04/06/087_claude-code-tool-system/)
+- 下一篇：[Context 管理：四级压缩与无限对话的秘密](/2026/04/06/080_claude-code-context-compression/)

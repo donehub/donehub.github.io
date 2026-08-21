@@ -708,5 +708,5 @@ Claude Code 的 Terminal UI 系统体现了几个核心设计原则：
 ---
 
 **系列文章导航：**
-- 上一篇：[Computer Use：桌面控制的九层安全关卡](/claude-code-computer-use/)
+- 上一篇：[Computer Use：桌面控制的九层安全关卡](/2026/04/06/079_claude-code-computer-use/)
 - 系列完结

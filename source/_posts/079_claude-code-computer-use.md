@@ -625,5 +625,5 @@ Claude Code 的 Computer Use 系统体现了几个核心设计原则：
 ---
 
 **系列文章导航：**
-- 上一篇：[Channel 系统：IM 远程控制 Agent](/claude-code-channel-system/)
-- 下一篇：[Terminal UI：React + Ink 的 TUI 实现](/claude-code-terminal-ui/)
+- 上一篇：[Channel 系统：IM 远程控制 Agent](/2026/04/06/078_claude-code-channel-system/)
+- 下一篇：[Terminal UI：React + Ink 的 TUI 实现](/2026/04/06/086_claude-code-terminal-ui/)

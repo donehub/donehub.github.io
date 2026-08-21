@@ -280,4 +280,4 @@ Claude Code 的 AsyncGenerator 模式在这些问题上做了不同的取舍：�
 ---
 
 **系列文章导航：**
-- 下一篇：[Claude Code 为什么不用 LangChain：自研架构的技术考量](/claude-code-why-no-langchain/)
+- 下一篇：[Claude Code 为什么不用 LangChain：自研架构的技术考量](/2026/04/07/090_claude-code-why-no-langchain/)

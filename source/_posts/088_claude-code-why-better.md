@@ -504,4 +504,4 @@ Claude Code 比其他 Code Agent 更强，不是因为"Prompt 更好"，而是�
 ---
 
 **系列文章导航：**
-- 系列起点：[Claude Code 源码揭秘：整体架构概览](/claude-code-architecture-overview/)
+- 系列起点：[Claude Code 源码揭秘：整体架构概览](/2026/04/07/089_claude-code-architecture-overview/)

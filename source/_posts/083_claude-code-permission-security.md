@@ -564,5 +564,5 @@ Claude Code 的权限系统体现了几个核心设计原则：
 ---
 
 **系列文章导航：**
-- 上一篇：[Skills 系统：条件激活与动态发现](/claude-code-skills-system/)
-- 下一篇：[Memory 系统：跨会话持久化知识库](/claude-code-memory-system/)
+- 上一篇：[Skills 系统：条件激活与动态发现](/2026/04/06/084_claude-code-skills-system/)
+- 下一篇：[Memory 系统：跨会话持久化知识库](/2026/04/06/081_claude-code-memory-system/)
