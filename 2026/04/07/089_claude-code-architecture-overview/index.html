@@ -23,15 +23,15 @@
     var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
   </script>
 
-  <meta name="description" content="2026年3月31日，Anthropic 的 Claude Code 源码意外泄露。这个全球最流行的 AI 编程助手，其背后的架构设计远超外界想象——它不是简单的 Prompt 包装，而是一个精心设计的流式状态机系统。本文将从整体架构视角，为你揭开 Claude Code 的神秘面纱。">
+  <meta name="description" content="2026 年 3 月 31 日，Anthropic 的 Claude Code 源码意外泄露。作为目前使用最广泛的 AI 编程助手之一，它的源码首次让社区有机会看到这类产品的内部实现。读完源码后，我发现它的架构设计和多数人的直觉判断有明显出入——大多数开发者最初认为它只是一个套壳 API 调用的 CLI 工具，实际代码量和工程复杂度远超这个定位。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Claude Code 源码揭秘：整体架构概览">
+<meta property="og:title" content="Claude Code 整体架构概览">
 <meta property="og:url" content="https://donehub.github.io/2026/04/07/089_claude-code-architecture-overview/index.html">
 <meta property="og:site_name" content="DoneHub">
-<meta property="og:description" content="2026年3月31日，Anthropic 的 Claude Code 源码意外泄露。这个全球最流行的 AI 编程助手，其背后的架构设计远超外界想象——它不是简单的 Prompt 包装，而是一个精心设计的流式状态机系统。本文将从整体架构视角，为你揭开 Claude Code 的神秘面纱。">
+<meta property="og:description" content="2026 年 3 月 31 日，Anthropic 的 Claude Code 源码意外泄露。作为目前使用最广泛的 AI 编程助手之一，它的源码首次让社区有机会看到这类产品的内部实现。读完源码后，我发现它的架构设计和多数人的直觉判断有明显出入——大多数开发者最初认为它只是一个套壳 API 调用的 CLI 工具，实际代码量和工程复杂度远超这个定位。">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2026-04-06T16:00:00.000Z">
-<meta property="article:modified_time" content="2026-04-13T15:36:45.228Z">
+<meta property="article:modified_time" content="2026-08-21T17:02:31.146Z">
 <meta property="article:author" content="Zou Rongsheng">
 <meta property="article:tag" content="Architecture">
 <meta name="twitter:card" content="summary">
@@ -49,7 +49,7 @@
   };
 </script>
 
-  <title>Claude Code 源码揭秘：整体架构概览 | DoneHub</title>
+  <title>Claude Code 整体架构概览 | DoneHub</title>
   
 
 
@@ -213,7 +213,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          Claude Code 源码揭秘：整体架构概览
+          Claude Code 整体架构概览
         </h1>
 
         <div class="post-meta">
@@ -230,7 +230,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-04-13 23:36:45" itemprop="dateModified" datetime="2026-04-13T23:36:45+08:00">2026-04-13</time>
+                <time title="修改时间：2026-08-22 01:02:31" itemprop="dateModified" datetime="2026-08-22T01:02:31+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -274,24 +274,9 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <blockquote>
-<p>2026年3月31日，Anthropic 的 Claude Code 源码意外泄露。这个全球最流行的 AI 编程助手，其背后的架构设计远超外界想象——它不是简单的 Prompt 包装，而是一个精心设计的流式状态机系统。本文将从整体架构视角，为你揭开 Claude Code 的神秘面纱。</p>
-</blockquote>
+        <p>2026 年 3 月 31 日，Anthropic 的 Claude Code 源码意外泄露。作为目前使用最广泛的 AI 编程助手之一，它的源码首次让社区有机会看到这类产品的内部实现。读完源码后，我发现它的架构设计和多数人的直觉判断有明显出入——大多数开发者最初认为它只是一个套壳 API 调用的 CLI 工具，实际代码量和工程复杂度远超这个定位。</p>
 <a id="more"></a>
-<h2 id="导读：一个根本性的问题"><a href="#导读：一个根本性的问题" class="headerlink" title="导读：一个根本性的问题"></a>导读：一个根本性的问题</h2><p>在深入源码之前，我们需要回答一个根本性的问题：<strong>Claude Code 到底是什么？</strong></p>
-<p>很多人的第一反应是：”不就是一个调用 Claude API 的 CLI 工具吗？加了一些 Prompt，让模型能读写文件、执行命令。”</p>
-<p>这种理解大大低估了 Claude Code 的复杂度。当你打开源码，会发现：</p>
-<ul>
-<li><strong>1356 个 TypeScript 文件</strong></li>
-<li><strong>48+ 个内置工具</strong>，每个工具都有完整的生命周期管理</li>
-<li><strong>4 种 Agent 类型</strong>，支持复杂的协作编排</li>
-<li><strong>4 级上下文压缩</strong>，实现”无限对话”</li>
-<li><strong>6 种故障恢复策略</strong>，确保用户体验的稳定性</li>
-<li><strong>3 级提示词缓存</strong>，大幅降低成本和延迟</li>
-</ul>
-<p>这不是一个”简单的 Prompt 工具”，而是一个<strong>深度集成的 AI 编程环境</strong>。</p>
-<hr>
-<h2 id="一、技术栈与项目结构"><a href="#一、技术栈与项目结构" class="headerlink" title="一、技术栈与项目结构"></a>一、技术栈与项目结构</h2><h3 id="1-1-核心技术栈"><a href="#1-1-核心技术栈" class="headerlink" title="1.1 核心技术栈"></a>1.1 核心技术栈</h3><p>Claude Code 的技术选型非常精简但高效：</p>
+<h2 id="一、技术栈与项目结构"><a href="#一、技术栈与项目结构" class="headerlink" title="一、技术栈与项目结构"></a>一、技术栈与项目结构</h2><h3 id="1-1-核心技术栈"><a href="#1-1-核心技术栈" class="headerlink" title="1.1 核心技术栈"></a>1.1 核心技术栈</h3><p>Claude Code 的技术选型比较克制，没有引入过多的依赖。运行时选择了 Bun 而非 Node.js，终端 UI 层用 React + Ink 的组合来构建，这意味着整个终端界面实际上是用 React 组件树来渲染的。CLI 参数处理使用 Commander.js，API 层直接对接 Anthropic SDK，协议层面支持 MCP 和 LSP。</p>
 <div class="table-container">
 <table>
 <thead>
@@ -335,58 +320,32 @@
 </tbody>
 </table>
 </div>
-<h3 id="1-2-目录结构概览"><a href="#1-2-目录结构概览" class="headerlink" title="1.2 目录结构概览"></a>1.2 目录结构概览</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">src&#x2F;</span><br><span class="line">├── assistant&#x2F;          # 会话历史管理</span><br><span class="line">├── bootstrap&#x2F;          # 启动初始化、全局状态</span><br><span class="line">├── bridge&#x2F;             # 远程桥接系统（Bridge）</span><br><span class="line">├── buddy&#x2F;              # 交互伴侣（动画、观察者）</span><br><span class="line">├── cli&#x2F;                # CLI 入口、传输层</span><br><span class="line">├── commands&#x2F;           # 60+ 斜杠命令</span><br><span class="line">├── components&#x2F;         # React UI 组件</span><br><span class="line">├── constants&#x2F;          # 系统提示词、常量</span><br><span class="line">├── context&#x2F;            # 上下文管理</span><br><span class="line">├── coordinator&#x2F;        # 协调器模式</span><br><span class="line">├── entrypoints&#x2F;        # 入口文件（CLI、SDK）</span><br><span class="line">├── hooks&#x2F;              # React Hooks</span><br><span class="line">├── ink&#x2F;                # Ink 框架扩展</span><br><span class="line">├── memdir&#x2F;             # 记忆系统</span><br><span class="line">├── migrations&#x2F;         # 数据迁移</span><br><span class="line">├── native-ts&#x2F;          # 原生模块（Yoga 布局等）</span><br><span class="line">├── outputStyles&#x2F;       # 输出样式配置</span><br><span class="line">├── plugins&#x2F;            # 插件系统</span><br><span class="line">├── proactive&#x2F;          # 主动模式</span><br><span class="line">├── query&#x2F;              # 查询循环核心</span><br><span class="line">├── remote&#x2F;             # 远程会话管理</span><br><span class="line">├── schemas&#x2F;            # JSON Schema 定义</span><br><span class="line">├── screens&#x2F;            # 全屏页面</span><br><span class="line">├── server&#x2F;             # 内置服务器</span><br><span class="line">├── services&#x2F;           # 核心服务层</span><br><span class="line">├── skills&#x2F;             # Skills 系统</span><br><span class="line">├── state&#x2F;              # 状态管理</span><br><span class="line">├── tasks&#x2F;              # 后台任务系统</span><br><span class="line">├── tools&#x2F;              # 48+ 内置工具</span><br><span class="line">├── types&#x2F;              # TypeScript 类型定义</span><br><span class="line">├── utils&#x2F;              # 工具函数</span><br><span class="line">├── vendor&#x2F;             # 第三方集成（Computer Use）</span><br><span class="line">├── vim&#x2F;                # Vim 模式</span><br><span class="line">└── voice&#x2F;              # 语音模式</span><br></pre></td></tr></table></figure>
-<p>这个结构体现了<strong>模块化设计</strong>的精髓：每个目录职责清晰，边界明确。</p>
+<p>选择 Bun 而非 Node.js 值得留意。Bun 在启动速度和运行时性能上有明显优势，对于一个需要快速响应的 CLI 工具来说，启动延迟直接影响用户的第一印象。这个选型说明团队对终端体验的响应速度有明确要求。</p>
+<h3 id="1-2-目录结构概览"><a href="#1-2-目录结构概览" class="headerlink" title="1.2 目录结构概览"></a>1.2 目录结构概览</h3><p>整个项目包含 1356 个 TypeScript 文件，源码按功能域划分。以下是主要的目录结构和各自的职责：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">src&#x2F;</span><br><span class="line">├── assistant&#x2F;          # 会话历史管理</span><br><span class="line">├── bootstrap&#x2F;          # 启动初始化、全局状态</span><br><span class="line">├── bridge&#x2F;             # 远程桥接系统（Bridge）</span><br><span class="line">├── buddy&#x2F;              # 交互伴侣（动画、观察者）</span><br><span class="line">├── cli&#x2F;                # CLI 入口、传输层</span><br><span class="line">├── commands&#x2F;           # 60+ 斜杠命令</span><br><span class="line">├── components&#x2F;         # React UI 组件</span><br><span class="line">├── constants&#x2F;          # 系统提示词、常量</span><br><span class="line">├── context&#x2F;            # 上下文管理</span><br><span class="line">├── coordinator&#x2F;        # 协调器模式</span><br><span class="line">├── entrypoints&#x2F;        # 入口文件（CLI、SDK）</span><br><span class="line">├── hooks&#x2F;              # React Hooks</span><br><span class="line">├── ink&#x2F;                # Ink 框架扩展</span><br><span class="line">├── memdir&#x2F;             # 记忆系统</span><br><span class="line">├── migrations&#x2F;         # 数据迁移</span><br><span class="line">├── native-ts&#x2F;          # 原生模块（Yoga 布局等）</span><br><span class="line">├── outputStyles&#x2F;       # 输出样式配置</span><br><span class="line">├── plugins&#x2F;            # 插件系统</span><br><span class="line">├── proactive&#x2F;          # 主动模式</span><br><span class="line">├── query&#x2F;              # 查询循环核心</span><br><span class="line">├── remote&#x2F;             # 远程会话管理</span><br><span class="line">├── schemas&#x2F;            # JSON Schema 定义</span><br><span class="line">├── screens&#x2F;            # 全屏页面</span><br><span class="line">├── server&#x2F;             # 内置服务器</span><br><span class="line">├── services&#x2F;           # 核心服务层</span><br><span class="line">├── skills&#x2F;             # Skills 系统</span><br><span class="line">├── state&#x2F;              # 状态管理</span><br><span class="line">├── tasks&#x2F;              # 后台任务系统</span><br><span class="line">├── tools&#x2F;              # 48+ 内置工具</span><br><span class="line">├── types&#x2F;              # TypeScript 类型定义</span><br><span class="line">├── utils&#x2F;              # 工具函数</span><br><span class="line">├── vendor&#x2F;             # 第三方集成（Computer Use）</span><br><span class="line">├── vim&#x2F;                # Vim 模式</span><br><span class="line">└── voice&#x2F;              # 语音模式</span><br></pre></td></tr></table></figure>
+<p>从目录划分可以看出几个设计倾向：<code>query/</code> 和 <code>tools/</code> 是核心模块，对应 Agent 的主循环和工具执行能力；<code>context/</code>、<code>state/</code>、<code>memdir/</code> 三个目录独立存在，说明上下文管理、状态管理和记忆系统被视为三个不同的关注点，而非混在一起处理；<code>skills/</code>、<code>plugins/</code>、<code>hooks/</code> 各自独立，扩展机制被拆成了多个层次而非一个通用的插件系统。</p>
 <hr>
-<h2 id="二、核心架构设计"><a href="#二、核心架构设计" class="headerlink" title="二、核心架构设计"></a>二、核心架构设计</h2><h3 id="2-1-整体架构图"><a href="#2-1-整体架构图" class="headerlink" title="2.1 整体架构图"></a>2.1 整体架构图</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                      用户输入                                │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">                              ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                   QueryEngine (入口)                         │</span><br><span class="line">│  - 构建系统提示词 (prompts.ts + context.ts + claudemd.ts)   │</span><br><span class="line">│  - 组装工具池 (tools.ts + MCP)                              │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">                              ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│              query() AsyncGenerator 循环                    │</span><br><span class="line">│  ┌──────────────────────────────────────────────────────┐  │</span><br><span class="line">│  │ 阶段1: 消息压缩 (snip → micro → collapse → compact)  │  │</span><br><span class="line">│  │ 阶段2: 流式 API 调用 (callModel + StreamingToolExec) │  │</span><br><span class="line">│  │ 阶段3: 决策点 (继续 or 完成)                          │  │</span><br><span class="line">│  │ 阶段4: 工具编排 (并行只读 + 串行写入)                 │  │</span><br><span class="line">│  │ 阶段5: 状态更新 (state &#x3D; next → continue)            │  │</span><br><span class="line">│  └──────────────────────────────────────────────────────┘  │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">          ┌───────────────────┼───────────────────┐</span><br><span class="line">          ▼                   ▼                   ▼</span><br><span class="line">┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐</span><br><span class="line">│    工具系统      │  │   多 Agent 系统  │  │   扩展生态      │</span><br><span class="line">│  48+ 内置工具    │  │  Subagent       │  │  Skills         │</span><br><span class="line">│  MCP 动态工具    │  │  Fork           │  │  Plugins        │</span><br><span class="line">│  三层过滤机制    │  │  Teammate       │  │  Hooks           │</span><br><span class="line">│  7步执行管道     │  │  Remote         │  │  MCP 协议        │</span><br><span class="line">└─────────────────┘  └─────────────────┘  └─────────────────┘</span><br></pre></td></tr></table></figure>
-<h3 id="2-2-核心设计理念"><a href="#2-2-核心设计理念" class="headerlink" title="2.2 核心设计理念"></a>2.2 核心设计理念</h3><p>Claude Code 的架构体现了三个核心理念：</p>
-<h4 id="理念一：流式优先（Streaming-First）"><a href="#理念一：流式优先（Streaming-First）" class="headerlink" title="理念一：流式优先（Streaming First）"></a>理念一：流式优先（Streaming First）</h4><p>整个架构围绕 <code>AsyncGenerator</code> 设计，一切都是流式的：</p>
-<ul>
-<li>模型响应是流式的</li>
-<li>工具在模型生成过程中就开始执行</li>
-<li>进度实时更新</li>
-<li>压缩策略是渐进式的</li>
-</ul>
-<p>这意味着用户<strong>永远不需要等待</strong>——看到模型在思考、工具在执行、结果在产出。</p>
-<h4 id="理念二：工具驱动（Tool-Driven）"><a href="#理念二：工具驱动（Tool-Driven）" class="headerlink" title="理念二：工具驱动（Tool-Driven）"></a>理念二：工具驱动（Tool-Driven）</h4><p>Claude Code 的哲学是：<strong>Agent 的能力等于其工具的能力</strong>。</p>
-<ul>
-<li>子代理生成？是一个工具（<code>AgentTool</code>）</li>
-<li>团队管理？是一个工具（<code>TeamCreate</code>/<code>SendMessage</code>）</li>
-<li>文件编辑？是一个工具（<code>FileEdit</code>）</li>
-<li>技能执行？是一个工具（<code>SkillTool</code>）</li>
-</ul>
-<p>这意味着<strong>所有能力都通过统一的工具接口暴露</strong>，模型通过自然语言推理来决定使用哪个工具。不需要显式的编排逻辑——模型本身就是编排器。</p>
-<h4 id="理念三：优雅降级（Graceful-Degradation）"><a href="#理念三：优雅降级（Graceful-Degradation）" class="headerlink" title="理念三：优雅降级（Graceful Degradation）"></a>理念三：优雅降级（Graceful Degradation）</h4><p>6 种恢复策略确保 Claude Code <strong>几乎不会因为技术问题中断用户的工作流</strong>：</p>
-<ul>
-<li>Token 超限？自动压缩</li>
-<li>API 超时？自动重试</li>
-<li>模型失败？降级到备用模型</li>
-<li>工具失败？记录错误，继续对话</li>
-</ul>
+<h2 id="二、核心架构设计"><a href="#二、核心架构设计" class="headerlink" title="二、核心架构设计"></a>二、核心架构设计</h2><h3 id="2-1-整体架构图"><a href="#2-1-整体架构图" class="headerlink" title="2.1 整体架构图"></a>2.1 整体架构图</h3><p>Claude Code 的运行流程可以用下面的架构图来概括。用户输入经过 QueryEngine 处理后，进入核心的 query() 循环，这个循环在内部完成消息压缩、流式 API 调用、决策判断、工具编排和状态更新五个阶段。循环的下游连接三个子系统：工具系统、多 Agent 系统和扩展生态。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                      用户输入                                │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">                              ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                   QueryEngine (入口)                         │</span><br><span class="line">│  - 构建系统提示词 (prompts.ts + context.ts + claudemd.ts)   │</span><br><span class="line">│  - 组装工具池 (tools.ts + MCP)                              │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">                              ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│              query() AsyncGenerator 循环                    │</span><br><span class="line">│  ┌──────────────────────────────────────────────────────┐  │</span><br><span class="line">│  │ 阶段1: 消息压缩 (snip → micro → collapse → compact)  │  │</span><br><span class="line">│  │ 阶段2: 流式 API 调用 (callModel + StreamingToolExec) │  │</span><br><span class="line">│  │ 阶段3: 决策点 (继续 or 完成)                          │  │</span><br><span class="line">│  │ 阶段4: 工具编排 (并行只读 + 串行写入)                 │  │</span><br><span class="line">│  │ 阶段5: 状态更新 (state &#x3D; next → continue)            │  │</span><br><span class="line">│  └──────────────────────────────────────────────────────┘  │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">          ┌───────────────────┼───────────────────┐</span><br><span class="line">          ▼                   ▼                   ▼</span><br><span class="line">┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐</span><br><span class="line">│    工具系统      │  │   多 Agent 系统  │  │   扩展生态      │</span><br><span class="line">│  48+ 内置工具    │  │  Subagent       │  │  Skills         │</span><br><span class="line">│  MCP 动态工具    │  │  Fork           │  │  Plugins        │</span><br><span class="line">│  三层过滤机制    │  │  Teammate       │  │  Hooks           │</span><br><span class="line">│  7步执行管道     │  │  Remote         │  │  MCP 协议        │</span><br><span class="line">└─────────────────┘  └─────────────────┘  └─────────────────┘</span><br></pre></td></tr></table></figure>
+<p>这个架构的核心思路是：模型本身只负责推理和决策，所有的执行能力、状态管理、错误恢复都由外部的循环机制来承担。模型是”大脑”，query 循环是”身体”——大脑决定做什么，身体负责怎么做以及出了问题怎么兜底。</p>
+<h3 id="2-2-三个核心设计理念"><a href="#2-2-三个核心设计理念" class="headerlink" title="2.2 三个核心设计理念"></a>2.2 三个核心设计理念</h3><p>通读源码后，能感受到整个架构围绕三个理念来组织。</p>
+<p><strong>流式优先。</strong> 整个架构基于 <code>AsyncGenerator</code> 构建，模型响应是流式的，工具在模型生成过程中就可以开始执行，进度实时更新，压缩策略也是渐进式的。用户在使用过程中的感受是：模型在思考的同时工具已经开始运行，不需要等一个完整的响应结束后才有下一步动作。这和使用传统的 request-response 模式有本质区别。</p>
+<p><strong>工具驱动。</strong> Claude Code 的哲学是把所有能力都统一为工具。子代理生成是一个工具（<code>AgentTool</code>），团队管理是工具（<code>TeamCreate</code>/<code>SendMessage</code>），文件编辑是工具（<code>FileEdit</code>），技能执行也是工具（<code>SkillTool</code>）。这意味着不需要显式的编排逻辑来协调这些能力——模型通过自然语言推理来决定调用哪个工具，模型本身就是编排器。这种设计的好处是新增能力只需要实现一个工具接口，不需要修改任何编排代码。</p>
+<p><strong>优雅降级。</strong> 生产环境中的 AI 工具会面对各种异常情况：Token 超限、API 超时、模型返回异常、工具执行失败。Claude Code 内置了 6 种恢复策略来应对这些情况——Token 超限自动触发压缩，API 超时自动重试，模型失败降级到备用模型，工具失败则记录错误并继续对话。这套机制保证了大部分技术异常不会直接中断用户的工作流，而是被静默处理或降级执行。</p>
 <hr>
-<h2 id="三、核心模块解析"><a href="#三、核心模块解析" class="headerlink" title="三、核心模块解析"></a>三、核心模块解析</h2><h3 id="3-1-query-ts-Agent-的心脏"><a href="#3-1-query-ts-Agent-的心脏" class="headerlink" title="3.1 query.ts - Agent 的心脏"></a>3.1 query.ts - Agent 的心脏</h3><p><code>src/query.ts</code> 是整个 Agent 的核心，约 1730 行。它不是简单的”想-做-看”循环，而是一个<strong>流式状态机</strong>：</p>
+<h2 id="三、核心模块解析"><a href="#三、核心模块解析" class="headerlink" title="三、核心模块解析"></a>三、核心模块解析</h2><h3 id="3-1-query-ts-—-Agent-的主循环"><a href="#3-1-query-ts-—-Agent-的主循环" class="headerlink" title="3.1 query.ts — Agent 的主循环"></a>3.1 query.ts — Agent 的主循环</h3><p><code>src/query.ts</code> 是整个 Agent 的核心文件，约 1730 行。它实现的是一个流式状态机，而不是简单的”想-做-看”循环：</p>
 <figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">async</span> <span class="function"><span class="keyword">function</span>* <span class="title">query</span>(<span class="params">params: QueryParams</span>): <span class="title">AsyncGenerator</span>&lt;...&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">let</span> state: State = &#123;</span><br><span class="line">    messages,</span><br><span class="line">    toolUseContext,</span><br><span class="line">    autoCompactTracking,</span><br><span class="line">    maxOutputTokensRecoveryCount,</span><br><span class="line">    hasAttemptedReactiveCompact,</span><br><span class="line">    maxOutputTokensOverride,</span><br><span class="line">    pendingToolUseSummary,</span><br><span class="line">    stopHookActive,</span><br><span class="line">    turnCount,</span><br><span class="line">    transition,</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">    <span class="comment">// 阶段1: 消息压缩</span></span><br><span class="line">    <span class="comment">// 阶段2: 流式 API 调用</span></span><br><span class="line">    <span class="comment">// 阶段3: 决策点</span></span><br><span class="line">    <span class="comment">// 阶段4: 工具执行</span></span><br><span class="line">    <span class="comment">// 阶段5: 状态更新</span></span><br><span class="line">    state = next  <span class="comment">// 通过赋值而非递归驱动循环</span></span><br><span class="line">    <span class="keyword">continue</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>关键设计</strong>：通过 <code>state = next</code> 赋值驱动循环，而非递归调用。这保证了：</p>
-<ul>
-<li><strong>内存稳定</strong>：不会因为深度递归导致栈溢出</li>
-<li><strong>状态可追溯</strong>：每一轮的状态转换原因都被记录</li>
-<li><strong>恢复可控</strong>：任何阶段的错误都可以通过修改 state 来恢复</li>
-</ul>
-<h3 id="3-2-Tool-ts-工具的定义"><a href="#3-2-Tool-ts-工具的定义" class="headerlink" title="3.2 Tool.ts - 工具的定义"></a>3.2 Tool.ts - 工具的定义</h3><p><code>src/Tool.ts</code> 定义了工具的完整接口（约 792 行）：</p>
+<p>这个循环的一个关键设计是：通过 <code>state = next</code> 赋值来驱动状态转换，而不是递归调用。递归调用会在深层嵌套时导致栈溢出风险，而赋值驱动循环的方式让内存使用保持稳定。同时，每一轮的状态转换原因都会被记录到 state 对象中，这使得问题排查时能够回溯整个执行路径。任何阶段出现错误，也可以通过修改 state 来触发恢复策略，不需要额外的异常处理框架。</p>
+<h3 id="3-2-Tool-ts-—-工具的类型定义"><a href="#3-2-Tool-ts-—-工具的类型定义" class="headerlink" title="3.2 Tool.ts — 工具的类型定义"></a>3.2 Tool.ts — 工具的类型定义</h3><p><code>src/Tool.ts</code> 定义了工具的完整接口，约 792 行。每个工具需要声明自己的身份、能力、生命周期和输出格式：</p>
 <figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> Tool&lt;Input, Output&gt; = &#123;</span><br><span class="line">  <span class="comment">// 身份</span></span><br><span class="line">  name: <span class="built_in">string</span></span><br><span class="line">  aliases?: <span class="built_in">string</span>[]        <span class="comment">// 向后兼容的旧名称</span></span><br><span class="line">  searchHint?: <span class="built_in">string</span>       <span class="comment">// ToolSearch 关键词匹配</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 能力声明</span></span><br><span class="line">  isEnabled(): <span class="built_in">boolean</span></span><br><span class="line">  isConcurrencySafe(input): <span class="built_in">boolean</span>   <span class="comment">// 是否可并行</span></span><br><span class="line">  isReadOnly(input): <span class="built_in">boolean</span>          <span class="comment">// 是否只读</span></span><br><span class="line">  isDestructive(input): <span class="built_in">boolean</span>       <span class="comment">// 是否破坏性</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 生命周期</span></span><br><span class="line">  validateInput(input, context)       <span class="comment">// 输入验证</span></span><br><span class="line">  checkPermissions(input, context)    <span class="comment">// 权限检查</span></span><br><span class="line">  call(input, context, ...)           <span class="comment">// 实际执行</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 输出与渲染</span></span><br><span class="line">  renderToolUseMessage(input)         <span class="comment">// 渲染调用信息</span></span><br><span class="line">  renderToolResultMessage(content)    <span class="comment">// 渲染结果信息</span></span><br><span class="line">  mapToolResultToToolResultBlockParam()  <span class="comment">// 映射为 API 格式</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 智能特性</span></span><br><span class="line">  inputSchema: Zod schema             <span class="comment">// Zod 类型验证</span></span><br><span class="line">  maxResultSizeChars: <span class="built_in">number</span>           <span class="comment">// 结果大小阈值</span></span><br><span class="line">  getToolUseSummary?(input): <span class="built_in">string</span>    <span class="comment">// 工具使用摘要</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这种设计使得每个工具都是<strong>自描述、自验证、自渲染</strong>的——框架不需要了解工具的内部逻辑，只需调用标准接口。</p>
-<h3 id="3-3-系统提示词组装"><a href="#3-3-系统提示词组装" class="headerlink" title="3.3 系统提示词组装"></a>3.3 系统提示词组装</h3><p><code>src/constants/prompts.ts</code>（约 577 行）实现了<strong>分层管道</strong>动态组装系统提示词：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    静态可缓存区域                              │</span><br><span class="line">│  ┌───────────────────────────────────────────────────────┐  │</span><br><span class="line">│  │ 角色定义  │  系统规则  │  任务指导  │  工具说明  │  风格  │  │</span><br><span class="line">│  └───────────────────────────────────────────────────────┘  │</span><br><span class="line">├─────────────────────── 缓存边界 ────────────────────────────┤</span><br><span class="line">│                    动态可变区域                                │</span><br><span class="line">│  ┌───────────────────────────────────────────────────────┐  │</span><br><span class="line">│  │ 会话指引 │ 记忆系统 │ 环境信息 │ MCP 指令 │ Token 预算 │  │</span><br><span class="line">│  └───────────────────────────────────────────────────────┘  │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
-<p><strong>缓存边界</strong>是一个关键设计：</p>
-<ul>
-<li><strong>边界之上</strong>：跨用户、跨组织通用的内容，使用 <code>scope: &#39;global&#39;</code> 缓存</li>
-<li><strong>边界之下</strong>：用户/会话特定的内容，使用 <code>scope: &#39;ephemeral&#39;</code> 缓存</li>
-</ul>
+<p>这种接口设计让每个工具成为自描述、自验证、自渲染的独立单元。框架不需要了解工具的内部逻辑，只需调用标准接口。<code>isReadOnly</code> 和 <code>isConcurrencySafe</code> 这两个声明尤其重要——框架根据它们来决定哪些工具可以并行执行，哪些必须串行。这意味着工具作者只需要如实声明自己的能力，并发控制完全由框架处理。</p>
+<h3 id="3-3-系统提示词的组装方式"><a href="#3-3-系统提示词的组装方式" class="headerlink" title="3.3 系统提示词的组装方式"></a>3.3 系统提示词的组装方式</h3><p><code>src/constants/prompts.ts</code>（约 577 行）实现了一个分层管道来组装系统提示词。整个提示词被划分为两个区域，中间有一个缓存边界：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    静态可缓存区域                              │</span><br><span class="line">│  ┌───────────────────────────────────────────────────────┐  │</span><br><span class="line">│  │ 角色定义  │  系统规则  │  任务指导  │  工具说明  │  风格  │  │</span><br><span class="line">│  └───────────────────────────────────────────────────────┘  │</span><br><span class="line">├─────────────────────────────────────────────────────────────┤</span><br><span class="line">│                    动态可变区域                                │</span><br><span class="line">│  ┌───────────────────────────────────────────────────────┐  │</span><br><span class="line">│  │ 会话指引 │ 记忆系统 │ 环境信息 │ MCP 指令 │ Token 预算 │  │</span><br><span class="line">│  └───────────────────────────────────────────────────────┘  │</span><br><span class="line">└─────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p>缓存边界的设计直接关系到调用成本。边界之上的内容（角色定义、系统规则、工具说明等）跨用户、跨会话基本不变，使用 <code>scope: &#39;global&#39;</code> 缓存后，这部分 Token 在多次调用中只计费一次。边界之下的内容（会话指引、记忆、环境信息等）每次会话都不同，使用 <code>scope: &#39;ephemeral&#39;</code> 缓存。这个划分方式让缓存命中率保持在一个较高的水平——系统提示词的大部分体积属于静态区域，只有少量动态内容需要每次重新计算。</p>
 <hr>
-<h2 id="四、与-LangChain-ReAct-的本质区别"><a href="#四、与-LangChain-ReAct-的本质区别" class="headerlink" title="四、与 LangChain/ReAct 的本质区别"></a>四、与 LangChain/ReAct 的本质区别</h2><p>这是理解 Claude Code 架构的关键。大多数人认为 Claude Code 使用的是经典的 <strong>ReAct</strong> 模式：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">思考(Thought) → 行动(Action) → 观察(Observation) → 思考 → ...</span><br></pre></td></tr></table></figure>
-<p><strong>实际上，Claude Code 没有采用这个模式。</strong></p>
-<h3 id="4-1-架构范式对比"><a href="#4-1-架构范式对比" class="headerlink" title="4.1 架构范式对比"></a>4.1 架构范式对比</h3><div class="table-container">
+<h2 id="四、与-LangChain-ReAct-的架构差异"><a href="#四、与-LangChain-ReAct-的架构差异" class="headerlink" title="四、与 LangChain/ReAct 的架构差异"></a>四、与 LangChain/ReAct 的架构差异</h2><p>阅读 Claude Code 源码之前，我默认它使用的是经典的 ReAct 模式：模型先思考，再执行动作，然后观察结果，再进入下一轮思考。这个模式在 LangChain 等框架中被广泛采用，也是目前大多数 AI Agent 实现的基础范式。</p>
+<p>但 Claude Code 并没有采用这个模式。</p>
+<h3 id="4-1-架构对比"><a href="#4-1-架构对比" class="headerlink" title="4.1 架构对比"></a>4.1 架构对比</h3><div class="table-container">
 <table>
 <thead>
 <tr>
@@ -444,20 +403,10 @@
 </tbody>
 </table>
 </div>
-<h3 id="4-2-为什么不用-ReAct？"><a href="#4-2-为什么不用-ReAct？" class="headerlink" title="4.2 为什么不用 ReAct？"></a>4.2 为什么不用 ReAct？</h3><p>ReAct 模式有几个固有限制：</p>
-<ol>
-<li><strong>串行瓶颈</strong>：每一步必须等待完整的”思考→行动→观察”循环</li>
-<li><strong>无流式能力</strong>：模型生成完整响应后才能开始执行工具</li>
-<li><strong>恢复困难</strong>：没有统一的状态表示，难以实现自动恢复</li>
-<li><strong>缓存不友好</strong>：每次循环的 prompt 结构变化大，难以利用缓存</li>
-</ol>
-<p>Claude Code 的 Async Generator 模式解决了所有这些问题：</p>
-<ul>
-<li><strong>流式执行</strong>：工具在模型生成过程中就开始运行</li>
-<li><strong>状态可控</strong>：<code>State</code> 对象包含所有需要的信息，恢复只需修改状态</li>
-<li><strong>缓存优化</strong>：静态提示词全局缓存，动态部分最小化</li>
-<li><strong>并行能力</strong>：只读工具自动并行，写入工具串行保序</li>
-</ul>
+<h3 id="4-2-ReAct-模式的局限"><a href="#4-2-ReAct-模式的局限" class="headerlink" title="4.2 ReAct 模式的局限"></a>4.2 ReAct 模式的局限</h3><p>ReAct 模式的根本问题在于它的串行特性。每一步都必须等待模型完成完整的思考过程，才能执行工具、获取结果、进入下一轮。在任务复杂度较低时，这个模式的延迟可以接受；但当 Agent 需要连续调用多个工具、处理大量上下文时，每一步的等待时间会累积成显著的用户体验问题。</p>
+<p>另一个问题是缓存友好性。ReAct 模式每一轮的 prompt 结构变化较大（因为上一轮的工具执行结果会被追加到上下文中），导致 API 层面的 prompt 缓存难以命中。在 Token 计费模型下，这意味着成本的线性增长。</p>
+<p>Claude Code 的 AsyncGenerator 模式在这些问题上做了不同的取舍：工具在模型流式输出过程中就可以开始执行（不必等完整响应），状态对象包含了所有需要的上下文信息（恢复只需修改状态），静态提示词部分走全局缓存（降低重复调用成本）。这些设计选择让它在复杂任务场景下的响应速度和成本结构都优于传统的 ReAct 实现。</p>
+<p>当然，ReAct 模式也有它的优势：逻辑清晰、容易理解、调试简单。Claude Code 的架构复杂度更高，理解门槛也相应提升——对于简单的 Agent 场景，ReAct 可能已经足够。</p>
 <hr>
 <h2 id="五、关键源文件索引"><a href="#五、关键源文件索引" class="headerlink" title="五、关键源文件索引"></a>五、关键源文件索引</h2><div class="table-container">
 <table>
@@ -474,13 +423,13 @@
 <td>核心循环</td>
 <td><code>src/query.ts</code></td>
 <td>~1730</td>
-<td>Agent 主循环</td>
+<td>Agent 主循环，状态机实现</td>
 </tr>
 <tr>
 <td>查询引擎</td>
 <td><code>src/QueryEngine.ts</code></td>
 <td>~687</td>
-<td>高层封装</td>
+<td>高层封装，参数组装</td>
 </tr>
 <tr>
 <td>工具定义</td>
@@ -498,7 +447,7 @@
 <td>系统提示词</td>
 <td><code>src/constants/prompts.ts</code></td>
 <td>~577</td>
-<td>提示词组装</td>
+<td>提示词分层组装</td>
 </tr>
 <tr>
 <td>上下文管理</td>
@@ -534,14 +483,9 @@
 </table>
 </div>
 <hr>
-<h2 id="六、总结"><a href="#六、总结" class="headerlink" title="六、总结"></a>六、总结</h2><p>Claude Code 的架构设计体现了<strong>简洁与强大的平衡</strong>：</p>
-<ol>
-<li><strong>一个循环</strong>：<code>while (true)</code> 驱动的状态机</li>
-<li><strong>一个状态</strong>：<code>State</code> 对象承载所有上下文</li>
-<li><strong>一个接口</strong>：<code>Tool</code> 类型统一所有能力</li>
-</ol>
-<p>没有 Agent → AgentExecutor → Chain → Memory → Callback 的嵌套抽象层，这使得代码<strong>易于理解、调试和扩展</strong>。</p>
-<p>在接下来的系列文章中，我们将深入每个模块，揭示更多设计细节。</p>
+<h2 id="六、总结"><a href="#六、总结" class="headerlink" title="六、总结"></a>六、总结</h2><p>回到最初的问题：Claude Code 到底是什么？从架构层面看，它的核心可以归纳为三个部分——一个 <code>while (true)</code> 驱动的状态机、一个承载所有上下文的 State 对象、一个统一所有能力的 Tool 接口。没有 LangChain 那种 Agent → AgentExecutor → Chain → Memory → Callback 的多层嵌套抽象，整个调用链路相对扁平。</p>
+<p>这种设计让代码在理解和调试上有明显的优势，但代价是核心循环承担了过多的职责——query.ts 的 1730 行代码同时处理了压缩、调用、决策、执行和状态管理，后续如果某个环节的逻辑变复杂，这个文件会成为一个维护瓶颈。</p>
+<p>后续会针对几个关键模块做更深入的分析。下一篇先看 query.ts 中的 AsyncGenerator 状态机，详细拆解它的压缩策略和错误恢复机制。</p>
 <hr>
 <p><strong>系列文章导航：</strong></p>
 <ul>
@@ -905,8 +849,8 @@
         
     <div class="post-nav">
       <div class="post-nav-item">
-    <a href="/2026/04/06/080_claude-code-context-compression/" rel="prev" title="Context 管理：四级压缩与无限对话的秘密">
-      <i class="fa fa-chevron-left"></i> Context 管理：四级压缩与无限对话的秘密
+    <a href="/2026/04/06/078_claude-code-channel-system/" rel="prev" title="Channel 系统：IM 远程控制 Agent">
+      <i class="fa fa-chevron-left"></i> Channel 系统：IM 远程控制 Agent
     </a></div>
       <div class="post-nav-item">
     <a href="/2026/04/15/090_claude-code-why-no-langchain/" rel="next" title="Claude Code 为什么不用 LangChain/LangGraph：自研架构的深层逻辑">
@@ -972,7 +916,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#导读：一个根本性的问题"><span class="nav-number">1.</span> <span class="nav-text">导读：一个根本性的问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、技术栈与项目结构"><span class="nav-number">2.</span> <span class="nav-text">一、技术栈与项目结构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-核心技术栈"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 核心技术栈</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-目录结构概览"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 目录结构概览</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、核心架构设计"><span class="nav-number">3.</span> <span class="nav-text">二、核心架构设计</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-整体架构图"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 整体架构图</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-核心设计理念"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 核心设计理念</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#理念一：流式优先（Streaming-First）"><span class="nav-number">3.2.1.</span> <span class="nav-text">理念一：流式优先（Streaming First）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#理念二：工具驱动（Tool-Driven）"><span class="nav-number">3.2.2.</span> <span class="nav-text">理念二：工具驱动（Tool-Driven）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#理念三：优雅降级（Graceful-Degradation）"><span class="nav-number">3.2.3.</span> <span class="nav-text">理念三：优雅降级（Graceful Degradation）</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、核心模块解析"><span class="nav-number">4.</span> <span class="nav-text">三、核心模块解析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-query-ts-Agent-的心脏"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 query.ts - Agent 的心脏</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-Tool-ts-工具的定义"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 Tool.ts - 工具的定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-系统提示词组装"><span class="nav-number">4.3.</span> <span class="nav-text">3.3 系统提示词组装</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、与-LangChain-ReAct-的本质区别"><span class="nav-number">5.</span> <span class="nav-text">四、与 LangChain&#x2F;ReAct 的本质区别</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-架构范式对比"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 架构范式对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-为什么不用-ReAct？"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 为什么不用 ReAct？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、关键源文件索引"><span class="nav-number">6.</span> <span class="nav-text">五、关键源文件索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、总结"><span class="nav-number">7.</span> <span class="nav-text">六、总结</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#一、技术栈与项目结构"><span class="nav-number">1.</span> <span class="nav-text">一、技术栈与项目结构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-核心技术栈"><span class="nav-number">1.1.</span> <span class="nav-text">1.1 核心技术栈</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-目录结构概览"><span class="nav-number">1.2.</span> <span class="nav-text">1.2 目录结构概览</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、核心架构设计"><span class="nav-number">2.</span> <span class="nav-text">二、核心架构设计</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-整体架构图"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 整体架构图</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-三个核心设计理念"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 三个核心设计理念</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、核心模块解析"><span class="nav-number">3.</span> <span class="nav-text">三、核心模块解析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-query-ts-—-Agent-的主循环"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 query.ts — Agent 的主循环</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-Tool-ts-—-工具的类型定义"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 Tool.ts — 工具的类型定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-系统提示词的组装方式"><span class="nav-number">3.3.</span> <span class="nav-text">3.3 系统提示词的组装方式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、与-LangChain-ReAct-的架构差异"><span class="nav-number">4.</span> <span class="nav-text">四、与 LangChain&#x2F;ReAct 的架构差异</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-架构对比"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 架构对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-ReAct-模式的局限"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 ReAct 模式的局限</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、关键源文件索引"><span class="nav-number">5.</span> <span class="nav-text">五、关键源文件索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、总结"><span class="nav-number">6.</span> <span class="nav-text">六、总结</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
