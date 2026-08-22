@@ -5,22 +5,13 @@ tags: GUI(Claude Code)
 categories: AI
 ---
 
-> CloudCLI UI（又名 Claude Code UI）是一款基于 Node.js + React 的 Web 应用，为 Claude Code、Cursor CLI、Codex 和 Gemini CLI 提供统一的图形化界面。与桌面应用不同，它可以通过浏览器访问，支持移动端使用，并提供云端托管选项。本文将详细介绍其功能特性、安装配置和使用方法。
-
 <!-- more -->
 
-## 一、项目简介
+CloudCLI UI（又名 Claude Code UI）是一款基于 Node.js + React 的 Web 应用，为 Claude Code、Cursor CLI、Codex 和 Gemini CLI 提供统一的图形化界面。与桌面应用不同，它通过浏览器访问，支持移动端使用，并提供云端托管选项。项目由 CloudCLI 团队开源，采用 Express + WebSocket + React 构建，配置直接写入 `~/.claude` 目录，与 CLI 完全同步。
 
-**CloudCLI UI** 是由 CloudCLI 团队开发的开源项目，采用 Express + WebSocket + React 构建，为多种 AI 编程 CLI 工具提供统一的 Web UI。
+## 项目定位与对比
 
-### 核心定位
-
-- **多 Agent 统一界面**：同时支持 Claude Code、Cursor CLI、Codex、Gemini CLI
-- **响应式 Web 设计**：桌面、平板、手机浏览器全覆盖
-- **云端托管选项**：可选择本地自托管或云端服务
-- **配置无缝同步**：UI 配置直接写入 `~/.claude`，与 CLI 完全一致
-
-### 与其他工具对比
+CloudCLI UI 的核心特点包括多 Agent 统一界面（同时支持 Claude Code、Cursor CLI、Codex、Gemini CLI）、响应式 Web 设计（桌面、平板、手机浏览器全覆盖）、云端托管选项（本地自托管或 CloudCLI Cloud 服务）、以及配置无缝同步（UI 配置直接写入 `~/.claude`，与 CLI 完全一致）。
 
 | 对比项 | CloudCLI UI | opcode | Claude Code Remote Control |
 |--------|-------------|--------|---------------------------|
@@ -32,7 +23,11 @@ categories: AI
 | 会话发现 | 自动发现全部会话 | 自动发现全部会话 | 仅当前会话 |
 | 配置同步 | 与 CLI 完全同步 | 与 CLI 完全同步 | 独立配置 |
 
-### 技术架构
+## 技术架构
+
+项目采用前后端分离架构。前端基于 React 18 + TypeScript + Vite 7 构建，UI 层使用 Tailwind CSS + Radix UI，代码编辑器采用 CodeMirror 6（带 minimap），终端模拟使用 xterm.js 5 + WebGL 渲染，Markdown 渲染依赖 react-markdown + remark-gfm + KaTeX。后端基于 Express 4 + WebSocket (ws)，通过 node-pty 创建伪终端进程，数据存储使用 SQLite + better-sqlite3，国际化方案为 i18next。
+
+目录结构如下：
 
 ```
 CloudCLI UI/
@@ -50,7 +45,7 @@ CloudCLI UI/
 │   ├── index.js             # Express 服务器
 │   ├── WebSocket 实时通信
 │   ├── REST API
-│   └── SQLite 数据存储
+│   ├── SQLite 数据存储
 │   └── node-pty 进程管理
 ├── shared/                  # 共享模块
 │   └── modelConstants.js    # 支持的模型列表
@@ -60,8 +55,6 @@ CloudCLI UI/
 │   └── gemini/
 └── public/                  # 静态资源
 ```
-
-**技术栈明细**：
 
 | 层级 | 技术 |
 |------|------|
@@ -75,49 +68,15 @@ CloudCLI UI/
 | 数据存储 | SQLite + better-sqlite3 |
 | 国际化 | i18next |
 
----
+## 多 Agent 支持
 
-## 二、核心功能详解
+CloudCLI UI 是目前唯一支持多种 AI Agent CLI 的统一界面，同时集成了 Claude Code（Anthropic 官方 CLI，使用 @anthropic-ai/claude-agent-sdk）、Cursor CLI（Cursor 编辑器的 CLI，独立集成）、Codex（OpenAI Codex CLI，使用 @openai/codex-sdk）、Gemini CLI（Google Gemini CLI，独立集成）。启动时可在 CLI Selection 界面选择要使用的 Agent，确认后进入对应会话。
 
-### 1. 多 Agent 支持
+## 响应式聊天界面
 
-CloudCLI UI 是目前唯一支持多种 AI Agent CLI 的统一界面：
+聊天界面支持多种消息格式：Markdown 渲染（标题、列表、表格、代码块）、KaTeX 数学公式、多语言代码高亮、以及工具调用的可视化展示。实时交互通过 WebSocket 实现，包括流式响应（实时显示 Agent 输出）、交互式工具（AskUserQuestion 等交互组件）、状态同步（Agent 状态实时更新）。
 
-| Agent CLI | 说明 | SDK 集成 |
-|-----------|------|----------|
-| Claude Code | Anthropic 官方 CLI | @anthropic-ai/claude-agent-sdk |
-| Cursor CLI | Cursor 编辑器的 CLI | 独立集成 |
-| Codex | OpenAI Codex CLI | @openai/codex-sdk |
-| Gemini CLI | Google Gemini CLI | 独立集成 |
-
-#### CLI 选择界面
-
-启动时可选择要使用的 Agent：
-
-```
-启动 CloudCLI → CLI Selection → 选择 Agent → 开始会话
-```
-
-### 2. 响应式聊天界面
-
-#### 消息渲染
-
-支持丰富的消息格式：
-
-- **Markdown 渲染**：标题、列表、表格、代码块
-- **数学公式**：KaTeX 渲染数学表达式
-- **代码高亮**：多语言语法高亮
-- **工具调用展示**：可视化展示 Agent 执行的工具
-
-#### 实时交互
-
-通过 WebSocket 实现实时通信：
-
-- **流式响应**：实时显示 Agent 输出
-- **交互式工具**：AskUserQuestion 等交互组件
-- **状态同步**：Agent 状态实时更新
-
-#### 聊天组件架构
+聊天组件架构：
 
 ```
 ChatInterface.tsx
@@ -129,9 +88,9 @@ ChatInterface.tsx
     └── ThinkingModeSelector.tsx # 思考模式选择
 ```
 
-### 3. 集成 Shell 终端
+## 集成 Shell 终端
 
-基于 xterm.js 的完整终端：
+基于 xterm.js 的完整终端，通过 node-pty 创建真实 shell 进程（伪终端 PTY），支持 ANSI 颜色转义序列、系统剪贴板集成（复制粘贴）、多 Tab 扩展（通过插件实现）。渲染层使用 WebGL addon 实现 GPU 加速，配合 Fit addon 自动调整尺寸、WebLinks addon 支持链接点击。
 
 ```
 Terminal.tsx
@@ -142,16 +101,9 @@ Terminal.tsx
     └── Clipboard addon          # 剪贴板支持
 ```
 
-**终端功能**：
+## 文件浏览器与代码编辑器
 
-- **伪终端（PTY）**：通过 node-pty 创建真实 shell 进程
-- **多 Tab 支持**：通过插件可扩展多终端
-- ** ANSI 颜色**：完整支持 ANSI 转义序列
-- **复制粘贴**：系统剪贴板集成
-
-### 4. 文件浏览器
-
-交互式文件树，支持多种视图模式：
+交互式文件树支持三种视图模式：Tree（树状结构，可展开目录）、List（平铺列表）、Detailed（详细信息，包含大小和修改时间）。文件操作包括点击文件在 CodeMirror 编辑器打开、拖拽上传到目录、右键菜单新建删除、实时搜索文件名过滤。
 
 ```
 FileTree.tsx
@@ -162,24 +114,7 @@ FileTree.tsx
     └── FileTreeDetailedColumns.tsx # 详细列视图
 ```
 
-**视图模式**：
-
-| 模式 | 说明 |
-|------|------|
-| Tree | 树状结构，可展开目录 |
-| List | 平铺列表 |
-| Detailed | 详细信息（大小、修改时间） |
-
-**文件操作**：
-
-- **打开编辑**：点击文件在 CodeMirror 编辑器打开
-- **上传文件**：拖拽上传到目录
-- **新建/删除**：右键菜单操作
-- **搜索过滤**：实时搜索文件名
-
-### 5. CodeMirror 代码编辑器
-
-完整的代码编辑体验：
+CodeMirror 编辑器提供完整的代码编辑体验，支持 JavaScript、Python、CSS、HTML、JSON、Markdown 等多种语言的语法高亮，配备代码缩略图侧边栏（Minimap）、One Dark 主题、自动保存、与 Git 版本的 Diff 视图、以及 Markdown 实时预览功能。
 
 ```
 CodeEditor.tsx
@@ -190,8 +125,6 @@ CodeEditor.tsx
     └── MarkdownPreview.tsx      # Markdown 预览
 ```
 
-**编辑器特性**：
-
 | 功能 | 说明 |
 |------|------|
 | 语法高亮 | JavaScript、Python、CSS、HTML、JSON、Markdown 等 |
@@ -201,9 +134,9 @@ CodeEditor.tsx
 | Diff 视图 | 显示与 Git 版本的差异 |
 | Markdown 预览 | 实时预览 Markdown 文件 |
 
-### 6. Git 浏览器
+## Git 浏览器
 
-可视化 Git 操作：
+可视化 Git 操作界面包含四个核心组件：GitStatus（当前状态）、GitChanges（变更列表）、GitCommit（提交面板）、GitBranch（分支选择）。功能覆盖查看变更（显示 modified、added、deleted 文件）、暂存文件（点击暂存或取消暂存）、提交更改（输入 commit message 并提交）、分支切换（下拉选择切换分支）、Diff 对比（查看文件变更详情）。
 
 ```
 GitExplorer.tsx
@@ -213,49 +146,15 @@ GitExplorer.tsx
     └── GitBranch.tsx            # 分支选择
 ```
 
-**Git 功能**：
+## 会话管理
 
-- **查看变更**：显示 modified、added、deleted 文件
-- **暂存文件**：点击暂存或取消暂存
-- **提交更改**：输入 commit message 并提交
-- **分支切换**：下拉选择切换分支
-- **Diff 对比**：查看文件变更详情
+启动时自动扫描 `~/.claude/projects/` 目录，加载所有项目并显示会话列表。支持的会话操作包括恢复会话（继续之前的对话）、新建会话（创建新的对话）、删除会话（清理历史会话）、查看历史（查看完整对话记录）。
 
-### 7. 会话管理
+## MCP Server 管理
 
-自动发现并管理所有会话：
+CloudCLI UI 直接读写 `~/.claude/settings.json`，实现与 Claude Code 配置的双向同步。在 UI 中添加 MCP 服务器后立即在 Claude Code CLI 中可用，在 CLI 中配置 MCP 后 UI 自动读取显示。配置入口位于 Settings → MCP → Add Server。
 
-#### 会话发现机制
-
-```
-启动 → 扫描 ~/.claude/projects/ → 加载所有项目 → 显示会话列表
-```
-
-#### 会话操作
-
-| 操作 | 说明 |
-|------|------|
-| 恢复会话 | 继续之前的对话 |
-| 新建会话 | 创建新的对话 |
-| 删除会话 | 清理历史会话 |
-| 查看历史 | 查看完整对话记录 |
-
-### 8. MCP Server 管理
-
-与 Claude Code 配置完全同步：
-
-```
-Settings → MCP → Add Server
-```
-
-#### 配置同步原理
-
-CloudCLI UI 直接读写 `~/.claude/settings.json`：
-
-- **UI 修改 → CLI 生效**：在 UI 中添加 MCP 服务器，立即在 Claude Code CLI 中可用
-- **CLI 修改 → UI 生效**：在 CLI 中配置 MCP，UI 自动读取显示
-
-#### MCP 配置格式
+MCP 配置格式示例：
 
 ```json
 {
@@ -271,15 +170,9 @@ CloudCLI UI 直接读写 `~/.claude/settings.json`：
 }
 ```
 
-### 9. 工具权限控制
+## 工具权限控制
 
-安全优先设计——所有工具默认禁用：
-
-```
-Settings → Tools Settings → 选择性启用
-```
-
-#### 工具分类
+所有工具默认禁用，需要在 Settings → Tools Settings 中选择性启用。工具按风险等级分为四类：文件操作（Read、Write、Edit，中等风险）、系统操作（Bash、Task，高风险）、网络操作（WebFetch、WebSearch，中等风险）、交互工具（AskUserQuestion，低风险）。推荐首次使用时仅启用基础工具（Read、AskUserQuestion），后续根据需要逐步启用其他工具，保存设置后自动持久化。
 
 | 类别 | 工具 | 风险等级 |
 |------|------|----------|
@@ -288,19 +181,9 @@ Settings → Tools Settings → 选择性启用
 | 网络操作 | WebFetch、WebSearch | 中等 |
 | 交互工具 | AskUserQuestion | 低 |
 
-#### 推荐做法
+## 插件系统
 
-```
-首次使用 → 启用基础工具（Read、AskUserQuestion）
-需要时 → 逐步启用其他工具
-保存设置 → 自动持久化
-```
-
-### 10. 插件系统
-
-可扩展的插件架构：
-
-#### 插件结构
+可扩展的插件架构支持自定义 Tab 和后端服务。插件结构包含 manifest.json（插件配置）、frontend 目录（React 前端）、backend 目录（Node.js 后端，可选）。安装插件的路径为 Settings → Plugins → Install from Git，输入仓库 URL 即可。
 
 ```
 my-plugin/
@@ -308,10 +191,10 @@ my-plugin/
 ├── frontend/               # React 前端
 │   └── TabComponent.tsx
 └── backend/                # Node.js 后端（可选）
-│   └ server.js
+    └── server.js
 ```
 
-#### 插件 Manifest
+插件 Manifest 配置示例：
 
 ```json
 {
@@ -332,75 +215,33 @@ my-plugin/
 }
 ```
 
-#### 安装插件
+目前可用的插件包括 Project Stats（文件统计、代码行数，仓库：cloudcli-plugin-starter）和 Web Terminal（多 Tab 终端，仓库：cloudcli-plugin-terminal）。
 
-```
-Settings → Plugins → Install from Git → 输入仓库 URL
-```
+## 安装与部署
 
-#### 可用插件
-
-| 插件 | 功能 | 仓库 |
-|------|------|------|
-| Project Stats | 文件统计、代码行数 | [cloudcli-plugin-starter](https://github.com/cloudcli-ai/cloudcli-plugin-starter) |
-| Web Terminal | 多 Tab 终端 | [cloudcli-plugin-terminal](https://github.com/cloudcli-ai/cloudcli-plugin-terminal) |
-
-### 11. REST API
-
-提供完整的 API 接口：
-
-```
-GET  /api/projects           # 获取项目列表
-GET  /api/projects/:id       # 获取项目详情
-POST /api/sessions           # 创建新会话
-GET  /api/sessions/:id       # 获取会话详情
-POST /api/sessions/:id/chat  # 发送消息
-GET  /api/files              # 获取文件树
-GET  /api/files/:path        # 获取文件内容
-PUT  /api/files/:path        # 更新文件内容
-GET  /api/git/status         # 获取 Git 状态
-POST /api/git/commit         # 提交更改
-```
-
----
-
-## 三、安装与部署
-
-### 快速启动（npx）
-
-最快的方式，无需安装：
+**npx 快速启动**（无需安装，需要 Node.js v22+）：
 
 ```bash
-# 需要 Node.js v22+
 npx @cloudcli-ai/cloudcli
 ```
 
 启动后访问 `http://localhost:3001`，自动发现所有会话。
 
-### 全局安装
-
-适合日常使用：
+**全局安装**（适合日常使用）：
 
 ```bash
 npm install -g @cloudcli-ai/cloudcli
-
-# 启动
 cloudcli
 ```
 
-### Docker 部署
-
-适合服务器部署：
+**Docker 部署**（适合服务器部署）：
 
 ```bash
-# 构建 Claude Code 容器
 docker build -f docker/claude-code/Dockerfile -t cloudcli-claude .
-
-# 运行
 docker run -p 3001:3001 -v ~/.claude:/root/.claude cloudcli-claude
 ```
 
-#### Dockerfile 结构
+Docker 部署文件结构：
 
 ```
 docker/
@@ -412,40 +253,26 @@ docker/
     └── start-cloudcli.sh    # 启动脚本
 ```
 
-### PM2 生产部署
-
-适合长期运行：
+**PM2 生产部署**（适合长期运行）：
 
 ```bash
-# 安装 PM2
 npm install -g pm2
-
-# 启动
 pm2 start server/index.js --name cloudcli
-
-# 查看状态
 pm2 status
-
-# 设置开机启动
 pm2 startup
 pm2 save
 ```
 
-### 远程服务器部署
-
-#### 1. 安装依赖
+**远程服务器部署**需要以下步骤。首先安装依赖（Ubuntu/Debian）：
 
 ```bash
-# Ubuntu/Debian
 sudo apt update
 sudo apt install -y nodejs npm git
-
-# 安装 Node.js v22
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-#### 2. 克隆并构建
+然后克隆并构建项目：
 
 ```bash
 git clone https://github.com/siteboon/claudecodeui.git
@@ -454,9 +281,7 @@ npm install
 npm run build
 ```
 
-#### 3. 配置环境变量
-
-创建 `.env` 文件：
+创建 `.env` 文件配置环境变量：
 
 ```env
 PORT=3001
@@ -465,189 +290,41 @@ AUTH_REQUIRED=true
 JWT_SECRET=your-secret-key
 ```
 
-#### 4. 启动服务
+启动服务并配置防火墙：
 
 ```bash
 npm run server
-```
-
-#### 5. 配置防火墙
-
-```bash
 sudo ufw allow 3001
 ```
 
-访问 `http://your-server-ip:3001`
+访问 `http://your-server-ip:3001` 即可。
 
-### CloudCLI Cloud（托管服务）
-
-无需本地部署的云端方案：
-
-**访问地址**：[cloudcli.ai](https://cloudcli.ai)
-
-**特点**：
+**CloudCLI Cloud 托管服务**提供无需本地部署的云端方案，访问地址为 [cloudcli.ai](https://cloudcli.ai)。
 
 | 特性 | 说明 |
 |------|------|
 | 无需安装 | 直接在浏览器使用 |
 | 云端运行 | Agent 在云端持续运行 |
 | 团队共享 | 团队成员可共享会话 |
-| REST API | 提供完整 API |
+| REST API | 提供 API 接口 |
 | n8n 集成 | 支持 n8n 自动化节点 |
 | 费用 | $7/月起 |
 
----
+## 使用指南
 
-## 四、使用指南
+启动服务后在终端会看到输出信息（Server running on http://localhost:3001、WebSocket connected、Discovered N projects from ~/.claude），浏览器访问 `http://localhost:3001`，首次使用需在 CLI Selection 界面选择 Agent（Claude Code / Cursor / Codex / Gemini）并确认。
 
-### 初次启动
+界面布局方面，顶部 Header 包含 Logo、项目名称、设置入口、用户信息；左侧 Sidebar 提供 Chat、Files、Git、Terminal、MCP 等导航；中间 Main Content 区域显示消息列表（虚拟滚动）和 Chat Composer（输入框 + 附件 + 发送按钮）；底部 Footer 展示 Token 使用量、当前模型、费用统计。移动端界面会自动调整为单列显示，底部导航栏保留 Chat、Files、Git、Terminal 入口。
 
-```bash
-npx @cloudcli-ai/cloudcli
-```
+**聊天操作**：在 Chat Composer 输入消息后点击 Send 或按 Enter 发送；输入 `@` 可提及文件，文件内容自动附加；点击 Attach 按钮可上传图片；通过 Thinking Mode Selector 可选择 Default（正常模式）、Thinking（扩展思考模式）、Interleaved（交替思考模式）。
 
-终端输出：
+**文件操作**：在 Sidebar → Files 中展开折叠目录，点击文件打开；点击文件后 CodeMirror 编辑器打开，编辑内容自动保存；在 Files 目标目录拖拽文件即可上传。
 
-```
-CloudCLI UI starting...
-Server running on http://localhost:3001
-WebSocket connected
-Discovered 5 projects from ~/.claude
-```
+**Git 操作**：Sidebar → Git 显示当前状态，包括 Modified（已修改未暂存）、Staged（已暂存待提交）、Untracked（未跟踪文件）；在 Git → Changes 中点击文件可 Stage/Unstage；输入 commit message 后点击 Commit 提交；通过 Branch dropdown 切换分支。
 
-浏览器访问 `http://localhost:3001`
+**终端使用**：Sidebar → Terminal 显示 xterm.js 终端，可输入命令执行、查看 ANSI 颜色输出、使用 Ctrl+Shift+C/V 复制粘贴、滚动查看历史输出。
 
-### 选择 Agent CLI
-
-首次使用需选择要使用的 Agent：
-
-```
-CLI Selection → 选择 Claude Code / Cursor / Codex / Gemini → Confirm
-```
-
-### 界面布局
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Header: Logo | Project Name | Settings | User               │
-├──────────┬──────────────────────────────────────────────────┤
-│ Sidebar  │ Main Content                                     │
-│          │                                                   │
-│ • Chat   │ ┌─────────────────────────────────────────────┐  │
-│ • Files  │ │ Message List                                │  │
-│ • Git    │ │ (Virtual Scroll)                            │  │
-│ • Term   │ │                                             │  │
-│ • MCP    │ └─────────────────────────────────────────────┘  │
-│          │ ┌─────────────────────────────────────────────┐  │
-│          │ │ Chat Composer                               │  │
-│          │ │ [Input] [Attach] [Send]                     │  │
-│          │ └─────────────────────────────────────────────┘  │
-├──────────┴──────────────────────────────────────────────────┤
-│ Footer: Token Usage | Model | Cost                          │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 聊天操作
-
-#### 发送消息
-
-```
-Chat Composer → 输入消息 → 点击 Send 或按 Enter
-```
-
-#### 提及文件
-
-```
-Chat Composer → 输入 @ → 选择文件 → 文件内容自动附加
-```
-
-#### 上传图片
-
-```
-Chat Composer → 点击 Attach → 选择图片 → 图片预览显示
-```
-
-#### 选择思考模式
-
-```
-Thinking Mode Selector → 选择模式
-  • Default: 正常模式
-  • Thinking: 扩展思考模式
-  • Interleaved: 交替思考模式
-```
-
-### 文件操作
-
-#### 浏览文件树
-
-```
-Sidebar → Files → 展开/折叠目录 → 点击文件打开
-```
-
-#### 编辑文件
-
-```
-点击文件 → CodeMirror 编辑器打开 → 编辑内容 → 自动保存
-```
-
-#### 上传文件
-
-```
-Files → 目标目录 → 拖拽文件 → 上传完成
-```
-
-### Git 操作
-
-#### 查看状态
-
-```
-Sidebar → Git → 显示当前状态
-```
-
-状态显示：
-
-- **Modified**：已修改未暂存
-- **Staged**：已暂存待提交
-- **Untracked**：未跟踪文件
-
-#### 暂存更改
-
-```
-Git → Changes → 点击文件 → Stage/Unstage
-```
-
-#### 提交更改
-
-```
-Git → 输入 commit message → Commit
-```
-
-#### 切换分支
-
-```
-Git → Branch dropdown → 选择分支 → Confirm
-```
-
-### 终端使用
-
-```
-Sidebar → Terminal → 显示 xterm.js 终端
-```
-
-**终端操作**：
-
-- 输入命令并执行
-- 查看命令输出（ANSI 颜色）
-- 复制粘贴（Ctrl+Shift+C/V）
-- 滚动查看历史输出
-
-### MCP 配置
-
-#### 添加服务器
-
-```
-Settings → MCP → Add Server → 填写配置 → Save
-```
+**MCP 配置**：Settings → MCP → Add Server 填写配置后保存；也支持从 Claude Desktop 导入（Settings → MCP → Import from Claude Desktop）。
 
 配置示例：
 
@@ -659,19 +336,7 @@ Settings → MCP → Add Server → 填写配置 → Save
 }
 ```
 
-#### 从 Claude Desktop 导入
-
-```
-Settings → MCP → Import from Claude Desktop
-```
-
-### 工具权限设置
-
-```
-Settings → Tools Settings → 选择性启用工具 → Apply
-```
-
-**推荐配置**：
+**工具权限设置**：Settings → Tools Settings 选择性启用工具后 Apply。推荐配置如下：
 
 | 工具 | 首次启用 | 高级使用 |
 |------|----------|----------|
@@ -682,129 +347,19 @@ Settings → Tools Settings → 选择性启用工具 → Apply
 | WebFetch | - | ✓ |
 | WebSearch | - | ✓ |
 
-### 移动端使用
+**移动端使用**：启动服务后，手机浏览器访问 `http://[你的电脑IP]:3001`，界面会自动适配移动端布局。
 
-#### 本地网络访问
+## 进阶配置
 
-```bash
-# 启动服务
-npx @cloudcli-ai/cloudcli
+环境变量通过 `.env` 文件配置，主要包含：服务器配置（PORT=3001、HOST=0.0.0.0）、认证配置（AUTH_REQUIRED=true、JWT_SECRET、JWT_EXPIRY=7d）、各 Agent API Key（CLAUDE_API_KEY、OPENAI_API_KEY、GOOGLE_API_KEY）、插件配置（PLUGINS_DIR=./plugins）、日志配置（LOG_LEVEL=info）。
 
-# 手机浏览器访问
-http://[你的电脑IP]:3001
-```
+认证系统方面，首次访问应用时会进入 Setup Screen 创建管理员账号，之后通过 Login Screen 登录进入 Protected Routes。认证组件包括 context/AuthContext.tsx（认证状态管理）、view/LoginForm.tsx（登录表单）、view/SetupForm.tsx（设置表单）、view/ProtectedRoute.tsx（路由保护）、utils.ts（认证工具函数）。
 
-#### 响应式适配
+国际化支持方面，界面已支持 English、中文、日本語、한국어、Deutsch、Русский 六种语言，通过 i18next-browser-languagedetector 自动检测浏览器语言，也可手动切换并持久化到 localStorage。
 
-移动端界面：
+性能优化方面，消息列表使用 `@tanstack/react-virtual` 实现虚拟滚动，仅渲染可见区域的消息；WebSocket 通信采用消息队列缓冲机制，避免并发处理冲突；终端渲染使用 xterm.js WebGL addon 启用 GPU 加速。
 
-```
-┌─────────────────────┐
-│ Header: [Menu] Logo │
-├─────────────────────┤
-│                     │
-│ Message List        │
-│ (单列显示)          │
-│                     │
-├─────────────────────┤
-│ Chat Composer       │
-├─────────────────────┤
-│ Bottom Nav:         │
-│ Chat Files Git Term │
-└─────────────────────┘
-```
-
----
-
-## 五、进阶配置
-
-### 环境变量
-
-创建 `.env` 文件进行配置：
-
-```env
-# 服务器配置
-PORT=3001
-HOST=0.0.0.0
-
-# 认证配置
-AUTH_REQUIRED=true
-JWT_SECRET=your-jwt-secret-key
-JWT_EXPIRY=7d
-
-# Claude 配置
-CLAUDE_API_KEY=your-api-key
-
-# Codex 配置
-OPENAI_API_KEY=your-openai-key
-
-# Gemini 配置
-GOOGLE_API_KEY=your-google-key
-
-# 插件配置
-PLUGINS_DIR=./plugins
-
-# 日志配置
-LOG_LEVEL=info
-```
-
-### 认证系统
-
-CloudCLI UI 内置认证模块：
-
-#### 首次设置
-
-```
-访问应用 → Setup Screen → 创建管理员账号 → 登录
-```
-
-#### 认证流程
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Setup      │ →   │  Login      │ →   │  Protected  │
-│  Screen     │     │  Screen     │     │  Routes     │
-└─────────────┘     └─────────────┘     └─────────────┘
-     首次              已有账号           正常使用
-```
-
-#### 认证组件
-
-```
-auth/
-├── context/AuthContext.tsx    # 认证状态管理
-├── view/LoginForm.tsx         # 登录表单
-├── view/SetupForm.tsx         # 设置表单
-├── view/ProtectedRoute.tsx    # 路由保护
-└── utils.ts                   # 认证工具函数
-```
-
-### 国际化支持
-
-支持多语言界面：
-
-```
-i18next + react-i18next
-├── en: English
-├── zh-CN: 中文
-├── ja: 日本語
-├── ko: 한국어
-├── de: Deutsch
-└── ru: Русский
-```
-
-语言自动检测：
-
-```
-i18next-browser-languagedetector
-→ 浏览器语言 → localStorage → navigator.language
-```
-
-### 性能优化
-
-#### 虚拟滚动
-
-消息列表使用 `@tanstack/react-virtual`：
+虚拟滚动代码示例：
 
 ```tsx
 // 仅渲染可见消息
@@ -815,7 +370,7 @@ const rowVirtualizer = useVirtualizer({
 });
 ```
 
-#### WebSocket 优化
+WebSocket 消息队列示例：
 
 ```js
 // 消息队列缓冲
@@ -832,9 +387,7 @@ function processQueue() {
 }
 ```
 
-#### 终端渲染
-
-xterm.js WebGL addon：
+终端渲染配置：
 
 ```js
 import { WebglAddon } from '@xterm/addon-webgl';
@@ -843,21 +396,16 @@ const terminal = new Terminal();
 terminal.loadAddon(new WebglAddon());
 ```
 
----
+## 插件开发指南
 
-## 六、插件开发指南
-
-### 创建插件
-
-#### 1. Fork 模板
+创建插件的第一步是 Fork 模板仓库 https://github.com/cloudcli-ai/cloudcli-plugin-starter，然后克隆到本地：
 
 ```bash
-# Fork https://github.com/cloudcli-ai/cloudcli-plugin-starter
 git clone https://github.com/your-username/my-plugin.git
 cd my-plugin
 ```
 
-#### 2. 插件结构
+插件目录结构：
 
 ```
 my-plugin/
@@ -866,11 +414,11 @@ my-plugin/
 │   ├── index.tsx
 │   └── TabComponent.tsx
 ├── backend/
-│   └ server.ts
+│   └── server.ts
 └── package.json
 ```
 
-#### 3. Manifest 配置
+Manifest 配置需要指定插件名称、版本、显示名称、描述、图标、入口文件、前端入口、Tab 定义、RPC 方法等：
 
 ```json
 {
@@ -892,7 +440,7 @@ my-plugin/
 }
 ```
 
-#### 4. 前端组件
+前端组件通过 `usePluginContext` 获取项目路径和 RPC 调用能力：
 
 ```tsx
 // frontend/TabComponent.tsx
@@ -915,7 +463,7 @@ export function MyTab() {
 }
 ```
 
-#### 5. 后端服务
+后端服务通过 `createPluginServer` 注册 RPC 方法：
 
 ```ts
 // backend/server.ts
@@ -935,158 +483,45 @@ server.registerMethod('processData', async (params) => {
 server.start();
 ```
 
-### 安装自定义插件
+安装自定义插件的路径为 Settings → Plugins → Install from Git，输入仓库 URL 后点击 Install。
 
-```
-Settings → Plugins → Install from Git → 输入仓库 URL → Install
-```
+## API 接口
 
----
+项目提供完整的 REST API 接口，涵盖项目管理、会话管理、文件操作、Git 操作四大模块。
 
-## 七、API 接口详解
-
-### 项目 API
+**项目 API**：
 
 ```bash
-# 获取项目列表
-GET /api/projects
-Response: [{ id, name, path, sessionsCount }]
-
-# 获取项目详情
-GET /api/projects/:id
-Response: { id, name, path, sessions, config }
+GET /api/projects           # 获取项目列表，返回 [{ id, name, path, sessionsCount }]
+GET /api/projects/:id       # 获取项目详情，返回 { id, name, path, sessions, config }
 ```
 
-### 会话 API
+**会话 API**：
 
 ```bash
-# 创建会话
-POST /api/sessions
-Body: { projectId, model, task }
-Response: { sessionId, status }
-
-# 发送消息
-POST /api/sessions/:id/chat
-Body: { message, attachments }
-Response: { messageId, status }
-
-# 获取会话详情
-GET /api/sessions/:id
-Response: { id, messages, model, usage }
+POST /api/sessions          # 创建会话，Body: { projectId, model, task }，返回 { sessionId, status }
+POST /api/sessions/:id/chat # 发送消息，Body: { message, attachments }，返回 { messageId, status }
+GET  /api/sessions/:id      # 获取会话详情，返回 { id, messages, model, usage }
 ```
 
-### 文件 API
+**文件 API**：
 
 ```bash
-# 获取文件树
-GET /api/files?path=/project
-Response: [{ name, type, path, children }]
-
-# 获取文件内容
-GET /api/files/:path
-Response: { content, encoding, size }
-
-# 更新文件
-PUT /api/files/:path
-Body: { content }
-Response: { success, size }
+GET  /api/files?path=/project  # 获取文件树，返回 [{ name, type, path, children }]
+GET  /api/files/:path          # 获取文件内容，返回 { content, encoding, size }
+PUT  /api/files/:path          # 更新文件，Body: { content }，返回 { success, size }
 ```
 
-### Git API
+**Git API**：
 
 ```bash
-# 获取状态
-GET /api/git/status
-Response: { branch, staged, unstaged, untracked }
-
-# 提交更改
-POST /api/git/commit
-Body: { message, files }
-Response: { commitId, success }
+GET  /api/git/status           # 获取状态，返回 { branch, staged, unstaged, untracked }
+POST /api/git/commit           # 提交更改，Body: { message, files }，返回 { commitId, success }
 ```
 
----
+## 与 Claude Code Remote Control 对比
 
-## 八、常见问题
-
-### 1. npx 启动失败
-
-**问题**：`node-pty` 编译失败
-
-**解决方案**：
-
-```bash
-# 安装编译工具
-# Windows: npm install -g windows-build-tools
-# Linux: sudo apt install build-essential
-
-# 清除缓存重新安装
-npm cache clean --force
-npx @cloudcli-ai/cloudcli
-```
-
-### 2. WebSocket 连接失败
-
-**问题**：浏览器无法连接 WebSocket
-
-**解决方案**：
-
-```env
-# 确保 HOST 配置正确
-HOST=0.0.0.0  # 远程访问
-HOST=localhost  # 本地访问
-```
-
-### 3. 移动端无法访问
-
-**问题**：手机浏览器无法打开
-
-**解决方案**：
-
-```bash
-# 检查防火墙
-sudo ufw allow 3001
-
-# 确认 IP 地址
-ip addr show
-
-# 手机访问
-http://[正确的IP]:3001
-```
-
-### 4. MCP 服务器不显示
-
-**问题**：UI 中添加的 MCP 在 CLI 中不生效
-
-**解决方案**：
-
-```bash
-# 检查配置文件
-cat ~/.claude/settings.json
-
-# 确保 JSON 格式正确
-# 重启 CloudCLI
-```
-
-### 5. 终端无法输入
-
-**问题**：xterm.js 终端无法输入命令
-
-**解决方案**：
-
-```bash
-# 确保 node-pty 正常安装
-npm rebuild node-pty
-
-# 检查终端权限
-# Linux/macOS: 确保 shell 有执行权限
-```
-
----
-
-## 九、与 Claude Code Remote Control 的区别
-
-官方的 Claude Code Remote Control 功能有限：
+官方的 Claude Code Remote Control 功能相对有限，以下是两者的详细对比：
 
 | 对比项 | CloudCLI UI | Claude Code Remote Control |
 |--------|-------------|---------------------------|
@@ -1098,9 +533,19 @@ npm rebuild node-pty
 | 超时限制 | 无限制 | 断网约 10 分钟超时 |
 | 移动端 | 响应式 Web | Claude App |
 
----
+## 常见问题
 
-## 十、项目资源
+**npx 启动失败**：如果 `node-pty` 编译失败，需要先安装编译工具（Windows: `npm install -g windows-build-tools`；Linux: `sudo apt install build-essential`），然后清除缓存重新安装（`npm cache clean --force && npx @cloudcli-ai/cloudcli`）。
+
+**WebSocket 连接失败**：浏览器无法连接 WebSocket 时，检查 `.env` 中的 HOST 配置，远程访问需设置为 `HOST=0.0.0.0`，本地访问使用 `HOST=localhost`。
+
+**移动端无法访问**：手机浏览器无法打开时，首先检查防火墙是否放行了 3001 端口（`sudo ufw allow 3001`），然后通过 `ip addr show` 确认正确的 IP 地址，最后用手机访问 `http://[正确的IP]:3001`。
+
+**MCP 服务器不显示**：UI 中添加的 MCP 在 CLI 中不生效时，检查 `~/.claude/settings.json` 文件内容，确保 JSON 格式正确，然后重启 CloudCLI。
+
+**终端无法输入**：xterm.js 终端无法输入命令时，执行 `npm rebuild node-pty` 重建伪终端模块，在 Linux/macOS 上还需确保 shell 有执行权限。
+
+## 项目资源
 
 | 资源 | 链接 |
 |------|------|
@@ -1111,36 +556,10 @@ npm rebuild node-pty
 | NPM 包 | [@cloudcli-ai/cloudcli](https://www.npmjs.com/package/@cloudcli-ai/cloudcli) |
 | 许可证 | AGPL-3.0-or-later |
 
----
-
-## 十一、总结
-
-CloudCLI UI 的核心优势：
-
-| 优势 | 说明 |
-|------|------|
-| 多 Agent 支持 | 统一管理 Claude、Cursor、Codex、Gemini |
-| 移动端友好 | 响应式设计，手机浏览器直接访问 |
-| 云端可选 | CloudCLI Cloud 提供 24/7 云端运行 |
-| 配置同步 | 与 CLI 完全同步，无需额外配置 |
-| 插件扩展 | 自定义 Tab + 后端服务 |
-| REST API | 完整 API 供外部集成 |
-
-### 选择建议
-
-| 场景 | 推荐方案 |
-|------|----------|
-| 本地开发 + Claude Code | opcode 或 CloudCLI UI 自托管 |
-| 移动端使用 Agent | CloudCLI UI 自托管或 CloudCLI Cloud |
-| 多种 AI Agent 统一管理 | CloudCLI UI |
-| 团队协作 + 云端运行 | CloudCLI Cloud |
-| 定制自动化 Agent | opcode |
-| 外部系统集成（n8n 等） | CloudCLI Cloud |
-
-一行命令启动 CloudCLI UI：
+快速启动 CloudCLI UI 只需一行命令：
 
 ```bash
 npx @cloudcli-ai/cloudcli
 ```
 
-然后打开 `http://localhost:3001`，即可在浏览器中管理所有 AI 编程 Agent。
+打开 `http://localhost:3001` 即可在浏览器中管理所有 AI 编程 Agent。

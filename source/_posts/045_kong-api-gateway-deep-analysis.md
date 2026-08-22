@@ -5,20 +5,17 @@ tags: 网关
 categories: 后端
 ---
 
-## 一、背景
+## 背景
 
 做微服务架构的人，基本绕不开 API 网关这个东西。不管你用 Spring Cloud Gateway、Envoy 还是 Nginx 手搓，总得有个统一的入口把请求转发给后端服务。
 
-Kong 是这个领域里做得最成熟的开源方案之一，GitHub 上 40K+ Stars，背后有商业公司维护，插件生态完善，大厂用得也多。但很多开发者对 Kong 的理解停留在"哦，就是个网关"这个层面，对其架构设计、插件系统、配置模式这些核心东西没深入过。
+Kong 是这个领域里做得最成熟的开源方案之一，GitHub 上 40K+ Stars，背后有商业公司维护，插件生态完善，大厂用得也多。但很多开发者对 Kong 的理解停留在"哦，就是个网关"这个层面，对其架构设计、插件系统、配置模式这些核心东西没深入过。这篇文章从架构、插件、配置、负载均衡等多个维度做一次系统拆解。
 
 <!-- more -->
----
 
-## 二、Kong 是什么
+## Kong 是什么
 
-一句话定义：Kong 是一个基于 **Nginx + OpenResty（LuaJIT）** 的开源 API 网关，核心能力是**路由转发、认证鉴权、流量控制、可观测性**。
-
-打个比方理解它的定位：
+Kong 是一个基于 Nginx + OpenResty（LuaJIT）的开源 API 网关，核心能力覆盖路由转发、认证鉴权、流量控制和可观测性。它解决的根本问题是：把认证、限流、日志这些横切关注点（Cross-Cutting Concerns）从各个业务服务中抽出来，统一收口到网关层，让业务服务只管业务逻辑。
 
 | 场景 | 没有网关 | 有了 Kong |
 |------|---------|-----------|
@@ -27,98 +24,27 @@ Kong 是这个领域里做得最成熟的开源方案之一，GitHub 上 40K+ St
 | 要记录所有请求日志 | 每个服务加日志代码 | Kong 统一采集，不影响业务 |
 | 要做灰度发布 | 改代码或改 Nginx 配置 | Kong 按权重分流，配置即生效 |
 
-核心区别在于：传统做法每个服务都要重复造轮子，Kong 把这些**横切关注点（Cross-Cutting Concerns）** 统一收口到网关层。
+传统做法每个服务都要重复造轮子，Kong 把这些公共能力集中到网关层统一处理，服务数量越多，这种架构的优势越明显。
 
----
+## 架构深度拆解
 
-## 三、架构深度拆解
+### 整体架构
 
-### 3.1 整体架构图
+Kong Gateway 的架构分为四层。最上面是 Nginx 反向代理层，负责接收和处理所有入站请求。第二层是 OpenResty/LuaJIT 运行时，提供 Lua 脚本的执行环境。第三层是 Kong Core，包含路由匹配引擎和插件系统（认证、限流、日志、转换等插件都在这里运行）。Kong Core 还暴露了 Admin API 用于配置管理。底层是数据存储层，支持 PostgreSQL、Cassandra 或声明式配置文件。数据平面的最终目标是把请求转发到后端的各个上游服务（User Service、Order Service 等）。
 
-```
-                    客户端请求
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      Kong Gateway                           │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │              Nginx (反向代理层)                        │   │
-│  ├─────────────────────────────────────────────────────┤   │
-│  │              OpenResty / LuaJIT                       │   │
-│  ├─────────────────────────────────────────────────────┤   │
-│  │                Kong Core                              │   │
-│  │  ┌───────────────────────────────────────────────┐   │   │
-│  │  │           Plugin System (插件系统)              │   │   │
-│  │  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐  │   │   │
-│  │  │  │ 认证    │ │ 限流   │ │ 日志   │ │ 转换   │  │   │   │
-│  │  │  └────────┘ └────────┘ └────────┘ └────────┘  │   │   │
-│  │  └───────────────────────────────────────────────┘   │   │
-│  ├─────────────────────────────────────────────────────┤   │
-│  │              Admin API (管理接口)                      │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                        │
-                        ▼
-              ┌─────────────────────┐
-              │   数据存储层          │
-              │  PostgreSQL /        │
-              │  Cassandra / 声明式   │
-              └─────────────────────┘
-                        │
-                        ▼
-              ┌─────────────────────┐
-              │   上游服务集群        │
-              │  (User Service,     │
-              │   Order Service...) │
-              └─────────────────────┘
-```
+### 为什么选 Nginx + OpenResty
 
-这个架构有几个关键点值得拆开说。
+Kong 没有用 Java、没用 Go，选了 Lua 这个相对小众的语言，核心原因在于 OpenResty。OpenResty 是 Nginx 的增强版，把 LuaJIT 嵌入到 Nginx 的请求处理生命周期里，带来了三个关键能力：
 
-### 3.2 为什么是 Nginx + OpenResty
+1. 性能极高：Nginx 本身就以高并发著称，LuaJIT 的执行速度接近 C
+2. 非阻塞 I/O：OpenResty 把所有网络操作都封装成非阻塞的，一个请求在等数据库返回的时候不会阻塞其他请求
+3. 生命周期钩子：Nginx 的各个处理阶段（rewrite、access、content、log）都能用 Lua 来扩展
 
-Kong 没有用 Java、没用 Go，选了 Lua 这个相对小众的语言，原因在于 **OpenResty**。
+Kong 本质上就是一个用 Lua 写的、运行在 OpenResty 上的 Nginx 配置生成器加插件执行引擎。
 
-OpenResty 是 Nginx 的一个增强版，把 LuaJIT 嵌入到 Nginx 的请求处理生命周期里。这意味着：
+### 核心抽象模型
 
-1. **性能极高**：Nginx 本身就以高并发著称，LuaJIT 的执行速度接近 C
-2. **非阻塞 I/O**：OpenResty 把所有网络操作都封装成非阻塞的，一个请求在等数据库返回的时候不会阻塞其他请求
-3. **生命周期钩子**：Nginx 的各个处理阶段（rewrite、access、content、log）都能用 Lua 来扩展
-
-Kong 本质上就是一个**用 Lua 写的、运行在 OpenResty 上的 Nginx 配置生成器 + 插件执行引擎**。
-
-### 3.3 核心抽象模型
-
-Kong 的配置管理围绕几个核心概念展开：
-
-```
-Consumer (消费者)
-    │
-    ├── 某个调用方的身份（API Key、JWT 等标识）
-    │
-    ▼
-Route (路由)
-    │
-    ├── 匹配规则：路径、Host、HTTP Method
-    ├── 一个 Service 可以挂多个 Route
-    │
-    ▼
-Service (服务)
-    │
-    ├── 一个上游服务的抽象（URL、协议、超时配置）
-    ├── 指向 Upstream
-    │
-    ▼
-Upstream (上游)
-    │
-    ├── 一组 Target 的集合
-    ├── 负载均衡策略、健康检查
-    │
-    ▼
-Target (目标)
-    │
-    └── 具体的后端实例地址（IP:Port）
-```
+Kong 的配置管理围绕五个核心概念展开。Service 是对一个上游后端服务的抽象，包含 URL、协议、超时等配置。Route 是请求的匹配规则，定义哪些请求应该被路由到哪个 Service，匹配维度包括路径、Host、HTTP Method，一个 Service 可以挂多个 Route。Upstream 是一组 Target（后端实例地址）的集合，负责负载均衡策略和健康检查。Consumer 代表 API 的调用方身份，通过 API Key、JWT 等方式标识。Plugin 则是对横切逻辑的抽象，可以挂载到 Service、Route 或 Consumer 上。
 
 举个实际例子：
 
@@ -141,93 +67,40 @@ Plugin:
   route: user-route
 ```
 
-这个模型的设计很清晰：**Service 是对后端服务的抽象，Route 是对请求匹配规则的抽象，Plugin 是对横切逻辑的抽象**。
+这套模型的设计思路很清晰：Service 抽象后端服务，Route 抽象匹配规则，Plugin 抽象横切逻辑，三者解耦，各司其职。
 
-### 3.4 请求生命周期
+### 请求生命周期
 
-一个请求到达 Kong 之后，会经历这些阶段：
+一个请求到达 Kong 之后，会按顺序经历以下阶段：
 
-```
-1. 客户端发送请求
-   │
-   ▼
-2. SSL/TLS 握手（certificate 阶段）
-   │  ← 这里可以执行 mTLS 插件
-   ▼
-3. URI 重写（rewrite 阶段）
-   │  ← 这里可以执行 URL 重写插件
-   ▼
-4. 路由匹配
-   │  ← Kong 根据 Host/Path/Method 找到对应的 Route
-   ▼
-5. 认证 & 鉴权（access 阶段）
-   │  ← 执行 key-auth、jwt、oauth2 等插件
-   ▼
-6. 限流 & 配额（access 阶段）
-   │  ← 执行 rate-limiting、quota 等插件
-   ▼
-7. 请求转换（access 阶段）
-   │  ← 执行 request-transformer 插件
-   ▼
-8. 转发请求到上游服务
-   │
-   ▼
-9. 接收上游响应
-   │
-   ▼
-10. 响应头处理（header_filter 阶段）
-    │  ← 执行 cors、response-transformer 等插件
-    ▼
-11. 响应体处理（body_filter 阶段）
-    │  ← 可以修改响应内容
-    ▼
-12. 日志记录（log 阶段）
-    │  ← 执行 tcp-log、http-log、file-log 等插件
-    ▼
-13. 返回响应给客户端
-```
+1. SSL/TLS 握手（certificate 阶段）：可以执行 mTLS 插件
+2. URI 重写（rewrite 阶段）：可以执行 URL 重写插件
+3. 路由匹配：Kong 根据 Host/Path/Method 找到对应的 Route
+4. 认证和鉴权（access 阶段）：执行 key-auth、jwt、oauth2 等插件
+5. 限流和配额（access 阶段）：执行 rate-limiting、quota 等插件
+6. 请求转换（access 阶段）：执行 request-transformer 插件
+7. 转发请求到上游服务
+8. 接收上游响应
+9. 响应头处理（header_filter 阶段）：执行 cors、response-transformer 等插件
+10. 响应体处理（body_filter 阶段）：可以修改响应内容
+11. 日志记录（log 阶段）：执行 tcp-log、http-log、file-log 等插件
+12. 返回响应给客户端
 
-注意 **access 阶段**是核心，大部分插件都在这个阶段执行。每个插件有优先级（priority），priority 越高越先执行。
+access 阶段是整个生命周期的核心，大部分插件都在这个阶段执行。每个插件有优先级（priority），priority 越高越先执行。
 
----
-
-## 四、插件系统：Kong 的核心竞争力
+## 插件系统
 
 插件系统是 Kong 区别于其他网关的最大优势。理解插件系统，才算真正理解 Kong。
 
-### 4.1 插件的作用域
+### 插件的作用域
 
-Kong 的插件不是全局一把梭，而是可以分层配置：
+Kong 的插件支持分层配置，从宽到窄分为四个层级：全局插件对所有请求生效；服务级插件对某个 Service 的所有请求生效；路由级插件对匹配某个 Route 的请求生效；消费者级插件对某个 Consumer 的请求生效。
 
-```
-全局插件（Global Plugin）
-    │
-    ├── 对所有请求生效
-    │
-    ▼
-服务级插件（Service-level Plugin）
-    │
-    ├── 对某个 Service 的所有请求生效
-    │
-    ▼
-路由级插件（Route-level Plugin）
-    │
-    ├── 对匹配某个 Route 的请求生效
-    │
-    ▼
-消费者级插件（Consumer-level Plugin）
-    │
-    └── 对某个 Consumer 的请求生效
-```
+这种分层设计在实际使用中非常灵活。比如全局开启 CORS 插件处理跨域，对支付服务单独开启更严格的限流策略，对 VIP 消费者放宽配额限制，这些场景都可以通过不同层级的插件组合来实现。
 
-这种分层设计很实用。比如：
-- 全局开启 CORS 插件
-- 对支付服务单独开启更严格的限流
-- 对 VIP 消费者放宽配额限制
+### 插件执行机制
 
-### 4.2 插件执行机制
-
-每个插件本质上是一个 **Lua 模块**，实现了特定的钩子函数：
+每个插件本质上是一个 Lua 模块，实现了特定的钩子函数：
 
 ```lua
 -- 一个最简单的 Kong 插件示例
@@ -255,7 +128,7 @@ end
 return MyPlugin
 ```
 
-Kong 提供了 **PDK（Plugin Development Kit）**，这是一组 Lua 函数，封装了所有常用操作：
+Kong 提供了 PDK（Plugin Development Kit），封装了所有常用操作：
 
 | PDK 函数 | 用途 |
 |---------|------|
@@ -266,11 +139,11 @@ Kong 提供了 **PDK（Plugin Development Kit）**，这是一组 Lua 函数，�
 | `kong.client.get_consumer()` | 获取当前消费者信息 |
 | `kong.ip.get_source()` | 获取客户端真实 IP |
 
-### 4.3 内置插件分类
+### 内置插件分类
 
-Kong 的内置插件可以分成这几大类：
+Kong 的内置插件覆盖了几大类场景。
 
-**认证类**
+认证类：
 
 | 插件 | 说明 |
 |------|------|
@@ -283,7 +156,7 @@ Kong 的内置插件可以分成这几大类：
 | openid-connect | OIDC 认证（对接 Okta、Auth0 等） |
 | mtls-auth | 双向 TLS 认证 |
 
-**流量控制类**
+流量控制类：
 
 | 插件 | 说明 |
 |------|------|
@@ -292,7 +165,7 @@ Kong 的内置插件可以分成这几大类：
 | proxy-cache | 响应缓存 |
 | canary | 金丝雀发布，按权重分流 |
 
-**转换类**
+转换类：
 
 | 插件 | 说明 |
 |------|------|
@@ -302,7 +175,7 @@ Kong 的内置插件可以分成这几大类：
 | correlation-id | 生成请求唯一标识 |
 | cors | 跨域配置 |
 
-**可观测性类**
+可观测性类：
 
 | 插件 | 说明 |
 |------|------|
@@ -314,11 +187,11 @@ Kong 的内置插件可以分成这几大类：
 | file-log | 写入本地文件 |
 | kafka-log | 发送到 Kafka |
 
-### 4.4 插件开发实战
+### 插件开发实战
 
-官方内置插件覆盖了大部分场景，但有时候你得写自己的插件。比如：给所有经过网关的请求加上公司内部的审计日志。
+官方内置插件覆盖了大部分场景，但有时候你得写自己的插件。比如给所有经过网关的请求加上公司内部的审计日志，这就需要开发一个自定义插件。
 
-**目录结构**
+目录结构：
 
 ```
 kong-plugin-audit-log/
@@ -330,7 +203,7 @@ kong-plugin-audit-log/
 └── kong-plugin-audit-log-0.1.0-1.rockspec
 ```
 
-**handler.lua - 插件主逻辑**
+handler.lua 是插件的主逻辑，在 log 阶段收集请求信息并发送到审计系统：
 
 ```lua
 local AuditLog = {
@@ -371,7 +244,7 @@ end
 return AuditLog
 ```
 
-**schema.lua - 配置校验**
+schema.lua 负责定义插件的配置校验规则：
 
 ```lua
 return {
@@ -390,7 +263,7 @@ return {
 }
 ```
 
-**安装插件**
+安装和启用插件：
 
 ```bash
 # 打包
@@ -403,9 +276,9 @@ plugins = bundled,audit-log
 KONG_PLUGINS=bundled,audit-log
 ```
 
-### 4.5 多语言插件支持
+### 多语言插件支持
 
-Lua 不是所有人都熟，Kong 后来加了 **External Plugins** 机制，支持用其他语言写插件：
+Lua 不是所有人都熟，Kong 后来加了 External Plugins 机制，支持用其他语言写插件：
 
 | 语言 | 方式 | 说明 |
 |------|------|------|
@@ -414,34 +287,19 @@ Lua 不是所有人都熟，Kong 后来加了 **External Plugins** 机制，支�
 | JavaScript | JS PDK | 同样走 gRPC |
 | WebAssembly | WASM | 新一代扩展方式 |
 
-原理是一样的：Kong 在插件执行阶段通过 gRPC 调用外部插件服务，外部服务处理完返回结果。性能比原生 Lua 插件差一点，但开发门槛低很多。
+原理是一样的：Kong 在插件执行阶段通过 gRPC 调用外部插件服务，外部服务处理完返回结果。性能比原生 Lua 插件差一些，但开发门槛低很多，团队不需要掌握 Lua 也能扩展 Kong 的能力。
 
----
-
-## 五、配置管理：三种模式
+## 配置管理
 
 Kong 支持三种配置管理模式，适应不同的部署场景。
 
-### 5.1 传统数据库模式（DB Mode）
+#### 传统数据库模式（DB Mode）
 
-```
-Kong 节点 ──→ PostgreSQL / Cassandra
-    │
-    └── Admin API 操作配置
-```
+所有配置（Service、Route、Plugin、Consumer）存在 PostgreSQL 或 Cassandra 里，通过 Admin API 管理。配置变更实时生效，不需要重启，多个 Kong 节点共享同一份配置，适合动态环境中服务频繁上下线的场景。代价是依赖数据库这个额外的运维组件，数据库挂了虽然不影响已有请求的转发（Kong 有本地缓存），但配置变更就无法进行了。
 
-这是最经典的模式。所有配置（Service、Route、Plugin、Consumer）都存在数据库里，通过 Admin API 管理。
+#### DB-less 声明式模式
 
-**优点**：
-- 配置变更实时生效，不需要重启
-- 多个 Kong 节点共享同一份配置
-- 适合动态环境，服务频繁上下线
-
-**缺点**：
-- 依赖数据库，多了一个运维组件
-- 数据库挂了 Kong 就废了（虽然有缓存，但配置变更就没了）
-
-### 5.2 DB-less 声明式模式
+所有配置写在一个 YAML 文件里，启动时加载：
 
 ```yaml
 # kong.yml
@@ -467,65 +325,28 @@ services:
         paths: ["/api/orders"]
 ```
 
-启动时加载配置文件：
+启动时指定配置文件：
 
 ```bash
 kong start -c kong.conf --declarative-config kong.yml
 ```
 
-**优点**：
-- 不需要数据库，部署更简单
-- 配置即代码，可以 Git 管理
-- 适合 GitOps、CI/CD 流程
-- 适合 Kubernetes ConfigMap/Secret
+这种模式不需要数据库，部署更简单，配置即代码可以 Git 管理，天然适合 GitOps 和 CI/CD 流程，也能直接放到 Kubernetes 的 ConfigMap 里。局限是配置变更需要 reload 才能生效，不支持 Consumer 的动态注册。
 
-**缺点**：
-- 配置变更需要重新加载（不是重启，是 reload）
-- 不支持 Consumer 的动态注册
+#### 混合模式（Hybrid Mode）
 
-### 5.3 混合模式（Hybrid Mode）
+Kong 把控制平面和数据平面分离。控制平面负责配置管理，连接数据库，暴露 Admin API；数据平面只做代理转发，不连数据库，不暴露 Admin API。控制平面通过 mTLS 把配置推送到数据平面，数据平面在本地缓存配置，即使控制平面暂时不可用也能继续处理请求。
 
-这是 Kong 比较新的部署模式，把控制平面和数据平面分离：
+| 组件 | 职责 | 特点 |
+|------|------|------|
+| 控制平面 | 配置管理，连接数据库 | 暴露 Admin API，集中管理所有配置 |
+| 数据平面 | 代理转发请求 | 无数据库，无 Admin API，本地缓存配置 |
 
-```
-┌─────────────────────┐         ┌─────────────────────┐
-│    Control Plane     │         │     Data Plane       │
-│    (控制平面)         │         │     (数据平面)        │
-│                      │         │                      │
-│  ┌───────────────┐   │   mTLS   │   ┌───────────────┐  │
-│  │  Admin API    │   │◄────────►│   │  Proxy Only   │  │
-│  │  配置管理      │   │   同步    │   │  只做代理      │  │
-│  └───────────────┘   │   配置    │   └───────────────┘  │
-│                      │         │                      │
-│  ┌───────────────┐   │         │   无 Admin API        │
-│  │  PostgreSQL   │   │         │   无数据库             │
-│  └───────────────┘   │         │                      │
-└─────────────────────┘         └─────────────────────┘
-```
+这种模式安全性更高（数据平面不暴露管理接口），数据平面部署更轻量（不需要数据库），还能跨机房集中管理。代价是架构复杂度增加，需要管理 mTLS 证书。
 
-**工作原理**：
-1. 控制平面负责配置管理，连接数据库
-2. 数据平面只做代理，不连数据库
-3. 控制平面通过 mTLS 把配置推送到数据平面
-4. 数据平面本地缓存配置，即使控制平面挂了也能继续工作
+## 负载均衡与服务发现
 
-**优点**：
-- 数据平面不暴露 Admin API，安全性更高
-- 数据平面不需要数据库，部署更轻量
-- 可以跨机房部署，控制平面集中管理
-- 适合大规模微服务架构
-
-**缺点**：
-- 架构复杂度增加
-- 需要管理 mTLS 证书
-
----
-
-## 六、负载均衡与服务发现
-
-### 6.1 负载均衡算法
-
-Kong 支持多种负载均衡算法：
+Kong 通过 Upstream 对象实现负载均衡，支持多种算法：
 
 | 算法 | 说明 | 适用场景 |
 |------|------|---------|
@@ -534,7 +355,7 @@ Kong 支持多种负载均衡算法：
 | least-connections | 最少连接数 | 后端实例性能不均 |
 | latency | 最低延迟 | 对延迟敏感的场景 |
 
-**一致性哈希**特别值得说一下。它可以基于不同的维度做哈希：
+一致性哈希值得单独说一下，它可以基于不同的维度做哈希，灵活度很高：
 
 ```bash
 # 基于 Consumer 做哈希，同一个消费者的请求总是打到同一个后端
@@ -554,27 +375,19 @@ curl -X POST http://localhost:8001/upstreams/my-upstream \
   --data hash_on_header=X-User-ID
 ```
 
-### 6.2 健康检查
+### 健康检查
 
-Kong 支持两种健康检查机制：
-
-**主动检查（Active Health Checks）**
-
-Kong 定期向后端实例发送探测请求：
+Kong 提供两种健康检查机制，通常配合使用。主动检查是 Kong 定期向后端实例发送探测请求，根据返回的 HTTP 状态码判断实例是否健康。被动检查是基于实际请求的失败情况来判断，也叫熔断机制，当连续出现 TCP 失败、超时或 HTTP 错误达到阈值时，将后端实例标记为不健康。
 
 ```bash
+# 主动检查配置
 curl -X POST http://localhost:8001/upstreams/my-upstream/healthcheck \
   --data active.healthy.interval=5 \
   --data active.unhealthy.interval=2 \
   --data active.http_path=/health \
   --data active.http_statuses=200,302
-```
 
-**被动检查（Passive Health Checks）**
-
-基于实际请求的失败情况来判断后端是否健康（也叫熔断）：
-
-```bash
+# 被动检查配置（熔断）
 curl -X POST http://localhost:8001/upstreams/my-upstream/healthcheck \
   --data passive.healthy.successes=5 \
   --data passive.unhealthy.tcp_failures=3 \
@@ -582,9 +395,7 @@ curl -X POST http://localhost:8001/upstreams/my-upstream/healthcheck \
   --data passive.unhealthy.http_failures=5
 ```
 
-两种方式通常配合使用：主动检查发现故障，被动检查在故障发生时快速熔断。
-
-### 6.3 服务发现
+### 服务发现
 
 Kong 支持与服务发现系统集成：
 
@@ -594,7 +405,7 @@ Kong 支持与服务发现系统集成：
 | Consul | 集成 HashiCorp Consul |
 | Kubernetes | 直接使用 K8s Service 名称 |
 
-Kubernetes 集成最常用。在 K8s 里，Kong 直接用 Service 名称做 upstream：
+Kubernetes 集成用得最多。在 K8s 环境里，Kong 直接用 Service 名称做 upstream，自动解析 ClusterIP，不需要手动维护后端实例列表：
 
 ```yaml
 services:
@@ -602,15 +413,11 @@ services:
     url: http://user-service.default.svc.cluster.local:8080
 ```
 
-Kong 会自动解析 K8s Service 的 ClusterIP，不需要手动维护后端实例列表。
+## 快速上手
 
----
+#### Docker 一键启动
 
-## 七、实战：快速上手
-
-### 7.1 Docker 一键启动
-
-最简单的方式是用 Docker Compose：
+最简单的方式是用 Docker Compose 拉起一套完整的 Kong 环境：
 
 ```yaml
 # docker-compose.yml
@@ -667,9 +474,9 @@ volumes:
 docker-compose up -d
 ```
 
-### 7.2 配置第一个 API
+#### 配置第一个 API
 
-用 Admin API 注册一个服务和路由：
+用 Admin API 注册一个服务和路由，然后验证转发是否生效：
 
 ```bash
 # 1. 创建服务
@@ -686,7 +493,7 @@ curl -X POST http://localhost:8001/services/httpbin/routes \
 curl http://localhost:8000/httpbin/get
 ```
 
-### 7.3 加上认证和限流
+#### 加上认证和限流
 
 ```bash
 # 1. 启用 key-auth 插件
@@ -717,9 +524,9 @@ curl -X POST http://localhost:8001/services/httpbin/plugins \
   --data "config.policy=local"
 ```
 
-### 7.4 DB-less 模式启动
+#### DB-less 模式启动
 
-如果不想用数据库，直接用声明式配置：
+如果不想用数据库，直接用声明式配置文件启动：
 
 ```yaml
 # kong.yml
@@ -748,13 +555,11 @@ consumers:
 KONG_DATABASE=off kong start -c kong.conf --declarative-config kong.yml
 ```
 
----
+## 企业级场景
 
-## 八、企业级场景
+#### 多环境管理
 
-### 8.1 多环境管理
-
-实际项目里通常有开发、测试、生产多套环境。Kong 的命名空间（Namespaces）或者用不同的 Kong 实例来隔离：
+实际项目里通常有开发、测试、生产多套环境，用不同的 Kong 实例配合不同的端口来隔离：
 
 ```bash
 # 开发环境 Kong
@@ -766,9 +571,9 @@ KONG_PROXY_LISTEN=0.0.0.0:9000
 KONG_ADMIN_LISTEN=0.0.0.0:9001
 ```
 
-### 8.2 灰度发布
+#### 灰度发布
 
-Kong 的 Canary 插件支持按权重分流：
+Kong 的 Canary 插件支持按权重分流，实现灰度发布：
 
 ```bash
 # 90% 流量打到 v1，10% 打到 v2
@@ -779,9 +584,9 @@ curl -X POST http://localhost:8001/services/my-service/plugins \
   --data "config.percentage=10"
 ```
 
-### 8.3 API 版本管理
+#### API 版本管理
 
-用 Route 的优先级来做 API 版本管理：
+用 Route 的优先级来做 API 版本管理，高优先级的路由先匹配：
 
 ```bash
 # v1 路由（低优先级）
@@ -797,9 +602,9 @@ curl -X POST http://localhost:8001/services/user-v2/routes \
   --data "priority=10"
 ```
 
-### 8.4 跨域处理
+#### 跨域处理
 
-微服务架构下跨域问题很常见，用 CORS 插件统一处理：
+微服务架构下跨域问题很常见，用 CORS 插件在网关层统一处理，不用在每个后端服务里单独配置：
 
 ```bash
 curl -X POST http://localhost:8001/services/my-service/plugins \
@@ -810,11 +615,9 @@ curl -X POST http://localhost:8001/services/my-service/plugins \
   --data "config.max_age=3600"
 ```
 
----
+## Kong vs 其他方案
 
-## 九、Kong vs 其他方案
-
-市面上 API 网关不少，简单对比一下：
+市面上 API 网关的选择不少，几个主流方案的对比：
 
 | 维度 | Kong | Spring Cloud Gateway | Envoy | APISIX |
 |------|------|---------------------|-------|--------|
@@ -827,31 +630,17 @@ curl -X POST http://localhost:8001/services/my-service/plugins \
 | K8s 集成 | Ingress Controller | 较弱 | 原生支持 | Ingress Controller |
 | 适用场景 | 通用 | Spring Cloud 体系 | Service Mesh | 通用 |
 
-**选型建议**：
-- Java 技术栈为主 → Spring Cloud Gateway
-- Service Mesh 架构 → Envoy
-- 通用场景、插件生态要求高 → Kong 或 APISIX
-- 已经在用 OpenResty → Kong 或 APISIX
+选型建议：Java 技术栈为主选 Spring Cloud Gateway，Service Mesh 架构选 Envoy，通用场景对插件生态要求高选 Kong 或 APISIX。对于中大型微服务架构，Kong 是一个成熟可靠的选择；服务数量上了规模之后，统一网关带来的收益会远超它的运维成本。小团队或者简单场景，Nginx 手搓配置可能就够用了。
 
----
+## 注意事项与局限性
 
-## 十、注意事项与局限性
+### 性能考量
 
-### 10.1 性能考量
+Kong 本身的延迟开销通常在 1-5ms（不含插件处理时间），但插件数量增多后延迟会明显上升。实际压测数据表明，无插件状态下延迟约 1ms，吞吐量可达 50K+ RPS；挂载 3 个插件后延迟约 3ms，吞吐量降到 30K+ RPS；5 个以上插件延迟会到 5-10ms，吞吐量降到 20K+ RPS。建议只启用真正需要的插件，不要为了"以防万一"开启一堆用不上的东西。
 
-Kong 的延迟开销通常在 1-5ms（不含插件处理时间），但插件用多了会明显增加延迟。实际压测数据：
+### Admin API 安全
 
-```
-无插件：~1ms 延迟，50K+ RPS
-3 个插件：~3ms 延迟，30K+ RPS
-5+ 个插件：~5-10ms 延迟，20K+ RPS
-```
-
-**建议**：只启用真正需要的插件，不要为了"以防万一"开启一堆不用的插件。
-
-### 10.2 Admin API 安全
-
-Admin API 是 Kong 的管理接口，默认监听 8001 端口。**生产环境必须限制访问**：
+Admin API 是 Kong 的管理接口，默认监听 8001 端口，拥有对 Kong 配置的完全控制权。生产环境必须限制访问，要么只允许内网访问，要么加上认证机制：
 
 ```bash
 # 只允许内网访问
@@ -861,30 +650,9 @@ KONG_ADMIN_LISTEN=127.0.0.1:8001
 KONG_ADMIN_GUI_AUTH=basic-auth
 ```
 
-### 10.3 配置备份
+### 配置备份与日志监控
 
-用 DB 模式时，定期备份 PostgreSQL 数据库。用 DB-less 模式时，确保 `kong.yml` 文件在 Git 里有版本管理。
-
-### 10.4 日志与监控
-
-生产环境一定要配好日志和监控。推荐组合：
-- **Prometheus 插件** → 暴露指标
-- **Grafana** → 可视化
-- **http-log 或 kafka-log** → 请求日志持久化
-
----
-
-## 十一、总结
-
-Kong 的核心价值可以概括为三点：
-
-1. **统一收口**：把认证、限流、日志这些横切关注点统一到网关层，业务服务只管业务
-2. **插件化架构**：功能按需启用，支持 Lua/Go/Python/JS 多语言扩展
-3. **部署灵活**：DB 模式、DB-less 模式、Hybrid 模式，适应不同规模和场景
-
-对于中大型微服务架构，Kong 是一个成熟可靠的选择。小团队或者简单场景，可能 Nginx 手搓配置就够了，没必要上 Kong。但当服务数量上了规模，统一网关的价值就体现出来了。
-
----
+用 DB 模式时要定期备份 PostgreSQL 数据库，用 DB-less 模式时确保 kong.yml 在 Git 里有版本管理，避免配置丢失。生产环境的日志和监控也需要提前配好，推荐组合是 Prometheus 插件暴露指标、Grafana 做可视化、http-log 或 kafka-log 做请求日志持久化。
 
 ## 参考资料
 

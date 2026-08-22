@@ -8,69 +8,32 @@ categories: AI
 ---
 
 <!-- more -->
-## 一、CrewAI 是什么？
 
-### 官方定义
+CrewAI 是一个用于编排自主 AI 代理的 Python 框架，核心卖点是让多个 Agent 像团队一样协同工作。它不依赖 LangChain 或其他框架，从零构建，官方宣称性能比 LangGraph 快 5 倍以上。框架提供两种编排模式：Crews 负责自主协作，Flows 负责精确控制工作流。对于需要多角色协作的场景（报告生成、数据分析、虚拟团队），CrewAI 的学习曲线比 LangGraph 平缓不少。
 
-CrewAI 是一个**精简、快速的 Python 框架**，用于编排自主 AI 代理（Agent）。它让多个 AI Agent 可以协同工作，像一个团队一样完成复杂任务。
+和同类框架横向对比，CrewAI 的优势在于简洁和独立，缺点是社区相对年轻。LangGraph 功能更全面但样板代码多且与 LangChain 强耦合，Autogen 的对话代理能力强但缺乏流程概念，ChatDev 有流程概念但定制能力有限。如果你的需求是快速搭建一个多角色协作系统，而不是构建复杂的有状态图，CrewAI 是目前上手成本最低的选择。
 
-### 核心特点
+## 核心概念
 
-| 特点 | 说明 |
-|-----|------|
-| **独立框架** | 不依赖 LangChain 或其他框架，从零构建 |
-| **高性能** | 比 LangGraph 快 5 倍以上 |
-| **灵活定制** | 从高层工作流到底层提示词都可定制 |
-| **两种模式** | Crews（自主协作）+ Flows（精确控制） |
+CrewAI 的架构围绕四个概念展开：Agent、Task、Crew 和 Tools。理解它们之间的关系是使用框架的前提。
 
-### 与其他框架对比
-
-| 框架 | 优点 | 缺点 |
-|-----|------|------|
-| **CrewAI** | 简洁、快速、独立 | 社区相对较新 |
-| **LangGraph** | 功能强大 | 样板代码多、与 LangChain 强耦合 |
-| **Autogen** | 对话代理能力强 | 缺乏流程概念 |
-| **ChatDev** | 有流程概念 | 定制能力有限 |
-
-### 适用场景
-
-- 自动化工作流（报告生成、数据分析）
-- 多角色协作系统（一人公司、虚拟团队）
-- 复杂任务分解与执行
-- AI 驱动的应用开发
-
----
-
-## 二、核心概念
-
-### 2.1 Agent（代理）
-
-Agent 是 CrewAI 的核心单元，代表一个"角色"。
+Agent 代表一个角色，是系统中最基本的执行单元。每个 Agent 需要定义 role（身份）、goal（目标）和 backstory（背景故事），其中 backstory 决定了 Agent 的性格和行为方式。此外还可以通过 tools 指定可用工具，通过 llm 指定使用哪个大模型，通过 allow_delegation 控制是否可以将任务委派给其他 Agent。
 
 ```python
 from crewai import Agent
 
 agent = Agent(
-    role="高级数据分析师",           # 角色
-    goal="分析数据并提供洞察",        # 目标
-    backstory="你是一位资深分析师...", # 背景故事
-    verbose=True,                    # 详细输出
-    allow_delegation=True,           # 是否可以委派任务
-    tools=[],                        # 可用工具
-    llm=...,                        # 使用的大模型
+    role="高级数据分析师",
+    goal="分析数据并提供洞察",
+    backstory="你是一位资深分析师，擅长从海量数据中发现关键趋势...",
+    verbose=True,
+    allow_delegation=True,
+    tools=[],
+    llm=...,
 )
 ```
 
-**关键参数**：
-- `role`：角色名称，定义 Agent 的身份
-- `goal`：目标，定义 Agent 想要达成什么
-- `backstory`：背景故事，决定 Agent 的性格和行为方式
-- `tools`：Agent 可以使用的工具列表
-- `llm`：Agent 使用的大模型
-
-### 2.2 Task（任务）
-
-Task 定义 Agent 需要完成的具体工作。
+Task 定义 Agent 需要完成的具体工作，包括 description（任务描述）、expected_output（预期输出格式）、agent（执行者）和 output_file（输出文件路径）。Task 和 Agent 是多对多的关系，但通常一个 Task 会绑定一个特定的 Agent。
 
 ```python
 from crewai import Task
@@ -78,14 +41,12 @@ from crewai import Task
 task = Task(
     description="分析销售数据，找出增长趋势",
     expected_output="包含 5 个关键发现的报告",
-    agent=agent,              # 执行任务的 Agent
-    output_file="report.md",  # 输出文件
+    agent=agent,
+    output_file="report.md",
 )
 ```
 
-### 2.3 Crew（团队）
-
-Crew 是 Agent 的集合，定义它们如何协作。
+Crew 是 Agent 和 Task 的集合，定义整个团队的协作方式。CrewAI 提供两种 process 模式：sequential（顺序执行，一个任务完成后执行下一个）适合流程明确的任务链，hierarchical（层级模式，自动分配 Manager Agent 协调）适合需要动态决策的场景。
 
 ```python
 from crewai import Crew, Process
@@ -93,27 +54,18 @@ from crewai import Crew, Process
 crew = Crew(
     agents=[agent1, agent2, agent3],
     tasks=[task1, task2, task3],
-    process=Process.sequential,  # 或 Process.hierarchical
+    process=Process.sequential,
     verbose=True,
 )
 ```
 
-**协作模式**：
-
-| 模式 | 说明 | 适用场景 |
-|-----|------|---------|
-| `Process.sequential` | 顺序执行，一个任务完成后执行下一个 | 流程明确的任务 |
-| `Process.hierarchical` | 层级模式，自动分配 Manager Agent 协调 | 需要动态决策的任务 |
-
-### 2.4 Tools（工具）
-
-Tools 扩展 Agent 的能力，让它可以搜索、读写文件、调用 API 等。
+Tools 扩展 Agent 的能力边界，让 Agent 可以搜索网页、读写文件、调用外部 API 等。框架内置了一批常用工具，也支持自定义工具。
 
 ```python
 from crewai_tools import SerperDevTool, FileReadTool
 
-search_tool = SerperDevTool()      # 搜索工具
-file_tool = FileReadTool()         # 文件读取工具
+search_tool = SerperDevTool()
+file_tool = FileReadTool()
 
 agent = Agent(
     role="研究员",
@@ -122,63 +74,21 @@ agent = Agent(
 )
 ```
 
-### 2.5 整体工作流程
+整个工作流程可以这样理解：你在 Crew 中注册一组 Agent 和一组 Task，Crew 根据选定的 process 模式将 Task 分配给对应的 Agent 执行。顺序模式下，Task 按定义顺序依次流转；层级模式下，Manager Agent 接收所有任务后动态拆解和分发。每个 Agent 在执行任务时可以调用自己的 tools 获取外部信息，完成后将结果传递给下一个环节。
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         Crew                                │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐                    │
-│  │ Agent 1 │  │ Agent 2 │  │ Agent 3 │                    │
-│  │ (分析师) │  │ (研究员) │  │ (撰稿人) │                    │
-│  └────┬────┘  └────┬────┘  └────┬────┘                    │
-│       │            │            │                          │
-│       ▼            ▼            ▼                          │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐                    │
-│  │  Task 1 │  │  Task 2 │  │  Task 3 │                    │
-│  │ 分析数据 │→│ 研究背景 │→│ 撰写报告 │                    │
-│  └─────────┘  └─────────┘  └─────────┘                    │
-└─────────────────────────────────────────────────────────────┘
-```
+## 安装与环境配置
 
----
+CrewAI 要求 Python 3.10 到 3.13，推荐使用 uv 作为包管理器。基础安装只需要 `pip install crewai`，如果需要内置工具集（搜索、文件操作等），执行 `pip install 'crewai[tools]'`。使用 uv 的话，对应命令是 `uv pip install crewai` 和 `uv pip install 'crewai[tools]'`。
 
-## 三、安装与环境配置
-
-### 3.1 环境要求
-
-- Python 3.10 - 3.13
-- 推荐使用 `uv` 作为包管理器
-
-### 3.2 安装 CrewAI
-
-**方式一：使用 pip**
+安装完成后，用 CLI 创建项目骨架：
 
 ```bash
-# 基础安装
-pip install crewai
-
-# 安装额外工具
-pip install 'crewai[tools]'
-```
-
-**方式二：使用 uv（推荐）**
-
-```bash
-# 安装 uv
-pip install uv
-
-# 安装 CrewAI
-uv pip install crewai
-uv pip install 'crewai[tools]'
-```
-
-### 3.3 创建项目
-
-```bash
-# 创建新项目
 crewai create crew my_project
+```
 
-# 项目结构
+生成的项目结构如下：
+
+```
 my_project/
 ├── .env                    # 环境变量
 ├── pyproject.toml          # 项目配置
@@ -191,44 +101,15 @@ my_project/
         └── tasks.yaml      # Task 配置
 ```
 
-### 3.4 常见安装问题
+Windows 用户安装时大概率会遇到两个问题。第一个是 `ModuleNotFoundError: tiktoken`，解决方法是安装嵌入依赖：`uv pip install 'crewai[embeddings]'`。第二个是 tiktoken 的 Rust 编译错误，可以跳过编译直接安装预编译包：`uv pip install tiktoken --prefer-binary`。如果这两个方案都不行，需要先安装 Visual C++ Build Tools。
 
-**问题 1：ModuleNotFoundError: tiktoken**
+## 大模型服务接入
 
-```bash
-uv pip install 'crewai[embeddings]'
-```
+这是大多数新手卡住的环节。CrewAI 默认连接 `https://api.openai.com/v1`，如果你用的是其他大模型服务（阿里百炼、DeepSeek、智谱等），必须显式指定 base_url，否则会遇到 `Connection refused` 或 `Invalid API key` 错误。
 
-**问题 2：Windows 上 Rust 编译错误**
+CrewAI 通过 LangChain 的 ChatModel 抽象来对接大模型，所以本质上你只需要构造一个正确的 ChatOpenAI 或 ChatAnthropic 实例，然后传给 Agent 的 llm 参数。不同服务商的差异只在 model 名称、api_key 和 base_url 三个字段上。
 
-```bash
-# 安装 Visual C++ Build Tools
-# 或使用预编译包
-uv pip install tiktoken --prefer-binary
-```
-
----
-
-## 四、大模型服务接入（重点）
-
-这是大多数新手卡住的地方。**CrewAI 默认使用 OpenAI，但你必须配置正确的 base_url 才能连接到你的大模型服务。**
-
-### 4.1 核心概念
-
-**为什么需要 base_url？**
-
-```
-┌─────────────┐         ┌─────────────────────┐
-│  CrewAI     │  ────→  │  LLM 服务端点        │
-│  (你的代码)  │   HTTP  │  (base_url)         │
-└─────────────┘         └─────────────────────┘
-```
-
-- 默认情况下，CrewAI 会连接 `https://api.openai.com/v1`
-- 如果你用的是其他服务（阿里百炼、DeepSeek 等），**必须指定 base_url**
-- 否则会报错：`Connection refused` 或 `Invalid API key`
-
-### 4.2 OpenAI 官方
+OpenAI 官方最简单，不指定 base_url 即可：
 
 ```python
 from langchain_openai import ChatOpenAI
@@ -236,17 +117,10 @@ from langchain_openai import ChatOpenAI
 llm = ChatOpenAI(
     model="gpt-4o",
     api_key="sk-xxxxx",
-    # base_url 默认是 https://api.openai.com/v1，可以不填
 )
 ```
 
-**环境变量方式**：
-
-```env
-OPENAI_API_KEY=sk-xxxxx
-```
-
-### 4.3 Anthropic Claude
+Anthropic Claude 使用独立的包：
 
 ```python
 from langchain_anthropic import ChatAnthropic
@@ -257,101 +131,49 @@ llm = ChatAnthropic(
 )
 ```
 
-**环境变量方式**：
-
-```env
-ANTHROPIC_API_KEY=sk-ant-xxxxx
-```
-
-### 4.4 阿里百炼 Coding Plan（推荐）
-
-阿里百炼 Coding Plan 提供两种兼容协议：
-
-| 协议 | Base URL | 说明 |
-|-----|---------|------|
-| **OpenAI 兼容** | `https://coding.dashscope.aliyuncs.com/v1` | 使用 langchain-openai |
-| **Anthropic 兼容** | `https://coding.dashscope.aliyuncs.com/apps/anthropic` | 使用 langchain-anthropic |
-
-**使用 OpenAI 兼容协议**：
+阿里百炼 Coding Plan 同时兼容 OpenAI 和 Anthropic 两种协议，对应的 base_url 不同。OpenAI 兼容协议的地址是 `https://coding.dashscope.aliyuncs.com/v1`，Anthropic 兼容协议的地址是 `https://coding.dashscope.aliyuncs.com/apps/anthropic`。两种协议都可以调用通义千问系列模型，选择取决于你更习惯哪个 SDK。
 
 ```python
+# OpenAI 兼容协议
 from langchain_openai import ChatOpenAI
 
 llm = ChatOpenAI(
-    model="qwen-max",           # 通义千问模型
+    model="qwen-max",
     api_key="your_dashscope_key",
-    base_url="https://coding.dashscope.aliyuncs.com/v1",  # 关键！
+    base_url="https://coding.dashscope.aliyuncs.com/v1",
 )
 ```
 
-**使用 Anthropic 兼容协议**：
-
 ```python
+# Anthropic 兼容协议
 from langchain_anthropic import ChatAnthropic
 
 llm = ChatAnthropic(
     model="qwen-max",
     api_key="your_dashscope_key",
-    base_url="https://coding.dashscope.aliyuncs.com/apps/anthropic",  # 关键！
+    base_url="https://coding.dashscope.aliyuncs.com/apps/anthropic",
 )
 ```
 
-**环境变量方式**：
+DeepSeek 和智谱 AI 都兼容 OpenAI 协议，只需要改 base_url。DeepSeek 的地址是 `https://api.deepseek.com/v1`，智谱 AI 的地址是 `https://open.bigmodel.cn/api/paas/v4/`。本地模型 Ollama 同理，地址是 `http://localhost:11434/v1`，api_key 填任意值即可。
 
-```env
-DASHSCOPE_API_KEY=your_dashscope_key
-DASHSCOPE_BASE_URL=https://coding.dashscope.aliyuncs.com/v1
-```
+| 服务商 | base_url | 兼容协议 |
+|-------|---------|---------|
+| OpenAI | 默认（无需配置） | 原生 |
+| Anthropic | 默认（无需配置） | 原生 |
+| 阿里百炼 Coding Plan | `https://coding.dashscope.aliyuncs.com/v1` | OpenAI / Anthropic |
+| DeepSeek | `https://api.deepseek.com/v1` | OpenAI |
+| 智谱 AI | `https://open.bigmodel.cn/api/paas/v4/` | OpenAI |
+| Ollama | `http://localhost:11434/v1` | OpenAI |
 
-### 4.5 DeepSeek
-
-```python
-from langchain_openai import ChatOpenAI
-
-llm = ChatOpenAI(
-    model="deepseek-chat",
-    api_key="your_deepseek_key",
-    base_url="https://api.deepseek.com/v1",  # 关键！
-)
-```
-
-### 4.6 智谱 AI (GLM)
-
-```python
-from langchain_openai import ChatOpenAI
-
-llm = ChatOpenAI(
-    model="glm-4",
-    api_key="your_zhipu_key",
-    base_url="https://open.bigmodel.cn/api/paas/v4/",  # 关键！
-)
-```
-
-### 4.7 本地模型 (Ollama)
-
-```python
-from langchain_openai import ChatOpenAI
-
-llm = ChatOpenAI(
-    model="llama3",
-    api_key="ollama",  # 任意值
-    base_url="http://localhost:11434/v1",  # Ollama 默认端口
-)
-```
-
-### 4.8 统一配置方案
-
-在实际项目中，推荐使用配置文件统一管理：
+在实际项目中，建议用配置文件统一管理不同服务商的参数，避免在每个 Agent 中重复填写：
 
 ```python
 # config/llm_config.py
-
 import os
 from langchain_openai import ChatOpenAI
 
 def get_llm(provider: str = "dashscope"):
-    """统一获取 LLM"""
-
     configs = {
         "openai": {
             "model": "gpt-4o",
@@ -381,17 +203,14 @@ def get_llm(provider: str = "dashscope"):
     )
 ```
 
-**使用**：
+使用时只需一行调用，切换模型也很方便：
 
 ```python
-# 默认使用阿里百炼
-llm = get_llm()
-
-# 切换到 OpenAI
-llm = get_llm("openai")
+llm = get_llm()              # 默认使用阿里百炼
+llm = get_llm("openai")      # 切换到 OpenAI
 ```
 
-### 4.9 Agent 中使用 LLM
+在 Agent 中引用这个配置：
 
 ```python
 from crewai import Agent
@@ -401,45 +220,17 @@ agent = Agent(
     role="分析师",
     goal="分析数据",
     backstory="你是一位资深分析师",
-    llm=get_llm("dashscope"),  # 指定 LLM
+    llm=get_llm("dashscope"),
 )
 ```
 
----
+## 项目结构详解
 
-## 五、项目结构详解
+CrewAI 的 CLI 工具会生成一套标准化的项目结构，理解每个文件的职责能让你更快地上手开发。
 
-### 5.1 使用 CLI 创建项目
-
-```bash
-crewai create crew my_crew
-cd my_crew
-```
-
-### 5.2 目录结构说明
-
-```
-my_crew/
-├── .env                    # 环境变量（API Key 等）
-├── pyproject.toml          # Python 项目配置
-├── README.md
-└── src/my_crew/
-    ├── __init__.py
-    ├── main.py             # 入口文件，运行 crew
-    ├── crew.py             # 定义 Crew、Agent、Task
-    ├── tools/              # 自定义工具
-    │   ├── __init__.py
-    │   └── custom_tool.py
-    └── config/
-        ├── agents.yaml     # Agent 配置（角色、目标、背景）
-        └── tasks.yaml      # Task 配置（描述、预期输出）
-```
-
-### 5.3 agents.yaml 配置
+`config/agents.yaml` 定义所有 Agent 的角色信息。文件中使用 YAML 格式描述每个 Agent 的 role、goal 和 backstory，支持 `{topic}` 这样的占位符在运行时动态替换。
 
 ```yaml
-# config/agents.yaml
-
 researcher:
   role: >
     {topic} 高级研究员
@@ -458,20 +249,15 @@ analyst:
     你是一位严谨的分析师，擅长将复杂数据转化为可执行的洞察。
 ```
 
-**占位符说明**：
-- `{topic}` 会在运行时被替换为实际值
-
-### 5.4 tasks.yaml 配置
+`config/tasks.yaml` 定义所有 Task 的描述和预期输出，同样支持占位符和动态绑定 Agent。
 
 ```yaml
-# config/tasks.yaml
-
 research_task:
   description: >
     对 {topic} 进行全面研究，找出最新、最相关的信息。
   expected_output: >
     包含 10 个关键发现的要点列表
-  agent: researcher  # 执行此任务的 Agent
+  agent: researcher
 
 analysis_task:
   description: >
@@ -479,20 +265,17 @@ analysis_task:
   expected_output: >
     一份完整的 Markdown 格式报告
   agent: analyst
-  output_file: report.md  # 输出文件
+  output_file: report.md
 ```
 
-### 5.5 crew.py 定义
+`crew.py` 是整个项目的核心，用装饰器模式将 agents.yaml 和 tasks.yaml 中的配置组装成可执行的 Crew。`@CrewBase` 标记类，`@agent` 和 `@task` 标记方法，`@crew` 标记最终的 Crew 组装方法。框架会自动读取配置文件并将内容注入到 `self.agents_config` 和 `self.tasks_config` 中。
 
 ```python
-# crew.py
-
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 
 @CrewBase
 class MyCrew():
-    """我的 Crew"""
 
     @agent
     def researcher(self) -> Agent:
@@ -510,9 +293,7 @@ class MyCrew():
 
     @task
     def research_task(self) -> Task:
-        return Task(
-            config=self.tasks_config['research_task'],
-        )
+        return Task(config=self.tasks_config['research_task'])
 
     @task
     def analysis_task(self) -> Task:
@@ -531,79 +312,51 @@ class MyCrew():
         )
 ```
 
-### 5.6 main.py 入口
+`main.py` 是入口文件，传入动态参数后启动 Crew 执行：
 
 ```python
-# main.py
-
 from my_crew.crew import MyCrew
 
 def run():
-    """运行 Crew"""
-    inputs = {
-        'topic': 'AI Agents'
-    }
+    inputs = {'topic': 'AI Agents'}
     MyCrew().crew().kickoff(inputs=inputs)
 
 if __name__ == "__main__":
     run()
 ```
 
-### 5.7 运行项目
+运行方式有两种：`crewai run`（CLI 方式）或 `python src/my_crew/main.py`（直接执行 Python）。
 
-```bash
-# 方式一：使用 CLI
-crewai run
+## 实战：构建一人公司 Agent 团队
 
-# 方式二：直接运行 Python
-python src/my_crew/main.py
-```
+假设你要开发一个「人生规划器」App，但只有你一个人。你可以用 CrewAI 搭建一个虚拟团队：CEO 负责决策和协调，CTO 负责技术架构，产品经理负责需求分析，工程师负责代码实现，测试负责质量保证。
 
----
-
-## 六、实战：构建一人公司 Agent 团队
-
-### 6.1 场景描述
-
-假设你要开发一个「人生规划器」App，但你只有一个人。你可以创建一个 Agent 团队来帮你：
-- CEO Agent：负责决策和协调
-- CTO Agent：负责技术架构
-- 产品经理 Agent：负责需求分析
-- 工程师 Agent：负责代码实现
-- 测试 Agent：负责质量保证
-
-### 6.2 项目结构
+项目按照职责拆分目录。agents 目录存放每个角色的定义，tasks 目录存放任务定义，crews 目录存放团队协作逻辑，config 目录存放 LLM 配置和项目参数。
 
 ```
 life-planner-crew/
 ├── .env
-├── requirements.txt
 ├── main.py
 ├── agents/
 │   ├── ceo_agent.py
 │   ├── cto_agent.py
 │   ├── product_manager.py
-│   ├── backend_engineer.py
-│   ├── frontend_engineer.py
-│   └── qa_agent.py
+│   └── backend_engineer.py
 ├── tasks/
 │   ├── requirement_tasks.py
 │   ├── development_tasks.py
 │   └── test_tasks.py
 ├── crews/
 │   └── development_crew.py
-├── tools/
-│   └── file_tools.py
 └── config/
-    ├── project_config.py
-    └── llm_config.py
+    ├── llm_config.py
+    └── project_config.py
 ```
 
-### 6.3 LLM 配置
+LLM 配置的策略是按角色分配模型。决策类 Agent（CEO、CTO）使用推理能力更强的模型（如 qwen-max），执行类 Agent（工程师、测试）使用速度更快的模型（如 qwen-turbo），这样可以在成本和质量之间取得平衡。
 
 ```python
 # config/llm_config.py
-
 import os
 from langchain_openai import ChatOpenAI
 
@@ -611,7 +364,7 @@ DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY")
 DASHSCOPE_BASE_URL = "https://coding.dashscope.aliyuncs.com/v1"
 
 def get_default_llm():
-    """默认模型（用于决策类 Agent）"""
+    """决策类 Agent 使用"""
     return ChatOpenAI(
         model="qwen-max",
         api_key=DASHSCOPE_API_KEY,
@@ -619,7 +372,7 @@ def get_default_llm():
     )
 
 def get_efficient_llm():
-    """高效模型（用于执行类 Agent）"""
+    """执行类 Agent 使用"""
     return ChatOpenAI(
         model="qwen-turbo",
         api_key=DASHSCOPE_API_KEY,
@@ -627,11 +380,10 @@ def get_efficient_llm():
     )
 ```
 
-### 6.4 Agent 定义
+CEO Agent 的定义需要足够详细，因为它的 backstory 直接影响决策质量。`allow_delegation=True` 允许 CEO 将任务委派给其他 Agent，这是层级模式的关键。
 
 ```python
 # agents/ceo_agent.py
-
 from crewai import Agent
 from config.llm_config import get_default_llm
 
@@ -650,11 +402,16 @@ def create_ceo_agent():
         决策果断但善于倾听，关注商业价值。
         """,
         verbose=True,
-        allow_delegation=True,  # 可以委派任务
+        allow_delegation=True,
         llm=get_default_llm(),
     )
+```
 
+后端工程师则使用高效模型，因为它的任务更多是执行而非决策：
+
+```python
 # agents/backend_engineer.py
+from config.llm_config import get_efficient_llm
 
 def create_backend_engineer_agent():
     return Agent(
@@ -663,15 +420,14 @@ def create_backend_engineer_agent():
         backstory="你专注于 Node.js 后端开发",
         verbose=True,
         allow_delegation=False,
-        llm=get_efficient_llm(),  # 使用高效模型
+        llm=get_efficient_llm(),
     )
 ```
 
-### 6.5 Crew 配置
+Crew 的组装使用 hierarchical 模式，由 CEO 充当管理者角色：
 
 ```python
 # crews/development_crew.py
-
 from crewai import Crew, Process
 from agents import (
     create_ceo_agent,
@@ -681,7 +437,6 @@ from agents import (
 )
 
 def create_development_crew():
-    # 创建 Agent
     ceo = create_ceo_agent()
     cto = create_cto_agent()
     pm = create_product_manager()
@@ -690,52 +445,22 @@ def create_development_crew():
     return Crew(
         agents=[ceo, cto, pm, backend],
         tasks=[],  # 动态添加
-        process=Process.hierarchical,  # 层级模式
+        process=Process.hierarchical,
         manager_llm="qwen-max",
-        manager_agent=ceo,  # CEO 作为管理者
+        manager_agent=ceo,
         verbose=True,
     )
 ```
 
-### 6.6 运行效果
+## 踩坑与调试
 
-```bash
-python main.py
+连接大模型失败是最常见的问题，错误信息通常是 `ConnectionError: Failed to connect to api.openai.com`。根因是忘记配置 base_url。用阿里百炼时必须显式指定 `base_url="https://coding.dashscope.aliyuncs.com/v1"`，只填 api_key 是不够的。
 
-# 输出
-╔═══════════════════════════════════════════════════════════════╗
-║           🎭 Life Planner Crew - 一人公司 Agent 团队 🎭        ║
-╚═══════════════════════════════════════════════════════════════╝
-
-📋 检查环境配置...
-  ✓ DASHSCOPE_API_KEY 已配置
-  ✓ 项目目录存在
-
-🎯 请选择操作模式：
-  [1] 初始化项目
-  [2] 功能开发模式
-  [3] 决策讨论模式
-```
-
----
-
-## 七、常见问题与解决方案
-
-### Q1: 连接大模型失败
-
-**错误信息**：
-```
-ConnectionError: Failed to connect to api.openai.com
-```
-
-**原因**：没有配置正确的 `base_url`
-
-**解决**：
 ```python
-# 错误 ❌
+# 错误写法
 llm = ChatOpenAI(model="qwen-max", api_key="xxx")
 
-# 正确 ✅
+# 正确写法
 llm = ChatOpenAI(
     model="qwen-max",
     api_key="xxx",
@@ -743,109 +468,43 @@ llm = ChatOpenAI(
 )
 ```
 
-### Q2: API Key 格式错误
+API Key 格式错误也会引发认证失败。排查方向有三个：检查 Key 是否完整复制（没有多余空格或截断），确认环境变量名和代码中读取的变量名一致，以及确保 `.env` 文件被正确加载。可以用 `python-dotenv` 的 `load_dotenv()` 显式加载，再用 `os.getenv()` 打印验证。
 
-**错误信息**：
-```
-AuthenticationError: Invalid API key
-```
-
-**检查项**：
-1. API Key 是否正确复制（没有多余空格）
-2. 是否填对了环境变量名
-3. `.env` 文件是否被正确加载
-
-**解决**：
 ```python
-# 确保加载 .env
 from dotenv import load_dotenv
 load_dotenv()
 
-# 验证 API Key
 import os
 print(os.getenv("DASHSCOPE_API_KEY"))
 ```
 
-### Q3: Agent 输出不符合预期
-
-**原因**：角色定义不够清晰
-
-**解决**：优化 `backstory`
+Agent 输出不符合预期时，问题通常出在 backstory 的定义上。一个模糊的 backstory 会让 Agent 的行为缺乏方向感。把 backstory 写得越具体，包含技术栈偏好、工作原则和输出标准，Agent 的表现就越稳定。
 
 ```python
-# 不好 ❌
+# 模糊 — Agent 行为不可预测
 backstory="你是一个程序员"
 
-# 更好 ✅
+# 具体 — Agent 行为有明确边界
 backstory="""
 你是一位专注 Node.js 后端开发的工程师。
-- 擅长 RESTful API 设计
-- 遵循 Clean Code 原则
-- 注重代码可维护性
-- 使用 TypeScript 和 NestJS
+擅长 RESTful API 设计，遵循 Clean Code 原则，
+注重代码可维护性，使用 TypeScript 和 NestJS。
 """
 ```
 
-### Q4: 依赖安装失败
-
-**Windows 上常见问题**：
-
-```bash
-# 安装 Visual C++ Build Tools
-# 或使用预编译包
-pip install tiktoken --prefer-binary
-pip install 'crewai[embeddings]'
-```
-
-### Q5: 如何调试 Agent
-
-**开启 verbose 模式**：
+调试方面，在 Agent 和 Crew 上都开启 `verbose=True` 可以看到完整的执行过程，包括 Agent 的思考链、任务分配和工具调用细节，这对定位问题非常有帮助。
 
 ```python
-agent = Agent(
-    role="分析师",
-    verbose=True,  # 输出详细过程
-)
-
-crew = Crew(
-    agents=[agent],
-    verbose=True,  # 输出团队协作过程
-)
+agent = Agent(role="分析师", verbose=True)
+crew = Crew(agents=[agent], verbose=True)
 ```
 
----
-
-## 八、总结
-
-### 核心要点
-
-1. **CrewAI 是什么**：多 Agent 协作框架，让多个 AI 角色协同完成任务
-2. **核心概念**：Agent（角色）、Task（任务）、Crew（团队）、Tools（工具）
-3. **关键配置**：LLM 接入必须配置 `base_url`，这是大多数人踩坑的地方
-
-### 大模型接入速查表
-
-| 服务商 | base_url | 备注 |
-|-------|---------|------|
-| OpenAI | 默认 | 无需配置 |
-| 阿里百炼 Coding Plan | `https://coding.dashscope.aliyuncs.com/v1` | OpenAI 兼容 |
-| DeepSeek | `https://api.deepseek.com/v1` | OpenAI 兼容 |
-| 智谱 AI | `https://open.bigmodel.cn/api/paas/v4/` | OpenAI 兼容 |
-| Ollama | `http://localhost:11434/v1` | 本地模型 |
-
-### 学习资源
+## 学习资源
 
 - [CrewAI 官方文档](https://docs.crewai.com)
 - [CrewAI GitHub](https://github.com/crewAIInc/crewAI)
-- [CrewAI 示例](https://github.com/crewAIInc/crewAI-examples)
+- [CrewAI 示例仓库](https://github.com/crewAIInc/crewAI-examples)
 - [LangChain 文档](https://python.langchain.com)
-
-### 下一步
-
-1. 尝试创建你的第一个 Crew
-2. 接入你喜欢的大模型服务
-3. 设计适合你场景的 Agent 角色
-4. 组合 Crews 和 Flows 构建复杂工作流
 
 ---
 

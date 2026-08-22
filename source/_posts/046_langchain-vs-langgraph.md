@@ -1,55 +1,27 @@
 ---
-title: LangChain vs LangGraph：从链式调用到图状态机的 Agent 演进之路
+title: LangChain 与 LangGraph 的 Agent 架构演进
 date: 2024-12-13
+updated: 2026-02-18
 tags: AI Agent
 categories: AI
 ---
 
-> 这篇文章不讲废话，只讲干货：LangChain 和 LangGraph 分别是什么、为什么 LangChain 团队要造 LangGraph、两者的技术本质差异、以及你该选哪个。
-
----
-
 <!-- more -->
-## 一、先说结论
 
-**LangChain 是"零件库"，LangGraph 是"组装图纸"。**
+## 先说结论
 
-- **LangChain**：给你各种组件——LLM 连接器、工具定义、记忆系统、向量检索器。你用它来"组装"一个 LLM 应用。
-- **LangGraph**：帮你定义组件之间的"组装方式"——怎么循环、怎么分支、怎么传递状态、什么时候结束。
+LangChain 是零件库，LangGraph 是组装图纸。
 
-两者不是竞争关系，而是**互补关系**。LangChain 团队自己造了 LangGraph，用来解决 LangChain 原生 Agent 能力不足的问题。
+- **LangChain**：提供 LLM 连接器、工具定义、记忆系统、向量检索器等基础组件，用于组装一个 LLM 应用。
+- **LangGraph**：定义组件之间的组装方式，包括循环、分支、状态传递和终止条件。
 
----
+两者不是竞争关系，而是互补关系。LangChain 团队自己造了 LangGraph，专门解决 LangChain 原生 Agent 能力不足的问题。
 
-## 二、LangChain：起源与发展
+## LangChain 的起源与发展
 
-### 2.1 创始人与背景
+Harrison Chase 曾在 Robust Intelligence（AI 安全公司）和 McKinsey 工作，2022 年 10 月将 LangChain 作为开源项目发布到 GitHub。2023 年初 LangChain Inc. 正式成立并获得风险投资，从社区项目走向商业化运营。
 
-| 维度 | 内容 |
-|------|------|
-| **创始人** | Harrison Chase |
-| **背景** | 曾在 Robust Intelligence（AI 安全公司）和 McKinsey 工作 |
-| **创立时间** | 2022 年 10 月，作为开源项目发布在 GitHub |
-| **公司成立** | 2023 年初，LangChain Inc. 成立，获得风险投资 |
-
-### 2.2 为什么能火
-
-2022 年 10 月，ChatGPT 还没发布（11 月才发布）。Harrison Chase 做了一件关键的事：**把 LLM 应用开发的"碎片化经验"变成"标准化组件"**。
-
-当时开发者面临的问题：
-
-```
-每个 LLM 应用都要自己解决：
-- 怎么调用不同模型的 API（OpenAI、Anthropic、 Cohere...）
-- 怎么记住用户之前说了什么
-- 怎么让 LLM 调用外部工具
-- 怎么把长文档切成小块让 LLM 能读
-- 怎么把检索结果喂给 LLM
-```
-
-LangChain 把这些问题**抽象成统一的组件**，你只需要配置参数，不用自己造轮子。
-
-### 2.3 发展时间线
+LangChain 能快速崛起，核心原因是它在 ChatGPT 发布前就抓住了一个关键痛点：LLM 应用开发的碎片化。当时每个开发者都要自己解决模型 API 调用（OpenAI、Anthropic、Cohere 各家接口不同）、对话记忆管理、外部工具集成、文档切分与检索等问题。LangChain 把这些经验抽象成统一的标准化组件，开发者只需配置参数，不用重复造轮子。
 
 | 时间 | 事件 | 影响 |
 |------|------|------|
@@ -61,36 +33,11 @@ LangChain 把这些问题**抽象成统一的组件**，你只需要配置参数
 | **2023.10** | LangServe 发布 | 快速部署 API |
 | **2024.01** | LangGraph 发布 | 解决 Agent 循环问题 |
 
-### 2.4 核心组件一览
+LangChain 的组件体系覆盖了 LLM 应用开发的各个环节。Models 负责连接各类大模型，Prompts 管理提示词模板，Memory 提供对话记忆能力，Tools 封装外部工具调用，Chains 将多个步骤串联成调用链，Agents 基于 LLM 决策调用工具，Retrieval 支撑 RAG 场景的文档检索，Output Parser 处理模型输出格式化，Document Loaders 对接各类数据源。
 
-```
-LangChain = 以下组件的集合
+## Chain 模型的能力边界
 
-┌─────────────────────────────────────────────────────────────┐
-│                    LangChain 组件体系                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │   Models    │  │   Prompts   │  │   Memory    │        │
-│  │  (LLM连接)  │  │ (模板管理)  │  │ (对话记忆)  │        │
-│  └─────────────┘  └─────────────┘  └─────────────┘        │
-│                                                             │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │   Tools     │  │   Chains    │  │   Agents    │        │
-│  │ (外部工具)  │  │ (调用链)    │  │ (决策执行)  │        │
-│  └─────────────┘  └─────────────┘  └─────────────┘        │
-│                                                             │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │  Retrieval  │  │   Output    │  │   Document  │        │
-│  │  (RAG检索)  │  │   Parser    │  │   Loaders   │        │
-│  └─────────────┘  └─────────────┘  └─────────────┘        │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 2.5 LangChain 的技术本质
-
-**LangChain 的核心抽象是 "Chain"（链）**——把多个步骤串起来，线性执行：
+LangChain 的核心抽象是 Chain（链），把多个步骤串起来线性执行：
 
 ```python
 # LangChain LCEL 语法（链式调用）
@@ -104,56 +51,15 @@ chain = (
 result = chain.invoke("什么是 Agent？")
 ```
 
-**优点**：
-- 简单直观，上手快
-- 组件丰富，生态完善
-- 适合 RAG、简单问答、固定流程的场景
+这种设计简单直观，上手快，组件生态完善，非常适合 RAG、简单问答和固定流程的场景。但它有一个根本性的限制：无法循环执行。Agent 需要 ReAct 循环（思考 → 执行 → 观察 → 再思考），而 LangChain 的链只能单向流动。加上无法根据中间结果动态选择路径、状态管理与执行流程脱节这两个问题，LangChain 在做复杂 Agent 时显得力不从心。
 
-**缺点**（这也是 LangGraph 存在的原因）：
-- 无法循环执行（Agent 需要 ReAct 循环）
-- 无法根据中间结果动态选择路径
-- 状态管理能力弱
+## LangGraph 解决什么问题
 
----
+LangChain 提供了 `AgentExecutor` 来支持 Agent 场景，实际使用中暴露出三个核心问题。
 
-## 三、LangGraph：为什么 LangChain 团队要造它
+第一个问题是无法真正循环。LangChain 的链是线性的，从 A 到 B 到 C 然后结束。Agent 需要的是 ReAct 循环：思考 → 执行 → 观察 → 再思考 → 再执行，直到任务完成。用 AgentExecutor 只能靠 `max_iterations` 硬限制循环次数，本质上是模拟而非原生支持。第二个问题是无法控制流程分支。Agent 执行到某一步后，可能需要根据结果走不同的路径：成功了就结束，失败了就重试，信息不够就再去搜索。LangChain 的链做不到这一点。第三个问题是状态管理混乱。Agent 需要追踪"我刚才做了什么"和"当前进度如何"，但 LangChain 的 Memory 组件是独立的，无法与执行流程绑定。
 
-### 3.1 核心问题：LangChain 的 Agent 不够用
-
-LangChain 有 `AgentExecutor`，理论上可以做 Agent。但实际使用中发现：
-
-```
-问题 1：AgentExecutor 无法真正循环
-- LangChain 的链是线性的：A → B → C → 结束
-- Agent 需要 ReAct 循环：思考 → 执行 → 观察 → 再思考 → 再执行...
-- 用 LangChain 做 Agent，只能"模拟"循环，很别扭
-
-问题 2：无法控制流程分支
-- Agent 执行到某一步，可能需要：
-  - 成功了 → 结束
-  - 失败了 → 重试
-  - 信息不够 → 再搜索
-- LangChain 的链无法根据条件选择不同路径
-
-问题 3：状态管理混乱
-- Agent 需要记住"我刚才做了什么"、"我现在的进度"
-- LangChain 的记忆系统是独立的，无法和执行流程绑定
-```
-
-### 3.2 LangGraph 的诞生
-
-2024 年第一季度，LangChain 团队推出 LangGraph，**专门解决 Agent 工作流问题**。
-
-| 维度 | 内容 |
-|------|------|
-| **发布时间** | 2024 年第一季度 |
-| **创始人** | LangChain 团队（Harrison Chase 领导） |
-| **核心目的** | 让 Agent 能真正循环执行、状态管理、流程分支 |
-| **技术本质** | 状态机（State Machine） + 图结构（Graph） |
-
-### 3.3 LangGraph 的核心创新
-
-**LangGraph 的核心抽象是 "StateGraph"（状态图）**——用图结构定义执行流程：
+2024 年第一季度，LangChain 团队推出 LangGraph，核心思路是用状态机加图结构来替代线性链。LangGraph 的核心抽象是 StateGraph，用节点表示计算步骤，用边定义节点之间的流转关系，条件边则根据当前状态动态决定下一步走向。
 
 ```python
 from langgraph.graph import StateGraph, END
@@ -174,7 +80,7 @@ graph.add_edge("agent", "tool")
 graph.add_edge("tool", "check")
 
 # 条件分支：根据检查结果决定下一步
-graph.add_conditional_edges("check", 
+graph.add_conditional_edges("check",
     lambda state: state["next_step"],
     {"continue": "agent", "end": END}  # 循环回去或结束
 )
@@ -183,15 +89,7 @@ graph.add_conditional_edges("check",
 app = graph.compile()
 ```
 
-**LangGraph 解决的三大问题**：
-
-| 问题 | LangChain 方案 | LangGraph 方案 |
-|------|---------------|---------------|
-| **循环执行** | 用 AgentExecutor 模拟，很别扭 | 用图的边连接回去，原生支持循环 |
-| **流程分支** | 无法根据条件选择路径 | `add_conditional_edges` 原生支持 |
-| **状态管理** | Memory 独立，不绑定流程 | State 在节点间传递，自动管理 |
-
-### 3.4 LangGraph 发展时间线
+LangGraph 针对上述三个问题分别给出了原生解决方案。循环执行方面，图的边可以指回之前的节点，天然支持 ReAct 循环。流程分支方面，`add_conditional_edges` 根据状态值选择不同路径，精确可控。状态管理方面，State 在节点间自动传递，与执行流程深度绑定。
 
 | 时间 | 事件 | 影响 |
 |------|------|------|
@@ -200,77 +98,23 @@ app = graph.compile()
 | **2024.08** | 支持多 Agent 协作 | 复杂系统必备 |
 | **2025.01** | LangGraph 0.3 发布 | 流式输出、多租户、改进调试 |
 
----
-
-## 四、技术对比：本质差异
-
-### 4.1 抽象模型对比
+## 技术本质差异
 
 | 维度 | LangChain | LangGraph |
 |------|-----------|-----------|
 | **核心抽象** | Chain（链） | StateGraph（状态图） |
-| **执行模式** | 线性执行 | 循环 + 分支执行 |
-| **状态管理** | 独立 Memory 组件 | State 在节点间传递 |
-| **流程控制** | 固定顺序 | 条件分支、并行、循环 |
+| **执行模式** | 线性执行，单向流动 | 循环 + 分支执行，可回环 |
+| **状态管理** | 独立 Memory 组件 | State 在节点间自动传递 |
+| **流程控制** | 固定顺序，无法回头 | 条件分支、并行、循环 |
 | **适用场景** | RAG、问答、固定流程 | Agent、多步骤决策 |
 
-### 4.2 架构图对比
+LangChain 的执行模型是单向链式流动：输入 → Prompt → LLM → Parser → 输出，每一步执行一次，无法回头。LangGraph 的执行模型是图结构：Start → Agent 思考 → 选择 Tool A 或 Tool B 执行 → Check 检查结果 → 根据条件决定继续循环回到 Agent 或终止。State 在整个图中自动传递，每个节点都能读取和修改当前状态。
 
-**LangChain：线性链**
+## 代码层面的对比
 
-```
-Input → [Prompt] → [LLM] → [Parser] → Output
+以"让 Agent 搜索信息，如果信息不够就再搜索"为例，两种实现方式的差异很直观。
 
-特点：
-- 单向流动
-- 固定顺序
-- 无法回头
-```
-
-**LangGraph：状态图**
-
-```
-              ┌─────────┐
-              │  Start  │
-              └────┬────┘
-                   │
-              ┌────▼────┐
-              │ Agent   │ ←─────┐
-              │(思考)   │       │
-              └────┬────┘       │
-                   │            │ 循环
-         ┌─────────┼─────────┐  │
-         │                   │  │
-    ┌────▼────┐         ┌────▼────┤
-    │ Tool A  │         │ Tool B  │
-    │(执行)   │         │(执行)   │
-    └────┬────┘         └────┬────┤
-         │                   │  │
-         └───────┬───────────┘  │
-                 │              │
-            ┌────▼────┐         │
-            │  Check  │─────────┘
-            │(检查)   │
-            └────┬────┘
-                 │
-         ┌───────┴───────┐
-         │               │
-    ┌────▼────┐     ┌────▼────┐
-    │ Continue│     │   End   │
-    │ (继续)  │     │  (结束) │
-    └─────────┘     └─────────┘
-
-特点：
-- 可以循环（边可以指向之前的节点）
-- 可以分支（条件判断选择路径）
-- State 在节点间自动传递
-```
-
-### 4.3 代码对比：同一功能的不同实现
-
-**任务：让 Agent 搜索信息，如果不够就再搜索**
-
-**LangChain 方案（别扭）**
+LangChain 方案用 `AgentExecutor` 模拟循环，只能靠 `max_iterations` 硬限制，无法精确控制什么时候结束：
 
 ```python
 # 只能模拟循环，用 max_iterations 限制
@@ -282,12 +126,9 @@ agent_executor = AgentExecutor(
     max_iterations=5,  # 强制限制循环次数
     verbose=True
 )
-
-# 问题：无法精确控制"什么时候结束"
-# 只能靠 iterations 数量硬限制
 ```
 
-**LangGraph 方案（原生支持）**
+LangGraph 方案通过条件边精确控制循环条件，根据实际搜索结果决定是继续搜索还是结束：
 
 ```python
 from langgraph.graph import StateGraph, END
@@ -311,120 +152,29 @@ graph.add_conditional_edges("check", check_result,
     {"continue": "agent", "end": END})
 
 app = graph.compile()
-# 优点：循环条件精确可控，不是硬限制
 ```
 
----
+前者是暴力限制，后者是精确控制，这是两种架构在设计理念上的根本差异。
 
-## 五、应用场景对比：该选哪个
+## 场景选型
 
-### 5.1 选 LangChain 的场景
+| 场景 | 推荐 | 原因 |
+|------|------|------|
+| **RAG 应用** | LangChain | 检索 → 生成，固定流程，不需要循环 |
+| **问答机器人** | LangChain | 用户问 → LLM 答，简单线性 |
+| **文档处理** | LangChain | 读文档 → 提取 → 输出，固定步骤 |
+| **快速原型** | LangChain | 上手快，组件多，适合验证想法 |
+| **真正的 Agent** | LangGraph | 需要 ReAct 循环（思考 → 执行 → 观察 → 再思考） |
+| **多步骤决策** | LangGraph | 执行到某一步后需要判断下一步做什么 |
+| **复杂工作流** | LangGraph | 有分支、有并行、有循环 |
+| **多 Agent 协作** | LangGraph | 多个 Agent 互相配合 |
+| **生产级复杂系统** | 两者配合 | LangGraph 编排流程，LangChain 提供组件 |
 
-| 场景 | 原因 |
-|------|------|
-| **RAG 应用** | 检索 → 生成，固定流程，不需要循环 |
-| **问答机器人** | 用户问 → LLM 答，简单线性 |
-| **文档处理** | 读文档 → 提取 → 输出，固定步骤 |
-| **快速原型** | 上手快，组件多，适合验证想法 |
-| **单轮任务** | 一次调用就完成，不需要多步骤决策 |
+选型的核心判断标准很简单：如果执行流程是固定的、一次调用就能完成，用 LangChain；如果需要循环、分支或状态追踪，用 LangGraph。快速验证阶段可以先用 LangChain 跑通逻辑，等流程复杂了再迁移到 LangGraph，迁移成本不高，因为 LangGraph 直接复用 LangChain 的组件。
 
-**典型 LangChain 代码（RAG）**：
+## 两者配合使用
 
-```python
-from langchain_openai import ChatOpenAI
-from langchain_community.vectorstores import Chroma
-from langchain.chains import RetrievalQA
-
-# 用 LangChain 做 RAG，三行搞定
-llm = ChatOpenAI(model="gpt-4o")
-vectorstore = Chroma.from_documents(docs, embeddings)
-qa = RetrievalQA.from_chain_type(llm, retriever=vectorstore.as_retriever())
-
-answer = qa.run("什么是 Agent？")
-```
-
-### 5.2 选 LangGraph 的场景
-
-| 场景 | 原因 |
-|------|------|
-| **真正的 Agent** | 需要 ReAct 循环（思考→执行→观察→再思考） |
-| **多步骤决策** | 执行到某一步后，需要判断下一步做什么 |
-| **复杂工作流** | 有分支、有并行、有循环 |
-| **多 Agent 协作** | 多个 Agent 互相配合 |
-| **需要状态管理** | 要追踪"做了什么"、"进度如何" |
-
-**典型 LangGraph 代码（Agent）**：
-
-```python
-from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import create_react_agent
-
-# 用 LangGraph 做真正的 Agent
-class AgentState(TypedDict):
-    messages: list
-    tools_result: dict
-
-def should_continue(state):
-    # 精确判断：任务是否完成
-    if state["tools_result"]["complete"]:
-        return "end"
-    return "continue"
-
-graph = StateGraph(AgentState)
-graph.add_node("agent", agent_node)
-graph.add_node("tools", tools_node)
-
-graph.add_edge("agent", "tools")
-graph.add_conditional_edges("tools", should_continue,
-    {"continue": "agent", "end": END})
-
-app = graph.compile()
-```
-
-### 5.3 选型决策树
-
-```
-你的需求是什么？
-│
-├─ 固定流程、单次调用（如 RAG、问答）
-│   → 选 LangChain
-│
-├─ 需要循环执行（如 Agent 多轮决策）
-│   → 选 LangGraph
-│
-├─ 需要根据结果选择不同路径
-│   → 选 LangGraph
-│
-├─ 需要多个 Agent 协作
-│   → 选 LangGraph 或 CrewAI
-│
-├─ 快速验证想法
-│   → 先用 LangChain，复杂了再迁移到 LangGraph
-│
-└─ 生产级复杂系统
-    → LangGraph + LangChain 组件配合使用
-```
-
----
-
-## 六、最佳实践：两者配合使用
-
-LangGraph 和 LangChain 不是竞争关系，而是**配合关系**：
-
-```
-LangChain 提供"零件"：
-- LLM 连接器（ChatOpenAI、ChatAnthropic）
-- 工具定义（@tool 装饰器）
-- 向量检索器
-- 文档加载器
-
-LangGraph 定义"组装方式"：
-- 怎么让 Agent 循环执行
-- 怎么根据结果选择路径
-- 怎么管理状态
-```
-
-**配合使用的典型代码**：
+实际项目中，LangChain 和 LangGraph 通常是搭配使用。LangChain 提供 LLM 连接器（ChatOpenAI、ChatAnthropic）、工具定义（`@tool` 装饰器）、向量检索器和文档加载器等基础组件，LangGraph 负责编排这些组件的执行流程，定义 Agent 的思考循环、条件分支和状态管理。
 
 ```python
 from langchain_openai import ChatOpenAI          # LangChain 组件
@@ -442,9 +192,9 @@ graph.add_node("tool", lambda s: search_tool.invoke(s["tool_input"]))
 ...
 ```
 
----
+这种分工很清晰：LangChain 解决"用什么组件"，LangGraph 解决"怎么组装和流转"。
 
-## 七、生态对比
+## 生态对比
 
 | 生态组件 | LangChain | LangGraph |
 |----------|-----------|-----------|
@@ -454,22 +204,29 @@ graph.add_node("tool", lambda s: search_tool.invoke(s["tool_input"]))
 | **社区** | GitHub 90k+ Star | GitHub 50k+ Star |
 | **教程** | 官方教程丰富 | 官方教程 + LangGraph Mastery Course |
 
----
+## LangGraph 1.0 的发布与现状
 
-## 八、总结：一句话记住两者的区别
+2026 年 2 月 18 日，LangChain 团队正式宣布 LangGraph 1.0 发布。这个版本距 LangGraph 首次发布已经过去了整整两年，标志着它从一个实验性项目走向了生产级稳定版本。LangGraph 1.0 并不是推倒重来，而是在过去两年积累的基础上做了一次系统性的收敛和固化。
 
-| 框架 | 一句话定义 |
-|------|-----------|
-| **LangChain** | 给你砖块、水泥、门窗——各种 LLM 应用组件 |
-| **LangGraph** | 教你怎么画房子的结构图——定义组件的组装流程 |
+LangGraph 1.0 的核心变化集中在三个方面。第一是正式弃用了 0.2 版本中引入的 Node 类，原因是开发者在实际使用中普遍觉得它增加了心智负担，收益不明显，团队决定回归更简洁的函数式 API 设计。第二是正式弃用了 langchain 集成包，LangGraph 从一开始就设计为可以与任何 LLM 或框架配合使用，不再需要依赖 langchain 包，团队建议用户迁移到 langchain-openai、langchain-anthropic 等模型提供商包，或者直接使用 LangGraph 的 BaseLanguageChatModel 接口。第三是正式弃用了 langgraph.prebuilt 中的 ToolMessage，统一使用 langchain_core.messages.ToolMessage。
 
-**什么时候用 LangChain**：固定流程、单次调用、快速原型。
+在平台侧，LangGraph 1.0 的配套工具也做了大规模调整。LangGraph Platform 移除了所有 LangGraph 0.2 时期引入的已弃用 API，LangGraph Server 的 API 版本从 2024-10-18 切换到 2025-03-19。LangGraph Studio（现更名为 LangGraph Workbench）移除了对 LangGraph Server 0.2 和 0.3 的支持。LangGraph SDK 移除了所有已弃用的 API 和旧的 2024 年 API 版本，同时修复了 Python SDK 中 `astream_events` 和 `stream_events` 的返回值类型错误。
 
-**什么时候用 LangGraph**：需要循环、需要分支、需要状态管理、真正的 Agent。
+另一个值得关注的变化是 langchain-openai 包的重大版本更新。0.3.x 版本被正式弃用，推荐使用 0.4.x 版本。0.4.x 是原生的 Pydantic 2 版本，不再依赖 Pydantic 1.x 的兼容层，同时移除了 `langchain_core` 的依赖，用户需要单独安装。这些变更反映了 LangChain 生态正在逐步摆脱 Pydantic 1.x 的历史包袱。
 
-**最佳方案**：两者配合使用——LangChain 提供组件，LangGraph 定义流程。
+从社区反响来看，LangGraph 1.0 的评价呈现两极化。正面评价集中在 API 的稳定性和生产可靠性上，认为经过两年打磨后 LangGraph 终于成为一个可以安心用于生产环境的框架。负面评价则主要围绕迁移成本和抽象复杂度，部分开发者认为频繁的 Breaking Change 增加了维护负担，而 LangGraph 的学习曲线相比更轻量的替代方案（如 PydanticAI、Smolagents）显得陡峭。也有观点指出 LangGraph 的"状态图"抽象对于中等复杂度的 Agent 场景来说有些过度设计。
 
----
+对于正在使用 LangGraph 0.3 的团队，LangGraph 1.0 的迁移路径比较清晰。Node 类的迁移只需将类方法改为普通函数，签名不变。langchain 集成包的迁移需要切换到模型提供商专用包或直接使用 BaseLanguageChatModel 接口。ToolMessage 的迁移是简单的类名替换。这些变更的破坏性不算大，但需要逐一排查代码中的引用点。
+
+| 时间 | 版本 | 关键变化 |
+|------|------|----------|
+| **2024.01** | LangGraph 0.1 发布 | 引入 StateGraph，解决 Agent 循环问题 |
+| **2024.06** | LangGraph Studio 发布 | 可视化调试工具 |
+| **2024.08** | 支持多 Agent 协作 | 复杂系统必备 |
+| **2025.01** | LangGraph 0.3 发布 | 流式输出、多租户、改进调试 |
+| **2026.02** | LangGraph 1.0 发布 | API 稳定化，弃用 Node 类和 langchain 集成包 |
+
+LangGraph 1.0 的发布意味着 LangChain 团队在 Agent 框架这条路线上做出了明确的选择：用状态图作为核心抽象，用 Pydantic 2 作为数据层基础，用模型提供商包替代大一统的集成层。这套技术栈在未来一两年内预计会保持稳定，对于已经在用 LangGraph 的团队来说是一个好消息，不用再担心频繁的 Breaking Change。对于还在观望的团队，现在是一个比较好的入场时机，API 已经收敛，文档也趋于完善。
 
 ## 参考资料
 

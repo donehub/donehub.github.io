@@ -5,39 +5,13 @@ tags: GUI(Claude Code)
 categories: AI
 ---
 
-> Claude Code 是 Anthropic 官方的命令行 AI 编程助手，强大的功能让它成为开发者的新宠。但命令行界面对于复杂任务管理仍有局限。opcode 作为一款基于 Tauri 2 的桌面应用，为 Claude Code 提供了可视化界面，支持自定义 Agent、会话管理、成本追踪等功能，让 AI 辅助编程更加直观高效。
+opcode 是由 Asterisk 团队开发的开源桌面应用，基于 Tauri 2 + React 构建，为 Claude Code CLI 提供完整的图形化管理界面。它将命令行工具转变为直观的桌面体验，支持自定义 Agent 创建、会话管理、成本追踪和时间线回滚等功能，所有数据存储在本地，无云端依赖。
 
 <!-- more -->
 
-## 一、项目简介
+## 技术架构
 
-**opcode** 是由 Asterisk 团队开发的开源桌面应用，基于 Tauri 2 + React 构建，为 Claude Code CLI 提供完整的图形化管理界面。
-
-### 核心定位
-
-- **命令中心的可视化扩展**：将 CLI 工具转变为直观的桌面体验
-- **Agent 定制平台**：创建专属 AI Agent，配置系统提示词和权限
-- **使用分析仪表盘**：实时追踪 API 成本和 Token 消耗
-- **本地优先**：所有数据存储在本地，无云端依赖
-
-### 技术架构
-
-```
-opcode/
-├── src/                   # React 18 + TypeScript 前端
-│   ├── components/        # UI 组件（shadcn/ui + Tailwind CSS v4）
-│   ├── lib/               # API 客户端与工具函数
-│   └── assets/            # 静态资源
-├── src-tauri/             # Rust 后端
-│   ├── src/
-│   │   ├── commands/      # Tauri 命令处理器
-│   │   ├── checkpoint/    # 时间线管理
-│   │   └── process/       # 进程管理
-│   └── tests/             # Rust 测试套件
-└── cc_agents/             # 预置 Agent 配置
-```
-
-**技术栈明细**：
+opcode 的前端使用 React 18 + TypeScript + Vite 6 构建，UI 层基于 Tailwind CSS v4 和 shadcn/ui，状态管理选用 Zustand 5。后端是 Rust 编写的 Tauri 2 层，负责进程管理、检查点和 Tauri 命令处理。预置的 Agent 配置存放在 cc_agents 目录中。数据存储使用 SQLite（通过 rusqlite），包管理工具为 Bun。
 
 | 层级 | 技术 |
 |------|------|
@@ -48,177 +22,59 @@ opcode/
 | 数据存储 | SQLite (rusqlite) |
 | 包管理 | Bun |
 
----
+## 项目与会话管理
 
-## 二、核心功能详解
+opcode 启动后自动扫描 `~/.claude/projects/` 目录，以可视化方式展示所有 Claude Code 项目。项目列表包含项目名称、路径和最近活动时间，支持智能搜索快速定位。点击项目即可进入该项目的会话管理界面。
 
-### 1. 项目与会话管理
+每个项目下的会话历史完整保留。会话概览展示首条消息、时间戳和模型信息，元数据区域显示 Token 使用量、成本和状态。会话恢复功能允许随时继续之前的对话，完整上下文不会丢失。
 
-#### 项目浏览器
+## CC Agents：定制专属 AI Agent
 
-opcode 自动扫描 `~/.claude/projects/` 目录，可视化展示所有 Claude Code 项目：
+自定义 Agent 是 opcode 的核心差异化功能。用户可以创建专属的 AI Agent，配置系统提示词、权限和默认任务，将特定工作流封装为可复用的 Agent 模板。
 
-- **项目列表**：显示项目名称、路径、最近活动时间
-- **智能搜索**：快速定位特定项目
-- **一键导航**：点击项目即可进入会话管理
-
-#### 会话历史
-
-每个项目下的会话完整保留：
-
-- **会话概览**：首条消息、时间戳、模型信息
-- **会话恢复**：随时继续之前的对话，保留完整上下文
-- **元数据展示**：Token 使用量、成本、状态一目了然
-
-### 2. CC Agents（自定义 Agent）
-
-这是 opcode 最强大的功能——创建专属 AI Agent。
-
-#### Agent 配置结构
-
-```json
-{
-  "version": 1,
-  "exported_at": "2025-04-12T10:00:00Z",
-  "agent": {
-    "name": "My Custom Agent",
-    "icon": "bot",
-    "model": "sonnet",
-    "system_prompt": "你的 Agent 指令...",
-    "default_task": "默认执行任务"
-  }
-}
-```
-
-#### 配置参数说明
+Agent 的配置采用 JSON 格式，包含名称、图标、模型、系统提示词和默认任务等字段。支持的图标类型包括 bot、shield、code、terminal、database 等，模型可选 opus、sonnet 或 haiku。
 
 | 参数 | 可选值 | 说明 |
 |------|--------|------|
-| `name` | 自定义字符串 | Agent 名称 |
-| `icon` | `bot`, `shield`, `code`, `terminal`, `database`, `globe`, `file-text`, `git-branch` | 图标类型 |
-| `model` | `opus`, `sonnet`, `haiku` | 使用的 Claude 模型 |
-| `system_prompt` | 自定义文本 | Agent 的行为指令 |
-| `default_task` | 自定义文本 | 默认执行的任务描述 |
+| name | 自定义字符串 | Agent 名称 |
+| icon | bot, shield, code, terminal, database, globe, file-text, git-branch | 图标类型 |
+| model | opus, sonnet, haiku | 使用的 Claude 模型 |
+| system_prompt | 自定义文本 | Agent 的行为指令 |
+| default_task | 自定义文本 | 默认执行的任务描述 |
 
-#### Agent 运行模式
+Agent 支持前台和后台两种执行模式。前台执行是阻塞式运行，可以实时查看进度；后台执行则在独立进程中运行，不阻塞主界面操作。权限方面可以配置文件读写和网络访问。
 
-- **前台执行**：阻塞式运行，实时查看进度
-- **后台执行**：独立进程运行，不阻塞主界面
-- **权限控制**：配置文件读写、网络访问权限
+### 预置 Agent 示例
 
-### 3. 预置 Agent 示例
+opcode 自带三个开箱即用的 Agent，覆盖了最常见的开发场景。
 
-opcode 提供三个开箱即用的 Agent：
+Git Commit Bot 用于自动化 Git 提交。它分析 Git 变更，生成符合 Conventional Commits 规范的提交信息并推送，模型选用 sonnet，默认任务为 "Push all changes."。日常开发中用它来替代手动编写 commit message，效率提升明显。
 
-#### Git Commit Bot（自动提交）
+Security Scanner 负责项目上线前的安全审计。它执行 STRIDE 威胁建模和 OWASP Top 10 漏洞扫描，生成专业安全报告，模型选用 opus 以获得更强的推理能力。
 
-```json
-{
-  "name": "Git Commit Bot",
-  "icon": "bot",
-  "model": "sonnet",
-  "default_task": "Push all changes.",
-  "system_prompt": "分析 Git 变更，生成符合 Conventional Commits 规范的提交信息并推送..."
-}
-```
+Unit Tests Bot 为新模块快速补充测试覆盖。它分析代码结构并生成单元测试，覆盖率目标设定在 80% 以上，同样使用 opus 模型。
 
-**使用场景**：日常开发中自动化 Git 提交，生成规范的 commit message。
+## 使用分析仪表盘
 
-#### Security Scanner（安全扫描）
+成本追踪模块实时监控 Claude API 的使用情况。总成本按会话累计，模型分布将成本按类型细分，时间趋势以每日或每周为粒度展示使用图表。这些数据导出后可以直接用于财务分析或团队核算。
 
-```json
-{
-  "name": "Security Scanner",
-  "icon": "shield",
-  "model": "opus",
-  "default_task": "Review the codebase for security issues.",
-  "system_prompt": "执行全面安全审计：STRIDE 威胁建模、OWASP Top 10 漏洞扫描、生成专业报告..."
-}
-```
+Token 分析提供四个关键指标：Input Tokens 消耗、Output Tokens 消耗、Context Usage 利用率和 Cache Hit Rate 命中率。通过饼图和折线图可视化呈现，帮助判断哪些会话的 Token 开销偏高。
 
-**使用场景**：项目上线前的安全检查，生成详细的安全报告。
+## MCP Server 管理
 
-#### Unit Tests Bot（单元测试）
+MCP（Model Context Protocol）服务器在 opcode 中集中管理。服务器注册表统一管理所有 MCP 配置，支持从 Claude Desktop 直接导入现有配置，连接测试功能验证服务器可用性。每个会话可以选择性启用不同的 MCP 服务器，不需要全局统一配置。
 
-```json
-{
-  "name": "Unit Tests Bot",
-  "icon": "code",
-  "model": "opus",
-  "default_task": "Generate unit tests for this codebase.",
-  "system_prompt": "分析代码结构，生成单元测试，覆盖率目标 >80%..."
-}
-```
+## 时间线与检查点
 
-**使用场景**：为新模块快速补充测试覆盖。
+时间线功能为会话提供了版本控制能力。在会话任意节点可以创建检查点快照，记录当前状态。可视化时间线展示会话的演进路径，支持查看两个检查点之间的代码差异，一键回滚到任意历史状态，也可以从检查点派生新的会话分支。
 
-### 4. 使用分析仪表盘
+这个功能的实际价值在于：当你让 Agent 执行一个高风险操作（比如大规模重构）时，可以先创建一个检查点，操作结果不满意直接回滚，零成本试错。
 
-#### 成本追踪
+## CLAUDE.md 编辑器
 
-实时监控 Claude API 使用情况：
+内置的 Markdown 编辑器用于管理项目配置文件。左侧编辑、右侧实时预览，完整支持语法高亮。opcode 自动扫描发现所有 CLAUDE.md 文件，修改后立即应用于当前会话。
 
-- **总成本**：会话累计花费
-- **模型分布**：按模型类型细分成本
-- **时间趋势**：每日/每周使用图表
-
-#### Token 分析
-
-详细的 Token 使用明细：
-
-| 指标 | 说明 |
-|------|------|
-| Input Tokens | 输入消耗 |
-| Output Tokens | 输出消耗 |
-| Context Usage | 上下文利用率 |
-| Cache Hit Rate | 缓存命中率 |
-
-#### 数据导出
-
-支持导出使用数据用于财务分析或团队核算。
-
-### 5. MCP Server 管理
-
-Model Context Protocol（MCP）服务器统一管理：
-
-- **服务器注册表**：集中管理所有 MCP 服务器
-- **配置导入**：从 Claude Desktop 导入现有配置
-- **连接测试**：验证服务器可用性
-- **动态启用**：按会话选择性启用服务器
-
-### 6. 时间线与检查点
-
-这是 opcode 独有的版本控制功能：
-
-#### 检查点创建
-
-在会话任意节点创建快照：
-
-```
-Session → Create Checkpoint → 记录当前状态
-```
-
-#### 时间线导航
-
-可视化展示会话历史：
-
-- **分支展示**：显示会话的演进路径
-- **差异对比**：查看检查点之间的代码变化
-- **一键回滚**：恢复到任意历史状态
-- **分支派生**：从检查点创建新的会话分支
-
-### 7. CLAUDE.md 编辑器
-
-内置 Markdown 编辑器管理项目配置：
-
-- **实时预览**：左侧编辑，右侧渲染
-- **语法高亮**：完整 Markdown 支持
-- **项目扫描**：自动发现所有 CLAUDE.md 文件
-- **即时生效**：修改后立即应用于会话
-
----
-
-## 三、安装指南
+## 安装指南
 
 ### 系统要求
 
@@ -229,463 +85,83 @@ Session → Create Checkpoint → 记录当前状态
 | 存储 | 至少 1GB 可用空间 |
 | Claude Code | 必须已安装 Claude Code CLI |
 
-### 前置依赖安装
+### 前置依赖
 
-#### 1. Rust 环境
+Rust 环境通过 rustup 安装（macOS/Linux 使用 `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`，Windows 下载 rustup-init.exe）。安装后通过 `rustc --version` 和 `cargo --version` 验证。
 
-```bash
-# macOS/Linux
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+Bun 运行时在 macOS/Linux 通过 `curl -fsSL https://bun.sh/install | bash` 安装，Windows 使用 `powershell -c "irm bun.sh/install.ps1 | iex"`。安装后通过 `bun --version` 验证。
 
-# Windows: 下载 rustup-init.exe
-# https://rustup.rs/
-```
+Claude Code CLI 从 claude.ai/code 下载安装，确保 `claude` 命令在 PATH 中可用。
 
-验证安装：
-
-```bash
-rustc --version
-cargo --version
-```
-
-#### 2. Bun 运行时
-
-```bash
-# macOS/Linux
-curl -fsSL https://bun.sh/install | bash
-
-# Windows
-powershell -c "irm bun.sh/install.ps1 | iex"
-```
-
-验证安装：
-
-```bash
-bun --version
-```
-
-#### 3. Claude Code CLI
-
-从 [Claude 官网](https://claude.ai/code) 下载安装，确保 `claude` 命令在 PATH 中：
-
-```bash
-claude --version
-```
-
-#### 4. 平台特定依赖
-
-**Linux (Ubuntu/Debian)**：
-
-```bash
-sudo apt update
-sudo apt install -y \
-  libwebkit2gtk-4.1-dev \
-  libgtk-3-dev \
-  libayatana-appindicator3-dev \
-  librsvg2-dev \
-  patchelf \
-  build-essential \
-  curl \
-  wget \
-  file \
-  libssl-dev \
-  libxdo-dev \
-  libsoup-3.0-dev \
-  libjavascriptcoregtk-4.1-dev
-```
-
-**macOS**：
-
-```bash
-# 安装 Xcode 命令行工具
-xcode-select --install
-
-# 可选：安装 pkg-config
-brew install pkg-config
-```
-
-**Windows**：
-
-- 安装 [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-- 确认已安装 WebView2（Windows 11 已预装）
+平台特定依赖方面，Linux (Ubuntu/Debian) 需要安装 libwebkit2gtk-4.1-dev、libgtk-3-dev 等系统库；macOS 需要 Xcode 命令行工具（`xcode-select --install`）；Windows 需要 Microsoft C++ Build Tools 和 WebView2。
 
 ### 构建步骤
 
-#### 1. 克隆仓库
+克隆仓库后执行 `bun install` 安装前端依赖。开发模式通过 `bun run tauri dev` 启动，支持热重载。生产构建使用 `bun run tauri build`，构建产物位于 `src-tauri/target/release/` 目录下，不同平台输出不同格式的可执行文件。
 
-```bash
-git clone https://github.com/winfunc/opcode.git
-cd opcode
-```
+Debug 构建使用 `bun run tauri build --debug`，编译更快但体积更大。macOS 可以通过 `--target universal-apple-darwin` 构建同时支持 Intel 和 Apple Silicon 的通用二进制。
 
-#### 2. 安装前端依赖
+## 使用流程
 
-```bash
-bun install
-```
+启动应用后，opcode 自动扫描 `~/.claude` 目录，欢迎界面可以选择进入 CC Agents 或 Projects。
 
-#### 3. 开发模式运行
+项目管理的路径是 Projects → 项目列表 → 点击项目查看会话。每个项目卡片显示名称、最近活动时间和会话数量。恢复会话的路径是 项目详情 → 会话列表 → 点击会话 → Resume，恢复后保持完整上下文。
 
-```bash
-bun run tauri dev
-```
+创建自定义 Agent 的路径是 CC Agents → Create Agent → 配置参数 → 保存。配置分为四步：填写基本信息（名称、图标、模型），编写系统提示词定义行为指令和输出格式，配置文件读写和网络访问权限，最后点击 Create 保存。
 
-这会启动开发服务器并打开应用窗口，支持热重载。
-
-#### 4. 生产构建
-
-```bash
-bun run tauri build
-```
-
-构建产物位置：
-
-| 平台 | 输出路径 |
-|------|----------|
-| Linux | `src-tauri/target/release/opcode` |
-| macOS | `src-tauri/target/release/opcode.app` |
-| Windows | `src-tauri/target/release/opcode.exe` |
-
-#### 5. 特殊构建选项
-
-**Debug 构建（更快编译，更大体积）**：
-
-```bash
-bun run tauri build --debug
-```
-
-**macOS Universal Binary（Intel + Apple Silicon）**：
-
-```bash
-bun run tauri build --target universal-apple-darwin
-```
-
----
-
-## 四、使用指南
-
-### 启动与初次配置
-
-1. **启动应用**：双击 `opcode.exe`（Windows）或运行 `./opcode`（Linux/macOS）
-2. **自动检测**：opcode 会自动扫描 `~/.claude` 目录
-3. **欢迎界面**：选择进入「CC Agents」或「Projects」
-
-### 管理项目与会话
-
-#### 查看项目
-
-```
-Projects → 项目列表 → 点击项目查看会话
-```
-
-每个项目卡片显示：
-- 项目名称
-- 最近活动时间
-- 会话数量
-
-#### 恢复会话
-
-```
-项目详情 → 会话列表 → 点击会话 → Resume
-```
-
-会话恢复后保持完整上下文，可直接继续对话。
-
-### 创建自定义 Agent
-
-#### 步骤详解
-
-```
-CC Agents → Create Agent → 配置参数 → 保存
-```
-
-1. **基本信息**：
-   - 输入 Agent 名称
-   - 选择图标类型
-   - 选择模型（Opus/Sonnet/Haiku）
-
-2. **系统提示词**：
-   - 编写 Agent 的行为指令
-   - 定义任务处理流程
-   - 设置输出格式要求
-
-3. **权限配置**：
-   - 文件读权限
-   - 文件写权限
-   - 网络访问权限
-
-4. **保存并测试**：点击「Create」保存 Agent
-
-#### Agent 最佳实践
-
-| 类型 | 推荐模型 | 提示词要点 |
-|------|----------|------------|
+| Agent 类型 | 推荐模型 | 提示词要点 |
+|------------|----------|------------|
 | 简单任务 | Haiku | 简洁明确的指令 |
 | 通用任务 | Sonnet | 结构化的步骤说明 |
 | 复杂推理 | Opus | 详细的上下文和示例 |
 
-### 导入预置 Agent
+导入预置 Agent 支持两种方式：从 GitHub 浏览官方仓库导入，或从本地 .opcode.json 文件导入。
 
-#### 从 GitHub 导入
+执行 Agent 任务时，前台执行适合短时间任务，可以实时查看进度；后台执行适合长时间任务，Agent 在独立进程运行。执行历史记录每次任务的开始结束时间、任务描述、执行结果和 Token 使用量。
 
-```
-CC Agents → Import → From GitHub → 浏览 Agent → Import Agent
-```
+时间线功能在 Session → Timeline 中使用，创建检查点后随时可以回滚或查看差异。
 
-官方仓库提供三个预置 Agent，可直接导入使用。
+MCP Server 配置在 Menu → MCP Manager 中管理，支持手动添加 JSON 配置或从 Claude Desktop 自动导入。
 
-#### 从文件导入
+使用分析仪表盘在 Menu → Usage Dashboard 中查看，展示实时成本、Token 分布饼图、趋势折线图，支持导出 CSV/JSON 数据。
 
-```
-CC Agents → Import → From File → 选择 .opcode.json 文件
-```
-
-下载 Agent 配置文件后本地导入。
-
-### 执行 Agent 任务
-
-#### 前台执行
-
-```
-选择 Agent → 设置任务描述 → Execute (Foreground)
-```
-
-实时查看执行进度，适合短任务。
-
-#### 后台执行
-
-```
-选择 Agent → 设置任务描述 → Execute (Background)
-```
-
-Agent 在独立进程运行，适合长时间任务。
-
-#### 查看执行历史
-
-```
-CC Agents → Agent 详情 → Execution History
-```
-
-显示每次执行的：
-- 开始/结束时间
-- 任务描述
-- 执行结果
-- Token 使用量
-
-### 使用时间线功能
-
-#### 创建检查点
-
-在会话过程中随时创建：
-
-```
-Session → Timeline → Create Checkpoint
-```
-
-#### 回滚到检查点
-
-```
-Timeline → 选择检查点 → Restore
-```
-
-#### 查看差异
-
-```
-Timeline → 选择两个检查点 → View Diff
-```
-
-### 配置 MCP Server
-
-```
-Menu → MCP Manager → Add Server
-```
-
-#### 手动添加
-
-输入服务器配置 JSON：
-
-```json
-{
-  "name": "my-server",
-  "command": "node",
-  "args": ["server.js"],
-  "env": {}
-}
-```
-
-#### 从 Claude Desktop 导入
-
-```
-MCP Manager → Import from Claude Desktop
-```
-
-自动读取 Claude Desktop 的 MCP 配置。
-
-### 查看使用分析
-
-```
-Menu → Usage Dashboard
-```
-
-仪表盘显示：
-
-- **实时成本**：当前会话花费
-- **Token 分布**：饼图展示输入/输出比例
-- **趋势图表**：折线图展示使用趋势
-- **导出功能**：下载 CSV/JSON 数据
-
----
-
-## 五、进阶技巧
+## 进阶技巧
 
 ### Agent 提示词模板
 
-#### 代码审查 Agent
+代码审查 Agent 的提示词结构分为三层：role 定义审查专家身份，task 列出审查关注点（代码风格、潜在 Bug、性能问题、安全漏洞），output_format 规定按文件、行号、问题类型输出表格和总体评分。这种结构化提示词让 Agent 的输出格式稳定可预期。
 
-```markdown
-<role>
-你是一位资深代码审查专家，专注于发现代码质量问题。
-</role>
+文档生成 Agent 的提示词同样采用 role-task-output_format 三层结构，task 部分要求分析函数签名、生成参数说明、编写使用示例和补充注意事项，输出使用 Markdown 格式包含函数名称、参数表格、返回值说明和代码示例。
 
-<task>
-审查提交的代码变更，关注：
-1. 代码风格一致性
-2. 潜在的 Bug
-3. 性能问题
-4. 安全漏洞
-</task>
+### 进程隔离机制
 
-<output_format>
-按以下格式输出审查报告：
-## 问题清单
-| 文件 | 行号 | 问题类型 | 描述 | 建议 |
-## 总体评价
-评分：A/B/C/D
-总结：...
-</output_format>
-```
-
-#### 文档生成 Agent
-
-```markdown
-<role>
-你是一位技术文档撰写专家。
-</role>
-
-<task>
-为代码模块生成 API 文档：
-1. 分析函数签名和注释
-2. 生成参数说明
-3. 编写使用示例
-4. 补充注意事项
-</task>
-
-<output_format>
-使用 Markdown 格式，包含：
-- 函数名称和描述
-- 参数表格
-- 返回值说明
-- 使用示例代码块
-- 注意事项列表
-</output_format>
-```
-
-### 进程隔离原理
-
-opcode 的 Agent 运行在独立进程：
-
-```
-主进程 (Tauri)
-    ├── UI 进程 (React)
-    ├── Agent 进程 1 (Claude Code subprocess)
-    ├── Agent 进程 2
-    └── ...
-```
-
-**优势**：
-- Agent 崩溃不影响主界面
-- 并行执行多个任务
-- 资源占用可控
+opcode 的 Agent 运行在独立子进程中，与主 Tauri 进程和 React UI 进程分离。这种架构带来三个直接好处：Agent 崩溃不会影响主界面稳定性，多个 Agent 可以并行执行互不干扰，每个 Agent 的资源占用可以单独监控和控制。
 
 ### 数据存储位置
 
 | 数据类型 | 存储路径 |
 |----------|----------|
-| Agent 配置 | `~/.opcode/agents/` |
-| 检查点数据 | `~/.opcode/checkpoints/` |
-| 使用记录 | `~/.opcode/analytics.db` |
-| MCP 配置 | `~/.claude/mcp_servers.json` |
+| Agent 配置 | ~/.opcode/agents/ |
+| 检查点数据 | ~/.opcode/checkpoints/ |
+| 使用记录 | ~/.opcode/analytics.db |
+| MCP 配置 | ~/.claude/mcp_servers.json |
 
----
+## 常见问题排查
 
-## 六、常见问题
+构建时出现 "cargo not found" 错误，通常是 Rust 环境变量未加载。执行 `source ~/.cargo/env` 或重启终端，确认 `cargo --version` 正常输出即可。
 
-### 1. 构建失败 "cargo not found"
+Linux 上 "webkit2gtk not found" 需要安装系统依赖：`sudo apt install libwebkit2gtk-4.1-dev`。
 
-**解决方案**：
+Windows 上 "MSVC not found" 需要安装 Visual Studio Build Tools 并选择 C++ 构建工具工作负载，安装后重启终端。
 
-```bash
-# 确保 Rust 已安装
-source ~/.cargo/env  # 或重启终端
-cargo --version
-```
+"claude command not found" 说明 Claude Code CLI 未安装或不在 PATH 中。先通过 `claude --version` 确认安装状态，Windows 需要手动将安装路径添加到 PATH。
 
-### 2. Linux "webkit2gtk not found"
+构建过程中内存不足时，可以通过 `cargo build -j 2` 减少并行编译任务数来降低内存占用。
 
-**解决方案**：
-
-```bash
-sudo apt install libwebkit2gtk-4.1-dev
-```
-
-### 3. Windows "MSVC not found"
-
-**解决方案**：
-- 安装 Visual Studio Build Tools
-- 选择「C++ 构建工具」工作负载
-- 重启终端
-
-### 4. "claude command not found"
-
-**解决方案**：
-
-```bash
-# 确保 Claude Code CLI 已安装
-claude --version
-
-# Windows: 添加到 PATH
-# macOS/Linux: 确认 /usr/local/bin 在 PATH
-```
-
-### 5. 构建内存不足
-
-**解决方案**：
-
-```bash
-# 减少并行编译
-cargo build -j 2
-```
-
----
-
-## 七、项目资源
+## 项目资源
 
 | 资源 | 链接 |
 |------|------|
 | GitHub 仓库 | [winfunc/opcode](https://github.com/winfunc/opcode) |
 | Discord 社区 | [Join Discord](https://discord.com/invite/KYwhHVzUsY) |
 | 许可证 | AGPL-3.0 |
-
----
-
-## 八、总结
-
-opcode 为 Claude Code 提供了完整的桌面 GUI 体验：
-
-| 功能 | 价值 |
-|------|------|
-| 自定义 Agent | 定制专属 AI 工作流 |
-| 会话管理 | 可视化管理所有对话 |
-| 成本追踪 | 实时监控 API 开销 |
-| 时间线回滚 | 版本控制式的会话管理 |
-| MCP 管理 | 统一配置扩展服务 |

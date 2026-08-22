@@ -1,111 +1,47 @@
 ---
-title: Computer Use：桌面控制的九层安全关卡
+title: Computer Use 桌面控制的九层安全关卡
 date: 2026-04-06
 tags: Computer Use
 categories: Claude Code
 ---
 
-> Computer Use 是 Claude Code 最具争议也最强大的能力——AI 可以直接操控你的桌面，点击按钮、输入文字、截图分析。这听起来像科幻电影，但 Claude Code 实现了一个九层安全关卡系统，确保每一步操作都在可控范围内。更关键的是，它通过 Python Bridge 实现跨语言通信，让 TypeScript 代理驱动 Python 执行器。
+Claude Code 的 Computer Use 功能让 AI 直接操控桌面环境：点击按钮、输入文字、截图分析界面状态。AI 能看见屏幕并操作鼠标键盘，带来的安全风险同样真实：误删文件、点错按钮、泄露敏感信息。为此，Claude Code 设计了一套九层安全关卡系统，每一层都可以独立拦截危险操作。底层通过 Python Bridge 实现跨语言通信，TypeScript 代理驱动 Python 执行器完成实际的桌面交互。
 
 <!-- more -->
 
-## 导读：当 AI 控制你的屏幕
+## 整体架构与 Python 选型
 
-想象这个场景：
-
-> Claude Code 正在帮你调试一个 GUI 应用。它打开应用窗口，点击菜单，输入测试数据，截图分析结果，然后告诉你"登录按钮在点击后无响应"。
-
-这就是 **Computer Use**——AI 直接操控桌面环境的能力。
-
-但这也带来巨大的安全风险：AI 可能误删文件、点击错误按钮、泄露敏感信息。Claude Code 的解决方案是**九层安全关卡**，每一层都可以中断操作。
-
----
-
-## 一、Computer Use 架构概览
-
-### 1.1 整体架构
+Computer Use 的整体架构是一个典型的跨语言代理模式。Claude Code（TypeScript）负责策略决策和权限控制，Python 进程负责执行实际的桌面操作，两者通过 JSON-RPC over stdio 进行通信。这个分层设计的好处是职责清晰：TypeScript 层处理安全逻辑和模型交互，Python 层专注平台 API 调用。
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Computer Use 架构                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Claude Code (TypeScript)                                   │
-│       ↓                                                     │
-│  Computer Use Tool                                          │
-│       ↓                                                     │
-│  JSON-RPC over stdio                                        │
-│       ↓                                                     │
-│  Python Bridge (computer_controller.py)                     │
-│       ↓                                                     │
-│  Platform Abstraction Layer                                 │
-│       ├─ Windows: pyautogui + Win32 API                    │
-│       ├─ macOS: PyObjC + AppleScript                       │
-│       └─ Linux: xdotool + Gdk/Xlib                         │
-│       ↓                                                     │
-│  Desktop Environment                                        │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+Claude Code (TypeScript)
+    ↓ JSON-RPC over stdio
+Python Bridge (computer_controller.py)
+    ↓ Platform Abstraction
+Desktop Environment
 ```
 
-### 1.2 为什么用 Python？
+选择 Python 而非 TypeScript 原生实现桌面操作，核心原因是生态成熟度。pyautogui、PyObjC、xdotool 这些库已经稳定运行多年，跨平台接口一致。如果在 TypeScript 中通过 native addon 调用系统 API，维护成本会显著增加。
 
-虽然 Claude Code 是 TypeScript 项目，但 Computer Use 使用 Python 实现：
+| 选型因素 | Python 方案 | TypeScript 原生方案 |
+|---|---|---|
+| 库生态 | pyautogui/PyObjC 成熟稳定 | 需要 native addon，生态碎片化 |
+| 跨平台一致性 | 三平台接口统一 | 每个平台需单独封装 |
+| 开发迭代速度 | 纯 Python 快速修改 | 编译 native 代码，迭代慢 |
+| 维护成本 | 社区维护，更新频繁 | 需自行适配各系统 API 变更 |
 
-| 原因 | 说明 |
-|------|------|
-| **生态成熟** | pyautogui、PyObjC 等库已稳定运行多年 |
-| **跨平台** | Python GUI 库对 Windows/macOS/Linux 支持一致 |
-| **快速迭代** | 不需要为每个平台单独编写 native 代码 |
+## 24 个桌面操作工具
 
----
+Computer Use 提供了 24 个工具，覆盖输入、显示、文件、进程四个类别。输入类工具处理鼠标点击、双击、拖拽、滚轮滚动、键盘组合键、单键按压、文字输入和剪贴板粘贴。显示类工具负责屏幕截图、获取屏幕尺寸、窗口列表查询、窗口激活、窗口位置和尺寸获取。文件类工具包括读写删除列目录移动复制和查看文件信息。进程类工具提供进程列表查询、启动新进程和终止进程三个操作。
 
-## 二、24 个桌面操作工具
+| 类别 | 工具数 | 核心能力 |
+|---|---|---|
+| 输入（Input） | 9 | 鼠标点击/拖拽/滚动、键盘输入/组合键、剪贴板粘贴 |
+| 显示（Display） | 6 | 截图、屏幕尺寸、窗口列表/激活/位置/尺寸 |
+| 文件（File） | 7 | 读写删除列目录移动复制、文件信息查询 |
+| 进程（Process） | 3 | 进程列表、启动进程、终止进程 |
 
-### 2.1 工具分类
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   24 个 Computer Use 工具                    │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  输入类（Input）                                             │
-│    ├─ computer_mouse_click      左键/右键/中键点击          │
-│    ├─ computer_mouse_double_click 双击                     │
-│    ├─ computer_mouse_drag       拖拽操作                    │
-│    ├─ computer_mouse_move       移动鼠标                    │
-│    ├─ computer_mouse_scroll     滚轮滚动                    │
-│    ├─ computer_keyboard_hotkey  组合键（Ctrl+C 等）         │
-│    ├─ computer_keyboard_press   单键按下                    │
-│    ├─ computer_keyboard_type    文字输入                    │
-│    └─ computer_clipboard_paste  粘贴内容                    │
-│                                                             │
-│  显示类（Display）                                           │
-│    ├─ computer_screen_capture   截图                        │
-│    ├─ computer_screen_get_size  获取屏幕尺寸                │
-│    ├─ computer_window_list      窗口列表                    │
-│    ├─ computer_window_activate  激活窗口                    │
-│    ├─ computer_window_get_position 窗口位置                 │
-│    └─ computer_window_get_size  窗口尺寸                    │
-│                                                             │
-│  文件类（File）                                              │
-│    ├─ computer_file_read        读取文件                    │
-│    ├─ computer_file_write       写入文件                    │
-│    ├─ computer_file_delete      删除文件                    │
-│    ├─ computer_file_list        列出目录                    │
-│    ├─ computer_file_move        移动文件                    │
-│    ├─ computer_file_copy        复制文件                    │
-│    └─ computer_file_info        文件信息                    │
-│                                                             │
-│  进程类（Process）                                           │
-│    ├─ computer_process_list     进程列表                    │
-│    ├─ computer_process_start    启动进程                    │
-│    └─ computer_process_kill     杀死进程                    │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 2.2 工具定义示例
+以鼠标点击工具为例，工具定义通过 JSON Schema 描述参数结构，包括坐标、按钮类型、点击次数。Claude Code 将这些定义注册为可调用的 tool，模型在需要操作桌面时通过 tool_use 发起调用。
 
 ```typescript
 // src/tools/ComputerUseTool/tools.ts
@@ -116,8 +52,8 @@ const computer_mouse_click = {
     properties: {
       x: { type: 'number', description: 'X coordinate' },
       y: { type: 'number', description: 'Y coordinate' },
-      button: { 
-        type: 'string', 
+      button: {
+        type: 'string',
         enum: ['left', 'right', 'middle'],
         default: 'left'
       },
@@ -129,54 +65,23 @@ const computer_mouse_click = {
 }
 ```
 
----
+## 九层安全关卡
 
-## 三、九层安全关卡
+安全设计是 Computer Use 系统的核心。九层关卡从外到内层层递进，每一层都可以独立拦截操作。这不是理论设计，而是实际代码中的检查链：操作必须通过所有关卡才能执行，任何一层返回 deny 都会立即终止。
 
-### 3.1 安全关卡架构
+| 关卡 | 名称 | 拦截规则 |
+|---|---|---|
+| Gate 1 | 功能门控 | tengu_computer_use Feature Flag 必须开启 |
+| Gate 2 | 用户确认 | 首次使用弹出确认对话框，用户必须授权 |
+| Gate 3 | 操作类型检查 | 写操作需要额外的写权限确认 |
+| Gate 4 | 路径约束 | 文件操作限制在白名单目录，禁止访问 .git、.claude、系统目录 |
+| Gate 5 | 危险命令过滤 | 拦截 rm -rf、killall 等命令，禁止访问密码管理器和银行应用 |
+| Gate 6 | 屏幕边界检查 | 鼠标坐标必须在屏幕分辨率范围内，窗口操作必须针对可见窗口 |
+| Gate 7 | 操作频率限制 | 每秒最多 10 次操作，连续失败 3 次自动暂停 |
+| Gate 8 | 截图内容分析 | 检测密码框、私人信息等敏感内容，检测错误弹窗 |
+| Gate 9 | 实时监控 | 用户随时 Ctrl+C 中断，操作日志实时输出 |
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    九层安全关卡                              │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Gate 1: 功能门控（Feature Gate）                           │
-│    └─ tengu_computer_use Feature Flag 必须开启             │
-│                                                             │
-│  Gate 2: 用户确认（User Consent）                           │
-│    └─ 首次使用弹出确认对话框                                │
-│                                                             │
-│  Gate 3: 操作类型检查（Action Type）                        │
-│    └─ 读写操作需要额外确认                                  │
-│                                                             │
-│  Gate 4: 路径约束（Path Constraint）                        │
-│    ├─ 文件操作限制在白名单目录                              │
-│    └─ 禁止访问 .git、.claude、系统目录                      │
-│                                                             │
-│  Gate 5: 危险命令过滤（Dangerous Command）                   │
-│    ├─ 禁止 rm -rf、killall 等命令                          │
-│    ├─ 禁止访问密码管理器、银行应用                          │
-│                                                             │
-│  Gate 6: 屏幕边界检查（Screen Boundary）                    │
-│    ├─ 鼠标坐标必须在屏幕范围内                              │
-│    └─ 窗口操作必须针对可见窗口                              │
-│                                                             │
-│  Gate 7: 操作频率限制（Rate Limit）                         │
-│    ├─ 每秒最多 10 次操作                                    │
-│    └─ 连续失败 3 次暂停                                     │
-│                                                             │
-│  Gate 8: 截图内容分析（Screenshot Analysis）                │
-│    ├─ 检测敏感内容（密码框、私人信息）                      │
-│    └─ 检测错误弹窗                                          │
-│                                                             │
-│  Gate 9: 实时监控（Real-time Monitoring）                   │
-│    ├─ 用户可随时按 Ctrl+C 中断                             │
-│    ├─ 操作日志实时输出                                      │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 3.2 Gate 实现示例
+代码实现上，gateComputerUseAction 函数按顺序执行所有检查，返回 allow、deny 或 ask 三种结果。前七层在操作执行前完成检查，Gate 8 在截图后进行内容分析，Gate 9 贯穿整个操作生命周期。
 
 ```typescript
 // src/tools/ComputerUseTool/security.ts
@@ -232,11 +137,9 @@ function gateComputerUseAction(
 }
 ```
 
----
+## 跨语言通信桥梁
 
-## 四、Python Bridge 通信协议
-
-### 4.1 JSON-RPC over stdio
+TypeScript 和 Python 之间的通信基于 JSON-RPC 2.0 协议，传输层使用 stdio。TypeScript 端构造标准 JSON-RPC 请求（包含 method、params、id），写入 Python 进程的 stdin，然后从 stdout 读取响应。这种设计避免了 HTTP 开销，同时保持了协议的标准化。
 
 ```typescript
 // src/tools/ComputerUseTool/bridge.ts
@@ -276,7 +179,7 @@ async function callBridge(method: string, params: unknown): Promise<unknown> {
 }
 ```
 
-### 4.2 Python 执行器
+Python 端的 ComputerController 维护一个方法名到处理函数的映射表，循环读取 stdin 中的 JSON-RPC 请求，分发到对应的处理器执行，将结果或错误写回 stdout。每个请求独立处理，异常不会中断整个进程。
 
 ```python
 # computer_controller.py
@@ -334,29 +237,9 @@ class ComputerController:
         return base64.b64encode(screenshot).decode('utf-8')
 ```
 
----
+## 截图分析与窗口管理
 
-## 五、截图分析机制
-
-### 5.1 截图流程
-
-```
-Model 决定截图
-    ↓
-computer_screen_capture 工具调用
-    ↓
-Python Bridge 执行 pyautogui.screenshot()
-    ↓
-PNG → Base64 编码
-    ↓
-返回给 Claude Code
-    ↓
-作为 image block 注入对话
-    ↓
-Model 多模态分析
-```
-
-### 5.2 截图内容过滤
+截图是 Computer Use 感知环境的主要手段。模型决定截图后，computer_screen_capture 工具通过 Python Bridge 调用 pyautogui.screenshot()，将 PNG 编码为 Base64 返回给 Claude Code，作为 image block 注入当前对话上下文，模型通过多模态能力分析截图内容。在截图注入之前，系统会通过本地 OCR 检测敏感关键词（password、secret、api key、token 等），如果命中则对敏感区域进行模糊处理。
 
 ```typescript
 // src/tools/ComputerUseTool/screenshotFilter.ts
@@ -368,7 +251,7 @@ async function filterScreenshot(
 
   // 2. 检测敏感关键词
   const sensitiveKeywords = ['password', 'secret', 'api key', 'token']
-  const foundSensitive = sensitiveKeywords.some(k => 
+  const foundSensitive = sensitiveKeywords.some(k =>
     detectedText.toLowerCase().includes(k)
   )
 
@@ -384,11 +267,7 @@ async function filterScreenshot(
 }
 ```
 
----
-
-## 六、窗口管理系统
-
-### 6.1 窗口发现
+窗口管理涉及三个平台各自的窗口 API 差异。系统定义了统一的 WindowInfo 接口（包含 id、title、process、position、size、visible 字段），各平台适配层负责将系统原生窗口信息转换为这个统一格式。激活窗口前会检查目标是否属于敏感应用（密码管理器、银行应用等），如果是则拒绝激活。
 
 ```typescript
 // 窗口列表返回格式
@@ -401,16 +280,6 @@ interface WindowInfo {
   visible: boolean
 }
 
-// 示例返回
-[
-  { id: 1234, title: 'VS Code', process: 'code', position: { x: 0, y: 0 }, size: { width: 1920, height: 1080 }, visible: true },
-  { id: 5678, title: 'Chrome', process: 'chrome', position: { x: 100, y: 100 }, size: { width: 800, height: 600 }, visible: true },
-]
-```
-
-### 6.2 窗口激活策略
-
-```typescript
 // 激活窗口的安全检查
 async function activateWindow(windowId: number): Promise<void> {
   // 1. 检查窗口是否存在
@@ -430,11 +299,9 @@ async function activateWindow(windowId: number): Promise<void> {
 }
 ```
 
----
+## 审计日志与中断机制
 
-## 七、操作审计日志
-
-### 7.1 日志格式
+所有 Computer Use 操作都会记录审计日志，包括时间戳、操作类型、参数、执行结果（success/deny/error）、拒绝原因和执行耗时，可选附加操作后的截图。日志以 JSONL 格式持久化到 .claude/computer_use_history.jsonl，便于事后追溯和问题排查。
 
 ```typescript
 interface ComputerUseLogEntry {
@@ -447,17 +314,6 @@ interface ComputerUseLogEntry {
   screenshot?: string  // 操作后的截图（可选）
 }
 
-// 示例日志
-[
-  { timestamp: 1712345678, action: 'mouse_click', params: { x: 100, y: 200 }, result: 'success', duration: 50 },
-  { timestamp: 1712345680, action: 'keyboard_type', params: { text: 'hello' }, result: 'success', duration: 100 },
-  { timestamp: 1712345682, action: 'file_delete', params: { path: '/etc/passwd' }, result: 'deny', reason: 'Dangerous path', duration: 0 },
-]
-```
-
-### 7.2 日志存储
-
-```typescript
 // 日志持久化到文件
 const LOG_PATH = '.claude/computer_use_history.jsonl'
 
@@ -467,39 +323,7 @@ async function appendLog(entry: ComputerUseLogEntry): Promise<void> {
 }
 ```
 
----
-
-## 八、中断机制
-
-### 8.1 Ctrl+C 中断
-
-```typescript
-// 监听中断信号
-process.on('SIGINT', async () => {
-  // 1. 通知 Python Bridge 停止
-  await callBridge('stop', {})
-
-  // 2. 恢复鼠标状态
-  await callBridge('mouse_move', { x: lastSafeX, y: lastSafeY })
-
-  // 3. 记录中断
-  appendLog({
-    timestamp: Date.now(),
-    action: 'interrupt',
-    params: {},
-    result: 'success',
-    reason: 'User pressed Ctrl+C',
-    duration: 0,
-  })
-
-  // 4. 提示用户
-  console.log('\nComputer Use interrupted. All operations stopped.')
-})
-```
-
-### 8.2 紧急停止
-
-Python Bridge 维护一个紧急停止标志：
+中断机制是安全体系的最后一道防线。用户按下 Ctrl+C 后，TypeScript 进程通知 Python Bridge 停止执行，将鼠标移到安全位置，记录中断事件到审计日志。Python 端维护一个 emergency_stop 标志，收到停止信号后退出主循环并将鼠标恢复到预设的安全坐标。这个设计确保即使在极端情况下，用户也能立即夺回控制权。
 
 ```python
 # computer_controller.py
@@ -517,11 +341,9 @@ class ComputerController:
         pyautogui.moveTo(self.safe_x, self.safe_y)
 ```
 
----
+## 三平台适配
 
-## 九、平台适配层
-
-### 9.1 Windows 实现
+三个平台的窗口操作 API 差异显著。Windows 通过 ctypes 调用 Win32 API（GetForegroundWindow、GetWindowTextW），macOS 通过 PyObjC 访问 NSWorkspace，Linux 依赖 xdotool 命令行工具。每个平台适配层都需要实现窗口获取、激活、位置查询、尺寸查询等完整接口。
 
 ```python
 # platform/windows.py
@@ -541,8 +363,6 @@ def get_window_title(hwnd):
     ctypes.windll.user32.GetWindowTextW(hwnd, title, length + 1)
     return title.value
 ```
-
-### 9.2 macOS 实现
 
 ```python
 # platform/macos.py
@@ -564,8 +384,6 @@ def activate_window(title):
             app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps)
             break
 ```
-
-### 9.3 Linux 实现
 
 ```python
 # platform/linux.py
@@ -591,9 +409,7 @@ def get_window_title(window_id):
     return result.stdout.strip()
 ```
 
----
-
-## 十、关键源文件索引
+## 关键源文件索引
 
 | 文件 | 职责 |
 |------|------|
@@ -606,21 +422,6 @@ def get_window_title(window_id):
 | `platform/windows.py` | Windows 平台适配 |
 | `platform/macos.py` | macOS 平台适配 |
 | `platform/linux.py` | Linux 平台适配 |
-
----
-
-## 十一、总结
-
-Claude Code 的 Computer Use 系统体现了几个核心设计原则：
-
-1. **九层防御**：从功能门控到实时监控，层层把关
-2. **跨语言架构**：TypeScript 代理 + Python 执行器
-3. **JSON-RPC 协议**：简单高效的跨进程通信
-4. **平台抽象**：统一接口，底层适配三大操作系统
-5. **审计日志**：完整记录所有操作，便于追溯
-6. **用户可控**：随时 Ctrl+C 中断，恢复安全状态
-
-这个设计让 AI 真正能够"看见"和"操控"桌面环境，同时保持高度安全性。
 
 ---
 

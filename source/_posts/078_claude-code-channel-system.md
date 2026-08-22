@@ -5,31 +5,13 @@ tags: Channel
 categories: Claude Code
 ---
 
-> 你在手机上打开 Telegram，给 Claude Code 发一条消息，它就开始在你的电脑上工作——这就是 Channel 系统。它打破了 AI 编程助手只能在终端中交互的限制，实现了真正的远程控制。更精妙的是，它有六层访问控制和权限中继机制，确保安全性。
+你在手机上打开 Telegram，给 Claude Code 发一条消息，它就开始在电脑上工作。Channel 系统的本质是打破了 AI 编程助手只能在终端中交互的限制，让任何 IM 平台都能成为远程控制入口。它通过六层访问控制和权限中继机制来保障安全性，同时基于 MCP 协议实现了对多种 IM 平台的兼容。
 
 <!-- more -->
 
-## 导读：打破终端的边界
+## Channel 的本质是 MCP Server
 
-传统的 AI 编程助手只能在终端中交互。如果你想让它工作，你必须坐在电脑前。
-
-Channel 系统改变了这一切：
-- 你在手机上通过 Telegram 发消息
-- Claude Code 收到消息，理解意图，执行操作
-- 结果回复到你的 Telegram 聊天窗口
-
-**这不是简单的消息转发**——这是一个完整的远程控制系统：
-- 六层访问控制确保只有授权的 Channel 能推送消息
-- 权限中继让你在手机上也能审批危险操作
-- MCP 协议让任何 IM 平台都能集成
-
----
-
-## 一、Channel 的本质
-
-### 1.1 Channel 就是一个 MCP Server
-
-从技术角度看，一个 Channel 就是一个特殊的 **MCP Server**：
+一个 Channel 在技术上就是一个特殊的 MCP Server，它通过能力声明告诉 Claude Code 自己支持 Channel 功能。
 
 ```typescript
 // Channel 的能力声明
@@ -41,7 +23,7 @@ Channel 系统改变了这一切：
 }
 ```
 
-### 1.2 Channel 的两种形态
+Channel 有两种形态：一种是来自 marketplace 的验证插件（plugin），需要白名单审批；另一种是直接指定的 MCP 服务器名称（server），需要 dev 模式旁路。
 
 ```typescript
 type ChannelEntry =
@@ -51,61 +33,22 @@ type ChannelEntry =
 
 | 形态 | 说明 | 安全性 |
 |------|------|--------|
-| **plugin** | 来自 marketplace 的验证插件 | 需要白名单 |
-| **server** | 直接指定的 MCP 服务器名称 | 需要 dev 旁路 |
+| plugin | 来自 marketplace 的验证插件 | 需要白名单 |
+| server | 直接指定的 MCP 服务器名称 | 需要 dev 旁路 |
 
----
+## 消息流转全链路
 
-## 二、消息流转全链路
+消息在 Channel 系统中的流转分为入站和出站两个方向。入站流程负责将 IM 平台的消息传递给 Agent，出站流程负责将 Agent 的回复发送回 IM 平台。
 
-### 2.1 入站流程（IM → Agent）
+### 入站流程
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    入站消息流程                              │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Telegram/Feishu/Discord                                    │
-│       ↓                                                     │
-│  Channel Plugin（MCP Server）                               │
-│       ↓                                                     │
-│  notifications/claude/channel { content, meta }             │
-│       ↓                                                     │
-│  useManageMCPConnections → registerNotificationHandler      │
-│       ↓                                                     │
-│  wrapChannelMessage() → <channel source="..." user="...">  │
-│       ↓                                                     │
-│  enqueue({ priority: 'next', isMeta: true })                │
-│       ↓                                                     │
-│  SleepTool 每 ~1s 轮询 hasCommandsInQueue()                │
-│       ↓                                                     │
-│  Model 看到 <channel> 标签，理解消息来源                      │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+消息从 Telegram、飞书或 Discord 等 IM 平台进入 Channel Plugin（MCP Server），经过 `notifications/claude/channel` 通知机制传递到 `useManageMCPConnections` 注册的通知处理器。消息经过 `wrapChannelMessage()` 封装后，以 `<channel source="..." user="...">` 标签的格式进入消息队列。SleepTool 每秒轮询一次消息队列，模型最终看到带来源信息的 `<channel>` 标签并理解消息内容。
 
-### 2.2 出站流程（Agent → IM）
+### 出站流程
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    出站消息流程                              │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Model 决定使用哪个工具回复                                   │
-│       ↓                                                     │
-│  callTool() → Channel 的 MCP 工具                           │
-│  （reply / react / edit_message / download_attachment）      │
-│       ↓                                                     │
-│  MCP 协议调用 Channel Server                                │
-│       ↓                                                     │
-│  Channel Server 发送消息到 IM 平台                           │
-│       ↓                                                     │
-│  Telegram/Feishu/Discord 用户收到回复                        │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+模型决定使用哪个工具回复后，通过 `callTool()` 调用 Channel 的 MCP 工具（reply、react、edit_message、download_attachment），经由 MCP 协议调用 Channel Server，最终将消息发送回 IM 平台。
 
-### 2.3 消息封装格式
+### 消息封装格式
 
 ```xml
 <channel source="plugin:telegram:tg" user="alice" chat_id="123456">
@@ -113,13 +56,11 @@ type ChannelEntry =
 </channel>
 ```
 
-模型看到这个标签后，就知道消息来自 Telegram 的用户 alice，并会使用 Telegram 的 `reply` 工具回复。
+模型看到这个标签后，知道消息来自 Telegram 的用户 alice，会使用 Telegram 的 reply 工具进行回复。
 
----
+## 六层访问控制
 
-## 三、六层访问控制
-
-### 3.1 Gate 函数
+Channel 系统通过一个 Gate 函数来控制哪些 MCP Server 能够注册为 Channel。这个函数检查六个层级，任何一个层级不通过都会返回 skip 结果。
 
 ```typescript
 // src/services/mcp/channelNotification.ts
@@ -130,36 +71,18 @@ function gateChannelServer(
 ): ChannelGateResult  // { action: 'register' } | { action: 'skip', kind, reason }
 ```
 
-### 3.2 六层关卡详解
+六个检查层级按顺序执行，每层拦截不同类型的问题：
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    六层访问控制                              │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Gate 1: 能力声明（Capability）                             │
-│    └─ MCP Server 必须声明 claude/channel 能力              │
-│                                                             │
-│  Gate 2: 运行时开关（Runtime Gate）                         │
-│    └─ tengu_harbor Feature Flag 必须开启                   │
-│                                                             │
-│  Gate 3: OAuth 认证（Auth）                                 │
-│    └─ 必须通过 OAuth 认证（API Key 用户被阻止）             │
-│                                                             │
-│  Gate 4: 组织策略（Policy）                                 │
-│    └─ Teams/Enterprise 必须在托管设置中显式启用             │
-│                                                             │
-│  Gate 5: 会话白名单（Session）                              │
-│    └─ 必须在 --channels 参数列表中                         │
-│                                                             │
-│  Gate 6: Marketplace 验证 + 白名单（Allowlist）             │
-│    ├─ 验证插件来源标签与实际安装来源匹配                    │
-│    └─ 插件必须在 GrowthBook 审批白名单中                   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+| 层级 | 检查内容 | 拦截原因 |
+|------|----------|----------|
+| Gate 1 | 能力声明（Capability） | MCP Server 未声明 claude/channel 能力 |
+| Gate 2 | 运行时开关（Runtime Gate） | tengu_harbor Feature Flag 未开启 |
+| Gate 3 | OAuth 认证（Auth） | API Key 用户被阻止，必须通过 OAuth |
+| Gate 4 | 组织策略（Policy） | Teams/Enterprise 未在托管设置中启用 |
+| Gate 5 | 会话白名单（Session） | 不在 --channels 参数列表中 |
+| Gate 6 | Marketplace 验证 + 白名单（Allowlist） | 插件来源标签不匹配或未在 GrowthBook 白名单中 |
 
-### 3.3 Gate 结果类型
+Gate 结果类型定义如下：
 
 ```typescript
 type ChannelGateResult =
@@ -169,20 +92,17 @@ type ChannelGateResult =
 // kind 枚举：capability | disabled | auth | policy | session | marketplace | allowlist
 ```
 
----
+这种分层设计的核心思路是渐进式信任：从全局开关到组织策略，再到会话级白名单，信任级别逐级递增。
 
-## 四、权限中继系统
+## 权限中继系统
 
-### 4.1 为什么需要权限中继
+当 Claude Code 需要执行敏感操作（如运行 Bash 命令），会弹出权限确认对话框。如果用户通过 Telegram 远程控制 Agent，他看不到本地终端的对话框。权限中继将权限提示转发到 IM 平台，让用户在手机上也能审批或拒绝操作。
 
-当 Claude Code 需要执行敏感操作（如运行 Bash 命令），会弹出权限确认对话框。但如果用户通过 Telegram 远程控制 Agent，他看不到本地终端的对话框。
+### 出站：权限请求
 
-**权限中继**解决了这个问题：将权限提示转发到 IM 平台，让用户在手机上也能审批或拒绝操作。
-
-### 4.2 出站：权限请求
+权限请求通过 `notifications/claude/channel/permission_request` 通知发送，包含 5 字母的 request_id、工具名、人类可读描述和输入预览（截断到 200 字符）。
 
 ```typescript
-// 通知 Schema
 const CHANNEL_PERMISSION_REQUEST_METHOD =
   'notifications/claude/channel/permission_request'
 
@@ -194,9 +114,9 @@ type ChannelPermissionRequestParams = {
 }
 ```
 
-### 4.3 Short Request ID 设计
+### Short Request ID 设计
 
-5 个字母标识符的设计充满巧思：
+5 个字母标识符的设计有几个值得关注的细节。字母表使用 a-z 去掉了 l（避免与 1/I 混淆），纯字母设计让手机用户不需要切换键盘模式，大小写不敏感适配手机自动更正，并且内置了脏话过滤机制。
 
 ```typescript
 // src/services/mcp/channelPermissions.ts
@@ -216,14 +136,9 @@ function shortRequestId(toolUseID: string): string {
 }
 ```
 
-**设计决策**：
-- **纯字母**：手机用户不需要切换键盘模式
-- **大小写不敏感**：适配手机自动更正
-- **脏话过滤**：防止尴尬场景
+### 入站：权限响应
 
-### 4.4 入站：权限响应
-
-用户在 IM 中回复格式：`yes tbxkq` 或 `no tbxkq`
+用户在 IM 中回复格式为 `yes tbxkq` 或 `no tbxkq`，服务端使用正则解析。
 
 ```typescript
 // 服务端解析正则
@@ -239,33 +154,24 @@ const ChannelPermissionNotificationSchema = z.object({
 })
 ```
 
-### 4.5 多源竞争
+### 多源竞争
 
-权限响应来自四个来源，先到先得：
+权限响应来自四个来源，通过 claim() 机制先到先得：
 
-```
-┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-│   本地终端    │   │    Bridge    │   │   Channels   │   │    Hooks     │
-│  Local UI    │   │   远程控制    │   │ Telegram etc │   │  Permission  │
-└──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
-       │                   │                   │                  │
-       └───────────────────┴───────────────────┴──────────────────┘
-                                    │
-                              claim() — 先到先得
-                                    │
-                              ┌─────┴─────┐
-                              │  resolve   │
-                              │  allow/deny│
-                              └───────────┘
-```
+| 来源 | 说明 |
+|------|------|
+| 本地终端（Local UI） | 直接在终端界面审批 |
+| Bridge 远程控制 | 通过远程桌面等工具审批 |
+| Channels（Telegram 等） | 通过 IM 平台审批 |
+| Hooks Permission | 通过外部 Hook 审批 |
 
----
+四个来源中任何一个先响应，就会锁定该权限请求的结果。
 
-## 五、安全设计
+## 安全设计
 
-### 5.1 XML 注入防护
+### XML 注入防护
 
-Channel 消息中的元数据会成为 XML 属性。两道防线：
+Channel 消息中的元数据会成为 XML 属性，需要防止注入攻击。防护分两道防线：键名只允许纯标识符格式（正则 `^[a-zA-Z_][a-zA-Z0-9_]*$`），值进行 XML 转义（`&` → `&amp;`，`"` → `&quot;`，`<` → `&lt;`，`>` → `&gt;`）。
 
 ```typescript
 // 键名过滤：只允许纯标识符格式
@@ -281,9 +187,9 @@ function escapeXmlAttr(value: string): string {
 }
 ```
 
-### 5.2 Marketplace 验证
+### Marketplace 验证
 
-`--channels plugin:slack@anthropic` 只是用户的"意图声明"。运行时验证：
+`--channels plugin:slack@anthropic` 只是用户的意图声明。运行时验证插件来源标签与实际安装来源是否匹配，不匹配则拦截。
 
 ```typescript
 const actual = pluginSource
@@ -294,23 +200,19 @@ if (actual !== entry.marketplace) {
 }
 ```
 
-### 5.3 权限中继的信任边界
+### 权限中继的信任边界
 
-**问题**：Claude 会自我审批吗？
+审批方是通过 Channel 的人类，不是 Claude 自己。信任边界不在终端，而在白名单。一个被妥协的 Channel Server 可以伪造响应，但它本来就有无限的对话注入能力，权限对话框减缓攻击速度，但不能完全阻止。
 
-**答案**：审批方是通过 Channel 的人类，不是 Claude。但信任边界不是终端——而是白名单。一个被妥协的 Channel Server 可以伪造响应，但：
-- 它本来就有无限的对话注入能力
-- 权限对话框减缓攻击速度，但不能完全阻止
-
-### 5.4 skipSlashCommands
+### skipSlashCommands
 
 Channel 消息入队时设置 `skipSlashCommands: true`，确保 IM 用户发送的 `/help` 等文本不会被解释为 Claude Code 的斜杠命令。
 
----
+## 插件 Channel 架构
 
-## 六、插件 Channel 架构
+### Plugin Manifest 声明
 
-### 6.1 Plugin Manifest 声明
+插件通过 manifest 文件声明 Channel 能力，包括 MCP 服务器配置和用户配置项。
 
 ```json
 {
@@ -348,9 +250,9 @@ Channel 消息入队时设置 `skipSlashCommands: true`，确保 IM 用户发送
 }
 ```
 
-### 6.2 作用域命名
+### 作用域命名
 
-插件提供的 MCP Server 会被添加作用域前缀：
+插件提供的 MCP Server 会被添加作用域前缀，避免不同插件之间的命名冲突。
 
 ```typescript
 // 输入：{ "tg": { ... } } from telegram@anthropic
@@ -370,11 +272,9 @@ function addPluginScopeToServers(servers, pluginName, pluginSource) {
 }
 ```
 
----
+## 命令行接口
 
-## 七、命令行接口
-
-### 7.1 启动参数
+### 启动参数
 
 ```bash
 # 使用已审批的 Channel 插件
@@ -388,7 +288,9 @@ claude --channels plugin:telegram@anthropic \
        --dangerously-load-development-channels plugin:dev-channel@local
 ```
 
-### 7.2 特性门控
+### 特性门控
+
+Channel 功能目前处于隐藏特性阶段，需要特定 Feature Flag 才能启用。
 
 ```typescript
 // src/main.tsx
@@ -398,11 +300,9 @@ if (feature('KAIROS') || feature('KAIROS_CHANNELS')) {
 }
 ```
 
-`hideHelp()` 表示这些选项不会出现在 `--help` 输出中——Channel 功能目前处于隐藏特性阶段。
+`hideHelp()` 使这些选项不会出现在 `--help` 输出中。
 
----
-
-## 八、关键源文件索引
+## 关键源文件索引
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
@@ -414,21 +314,6 @@ if (feature('KAIROS') || feature('KAIROS_CHANNELS')) {
 | `src/components/DevChannelsDialog.tsx` | ~105 | 开发模式确认对话框 |
 | `src/utils/plugins/mcpPluginIntegration.ts` | - | 插件 MCP 集成、作用域命名 |
 | `src/bootstrap/state.ts` | - | 全局 Channel 白名单状态 |
-
----
-
-## 九、总结
-
-Channel 系统体现了几个核心设计原则：
-
-1. **安全优先**：六层访问控制确保只有授权 Channel 能推送消息
-2. **协议驱动**：Channel 就是 MCP Server，任何语言都可以实现
-3. **松耦合**：Channel 失败不会阻断本地工作流
-4. **渐进式信任**：从全局开关到白名单，信任级别逐级递增
-5. **插件友好**：声明式配置，自动用户配置提示
-6. **权限中继**：远程审批危险操作
-
-这个设计让 Claude Code 真正成为一个"无处不在"的 AI 编程助手。
 
 ---
 

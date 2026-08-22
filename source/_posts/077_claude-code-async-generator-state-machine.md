@@ -5,38 +5,21 @@ tags: State Machine
 categories: Claude Code
 ---
 
-> 当大多数人谈论 AI Agent 架构时，ReAct（Reasoning + Acting）几乎是唯一的答案。但 Claude Code 选择了一条不同的路——Async Generator 状态机。这个设计决策背后有着深刻的思考，它解决了 ReAct 的根本性限制，为流式交互和优雅恢复奠定了基础。
+Claude Code 没有使用 ReAct 模式来驱动 Agent 循环。这个选择在 2025 年的 AI Agent 领域几乎是反直觉的，因为 ReAct（Reasoning + Acting）已经是 LangChain、AutoGPT 等框架的默认范式。但 Claude Code 选择了 Async Generator 状态机，用一套 `while (true)` + `state = next` + `continue` 的结构替代了传统的思考-行动-观察循环。这个设计决策解决了 ReAct 在流式交互和故障恢复上的根本性限制。
 
 <!-- more -->
 
-## 导读：ReAct 的困境
+## ReAct 为什么不够用
 
-如果你熟悉 AI Agent 开发，一定对 ReAct 模式不陌生：
+ReAct 模式的核心流程是"思考 → 行动 → 观察 → 思考"，每一步都需要等模型生成完整响应后才能进入下一阶段。这个模式在演示场景中表现良好，但在生产环境中暴露出三个结构性问题。
 
-```
-思考(Thought) → 行动(Action) → 观察(Observation) → 思考 → ...
-```
+第一是串行瓶颈。每一轮思考必须等待完整的模型输出，用户只能盯着光标闪烁。模型明明在流式生成 token，但工具执行必须等到响应结束才能开始，流式传输的价值被大幅削弱。第二是恢复能力缺失。当 API 超时、Token 溢出或工具执行失败时，ReAct 模式没有统一的状态表示来支持自动恢复，开发者只能在循环外部手动编写重试逻辑。第三是工具调度的局限。ReAct 模式下工具调用是严格串行的，一次只能执行一个工具，无法利用只读工具之间天然的可并行性。
 
-这个模式直观且易于理解，已经成为 LangChain、AutoGPT 等框架的标配。但当你深入使用时，会发现它有几个难以回避的问题：
+Claude Code 的方案是放弃 ReAct 的整体框架，用 Async Generator 状态机来重构整个 Agent 循环。
 
-**问题一：串行瓶颈**
-每一轮"思考"必须等待模型生成完整响应后才能开始执行工具。用户盯着屏幕等待，体验割裂。
+## 状态机的核心设计
 
-**问题二：无法利用流式传输**
-模型支持流式输出，但 ReAct 模式下，流式传输的价值被大大削弱——你必须等待完整的 action 才能执行。
-
-**问题三：恢复困难**
-当 API 超时、Token 溢出或工具失败时，ReAct 没有统一的状态表示来支持自动恢复。
-
-Claude Code 的解决方案是：**放弃 ReAct，使用 Async Generator 状态机**。
-
----
-
-## 一、状态机的核心设计
-
-### 1.1 State 数据结构
-
-`src/query.ts` 定义了状态机的核心状态（第 204-217 行）：
+`src/query.ts` 定义了一个 `State` 类型作为状态机的核心数据结构，其中包含了对话历史（`messages`）、工具执行上下文（`toolUseContext`）、自动压缩追踪（`autoCompactTracking`）、输出恢复计数（`maxOutputTokensRecoveryCount`）、对话轮数（`turnCount`）等字段。这个状态对象贯穿整个 Agent 生命周期，所有的执行逻辑都围绕它展开。
 
 ```typescript
 type State = {
@@ -53,47 +36,19 @@ type State = {
 }
 ```
 
-**关键洞察**：`transition` 字段记录了每一轮状态转换的原因。这使得调试和测试变得非常清晰——你可以精确知道为什么 Agent 从一个状态跳转到另一个状态。
+`transition` 字段是整个设计中值得关注的一个细节。它记录了每一轮状态转换的原因，使得调试和测试时可以精确追踪 Agent 为什么从一个状态跳转到另一个状态。后续的 `Continue` 类型定义了这个字段的全部可选值，包括 `next_turn`、`collapse_drain_retry`、`reactive_compact_retry` 等六种原因。
 
-### 1.2 核心循环：五个阶段
+整个 Agent 主循环位于 `src/query.ts` 的第 307-1728 行，是一个 `while (true)` 结构，内部划分为五个阶段。
 
-整个 `while (true)` 循环（第 307-1728 行）分为五个阶段：
+**消息准备与智能压缩**（第 365-543 行）负责处理上下文膨胀问题。它包含四级压缩机制：Snip 压缩删除旧消息中的冗余 token，Micro 压缩修改已缓存消息的内容，上下文折叠分阶段摘要历史消息，Auto Compact 通过 Claude 生成完整摘要。这四级压缩逐级触发，确保上下文窗口不会溢出。
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      while (true)                           │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  阶段1: 消息准备与智能压缩（第 365-543 行）                  │
-│    ├─ Snip 压缩：智能删除旧消息中的冗余 token               │
-│    ├─ Micro 压缩：修改已缓存消息的内容                      │
-│    ├─ 上下文折叠：分阶段摘要历史消息                        │
-│    └─ Auto Compact：通过 Claude 生成完整摘要                │
-│                                                             │
-│  阶段2: 流式 API 调用（第 652-954 行）                       │
-│    ├─ 构建 API 请求（含 CacheSafeParams）                   │
-│    ├─ 流式处理响应                                          │
-│    ├─ StreamingToolExecutor 即时执行工具                    │
-│    └─ 累积 usage 指标                                       │
-│                                                             │
-│  阶段3: 决策点（第 1062-1358 行）                            │
-│    ├─ 有工具调用？→ 继续循环（阶段 4）                      │
-│    └─ 无工具调用？→ 运行 Stop 钩子 → 返回结果               │
-│                                                             │
-│  阶段4: 工具编排执行（第 1363-1409 行）                      │
-│    ├─ 分区：只读 vs 写入                                    │
-│    ├─ 只读工具 → 并行执行（最多 10 个并发）                 │
-│    └─ 写入工具 → 串行执行（防止竞态条件）                   │
-│                                                             │
-│  阶段5: 状态更新与循环（第 1704-1728 行）                    │
-│    └─ state = next → continue                              │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+**流式 API 调用**（第 652-954 行）构建请求并消费流式响应。与传统 ReAct 不同，工具调用不需要等待模型输出完毕，`StreamingToolExecutor` 会在接收到 `tool_use` 块的流式数据时立即开始执行工具。
 
-### 1.3 状态更新的优雅之处
+**决策点**（第 1062-1358 行）判断当前轮次的走向。如果模型返回了工具调用，进入工具编排阶段；如果没有工具调用，运行 Stop 钩子后返回结果。
 
-这是整个设计最优雅的部分——**通过状态赋值而非递归调用驱动循环**：
+**工具编排执行**（第 1363-1409 行）将工具调用分区处理。只读工具（Read、Grep、Glob、WebFetch）并行执行，最多 10 个并发；写入工具（FileEdit、FileWrite、非只读 Bash）串行执行，防止竞态条件。
+
+**状态更新与循环**（第 1704-1728 行）构建下一个 State 对象，赋值给 `state` 变量，然后 `continue` 回到循环顶部。
 
 ```typescript
 // src/query.ts:1715-1728
@@ -108,28 +63,17 @@ state = next
 // 回到 while(true) 循环顶部
 ```
 
-没有递归，没有回调地狱，只是简单的 `state = next` 然后 `continue`。
+这个循环结构的关键特征是驱动方式。没有递归调用，没有回调嵌套，只有一行 `state = next` 加一个 `continue`。带来的直接收益是内存稳定（不会栈溢出）、状态可追溯（每轮转换原因都有记录）、恢复可控（任何阶段出错都可以通过修改 state 重试）。
 
-**为什么这很重要？**
+## 流式优先的工具执行
 
-1. **内存稳定**：不会因为深度递归导致栈溢出
-2. **状态可追溯**：每一轮的状态转换原因都被记录
-3. **恢复可控**：任何阶段的错误都可以通过修改 state 来恢复
-
----
-
-## 二、流式优先的执行模型
-
-### 2.1 StreamingToolExecutor 的设计
-
-Claude Code 的一个关键创新是 `StreamingToolExecutor`——当模型生成 `tool_use` 块时，工具**立即**开始运行，而不是等模型生成完整响应。
+`StreamingToolExecutor` 是 Claude Code 与 ReAct 模式拉开差距的核心组件。在 ReAct 模式下，工具执行必须等待模型输出完整的 action 指令后才能开始。Claude Code 的做法是在模型流式生成 `tool_use` 块的过程中就启动工具执行，不需要等待响应结束。
 
 ```typescript
 // src/services/tools/StreamingToolExecutor.ts
 class StreamingToolExecutor {
   async *processToolUseBlocks(toolUseBlocks: ToolUseBlock[]): AsyncGenerator {
     for (const block of toolUseBlocks) {
-      // 在流式传输过程中就开始执行
       const result = await this.executeTool(block)
       yield result
     }
@@ -137,120 +81,59 @@ class StreamingToolExecutor {
 }
 ```
 
-**对比 ReAct**：
+这种设计的效果从下面的对比中可以直接看出：
 
 | 模式 | 工具执行时机 | 用户体验 |
 |------|------------|---------|
-| ReAct | 等待模型完整响应 | 割裂，需要等待 |
-| Async Generator | 流式传输中即时执行 | 流畅，实时反馈 |
+| ReAct | 等待模型完整响应后执行 | 每轮有明显的等待间隔 |
+| Async Generator | 流式传输中即时执行 | 工具调用几乎无感延迟 |
 
-### 2.2 工具编排策略
+工具编排层面，`src/services/tools/toolOrchestration.ts` 实现了一套分区调度策略。当模型在一轮响应中返回多个工具调用时，系统首先将它们按副作用特征分为只读和写入两组。只读工具（Read、Grep、Glob、WebFetch）没有副作用，可以安全地并行执行，上限是 10 个并发。写入工具（FileEdit、FileWrite、非只读 Bash）可能修改文件或系统状态，必须串行执行以保证顺序一致性。这个分区策略不需要用户或开发者手动指定，系统根据工具类型自动判断。
 
-工具执行不是简单的逐个运行，而是有精心设计的**编排策略**（`src/services/tools/toolOrchestration.ts`）：
+## 六种内置故障恢复
 
-```
-工具调用列表
-  │
-  ├─ 分区：只读 vs 写入
-  │
-  ├─ 只读工具 ──→ 并行执行（最多 10 个并发）
-  │   ├─ Read
-  │   ├─ Grep
-  │   ├─ Glob
-  │   └─ WebFetch
-  │
-  └─ 写入工具 ──→ 串行执行（防止竞态条件）
-      ├─ FileEdit
-      ├─ FileWrite
-      └─ Bash (非只读)
-```
-
-**设计原理**：
-- 只读工具没有副作用，可以安全并行
-- 写入工具可能相互影响，必须串行保证顺序
-- 10 个并发限制防止资源耗尽
-
----
-
-## 三、六种故障恢复策略
-
-这是 Claude Code 最精妙的设计之一。核心循环内置了 **6 种恢复策略**，确保用户体验的稳定性：
-
-### 3.1 恢复策略详解
+Claude Code 的主循环内置了六种恢复策略，覆盖了 Agent 运行中最常见的故障场景。每种恢复都通过修改 `state` 对象并 `continue` 实现，不需要跳出循环或抛异常。
 
 | 恢复策略 | 触发条件 | 恢复方式 |
 |----------|----------|----------|
 | `collapse_drain_retry` | prompt 过长 | 排空已暂存的上下文折叠，重试 |
 | `reactive_compact_retry` | 仍然过长 | 通过 Claude 生成摘要，重试 |
 | `max_output_tokens_escalate` | 触及 8k 默认限制 | 升级到 64k 限制重试 |
-| `max_output_tokens_recovery` | 触及任何限制 | 注入"继续"提示，重试（最多 3 次） |
+| `max_output_tokens_recovery` | 触及任何输出限制 | 注入"继续"提示，重试（最多 3 次） |
 | `stop_hook_blocking` | Stop 钩子阻塞 | 将阻塞错误注入上下文，重试 |
 | `token_budget_continuation` | 预算尚余 | 注入预算提示，继续执行 |
 
-### 3.2 恢复代码示例
-
-每种恢复都通过修改 `state` 实现：
+恢复逻辑的实现方式统一且简洁。以 prompt 过长为例，系统首先尝试排空所有暂存的上下文折叠（`drainStagedCollapses`），缩短消息列表后重试。如果仍然超长，则升级到反应式压缩（`reactive_compact`），通过 Claude 对历史消息生成摘要来缩减 token 数。
 
 ```typescript
-// 例：prompt 过长恢复
+// prompt 过长恢复
 if (error.type === 'prompt_too_long') {
-  // 排空所有暂存的折叠
   const compacted = drainStagedCollapses(state.messages)
   state = { 
     ...state, 
     messages: compacted, 
     transition: { reason: 'collapse_drain_retry' } 
   }
-  continue  // 回到循环顶部重试
+  continue
 }
 
-// 例：max_output_tokens 恢复
+// max_output_tokens 恢复
 if (error.type === 'max_output_tokens') {
   state = {
     ...state,
     maxOutputTokensRecoveryCount: state.maxOutputTokensRecoveryCount + 1,
     transition: { reason: 'max_output_tokens_recovery' }
   }
-  // 注入"继续"提示
   messages.push(createUserMessage({ content: 'Please continue.' }))
   continue
 }
 ```
 
-### 3.3 为什么这些恢复策略重要？
+这套机制的实际效果是：当用户在一个 50 轮的长对话中遇到 Token 溢出，系统会自动触发压缩，用户无感知；API 超时时自动重试；模型达到输出上限时注入"继续"提示自动续写。整个过程中用户几乎不会遇到中断。
 
-想象一个场景：用户正在让 Claude 修改一个大型代码库，对话已经进行了 50 轮，积累了大量上下文。突然：
+## 与 LangChain 和 LangGraph 的差异
 
-1. **Token 溢出** → 自动压缩，用户无感知
-2. **API 超时** → 自动重试，用户无感知
-3. **模型达到输出限制** → 注入"继续"，自动续写
-
-用户几乎感觉不到任何中断。这是 Claude Code 能提供流畅体验的关键。
-
----
-
-## 四、与 LangChain Agent 的具体差异
-
-### 4.1 代码对比
-
-**LangChain Agent（简化）：**
-```python
-agent = initialize_agent(tools, llm, agent="zero-shot-react-description")
-result = agent.run("do something")
-# 内部：LLM → parse → tool → LLM → parse → tool → ... → final answer
-# 每一步都是独立的 LLM 调用
-```
-
-**Claude Code Agent（简化）：**
-```typescript
-for await (const msg of query({ messages, tools, systemPrompt })) {
-  yield msg  // 实时产出消息
-  // 内部：流式 LLM → 流式工具执行 → 状态更新 → 继续
-  // 单次 API 调用可以触发多个工具，工具在流式中执行
-}
-```
-
-### 4.2 关键差异
+LangChain 的 Agent 实现基于 ReAct 模式，每一轮都是独立的 LLM 调用，工具解析依赖 OutputParser 从文本中提取 action 指令，错误处理需要开发者手动编写 try-catch。Claude Code 则直接使用 Anthropic API 的原生 `tool_use` 块进行工具调用，无需 OutputParser 层，流式响应中即时执行工具，并内置六种自动恢复策略。
 
 | 维度 | LangChain | Claude Code |
 |------|-----------|-------------|
@@ -260,48 +143,23 @@ for await (const msg of query({ messages, tools, systemPrompt })) {
 | 错误处理 | 手动 try-catch | 内置 6 种恢复 |
 | 并行工具 | 需要显式编排 | 自动分区并行 |
 
-### 4.3 与 LangGraph 的对比
-
-LangGraph 是 LangChain 的升级版，引入了图结构：
+LangGraph 作为 LangChain 的升级版，引入了显式的图结构来描述状态流转。它在状态管理上更加形式化（图节点 + 边），支持 Checkpoint 持久化和 `interrupt_before/after` 人机交互。但代价是需要预先定义图结构，开发复杂度更高。
 
 | 维度 | LangGraph | Claude Code |
 |------|-----------|-------------|
-| **状态流转** | 显式图节点 + 边 | 隐式状态机（while + continue） |
-| **可视化** | 可导出为图 | 状态转换原因可追溯 |
-| **持久化** | Checkpoint + State | 文件系统 + 消息历史 |
-| **人机交互** | interrupt_before/after | 权限系统 + 钩子 |
-| **多 Agent** | 需要显式编排 | AgentTool 统一接口 |
+| 状态流转 | 显式图节点 + 边 | 隐式状态机（while + continue） |
+| 可视化 | 可导出为图结构 | transition 字段可追溯 |
+| 持久化 | Checkpoint + State | 文件系统 + 消息历史 |
+| 人机交互 | interrupt_before/after | 权限系统 + 钩子 |
+| 多 Agent | 需要显式编排 | AgentTool 统一接口 |
 
-Claude Code 的优势在于**简单性**——不需要定义图结构，一个 while 循环就能处理所有情况。
+Claude Code 的选择偏向简单性：不定义图结构，一个 while 循环处理所有状态转换。对于 Claude Code 这类以单 Agent 为核心的产品，这种简洁性直接转化为更低的维护成本和更快的迭代速度。LangGraph 的图结构在需要复杂多分支流程的场景中更有优势，但对于"用户提需求 → Agent 执行工具 → 返回结果"这类线性交互，状态机方案足够胜任。
 
----
+## 最小抽象与原生集成
 
-## 五、设计原则总结
+从源码结构来看，Claude Code 的 Agent 核心只有三个组件：一个循环（`while (true)` in `query()`）、一个状态（`State` 对象）、一个工具接口（`Tool` 类型）。没有 Agent → AgentExecutor → Chain → Memory → Callback 的嵌套抽象层。
 
-从源码分析中，我们可以总结出以下核心设计原则：
-
-### 5.1 最小抽象原则
-
-与 LangChain 的"万物皆抽象"不同，Claude Code 的核心只有：
-- **一个循环**（`while (true)` in `query()`）
-- **一个状态**（`State` 对象）
-- **一个接口**（`Tool` 类型）
-
-没有 Agent → AgentExecutor → Chain → Memory → Callback 的嵌套抽象层。
-
-### 5.2 原生 API 集成
-
-Claude Code 直接使用 Anthropic API 的原生能力：
-- **原生工具调用**：无需 OutputParser，直接使用 `tool_use` 块
-- **原生流式传输**：无需包装层，直接消费 SSE 流
-- **原生缓存**：利用 API 的 prompt caching 特性
-- **原生思维链**：直接使用 extended thinking
-
-这避免了"框架税"——LangChain 等框架在 LLM 和开发者之间增加的抽象层。
-
-### 5.3 可观测性设计
-
-`transition` 字段的设计体现了对可观测性的重视：
+在 API 集成层面，Claude Code 直接使用 Anthropic API 的原生能力：原生工具调用（无需 OutputParser，直接使用 `tool_use` 块）、原生流式传输（无需包装层，直接消费 SSE 流）、原生缓存（利用 prompt caching 特性）、原生思维链（直接使用 extended thinking）。这避免了 LangChain 等框架在 LLM 和开发者之间增加的抽象层带来的性能损耗和调试复杂度。
 
 ```typescript
 type Continue = {
@@ -314,11 +172,9 @@ type Continue = {
 }
 ```
 
-每一轮循环都知道自己为什么继续，这对于调试和测试至关重要。
+`transition` 字段的设计让每一轮循环都知道自己为什么继续。这不是一个装饰性的字段，它在测试中可以直接作为断言依据，在日志中可以作为问题定位的起点。一个 Agent 系统的可观测性，往往就取决于这类细节的积累。
 
----
-
-## 六、关键源文件索引
+## 关键源文件
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
@@ -329,20 +185,6 @@ type Continue = {
 | `src/query/transitions.ts` | ~50 | 状态转换类型定义 |
 | `src/query/tokenBudget.ts` | ~100 | Token 预算管理 |
 | `src/query/stopHooks.ts` | ~200 | Stop 钩子处理 |
-
----
-
-## 七、总结
-
-Claude Code 的 Async Generator 状态机设计解决了 ReAct 模式的根本性限制：
-
-1. **流式执行**：工具在模型生成过程中就开始运行
-2. **状态可控**：统一的 `State` 对象，恢复只需修改状态
-3. **自动恢复**：6 种内置策略确保用户体验稳定
-4. **缓存友好**：静态部分全局缓存，动态部分最小化
-5. **并行能力**：只读工具自动并行，写入工具串行保序
-
-这个设计选择体现了 Claude Code 团队对产品体验的深刻理解：**用户不应该等待，也不应该因为技术问题中断**。
 
 ---
 
