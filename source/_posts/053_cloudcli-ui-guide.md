@@ -5,9 +5,9 @@ tags: GUI(Claude Code)
 categories: AI
 ---
 
-<!-- more -->
-
 CloudCLI UI（又名 Claude Code UI）是一款基于 Node.js + React 的 Web 应用，为 Claude Code、Cursor CLI、Codex 和 Gemini CLI 提供统一的图形化界面。与桌面应用不同，它通过浏览器访问，支持移动端使用，并提供云端托管选项。项目由 CloudCLI 团队开源，采用 Express + WebSocket + React 构建，配置直接写入 `~/.claude` 目录，与 CLI 完全同步。
+
+<!-- more -->
 
 ## 项目定位与对比
 

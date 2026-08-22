@@ -6,6 +6,8 @@ tags: AI Agent
 categories: AI
 ---
 
+LangChain 和 LangGraph 是目前 LLM 应用开发领域使用最广泛的两个框架。很多开发者对两者的定位和适用场景感到困惑：什么时候用 LangChain，什么时候用 LangGraph，能不能一起用？这篇文章从技术本质、设计动机和实际应用三个角度做一次系统对比。
+
 <!-- more -->
 
 ## 先说结论

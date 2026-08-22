@@ -5,13 +5,13 @@ tags: Code Agent
 categories: Claude Code
 ---
 
-<!-- more -->
-
 ## 同样的模型，不同的体验
 
 一个反直觉的现象：用 GPT-4 模型搭配 OpenAI 的 Codex CLI，效果尚可；用 GPT-4 模型搭配 Anthropic 的 Claude Code，效果更好。自家模型配自家 Agent 应该是最佳组合，但实际表现不如搭配竞争对手的 Agent。
 
 常见的猜测是"Claude Code 的 Prompt 更好"。Prompt 确实有影响，但不是决定性因素。Claude Code 的源码揭示了一个更根本的差异：它不是一个 Prompt 工具，而是一个完整的 Agent 运行时框架。这个框架理解模型的能力边界、工具的执行风险、上下文的压缩策略和用户的意图流转。模型是大脑，Claude Code 是躯体——这个类比虽然粗略，但抓住了核心关系。
+
+<!-- more -->
 
 ## 主流竞品概览
 

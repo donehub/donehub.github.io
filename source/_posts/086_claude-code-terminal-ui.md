@@ -5,13 +5,13 @@ tags: Terminal UI
 categories: Claude Code
 ---
 
-<!-- more -->
-
 ## 终端里的 React 应用
 
 Claude Code 的终端界面不是传统的 CLI 逐行输出，而是一个完整的 React 应用。它通过 Ink 框架（React 的终端渲染器）实现了组件化 UI、Flexbox 布局、双缓冲渲染和交互式对话框。选择 Ink 而非 ncurses 或 blessed 这类传统终端 UI 库，核心原因是复用 React 生态：组件化思想、状态管理、生命周期、以及开发者的熟悉度。
 
 Ink 的架构分为四层。React Components 通过自定义的 React Reconciler 转换为 Ink Host Config 调用，Host Config 使用 Yoga 布局引擎计算 Flexbox 布局（基于终端字符单位），最终 Terminal Renderer 将布局结果转换为 ANSI 转义序列输出到 stdout。这个架构让终端 UI 开发体验接近 Web 前端，同时保持了终端应用的性能特征。
+
+<!-- more -->
 
 ## 核心组件与布局
 

@@ -5,13 +5,13 @@ tags: Multi-Agent
 categories: Claude Code
 ---
 
-<!-- more -->
-
 ## 单 Agent 的瓶颈
 
 考虑一个典型场景：把项目的所有 TypeScript 文件迁移到 strict 模式，同时更新 ESLint 配置，然后运行测试确认无回归。单 Agent 只能顺序执行——修改 tsconfig、修改 ESLint、修改文件、运行测试，每一步等上一步完成。对于一个有 200 个文件的项目，这个过程可能需要十几分钟。
 
 多 Agent 的价值在于把这类任务拆解为可并行的子任务。Explore Agent 扫描文件识别修改点，多个 Fork Agent 并行修改不同文件组，Plan Agent 协调顺序避免冲突，Verification Agent 运行测试验证结果。并行化、专业化、隔离性，这是多 Agent 编排解决的核心问题。
+
+<!-- more -->
 
 ## Agent 类型与职责
 

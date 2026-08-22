@@ -5,11 +5,11 @@ tags: Skills
 categories: Claude Code
 ---
 
-<!-- more -->
-
 ## 不只是命令别名
 
 Skills 的表面形态是斜杠命令（`/code-review`、`/commit`），但本质是一个完整的 AI 行为定义系统。一个 Skill 文件可以同时约束工具池、指定模型、注入 Hook、选择执行上下文（inline 或 fork），这些能力组合起来让 Skill 成为一个可复用的行为模板，而不是简单的 prompt 快捷方式。
+
+<!-- more -->
 
 ```markdown
 ---

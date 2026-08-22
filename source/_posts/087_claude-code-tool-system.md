@@ -5,11 +5,11 @@ tags: Tool System
 categories: Claude Code
 ---
 
-<!-- more -->
-
 ## 工具不只是函数调用
 
 在多数 AI Agent 框架中，工具只是一个带装饰器的函数：接收参数，返回结果。Claude Code 的工具设计远超这个层次。每个工具是一个自描述的实体，通过统一接口向框架暴露身份、能力声明、生命周期钩子、渲染逻辑和智能特性。框架不需要了解工具的内部实现，只需调用标准接口即可完成验证、权限检查、执行和结果处理。
+
+<!-- more -->
 
 ```typescript
 type Tool<Input, Output> = {
