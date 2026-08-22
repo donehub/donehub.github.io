@@ -23,15 +23,15 @@
     var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
   </script>
 
-  <meta name="description" content="背景微软开源了 GraphRAG，各大技术社区都在讨论。今天这篇文章，把以下几个核心问题讲透：  普通 RAG 的能力边界在哪 GraphRAG 解决的到底是什么问题 哪四类场景必须考虑 GraphRAG 工程上为什么不能无脑上 GraphRAG 混合路由架构怎么设计">
+  <meta name="description" content="普通 RAG 的实际能力范围RAG（Retrieval-Augmented Generation）的核心机制可以概括为：文档切 Chunk，做向量 Embedding 存入向量数据库；用户查询时，将 Query 向量化，通过语义相似度检索 TopK 个 Chunk，喂给大模型生成答案。这套机制的本质是文本片段的相似度匹配，它能做好的事情和做不好的事情，边界非常清晰。 普通 RAG 最擅长的是单点事">
 <meta property="og:type" content="article">
 <meta property="og:title" content="GraphRAG 与普通 RAG 的应用分析">
 <meta property="og:url" content="https://donehub.github.io/2026/03/10/068_graphrag-vs-rag-scenarios/index.html">
 <meta property="og:site_name" content="DoneHub">
-<meta property="og:description" content="背景微软开源了 GraphRAG，各大技术社区都在讨论。今天这篇文章，把以下几个核心问题讲透：  普通 RAG 的能力边界在哪 GraphRAG 解决的到底是什么问题 哪四类场景必须考虑 GraphRAG 工程上为什么不能无脑上 GraphRAG 混合路由架构怎么设计">
+<meta property="og:description" content="普通 RAG 的实际能力范围RAG（Retrieval-Augmented Generation）的核心机制可以概括为：文档切 Chunk，做向量 Embedding 存入向量数据库；用户查询时，将 Query 向量化，通过语义相似度检索 TopK 个 Chunk，喂给大模型生成答案。这套机制的本质是文本片段的相似度匹配，它能做好的事情和做不好的事情，边界非常清晰。 普通 RAG 最擅长的是单点事">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2026-03-09T16:00:00.000Z">
-<meta property="article:modified_time" content="2026-07-06T17:17:39.827Z">
+<meta property="article:modified_time" content="2026-08-22T10:28:38.333Z">
 <meta property="article:author" content="Zou Rongsheng">
 <meta property="article:tag" content="GraphRAG">
 <meta name="twitter:card" content="summary">
@@ -230,7 +230,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-07-07 01:17:39" itemprop="dateModified" datetime="2026-07-07T01:17:39+08:00">2026-07-07</time>
+                <time title="修改时间：2026-08-22 18:28:38" itemprop="dateModified" datetime="2026-08-22T18:28:38+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -274,83 +274,21 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>微软开源了 GraphRAG，各大技术社区都在讨论。今天这篇文章，把以下几个核心问题讲透：</p>
-<ul>
-<li>普通 RAG 的能力边界在哪</li>
-<li>GraphRAG 解决的到底是什么问题</li>
-<li>哪四类场景必须考虑 GraphRAG</li>
-<li>工程上为什么不能无脑上 GraphRAG</li>
-<li>混合路由架构怎么设计</li>
-</ul>
-<a id="more"></a>
-<h2 id="普通-RAG-能力边界"><a href="#普通-RAG-能力边界" class="headerlink" title="普通 RAG 能力边界"></a>普通 RAG 能力边界</h2><h3 id="普通-RAG-核心机制"><a href="#普通-RAG-核心机制" class="headerlink" title="普通 RAG 核心机制"></a>普通 RAG 核心机制</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">文档 → 切 Chunk → 向量 Embedding → 存入向量数据库</span><br><span class="line">                                    ↓</span><br><span class="line">用户 Query → 向量化 → 语义相似度检索 → TopK Chunk → 喂给大模型 → 生成答案</span><br></pre></td></tr></table></figure>
-<p>这套机制的本质是文本片段的相似度匹配。它能做好的事情，和它做不好的事情，边界非常清晰。</p>
-<h3 id="普通-RAG-擅长"><a href="#普通-RAG-擅长" class="headerlink" title="普通 RAG 擅长"></a>普通 RAG 擅长</h3><p>单点事实类问题，答案完整地存在于某个 Chunk 里。比如查询”接口超时时间””产品支持的功能””GPT-4 发布时间”这类事实。</p>
-<p>只要答案在某个 Chunk 里写得明明白白，普通 RAG 基本都能精准召回。这类问题占据了企业知识库 70% 以上的查询量。</p>
-<h3 id="普通-RAG-短板"><a href="#普通-RAG-短板" class="headerlink" title="普通 RAG 短板"></a>普通 RAG 短板</h3><p>短板在于：它只能找到片段，但不一定能把片段之间的关系连起来。</p>
-<p>来看一个真实场景。用户输入一个多条件查询：有没有一款适合拍视频、续航也不错、而且用户评价稳定的手机</p>
-<p>普通 RAG 的处理方式如下：</p>
-<ul>
-<li>可能召回 Chunk A：”XX 手机影像系统强大，视频拍摄能力突出”</li>
-<li>可能召回 Chunk B：”XX 手机电池 5500mAh，续航表现优秀”</li>
-<li>可能召回 Chunk C：”用户评价：用了半年，系统稳定，没有大问题”</li>
-</ul>
-<p>问题是：A、B、C 可能来自三篇不同的文档，描述的是三款不同的手机。普通 RAG 把三个 Chunk 一起扔给大模型，大模型也不知道到底哪款手机同时满足这三个条件。</p>
-<p>这就是普通 RAG 的根本局限：</p>
-<blockquote>
-<p><strong>它的检索单元是文本片段，不是实体，更不是关系。它擅长”找到相似的文字”，不擅长”找到满足多个关系约束的答案”。</strong></p>
-</blockquote>
-<p>那什么场景下这个问题会变得无法回避，下面逐一分析。</p>
-<h2 id="场景一：多维度关联查询"><a href="#场景一：多维度关联查询" class="headerlink" title="场景一：多维度关联查询"></a>场景一：多维度关联查询</h2><h3 id="多维度关联查询的含义"><a href="#多维度关联查询的含义" class="headerlink" title="多维度关联查询的含义"></a>多维度关联查询的含义</h3><p>注意，不是简单的多条件过滤。多条件过滤是 <code>&quot;价格 &lt; 5000 AND 品牌 = 华为&quot;</code>，这是 SQL 能干的事。</p>
-<p>多维度关联查询指的是：多个维度之间存在结构化的关系，需要沿着关系做导航和交集运算。</p>
-<h3 id="典型场景：商品推荐系统"><a href="#典型场景：商品推荐系统" class="headerlink" title="典型场景：商品推荐系统"></a>典型场景：商品推荐系统</h3><p>商品知识不是一张扁平的表，而是一个关系网络：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">商品 A ──→ 品牌: XX</span><br><span class="line">       ──→ 价格段: 高端</span><br><span class="line">       ──→ 核心卖点: 影像旗舰</span><br><span class="line">       ──→ 适用人群: 摄影爱好者</span><br><span class="line">       ──→ 用户口碑: 稳定</span><br><span class="line"></span><br><span class="line">商品 B ──→ 品牌: YY</span><br><span class="line">       ──→ 价格段: 中高端</span><br><span class="line">       ──→ 核心卖点: 性能旗舰</span><br><span class="line">       ──→ 适用人群: 游戏玩家</span><br><span class="line">       ──→ 用户口碑: 良好</span><br></pre></td></tr></table></figure>
-<p>用户输入：”有没有适合拍视频、性能强、口碑稳定的旗舰机”</p>
-<p>普通 RAG 的做法是在文本里模糊匹配，召回”影像强”的片段、”性能强”的片段、”口碑好”的片段，最后让大模型自己猜。</p>
-<p>GraphRAG 的做法是：把知识建成图，然后沿着关系边做导航——找到”影像旗舰”节点，找到”性能旗舰”节点，找到”用户口碑稳定”节点，然后取它们关联的商品实体的交集。</p>
-<p>这不是语义相似度的问题，这是图遍历的问题。</p>
-<h3 id="为什么普通-RAG-在这里失效"><a href="#为什么普通-RAG-在这里失效" class="headerlink" title="为什么普通 RAG 在这里失效"></a>为什么普通 RAG 在这里失效</h3><p>根本原因：普通 RAG 的检索空间是向量空间，它衡量的是两段文本像不像。而多维度关联查询需要的检索空间是关系空间，它需要的是沿着实体关系做路径查找。</p>
-<p>两个完全不同的空间，用错工具，效果天差地别。</p>
-<h2 id="场景二：全局总结类问题"><a href="#场景二：全局总结类问题" class="headerlink" title="场景二：全局总结类问题"></a>场景二：全局总结类问题</h2><h3 id="全局总结类问题的特征"><a href="#全局总结类问题的特征" class="headerlink" title="全局总结类问题的特征"></a>全局总结类问题的特征</h3><p>不是问某个点，而是问整体。比如”最近几年高端手机的发展趋势””目前 AI Agent 行业的技术格局””公司各部门的业务关联情况”这类问题。</p>
-<h3 id="普通-RAG-在这里翻车"><a href="#普通-RAG-在这里翻车" class="headerlink" title="普通 RAG 在这里翻车"></a>普通 RAG 在这里翻车</h3><p>这类问题的特点是：答案不在任何一个 Chunk 里，而是分散在整个语料库中。</p>
-<p>普通 RAG 召回的是 TopK 个最相似的 Chunk，可能Chunk 1 讲影像，Chunk 2 讲芯片，Chunk 3 讲价格，Chunk 4 讲 AI 功能。大模型拿到这些碎片化的信息，只能硬拼，最后生成一个面面俱到但毫无洞察的答案——读起来像目录，不像分析。</p>
-<h3 id="GraphRAG-的解法：社区发现-分层摘要"><a href="#GraphRAG-的解法：社区发现-分层摘要" class="headerlink" title="GraphRAG 的解法：社区发现 + 分层摘要"></a>GraphRAG 的解法：社区发现 + 分层摘要</h3><p>GraphRAG 的核心机制是这样的：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">知识图谱</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">┌─────────────────────────┐</span><br><span class="line">│  社区发现算法              │</span><br><span class="line">│  (如 Leiden 算法)         │</span><br><span class="line">│  把图谱划分为若干社区       │</span><br><span class="line">└──────────┬──────────────┘</span><br><span class="line">           │</span><br><span class="line">     ┌─────┼──────────┬──────────┐</span><br><span class="line">     ▼     ▼          ▼          ▼</span><br><span class="line">  社区A   社区B      社区C      社区D</span><br><span class="line">  影像    芯片性能    品牌竞争    用户需求</span><br><span class="line">     │     │          │          │</span><br><span class="line">     ▼     ▼          ▼          ▼</span><br><span class="line">  局部摘要 局部摘要   局部摘要   局部摘要</span><br><span class="line">     │     │          │          │</span><br><span class="line">     └─────┴──────────┴──────────┘</span><br><span class="line">                  │</span><br><span class="line">                  ▼</span><br><span class="line">           全局汇总摘要</span><br></pre></td></tr></table></figure>
-<p>第一步，用社区发现算法把知识图谱划分成若干个语义社区。每个社区里的实体关系紧密，社区之间相对松散。</p>
-<p>第二步，对每个社区分别做摘要，生成局部摘要。</p>
-<p>第三步，把所有局部摘要汇总，生成全局摘要。</p>
-<p>这个分层摘要的机制，天然适合回答”整体趋势””行业格局”这一类问题。因为它不是从碎片拼凑，而是从结构化的社区出发，每个社区都有自己的主题和洞察，最后合并起来就是全局视图。</p>
-<h2 id="场景三：隐性关系发现"><a href="#场景三：隐性关系发现" class="headerlink" title="场景三：隐性关系发现"></a>场景三：隐性关系发现</h2><h3 id="隐性关系的定义"><a href="#隐性关系的定义" class="headerlink" title="隐性关系的定义"></a>隐性关系的定义</h3><p>两个实体之间，文本里从来没有直接说明它们有关系，但通过中间节点可以推断出关联。</p>
-<p>举个例子：</p>
-<ul>
-<li>产品 A 和产品 B 从来没有被任何文档直接比较过</li>
-<li>但产品 A：价格段 = 高端，目标人群 = 商务用户，核心能力 = 影像</li>
-<li>产品 B：价格段 = 高端，目标人群 = 商务用户，核心能力 = 影像</li>
-</ul>
-<p>在图结构里，产品 A 和产品 B 虽然不直接相连，但它们共享了多个相同的邻居节点。这种结构上的接近性，就是隐性关系。</p>
-<h3 id="普通-RAG-无法发现隐性关系的原因"><a href="#普通-RAG-无法发现隐性关系的原因" class="headerlink" title="普通 RAG 无法发现隐性关系的原因"></a>普通 RAG 无法发现隐性关系的原因</h3><p>普通 RAG 的检索是基于 Query 和 Chunk 的语义相似度。如果没有任何文档把产品 A 和产品 B 放在同一段文字里，普通 RAG 就完全没有办法发现它们之间的联系——因为它的信息组织单位是文本片段，不是实体关系图。</p>
-<h3 id="依赖隐性关系发现的典型业务场景"><a href="#依赖隐性关系发现的典型业务场景" class="headerlink" title="依赖隐性关系发现的典型业务场景"></a>依赖隐性关系发现的典型业务场景</h3><ul>
-<li><strong>竞品分析</strong>：发现没有被直接对比，但实质上高度重叠的竞品</li>
-<li><strong>风控排查</strong>：多个看似无关的账户，通过中间节点发现它们共享同一控制人</li>
-<li><strong>推荐系统</strong>：用户 A 和用户 B 从未被直接比较，但行为模式高度相似</li>
-<li><strong>药物研发</strong>：两种靶点蛋白没有被同一篇论文提及，但通过通路网络发现它们在同一信号通路上</li>
-</ul>
-<p>这些都是普通 RAG 根本做不到的事。</p>
-<h2 id="场景四：分散信息的因果链追溯"><a href="#场景四：分散信息的因果链追溯" class="headerlink" title="场景四：分散信息的因果链追溯"></a>场景四：分散信息的因果链追溯</h2><h3 id="问题描述"><a href="#问题描述" class="headerlink" title="问题描述"></a>问题描述</h3><p>有些问题的答案，需要从多个文档中串联多条信息，才能推导出根因。</p>
-<p>典型的例子是”XX 项目延期的根本原因分析”。真实的答案可能分散在：</p>
-<ul>
-<li>需求文档：中期发生了重大需求变更</li>
-<li>排期表：关键开发人员被借调到其他项目</li>
-<li>研发周报：接口联调出现了预期外的问题</li>
-<li>测试反馈：某个第三方 SDK 有 Bug，阻塞了测试进度</li>
-<li>客户沟通记录：客户在验收阶段新增了功能点</li>
-</ul>
-<h3 id="普通-RAG-的处理方式"><a href="#普通-RAG-的处理方式" class="headerlink" title="普通 RAG 的处理方式"></a>普通 RAG 的处理方式</h3><p>普通 RAG 最可能召回的是某一篇文档中的一个片段，比如会议纪要里的一句话：”本次会议确认项目延期两周，主要原因是需求变更。”</p>
-<p>这个答案不算错，但不完整。真正的根因是多个因素叠加的结果，只看其中一个，会误导决策。</p>
-<h3 id="GraphRAG-的处理方式"><a href="#GraphRAG-的处理方式" class="headerlink" title="GraphRAG 的处理方式"></a>GraphRAG 的处理方式</h3><p>GraphRAG 把人、需求、任务、时间、风险、依赖关系全部建模成图的节点和边：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">需求变更 ──→ 影响任务A ──→ 阻塞任务B ──→ 延期</span><br><span class="line">    ↑</span><br><span class="line">开发人员借调 ──→ 任务A人力不足 ──→ 延期</span><br><span class="line">    ↑</span><br><span class="line">SDK Bug ──→ 联调阻塞 ──→ 延期</span><br><span class="line">    ↑</span><br><span class="line">客户新增需求 ──→ 验收阶段返工 ──→ 延期</span><br></pre></td></tr></table></figure>
-<p>从”项目延期”这个现象出发，沿着关系边可以追溯到多个根因节点。这是图上的路径查找问题，不是文本相似度问题。</p>
-<h2 id="GraphRAG-的代价：为什么不能无脑上"><a href="#GraphRAG-的代价：为什么不能无脑上" class="headerlink" title="GraphRAG 的代价：为什么不能无脑上"></a>GraphRAG 的代价：为什么不能无脑上</h2><p>讲完四个场景，必须马上泼一盆冷水。GraphRAG 的索引阶段和普通 RAG 完全不在一个量级：</p>
+        <h2 id="普通-RAG-的实际能力范围"><a href="#普通-RAG-的实际能力范围" class="headerlink" title="普通 RAG 的实际能力范围"></a>普通 RAG 的实际能力范围</h2><p>RAG（Retrieval-Augmented Generation）的核心机制可以概括为：文档切 Chunk，做向量 Embedding 存入向量数据库；用户查询时，将 Query 向量化，通过语义相似度检索 TopK 个 Chunk，喂给大模型生成答案。这套机制的本质是文本片段的相似度匹配，它能做好的事情和做不好的事情，边界非常清晰。</p>
+<p>普通 RAG 最擅长的是单点事实类问题，即答案完整地存在于某个 Chunk 里的查询。比如”接口超时时间是多少””产品支持哪些功能””GPT-4 什么时候发布”这类事实性问题。只要答案在某个 Chunk 里写得明明白白，普通 RAG 基本都能精准召回。这类问题占据了企业知识库 70% 以上的查询量，也是 RAG 架构最稳固的基本盘。</p>
+<h2 id="它真正做不到的事"><a href="#它真正做不到的事" class="headerlink" title="它真正做不到的事"></a>它真正做不到的事</h2><p>普通 RAG 的短板在于，它只能找到片段，但不一定能把片段之间的关系连起来。来看一个真实场景：用户输入一个多条件查询，想找一款适合拍视频、续航不错、而且用户评价稳定的手机。普通 RAG 可能召回 Chunk A”XX 手机影像系统强大，视频拍摄能力突出”、Chunk B”XX 手机电池 5500mAh，续航表现优秀”、Chunk C”用户评价：用了半年，系统稳定”。问题在于，A、B、C 可能来自三篇不同的文档，描述的是三款不同的手机。普通 RAG 把三个 Chunk 一起扔给大模型，大模型也不知道到底哪款手机同时满足这三个条件。</p>
+<p>这就是普通 RAG 的根本局限：它的检索单元是文本片段，不是实体，更不是关系。它擅长”找到相似的文字”，不擅长”找到满足多个关系约束的答案”。这个局限在以下四类场景中会变得无法回避。</p>
+<h2 id="多维度关联查询"><a href="#多维度关联查询" class="headerlink" title="多维度关联查询"></a>多维度关联查询</h2><p>多维度关联查询不是简单的多条件过滤。多条件过滤是 <code>价格 &lt; 5000 AND 品牌 = 华为</code>，这是 SQL 能干的事。多维度关联查询指的是：多个维度之间存在结构化的关系，需要沿着关系做导航和交集运算。</p>
+<p>商品推荐系统是一个典型场景。商品知识不是一张扁平的表，而是一个关系网络：每款商品连接着品牌、价格段、核心卖点、适用人群、用户口碑等多个属性节点。用户输入”有没有适合拍视频、性能强、口碑稳定的旗舰机”，普通 RAG 的做法是在文本里模糊匹配，分别召回”影像强””性能强””口碑好”的片段，最后让大模型自己猜。GraphRAG 的做法是把知识建成图，然后沿着关系边做导航：找到”影像旗舰”节点、”性能旗舰”节点、”用户口碑稳定”节点，取它们关联的商品实体的交集。这不是语义相似度的问题，而是图遍历的问题。</p>
+<p>失效的根本原因在于检索空间的错配。普通 RAG 的检索空间是向量空间，衡量的是两段文本像不像；而多维度关联查询需要的检索空间是关系空间，需要沿着实体关系做路径查找。两个完全不同的空间，用错工具效果天差地别。</p>
+<h2 id="全局总结与隐性关系发现"><a href="#全局总结与隐性关系发现" class="headerlink" title="全局总结与隐性关系发现"></a>全局总结与隐性关系发现</h2><p>全局总结类问题问的不是某个点，而是整体。比如”最近几年高端手机的发展趋势””目前 AI Agent 行业的技术格局””公司各部门的业务关联情况”。这类问题的答案是分散在整个语料库中的，不在任何一个 Chunk 里。普通 RAG 召回的 TopK 个最相似 Chunk 往往是碎片化的：Chunk 1 讲影像，Chunk 2 讲芯片，Chunk 3 讲价格，Chunk 4 讲 AI 功能。大模型拿到这些碎片化的信息只能硬拼，最后生成一个面面俱到但毫无洞察的答案，读起来像目录，不像分析。</p>
+<p>GraphRAG 通过社区发现和分层摘要来解决这个问题。它的做法分三步：第一步用社区发现算法（如 Leiden 算法）把知识图谱划分成若干个语义社区，每个社区内的实体关系紧密，社区之间相对松散；第二步对每个社区分别做摘要生成局部摘要；第三步把所有局部摘要汇总生成全局视图。这个分层摘要机制天然适合回答”整体趋势””行业格局”这一类问题，因为它不是从碎片拼凑，而是从结构化的社区出发，每个社区有自己的主题和洞察，合并起来就是全局视图。</p>
+<p>另一类普通 RAG 无能为力的问题是隐性关系发现。两个实体之间，文本里从来没有直接说明它们有关系，但通过中间节点可以推断出关联。比如产品 A 和产品 B 从来没有被任何文档直接比较过，但它们的属性高度重叠：价格段都是高端，目标人群都是商务用户，核心能力都是影像。在图结构里，产品 A 和产品 B 虽然不直接相连，但它们共享了多个相同的邻居节点，这种结构上的接近性就是隐性关系。普通 RAG 的检索基于 Query 和 Chunk 的语义相似度，如果没有任何文档把产品 A 和产品 B 放在同一段文字里，就完全没有办法发现它们之间的联系。</p>
+<p>依赖隐性关系发现的业务场景其实相当广泛。竞品分析中需要发现没有被直接对比但实质上高度重叠的产品，风控排查中需要从多个看似无关的账户通过中间节点发现它们共享同一控制人，药物研发中需要发现两种没有被同一篇论文提及但通过通路网络发现处于同一信号通路的靶点蛋白。这些都是普通 RAG 根本做不到的事，因为它的信息组织单位是文本片段，不是实体关系图。</p>
+<h2 id="分散信息的因果链追溯"><a href="#分散信息的因果链追溯" class="headerlink" title="分散信息的因果链追溯"></a>分散信息的因果链追溯</h2><p>有些问题的答案需要从多个文档中串联多条信息才能推导出根因。典型的例子是”XX 项目延期的根本原因分析”，真实的答案可能分散在：需求文档里记录了中期发生的重大需求变更，排期表显示关键开发人员被借调到其他项目，研发周报提到接口联调出现了预期外的问题，测试反馈指出某个第三方 SDK 有 Bug 阻塞了测试进度，客户沟通记录显示客户在验收阶段新增了功能点。</p>
+<p>普通 RAG 最可能召回的是某一篇文档中的一个片段，比如会议纪要里的一句话：”本次会议确认项目延期两周，主要原因是需求变更。”这个答案不算错，但不完整。真正的根因是多个因素叠加的结果，只看其中一个会误导决策。</p>
+<p>GraphRAG 把人、需求、任务、时间、风险、依赖关系全部建模成图的节点和边。从”项目延期”这个现象出发，沿着关系边可以追溯到多条因果路径：需求变更影响了任务 A 进而阻塞了任务 B 最终导致延期，开发人员借调导致任务 A 人力不足引发延期，SDK Bug 导致联调阻塞造成延期，客户新增需求导致验收阶段返工带来延期。这是图上的多路径汇聚问题，不是文本相似度能解决的。</p>
+<h2 id="为什么不能无脑上-GraphRAG"><a href="#为什么不能无脑上-GraphRAG" class="headerlink" title="为什么不能无脑上 GraphRAG"></a>为什么不能无脑上 GraphRAG</h2><p>讲完 GraphRAG 擅长解决的问题，必须正视它的工程代价。GraphRAG 的索引阶段和普通 RAG 完全不在一个量级。</p>
 <div class="table-container">
 <table>
 <thead>
@@ -374,7 +312,7 @@
 <tr>
 <td>LLM 调用量</td>
 <td>低（只做 Embedding）</td>
-<td><strong>极高</strong>（抽取、摘要都在调 LLM）</td>
+<td>极高（抽取、摘要都在调 LLM）</td>
 </tr>
 <tr>
 <td>索引时间</td>
@@ -383,8 +321,8 @@
 </tr>
 <tr>
 <td>查询延迟</td>
-<td>毫秒 ~ 秒级</td>
-<td>秒级 ~ 十秒级（遍历 + 合成）</td>
+<td>毫秒到秒级</td>
+<td>秒级到十秒级（遍历 + 合成）</td>
 </tr>
 <tr>
 <td>存储成本</td>
@@ -394,30 +332,16 @@
 </tbody>
 </table>
 </div>
-<p>举个量化的例子：一份 100 万 Token 的企业知识库，普通 RAG 的索引成本可能只需要几美元的 Embedding 费用。而 GraphRAG 的索引阶段——实体抽取、关系抽取、社区摘要——可能需要几十甚至上百美元的 LLM 调用费用。</p>
-<p>这还没有算查询阶段的开销。每次查询，GraphRAG 可能需要遍历更多节点、读取更多关系、合成更长的上下文，这些都是 Token 成本。</p>
-<p>所以结论非常清晰：</p>
-<blockquote>
-<p><strong>如果你的场景 80% 以上都是简单事实类问题，上 GraphRAG 就是过度设计。</strong> 花钱更多，延迟更高，简单问题的回答质量可能还更差。</p>
-</blockquote>
-<h2 id="工程实践：混合路由架构"><a href="#工程实践：混合路由架构" class="headerlink" title="工程实践：混合路由架构"></a>工程实践：混合路由架构</h2><p>真正做过线上系统的人，不会在普通 RAG 和 GraphRAG 之间二选一。正确的做法是混合路由。</p>
-<h3 id="架构设计"><a href="#架构设计" class="headerlink" title="架构设计"></a>架构设计</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">用户 Query</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">┌─────────────────────────┐</span><br><span class="line">│   Query Router          │</span><br><span class="line">│   (LLM &#x2F; 规则引擎)       │</span><br><span class="line">│   判断问题类型           │</span><br><span class="line">└──────────┬──────────────┘</span><br><span class="line">           │</span><br><span class="line">     ┌─────┼──────────────┬──────────────┐</span><br><span class="line">     ▼     ▼              ▼              ▼</span><br><span class="line">  简单事实  结构化查询     关系推理        全局总结</span><br><span class="line">     │        │             │              │</span><br><span class="line">     ▼        ▼             ▼              ▼</span><br><span class="line">  普通RAG   SQL查询      GraphRAG      GraphRAG</span><br><span class="line">  + BM25    (转SQL)      (图遍历)      (社区摘要)</span><br><span class="line">     │        │             │              │</span><br><span class="line">     └────────┴─────────────┴──────────────┘</span><br><span class="line">                         │</span><br><span class="line">                         ▼</span><br><span class="line">                   答案合成 &amp; 输出</span><br></pre></td></tr></table></figure>
-<h3 id="Query-Router-的设计方式"><a href="#Query-Router-的设计方式" class="headerlink" title="Query Router 的设计方式"></a>Query Router 的设计方式</h3><p>Query Router 是整个混合路由的大脑。它的职责是判断用户的问题属于哪一类，然后路由到对应的检索引擎。</p>
-<p>实现方式有三种，从轻到重：</p>
-<p><strong>方式一：规则路由</strong></p>
-<p>基于关键词和句式模式匹配，速度快，成本低。</p>
+<p>举个量化的例子：一份 100 万 Token 的企业知识库，普通 RAG 的索引成本可能只需要几美元的 Embedding 费用。而 GraphRAG 的索引阶段（实体抽取、关系抽取、社区摘要）可能需要几十甚至上百美元的 LLM 调用费用。这还没有算查询阶段的开销，每次查询 GraphRAG 需要遍历更多节点、读取更多关系、合成更长的上下文，这些都是 Token 成本。</p>
+<p>如果你的场景 80% 以上都是简单事实类问题，上 GraphRAG 就是过度设计。花钱更多，延迟更高，简单问题的回答质量可能还更差。</p>
+<h2 id="混合路由架构"><a href="#混合路由架构" class="headerlink" title="混合路由架构"></a>混合路由架构</h2><p>真正做过线上系统的人，不会在普通 RAG 和 GraphRAG 之间二选一。正确的做法是混合路由：根据查询类型路由到不同的处理引擎，简单事实走普通 RAG，结构化查询走 SQL，关系推理和全局总结走 GraphRAG，最后统一做答案合成。</p>
+<p>Query Router 是整个混合路由的核心，职责是判断用户问题属于哪一类然后路由到对应的检索引擎。实现方式有三种，从轻到重。第一种是规则路由，基于关键词和句式模式匹配，速度快成本低：</p>
 <figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">route_query</span><span class="params">(query: str)</span> -&gt; str:</span></span><br><span class="line">    <span class="comment"># 全局总结类关键词</span></span><br><span class="line">    summary_keywords = [<span class="string">"趋势"</span>, <span class="string">"格局"</span>, <span class="string">"整体"</span>, <span class="string">"总结"</span>, <span class="string">"概括"</span>, <span class="string">"发展"</span>]</span><br><span class="line">    <span class="keyword">if</span> any(kw <span class="keyword">in</span> query <span class="keyword">for</span> kw <span class="keyword">in</span> summary_keywords):</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"graphrag_summary"</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 结构化查询类关键词</span></span><br><span class="line">    <span class="keyword">if</span> <span class="string">"多少"</span> <span class="keyword">in</span> query <span class="keyword">or</span> <span class="string">"什么时候"</span> <span class="keyword">in</span> query <span class="keyword">or</span> <span class="string">"是什么"</span> <span class="keyword">in</span> query:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"normal_rag"</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 关系推理类关键词</span></span><br><span class="line">    relation_keywords = [<span class="string">"关联"</span>, <span class="string">"影响"</span>, <span class="string">"原因"</span>, <span class="string">"依赖"</span>, <span class="string">"共同"</span>]</span><br><span class="line">    <span class="keyword">if</span> any(kw <span class="keyword">in</span> query <span class="keyword">for</span> kw <span class="keyword">in</span> relation_keywords):</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"graphrag_relation"</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="string">"normal_rag"</span>  <span class="comment"># 默认走普通 RAG</span></span><br></pre></td></tr></table></figure>
-<p><strong>方式二：LLM 分类路由</strong></p>
-<p>用一个小模型（如 GPT-4o-mini）对 Query 做分类，准确率更高，但有额外延迟和成本。</p>
+<p>第二种是 LLM 分类路由，用一个小模型（如 GPT-4o-mini）对 Query 做分类，准确率更高，但有额外延迟和成本：</p>
 <figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">ROUTER_PROMPT = <span class="string">"""</span></span><br><span class="line"><span class="string">请将以下用户问题分类为以下类型之一：</span></span><br><span class="line"><span class="string">- factual：简单事实查询，答案在某段文本中</span></span><br><span class="line"><span class="string">- sql：可转为结构化查询的问题</span></span><br><span class="line"><span class="string">- relation：需要跨实体关系推理的问题</span></span><br><span class="line"><span class="string">- summary：需要全局总结或趋势分析的问题</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">用户问题：&#123;query&#125;</span></span><br><span class="line"><span class="string">类型：</span></span><br><span class="line"><span class="string">"""</span></span><br></pre></td></tr></table></figure>
-<p><strong>方式三：混合路由</strong></p>
-<p>规则优先，规则无法判断时再调 LLM。成本和延迟之间取得平衡。</p>
-<h3 id="路由策略的核心原则"><a href="#路由策略的核心原则" class="headerlink" title="路由策略的核心原则"></a>路由策略的核心原则</h3><blockquote>
-<p><strong>默认走普通 RAG，只在明确需要时路由到 GraphRAG。</strong></p>
-</blockquote>
-<p>原因很简单：大部分查询都是简单事实类问题，GraphRAG 应该是”特种兵”，不是”常规军”。</p>
-<p>如果反过来，所有问题都走 GraphRAG，你会发现：成本上去了，延迟上去了，简单问题的准确率反而下降了。因为 GraphRAG 的上下文更长、噪声更多，大模型反而更容易被干扰。</p>
-<h2 id="一张表总结：场景与工具对应关系"><a href="#一张表总结：场景与工具对应关系" class="headerlink" title="一张表总结：场景与工具对应关系"></a>一张表总结：场景与工具对应关系</h2><div class="table-container">
+<p>第三种是混合路由，规则优先，规则无法判断时再调 LLM，在成本和延迟之间取得平衡。</p>
+<p>路由策略的核心原则是：默认走普通 RAG，只在明确需要时路由到 GraphRAG。大部分查询都是简单事实类问题，GraphRAG 应该是特种部队而非常规军。如果反过来所有问题都走 GraphRAG，成本上去了，延迟上去了，简单问题的准确率反而下降了，因为 GraphRAG 的上下文更长、噪声更多，大模型反而更容易被干扰。</p>
+<h2 id="场景与工具对照"><a href="#场景与工具对照" class="headerlink" title="场景与工具对照"></a>场景与工具对照</h2><div class="table-container">
 <table>
 <thead>
 <tr>
@@ -473,9 +397,7 @@
 </tbody>
 </table>
 </div>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>技术在演进，但工程思维不变。GraphRAG 不是普通 RAG 的替代品，而是补充。它们解决的是不同类型的问题，没有谁比谁更高级，只有谁更适合哪个场景。</p>
-<p>做技术选型的时候，正确的思路不是列举某个技术的优点，而是先说清楚现有方案的能力边界，再说新方案补的是什么，最后说工程上怎么把两者结合起来。</p>
-<p>能把这个选型逻辑讲清楚，就说明不是在追热点，而是真的做过系统，踩过坑，想清楚了。</p>
+<p>技术选型的正确思路不是列举某个技术的优点，而是先说清楚现有方案的能力边界，再说新方案补的是什么，最后在工程上把两者结合起来。能把这个选型逻辑讲清楚，就说明不是在追热点，而是真的做过系统、踩过坑、想清楚了。</p>
 
     </div>
 
@@ -901,7 +823,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#背景"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#普通-RAG-能力边界"><span class="nav-number">2.</span> <span class="nav-text">普通 RAG 能力边界</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#普通-RAG-核心机制"><span class="nav-number">2.1.</span> <span class="nav-text">普通 RAG 核心机制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#普通-RAG-擅长"><span class="nav-number">2.2.</span> <span class="nav-text">普通 RAG 擅长</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#普通-RAG-短板"><span class="nav-number">2.3.</span> <span class="nav-text">普通 RAG 短板</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#场景一：多维度关联查询"><span class="nav-number">3.</span> <span class="nav-text">场景一：多维度关联查询</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#多维度关联查询的含义"><span class="nav-number">3.1.</span> <span class="nav-text">多维度关联查询的含义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#典型场景：商品推荐系统"><span class="nav-number">3.2.</span> <span class="nav-text">典型场景：商品推荐系统</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#为什么普通-RAG-在这里失效"><span class="nav-number">3.3.</span> <span class="nav-text">为什么普通 RAG 在这里失效</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#场景二：全局总结类问题"><span class="nav-number">4.</span> <span class="nav-text">场景二：全局总结类问题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#全局总结类问题的特征"><span class="nav-number">4.1.</span> <span class="nav-text">全局总结类问题的特征</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#普通-RAG-在这里翻车"><span class="nav-number">4.2.</span> <span class="nav-text">普通 RAG 在这里翻车</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#GraphRAG-的解法：社区发现-分层摘要"><span class="nav-number">4.3.</span> <span class="nav-text">GraphRAG 的解法：社区发现 + 分层摘要</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#场景三：隐性关系发现"><span class="nav-number">5.</span> <span class="nav-text">场景三：隐性关系发现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#隐性关系的定义"><span class="nav-number">5.1.</span> <span class="nav-text">隐性关系的定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#普通-RAG-无法发现隐性关系的原因"><span class="nav-number">5.2.</span> <span class="nav-text">普通 RAG 无法发现隐性关系的原因</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#依赖隐性关系发现的典型业务场景"><span class="nav-number">5.3.</span> <span class="nav-text">依赖隐性关系发现的典型业务场景</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#场景四：分散信息的因果链追溯"><span class="nav-number">6.</span> <span class="nav-text">场景四：分散信息的因果链追溯</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#问题描述"><span class="nav-number">6.1.</span> <span class="nav-text">问题描述</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#普通-RAG-的处理方式"><span class="nav-number">6.2.</span> <span class="nav-text">普通 RAG 的处理方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#GraphRAG-的处理方式"><span class="nav-number">6.3.</span> <span class="nav-text">GraphRAG 的处理方式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#GraphRAG-的代价：为什么不能无脑上"><span class="nav-number">7.</span> <span class="nav-text">GraphRAG 的代价：为什么不能无脑上</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#工程实践：混合路由架构"><span class="nav-number">8.</span> <span class="nav-text">工程实践：混合路由架构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#架构设计"><span class="nav-number">8.1.</span> <span class="nav-text">架构设计</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Query-Router-的设计方式"><span class="nav-number">8.2.</span> <span class="nav-text">Query Router 的设计方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#路由策略的核心原则"><span class="nav-number">8.3.</span> <span class="nav-text">路由策略的核心原则</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一张表总结：场景与工具对应关系"><span class="nav-number">9.</span> <span class="nav-text">一张表总结：场景与工具对应关系</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#总结"><span class="nav-number">10.</span> <span class="nav-text">总结</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#普通-RAG-的实际能力范围"><span class="nav-number">1.</span> <span class="nav-text">普通 RAG 的实际能力范围</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#它真正做不到的事"><span class="nav-number">2.</span> <span class="nav-text">它真正做不到的事</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#多维度关联查询"><span class="nav-number">3.</span> <span class="nav-text">多维度关联查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#全局总结与隐性关系发现"><span class="nav-number">4.</span> <span class="nav-text">全局总结与隐性关系发现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#分散信息的因果链追溯"><span class="nav-number">5.</span> <span class="nav-text">分散信息的因果链追溯</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#为什么不能无脑上-GraphRAG"><span class="nav-number">6.</span> <span class="nav-text">为什么不能无脑上 GraphRAG</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#混合路由架构"><span class="nav-number">7.</span> <span class="nav-text">混合路由架构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#场景与工具对照"><span class="nav-number">8.</span> <span class="nav-text">场景与工具对照</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 

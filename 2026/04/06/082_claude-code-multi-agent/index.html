@@ -23,15 +23,15 @@
     var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
   </script>
 
-  <meta name="description" content="Claude Code 的多 Agent 系统可能是其最被低估的设计之一。它不是简单的”子代理调用”，而是一个完整的协作框架：四种 Agent 类型（Subagent、Fork、Teammate、Remote）、Teams 邮箱通信、权限同步、Worktree 隔离。这个设计让 Claude Code 能够处理单 Agent 无法完成的复杂任务。">
+  <meta name="description" content="单 Agent 的瓶颈考虑一个典型场景：把项目的所有 TypeScript 文件迁移到 strict 模式，同时更新 ESLint 配置，然后运行测试确认无回归。单 Agent 只能顺序执行——修改 tsconfig、修改 ESLint、修改文件、运行测试，每一步等上一步完成。对于一个有 200 个文件的项目，这个过程可能需要十几分钟。 多 Agent 的价值在于把这类任务拆解为可并行的子任务。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="多 Agent 编排：四种代理类型与协作机制">
+<meta property="og:title" content="多 Agent 编排的四种路径">
 <meta property="og:url" content="https://donehub.github.io/2026/04/06/082_claude-code-multi-agent/index.html">
 <meta property="og:site_name" content="DoneHub">
-<meta property="og:description" content="Claude Code 的多 Agent 系统可能是其最被低估的设计之一。它不是简单的”子代理调用”，而是一个完整的协作框架：四种 Agent 类型（Subagent、Fork、Teammate、Remote）、Teams 邮箱通信、权限同步、Worktree 隔离。这个设计让 Claude Code 能够处理单 Agent 无法完成的复杂任务。">
+<meta property="og:description" content="单 Agent 的瓶颈考虑一个典型场景：把项目的所有 TypeScript 文件迁移到 strict 模式，同时更新 ESLint 配置，然后运行测试确认无回归。单 Agent 只能顺序执行——修改 tsconfig、修改 ESLint、修改文件、运行测试，每一步等上一步完成。对于一个有 200 个文件的项目，这个过程可能需要十几分钟。 多 Agent 的价值在于把这类任务拆解为可并行的子任务。">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2026-04-05T16:00:00.000Z">
-<meta property="article:modified_time" content="2026-08-21T17:21:12.519Z">
+<meta property="article:modified_time" content="2026-08-22T05:26:58.905Z">
 <meta property="article:author" content="Zou Rongsheng">
 <meta property="article:tag" content="Multi-Agent">
 <meta name="twitter:card" content="summary">
@@ -49,7 +49,7 @@
   };
 </script>
 
-  <title>多 Agent 编排：四种代理类型与协作机制 | DoneHub</title>
+  <title>多 Agent 编排的四种路径 | DoneHub</title>
   
 
 
@@ -213,7 +213,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          多 Agent 编排：四种代理类型与协作机制
+          多 Agent 编排的四种路径
         </h1>
 
         <div class="post-meta">
@@ -230,7 +230,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-08-22 01:21:12" itemprop="dateModified" datetime="2026-08-22T01:21:12+08:00">2026-08-22</time>
+                <time title="修改时间：2026-08-22 13:26:58" itemprop="dateModified" datetime="2026-08-22T13:26:58+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -274,139 +274,109 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <blockquote>
-<p>Claude Code 的多 Agent 系统可能是其最被低估的设计之一。它不是简单的”子代理调用”，而是一个完整的协作框架：四种 Agent 类型（Subagent、Fork、Teammate、Remote）、Teams 邮箱通信、权限同步、Worktree 隔离。这个设计让 Claude Code 能够处理单 Agent 无法完成的复杂任务。</p>
-</blockquote>
-<a id="more"></a>
-<h2 id="导读：为什么需要多-Agent？"><a href="#导读：为什么需要多-Agent？" class="headerlink" title="导读：为什么需要多 Agent？"></a>导读：为什么需要多 Agent？</h2><p>假设你让 Claude Code 做这件事：</p>
-<blockquote>
-<p>“帮我把这个项目的所有 TypeScript 文件迁移到 strict 模式，同时更新 ESLint 配置，然后运行所有测试确保没有回归。”</p>
-</blockquote>
-<p>单 Agent 会怎么做？顺序执行：修改 tsconfig → 修改 ESLint → 修改文件 → 运行测试。每一步都要等待上一步完成。</p>
-<p>但如果使用多 Agent：</p>
-<ol>
-<li><strong>Explore Agent</strong>：并行扫描所有 TypeScript 文件，识别需要修改的地方</li>
-<li><strong>多个 Fork Agent</strong>：并行修改不同的文件组</li>
-<li><strong>Plan Agent</strong>：协调修改顺序，避免冲突</li>
-<li><strong>Verification Agent</strong>：运行测试，验证修改</li>
-</ol>
-<p>这就是多 Agent 编排的价值：<strong>并行化、专业化、隔离性</strong>。</p>
-<hr>
-<h2 id="一、五种-Agent-类型和职责"><a href="#一、五种-Agent-类型和职责" class="headerlink" title="一、五种 Agent 类型和职责"></a>一、五种 Agent 类型和职责</h2><h3 id="1-1-Agent-类型概览"><a href="#1-1-Agent-类型概览" class="headerlink" title="1.1 Agent 类型概览"></a>1.1 Agent 类型概览</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────┐</span><br><span class="line">│                  Agent Tool                      │</span><br><span class="line">│              (入口 &amp; 路由分发)                    │</span><br><span class="line">├───────────┬───────────┬───────────┬─────────────┤</span><br><span class="line">│  Subagent │  Fork     │ Teammate  │   Remote    │</span><br><span class="line">│  (子代理)  │ (分叉)    │ (队友)    │   (远程)    │</span><br><span class="line">│           │           │           │             │</span><br><span class="line">│ 独立上下文 │ 继承上下文 │ 团队协作   │ CCR 环境   │</span><br><span class="line">│ 按类型过滤 │ 缓存共享   │ 邮箱通信   │ 远程执行   │</span><br><span class="line">│ 工具池     │ 字节一致   │ 权限同步   │ 轮询结果   │</span><br><span class="line">└───────────┴───────────┴───────────┴─────────────┘</span><br><span class="line">                        │</span><br><span class="line">                  ┌─────┴─────┐</span><br><span class="line">                  │ DreamTask │</span><br><span class="line">                  │ (记忆整合)  │</span><br><span class="line">                  │ 定时后台   │</span><br><span class="line">                  └───────────┘</span><br></pre></td></tr></table></figure>
-<h3 id="1-2-内置-Agent-类型"><a href="#1-2-内置-Agent-类型" class="headerlink" title="1.2 内置 Agent 类型"></a>1.2 内置 Agent 类型</h3><div class="table-container">
+        <a id="more"></a>
+<h2 id="单-Agent-的瓶颈"><a href="#单-Agent-的瓶颈" class="headerlink" title="单 Agent 的瓶颈"></a>单 Agent 的瓶颈</h2><p>考虑一个典型场景：把项目的所有 TypeScript 文件迁移到 strict 模式，同时更新 ESLint 配置，然后运行测试确认无回归。单 Agent 只能顺序执行——修改 tsconfig、修改 ESLint、修改文件、运行测试，每一步等上一步完成。对于一个有 200 个文件的项目，这个过程可能需要十几分钟。</p>
+<p>多 Agent 的价值在于把这类任务拆解为可并行的子任务。Explore Agent 扫描文件识别修改点，多个 Fork Agent 并行修改不同文件组，Plan Agent 协调顺序避免冲突，Verification Agent 运行测试验证结果。并行化、专业化、隔离性，这是多 Agent 编排解决的核心问题。</p>
+<h2 id="Agent-类型与职责"><a href="#Agent-类型与职责" class="headerlink" title="Agent 类型与职责"></a>Agent 类型与职责</h2><p>Claude Code 定义了四种 Agent 生成方式和五类内置角色。</p>
+<p>四种生成方式决定了 Agent 的运行环境和隔离程度：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
-<th>Agent 类型</th>
-<th>用途</th>
-<th>工具池限制</th>
+<th>生成方式</th>
+<th>上下文来源</th>
+<th>执行环境</th>
+<th>通信方式</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>General Purpose</strong></td>
+<td>Subagent（子代理）</td>
+<td>独立上下文</td>
+<td>同步/异步执行</td>
+<td>返回值传递</td>
+</tr>
+<tr>
+<td>Fork（分叉）</td>
+<td>继承父代理上下文</td>
+<td>共享 prompt cache</td>
+<td>返回值传递</td>
+</tr>
+<tr>
+<td>Teammate（队友）</td>
+<td>独立上下文</td>
+<td>tmux/iTerm2/进程内</td>
+<td>邮箱通信</td>
+</tr>
+<tr>
+<td>Remote（远程）</td>
+<td>独立上下文</td>
+<td>CCR 环境</td>
+<td>轮询结果</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>五类内置角色定义了工具权限和行为边界：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>用途</th>
+<th>工具池</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>General Purpose</td>
 <td>通用任务</td>
 <td>全部工具</td>
 </tr>
 <tr>
-<td><strong>Explore</strong></td>
+<td>Explore</td>
 <td>代码库探索</td>
 <td>Read, Grep, Glob, WebSearch</td>
 </tr>
 <tr>
-<td><strong>Plan</strong></td>
+<td>Plan</td>
 <td>制定计划</td>
-<td>全部工具，但受限输出</td>
+<td>全部工具，受限输出</td>
 </tr>
 <tr>
-<td><strong>Verification</strong></td>
+<td>Verification</td>
 <td>验证结果</td>
 <td>Bash, Read, Grep</td>
 </tr>
 <tr>
-<td><strong>Coordinator</strong></td>
+<td>Coordinator</td>
 <td>编排协调</td>
 <td>受限工具集</td>
 </tr>
 </tbody>
 </table>
 </div>
-<h3 id="1-3-Agent-定义结构"><a href="#1-3-Agent-定义结构" class="headerlink" title="1.3 Agent 定义结构"></a>1.3 Agent 定义结构</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/AgentTool/loadAgentsDir.ts</span></span><br><span class="line"><span class="keyword">type</span> AgentDefinition = &#123;</span><br><span class="line">  agentType: <span class="built_in">string</span>              <span class="comment">// Agent 类型标识</span></span><br><span class="line">  description: <span class="built_in">string</span>            <span class="comment">// 描述</span></span><br><span class="line">  getSystemPrompt: <span class="function">(<span class="params">context</span>) =&gt;</span> <span class="built_in">string</span>  <span class="comment">// 系统提示词</span></span><br><span class="line">  tools?: <span class="built_in">string</span>[]               <span class="comment">// 允许的工具（'*' = 全部）</span></span><br><span class="line">  disallowedTools?: <span class="built_in">string</span>[]     <span class="comment">// 禁止的工具</span></span><br><span class="line">  model?: <span class="built_in">string</span>                 <span class="comment">// 模型选择</span></span><br><span class="line">  permissionMode?: PermissionMode <span class="comment">// 权限模式</span></span><br><span class="line">  isBuiltin?: <span class="built_in">boolean</span>            <span class="comment">// 是否内置</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="二、Agent-生成流程：四条路径"><a href="#二、Agent-生成流程：四条路径" class="headerlink" title="二、Agent 生成流程：四条路径"></a>二、Agent 生成流程：四条路径</h2><h3 id="2-1-入口：AgentTool-call"><a href="#2-1-入口：AgentTool-call" class="headerlink" title="2.1 入口：AgentTool.call()"></a>2.1 入口：AgentTool.call()</h3><p><code>src/tools/AgentTool/AgentTool.tsx</code> 中的 <code>call()</code> 函数是所有 Agent 生成的入口：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">AgentTool.call(input)</span><br><span class="line">  │</span><br><span class="line">  ├─ team_name + name? ──────→ 路径1: spawnTeammate()</span><br><span class="line">  │</span><br><span class="line">  ├─ run_in_background?  ────→ 路径2: registerAsyncAgent()</span><br><span class="line">  │     └─ agent.background?</span><br><span class="line">  │</span><br><span class="line">  ├─ 省略 subagent_type? ───→ 路径3: Fork (buildForkedMessages())</span><br><span class="line">  │     └─ fork 实验开启?</span><br><span class="line">  │</span><br><span class="line">  └─ 默认 ───────────────────→ 路径4: runAgent() 同步执行</span><br></pre></td></tr></table></figure>
-<h3 id="2-2-路径1：Teammate-生成"><a href="#2-2-路径1：Teammate-生成" class="headerlink" title="2.2 路径1：Teammate 生成"></a>2.2 路径1：Teammate 生成</h3><p><strong>触发条件</strong>：<code>team_name</code> 和 <code>name</code> 同时存在</p>
-<p><strong>流程</strong>：</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/shared/spawnMultiAgent.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">spawnTeammate</span>(<span class="params">config, context</span>) </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 检测执行后端</span></span><br><span class="line">  <span class="keyword">const</span> backend = detectBackend()  <span class="comment">// tmux / iTerm2 / in-process</span></span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 生成唯一 agentId</span></span><br><span class="line">  <span class="keyword">const</span> agentId = formatAgentId(name, teamName)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 分配颜色</span></span><br><span class="line">  <span class="keyword">const</span> color = assignColor(name)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 创建执行环境</span></span><br><span class="line">  <span class="keyword">if</span> (backend === <span class="string">'in-process'</span>) &#123;</span><br><span class="line">    <span class="keyword">await</span> spawnInProcessTeammate(config, context)</span><br><span class="line">  &#125; <span class="keyword">else</span> <span class="keyword">if</span> (backend === <span class="string">'tmux'</span>) &#123;</span><br><span class="line">    <span class="keyword">await</span> TmuxBackend.createPane(config)</span><br><span class="line">  &#125; <span class="keyword">else</span> <span class="keyword">if</span> (backend === <span class="string">'iTerm2'</span>) &#123;</span><br><span class="line">    <span class="keyword">await</span> ITerm2Backend.createWindow(config)</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 5. 写入 TeamFile</span></span><br><span class="line">  <span class="keyword">await</span> updateTeamFile(teamName, &#123; members: [...members, newMember] &#125;)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> &#123; status: <span class="string">'teammate_spawned'</span>, agentId, tmuxPaneId, ... &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>In-Process 队友的隔离</strong>：</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/utils/swarm/spawnInProcess.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">spawnInProcessTeammate</span>(<span class="params">config, context</span>) </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 独立的 AbortController（不随 leader 中断）</span></span><br><span class="line">  <span class="keyword">const</span> abortController = <span class="keyword">new</span> AbortController()</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. AsyncLocalStorage 上下文隔离</span></span><br><span class="line">  runWithTeammateContext(teammateContext, <span class="keyword">async</span> () =&gt; &#123;</span><br><span class="line">    <span class="comment">// 3. 独立的任务状态</span></span><br><span class="line">    <span class="comment">// 4. 独立的消息循环</span></span><br><span class="line">    <span class="comment">// 5. 共享的权限管道（通过 mailbox）</span></span><br><span class="line">  &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="2-3-路径2：异步-Subagent"><a href="#2-3-路径2：异步-Subagent" class="headerlink" title="2.3 路径2：异步 Subagent"></a>2.3 路径2：异步 Subagent</h3><p><strong>触发条件</strong>：<code>run_in_background=true</code> 或 Agent 定义中 <code>background: true</code></p>
-<p><strong>流程</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">registerAsyncAgent()</span><br><span class="line">  │</span><br><span class="line">  ├─ 创建 LocalAgentTask（status: &#39;running&#39;）</span><br><span class="line">  ├─ 注册到 agentNameRegistry（如有 name）</span><br><span class="line">  ├─ 创建输出文件符号链接</span><br><span class="line">  ├─ 创建 AbortController（链接到父代理）</span><br><span class="line">  ├─ 发射 SDK event: task_started</span><br><span class="line">  │</span><br><span class="line">  └─ void runAsyncAgentLifecycle()  ← 异步分离执行</span><br><span class="line">       │</span><br><span class="line">       ├─ 创建 ProgressTracker</span><br><span class="line">       ├─ 遍历 makeStream() 生成器</span><br><span class="line">       │   ├─ 追加消息到 agentMessages[]</span><br><span class="line">       │   ├─ 更新进度（tokens、tools、activities）</span><br><span class="line">       │   └─ 发射 SDK progress events</span><br><span class="line">       │</span><br><span class="line">       └─ 完成时：</span><br><span class="line">           ├─ finalizeAgentTool()（提取结果）</span><br><span class="line">           ├─ completeAgentTask()（标记完成）</span><br><span class="line">           ├─ 清理 worktree（如有隔离）</span><br><span class="line">           └─ enqueuePendingNotification()（通知主代理）</span><br></pre></td></tr></table></figure>
-<h3 id="2-4-路径3：Fork-Subagent"><a href="#2-4-路径3：Fork-Subagent" class="headerlink" title="2.4 路径3：Fork Subagent"></a>2.4 路径3：Fork Subagent</h3><p><strong>触发条件</strong>：省略 <code>subagent_type</code> 且 Fork 实验开启</p>
-<p><strong>核心优化</strong>：通过字节级一致的 API 请求前缀，实现 <strong>prompt cache 命中</strong>。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">buildForkedMessages(directive, assistantMessage)</span><br><span class="line">  │</span><br><span class="line">  ├─ 保留父代理完整的 assistant message（所有 tool_use 块）</span><br><span class="line">  ├─ 构建 user message：</span><br><span class="line">  │   ├─ 对每个 tool_use 创建占位 tool_result（字节一致）</span><br><span class="line">  │   └─ 追加 per-child directive（唯一差异部分）</span><br><span class="line">  │</span><br><span class="line">  └─ 结果：字节级一致的 API 前缀 → prompt cache 命中！</span><br></pre></td></tr></table></figure>
-<p><strong>Fork 子代理的行为约束</strong>（通过 <code>FORK_BOILERPLATE_TAG</code> 注入）：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">1. 你是分叉的工作进程，不是主代理</span><br><span class="line">2. 不要对话、提问或建议后续步骤</span><br><span class="line">3. 直接使用工具（Bash、Read、Write 等）</span><br><span class="line">4. 如修改文件，在报告前提交更改</span><br><span class="line">5. 工具调用之间不要输出文本</span><br><span class="line">6. 严格限制在指令范围内</span><br><span class="line">7. 报告控制在 500 词以内</span><br><span class="line">8. 响应必须以 &quot;Scope:&quot; 开头</span><br></pre></td></tr></table></figure>
-<h3 id="2-5-路径4：同步-Subagent"><a href="#2-5-路径4：同步-Subagent" class="headerlink" title="2.5 路径4：同步 Subagent"></a>2.5 路径4：同步 Subagent</h3><p><strong>触发条件</strong>：默认路径（无 team_name、无 background、非 fork）</p>
-<p><strong>流程</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">runAgent(promptMessages, toolUseContext, options)</span><br><span class="line">  │</span><br><span class="line">  ├─ 解析 Agent 定义（getSystemPrompt、tools、permissions）</span><br><span class="line">  ├─ 构建系统提示词（buildEffectiveSystemPrompt）</span><br><span class="line">  ├─ 创建隔离的 ToolUseContext（createSubagentContext）</span><br><span class="line">  ├─ 启动查询循环（query() async generator）</span><br><span class="line">  │   ├─ 发送 API 请求</span><br><span class="line">  │   ├─ 处理流式事件</span><br><span class="line">  │   ├─ 执行工具调用</span><br><span class="line">  │   └─ 累积消息和 usage</span><br><span class="line">  │</span><br><span class="line">  └─ 返回 AgentToolResult</span><br><span class="line">       ├─ content: 最后 assistant 消息的文本</span><br><span class="line">       ├─ totalToolUseCount</span><br><span class="line">       ├─ totalDurationMs</span><br><span class="line">       └─ totalTokens</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="三、工具池系统：三层过滤"><a href="#三、工具池系统：三层过滤" class="headerlink" title="三、工具池系统：三层过滤"></a>三、工具池系统：三层过滤</h2><h3 id="3-1-第一层：全局禁止"><a href="#3-1-第一层：全局禁止" class="headerlink" title="3.1 第一层：全局禁止"></a>3.1 第一层：全局禁止</h3><p><code>ALL_AGENT_DISALLOWED_TOOLS</code> — 对所有 Agent 禁止的工具：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>工具</th>
-<th>禁止原因</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>TaskOutput</td>
-<td>仅主代理可读取任务输出</td>
-</tr>
-<tr>
-<td>ExitPlanMode</td>
-<td>仅主代理可退出计划模式</td>
-</tr>
-<tr>
-<td>EnterPlanMode</td>
-<td>仅主代理可进入计划模式</td>
-</tr>
-<tr>
-<td>AskUserQuestion</td>
-<td>子代理不应直接问用户</td>
-</tr>
-<tr>
-<td>TaskStop</td>
-<td>仅主代理可终止任务</td>
-</tr>
-<tr>
-<td>Agent</td>
-<td>防止递归生成（Ant 内部例外）</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h3 id="3-2-第二层：Agent-类型过滤"><a href="#3-2-第二层：Agent-类型过滤" class="headerlink" title="3.2 第二层：Agent 类型过滤"></a>3.2 第二层：Agent 类型过滤</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/AgentTool/agentToolUtils.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">filterToolsForAgent</span>(<span class="params">tools, agentDef</span>) </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 移除 ALL_AGENT_DISALLOWED_TOOLS</span></span><br><span class="line">  <span class="comment">// 2. 如果非内置 Agent，额外移除 CUSTOM_AGENT_DISALLOWED_TOOLS</span></span><br><span class="line">  <span class="comment">// 3. 如果是异步 Agent，限制为 ASYNC_AGENT_ALLOWED_TOOLS</span></span><br><span class="line">  <span class="comment">// 4. MCP 工具始终允许</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>ASYNC_AGENT_ALLOWED_TOOLS</strong>（15 个）：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Read, WebSearch, TodoWrite, Grep, WebFetch, Glob,</span><br><span class="line">Bash&#x2F;PowerShell, FileEdit, FileWrite, NotebookEdit,</span><br><span class="line">Skill, SyntheticOutput, ToolSearch, EnterWorktree, ExitWorktree</span><br></pre></td></tr></table></figure>
-<h3 id="3-3-第三层：Agent-定义过滤"><a href="#3-3-第三层：Agent-定义过滤" class="headerlink" title="3.3 第三层：Agent 定义过滤"></a>3.3 第三层：Agent 定义过滤</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">resolveAgentTools</span>(<span class="params">agentDef, availableTools</span>) </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (tools === [<span class="string">'*'</span>] || <span class="literal">undefined</span>)  → 通配符，全部允许</span><br><span class="line">  <span class="keyword">if</span> (tools === [<span class="string">'Read'</span>, <span class="string">'Grep'</span>])    → 仅允许列表中的工具</span><br><span class="line">  <span class="keyword">if</span> (disallowedTools === [<span class="string">'Agent'</span>]) → 从可用工具中减去</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>过滤流程图</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">所有可用工具</span><br><span class="line">  │</span><br><span class="line">  ├─ 减去 ALL_AGENT_DISALLOWED_TOOLS ──→ 通用禁止</span><br><span class="line">  │</span><br><span class="line">  ├─ 非内置？减去 CUSTOM_AGENT_DISALLOWED_TOOLS</span><br><span class="line">  │</span><br><span class="line">  ├─ 异步？限制为 ASYNC_AGENT_ALLOWED_TOOLS</span><br><span class="line">  │</span><br><span class="line">  ├─ 有 tools 列表？取交集</span><br><span class="line">  │</span><br><span class="line">  ├─ 有 disallowedTools？取差集</span><br><span class="line">  │</span><br><span class="line">  └─ 最终工具池</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="四、上下文传递机制"><a href="#四、上下文传递机制" class="headerlink" title="四、上下文传递机制"></a>四、上下文传递机制</h2><h3 id="4-1-CacheSafeParams-—-缓存安全参数"><a href="#4-1-CacheSafeParams-—-缓存安全参数" class="headerlink" title="4.1 CacheSafeParams — 缓存安全参数"></a>4.1 CacheSafeParams — 缓存安全参数</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/utils/forkedAgent.ts</span></span><br><span class="line"><span class="keyword">type</span> CacheSafeParams = &#123;</span><br><span class="line">  systemPrompt: SystemPrompt       <span class="comment">// 系统提示词</span></span><br><span class="line">  userContext: &#123; [k: <span class="built_in">string</span>]: <span class="built_in">string</span> &#125;  <span class="comment">// 目录结构、CLAUDE.md 等</span></span><br><span class="line">  systemContext: &#123; [k: <span class="built_in">string</span>]: <span class="built_in">string</span> &#125; <span class="comment">// git status、环境信息</span></span><br><span class="line">  toolUseContext: ToolUseContext    <span class="comment">// 工具配置、模型、选项</span></span><br><span class="line">  forkContextMessages: Message[]   <span class="comment">// Fork 上下文消息（用于缓存共享）</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>缓存共享原理</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────┐</span><br><span class="line">│         共享前缀（字节一致）              │</span><br><span class="line">│  ┌──────────────────────────────────┐   │</span><br><span class="line">│  │ System Prompt                    │   │</span><br><span class="line">│  │ User Context                     │   │</span><br><span class="line">│  │ System Context                   │   │</span><br><span class="line">│  │ Tool Use Context                 │   │</span><br><span class="line">│  │ 对话历史 Messages                │   │</span><br><span class="line">│  │ Assistant Message (all tool_use) │   │</span><br><span class="line">│  │ User Message (placeholder results)│  │</span><br><span class="line">│  └──────────────────────────────────┘   │</span><br><span class="line">├─────────────────────────────────────────┤</span><br><span class="line">│  唯一差异：per-child directive text      │</span><br><span class="line">└─────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
-<h3 id="4-2-SubagentContext-—-子代理上下文隔离"><a href="#4-2-SubagentContext-—-子代理上下文隔离" class="headerlink" title="4.2 SubagentContext — 子代理上下文隔离"></a>4.2 SubagentContext — 子代理上下文隔离</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> SubagentContextOverrides = &#123;</span><br><span class="line">  options?: ToolUseContext[<span class="string">'options'</span>]           <span class="comment">// 自定义工具、模型</span></span><br><span class="line">  agentId?: AgentId                            <span class="comment">// 子代理 ID</span></span><br><span class="line">  agentType?: <span class="built_in">string</span>                           <span class="comment">// Agent 类型</span></span><br><span class="line">  messages?: Message[]                         <span class="comment">// 自定义消息历史</span></span><br><span class="line">  readFileState?: ToolUseContext[<span class="string">'readFileState'</span>] <span class="comment">// 文件读取缓存</span></span><br><span class="line">  abortController?: AbortController            <span class="comment">// 中止控制器</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 显式 opt-in 共享（默认隔离）</span></span><br><span class="line">  shareSetAppState?: <span class="built_in">boolean</span>                   <span class="comment">// 共享 AppState 写入</span></span><br><span class="line">  shareSetResponseLength?: <span class="built_in">boolean</span>             <span class="comment">// 共享响应长度度量</span></span><br><span class="line">  shareAbortController?: <span class="built_in">boolean</span>               <span class="comment">// 共享中止控制器</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 实验性注入</span></span><br><span class="line">  criticalSystemReminder_EXPERIMENTAL?: <span class="built_in">string</span> <span class="comment">// 每轮重新注入的提醒</span></span><br><span class="line">  contentReplacementState?: ContentReplacementState</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>隔离 vs 共享</strong>：</p>
+<p>Agent 的定义结构统一：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> AgentDefinition = &#123;</span><br><span class="line">  agentType: <span class="built_in">string</span>                       <span class="comment">// 类型标识</span></span><br><span class="line">  description: <span class="built_in">string</span>                     <span class="comment">// 描述</span></span><br><span class="line">  getSystemPrompt: <span class="function">(<span class="params">context</span>) =&gt;</span> <span class="built_in">string</span>    <span class="comment">// 系统提示词</span></span><br><span class="line">  tools?: <span class="built_in">string</span>[]                        <span class="comment">// 允许的工具（'*' = 全部）</span></span><br><span class="line">  disallowedTools?: <span class="built_in">string</span>[]              <span class="comment">// 禁止的工具</span></span><br><span class="line">  model?: <span class="built_in">string</span>                          <span class="comment">// 模型选择</span></span><br><span class="line">  permissionMode?: PermissionMode         <span class="comment">// 权限模式</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="四条生成路径"><a href="#四条生成路径" class="headerlink" title="四条生成路径"></a>四条生成路径</h2><p>所有 Agent 生成都从 <code>AgentTool.call()</code> 入口进入，根据输入参数路由到四条不同路径。</p>
+<p><strong>Teammate 生成</strong>——当 <code>team_name</code> 和 <code>name</code> 同时存在时触发。系统检测执行后端（tmux/iTerm2/进程内），生成唯一 agentId，分配 UI 颜色，创建执行环境，最后更新 TeamFile。进程内队友使用独立的 AbortController 和 AsyncLocalStorage 实现上下文隔离，但共享权限管道。</p>
+<p><strong>异步 Subagent</strong>——当 <code>run_in_background=true</code> 或 Agent 定义中 <code>background: true</code> 时触发。系统创建 LocalAgentTask，注册到 agentNameRegistry，创建 AbortController，然后异步分离执行。执行过程中通过 ProgressTracker 追踪进度，完成时提取结果、标记完成、清理 worktree、通知主代理。</p>
+<p><strong>Fork Subagent</strong>——当省略 <code>subagent_type</code> 且 Fork 实验开启时触发。这是性能最优的路径，通过构建字节级一致的 API 请求前缀实现 prompt cache 命中。Fork 子代理保留父代理完整的 assistant message，对每个 tool_use 创建占位 tool_result，最后追加唯一的 per-child directive。前缀字节一致意味着 API 层的 prompt cache 可以直接复用，省去了重新计算缓存的开销。</p>
+<p>Fork 子代理有严格的行为约束：不对话、不提问、不使用后续建议，直接调用工具，工具调用之间不输出文本，响应必须以 “Scope:” 开头，报告控制在 500 词以内。这些约束确保 Fork 是一个高效的工作进程而非对话伙伴。</p>
+<p><strong>同步 Subagent</strong>——默认路径。系统解析 Agent 定义，构建系统提示词，创建隔离的 ToolUseContext，启动查询循环，返回最终结果。</p>
+<h2 id="工具池的三层过滤"><a href="#工具池的三层过滤" class="headerlink" title="工具池的三层过滤"></a>工具池的三层过滤</h2><p>每个 Agent 能使用哪些工具，经过三层过滤决定。</p>
+<p>第一层是全局禁止。TaskOutput、ExitPlanMode、EnterPlanMode、AskUserQuestion、TaskStop、Agent 这六个工具对所有子代理禁用。前五个只有主代理有权操作，Agent 工具禁用是为了防止递归生成。</p>
+<p>第二层是 Agent 类型过滤。异步 Agent 限制为 15 个工具（Read、Grep、Glob、Bash/PowerShell、FileEdit、FileWrite、WebSearch、WebFetch、TodoWrite、NotebookEdit、Skill、SyntheticOutput、ToolSearch、EnterWorktree、ExitWorktree），MCP 工具始终允许。</p>
+<p>第三层是 Agent 定义过滤。如果定义了 <code>tools</code> 列表，取交集；如果定义了 <code>disallowedTools</code>，取差集；如果 <code>tools: [&#39;*&#39;]</code> 或未定义，通配全部允许。</p>
+<h2 id="上下文传递与隔离"><a href="#上下文传递与隔离" class="headerlink" title="上下文传递与隔离"></a>上下文传递与隔离</h2><p>Agent 之间的上下文传递需要在共享和隔离之间取得平衡。</p>
+<p>Fork Agent 的设计目标是最大化缓存共享。它在 API 请求中保持字节级一致的前缀（系统提示词、用户上下文、系统上下文、工具配置、对话历史、父代理的 assistant message 和占位 tool_result），只有末尾的 per-child directive 是差异部分。这意味着多个 Fork 子代理可以共享同一份 prompt cache，大幅降低 token 消耗和响应延迟。</p>
+<p>Subagent 的设计目标是默认隔离、显式共享。消息历史独立，文件读取缓存独立，内容替换状态独立，AbortController 独立但链接到父代理（父取消时子也取消）。如果子代理需要影响父状态，必须通过 <code>shareSetAppState</code> 等显式 opt-in 参数开启。</p>
 <div class="table-container">
 <table>
 <thead>
 <tr>
 <th>资源</th>
-<th>默认</th>
+<th>默认行为</th>
 <th>说明</th>
 </tr>
 </thead>
@@ -439,28 +409,15 @@
 </tbody>
 </table>
 </div>
-<hr>
-<h2 id="五、Agent-Teams：邮箱通信"><a href="#五、Agent-Teams：邮箱通信" class="headerlink" title="五、Agent Teams：邮箱通信"></a>五、Agent Teams：邮箱通信</h2><h3 id="5-1-TeamFile-结构"><a href="#5-1-TeamFile-结构" class="headerlink" title="5.1 TeamFile 结构"></a>5.1 TeamFile 结构</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 存储路径：~/.claude/teams/&#123;team_name&#125;/config.json</span></span><br><span class="line">&#123;</span><br><span class="line">  name: <span class="built_in">string</span>                        <span class="comment">// 团队名称</span></span><br><span class="line">  description?: <span class="built_in">string</span>                <span class="comment">// 团队描述</span></span><br><span class="line">  createdAt: <span class="built_in">number</span>                   <span class="comment">// 创建时间戳</span></span><br><span class="line">  leadAgentId: <span class="built_in">string</span>                 <span class="comment">// Team Lead 的 Agent ID</span></span><br><span class="line">  leadSessionId?: <span class="built_in">string</span>              <span class="comment">// Lead 的会话 UUID</span></span><br><span class="line">  hiddenPaneIds?: <span class="built_in">string</span>[]            <span class="comment">// UI 中隐藏的 pane</span></span><br><span class="line">  teamAllowedPaths?: TeamAllowedPath[] <span class="comment">// 团队级共享权限</span></span><br><span class="line">  members: <span class="built_in">Array</span>&lt;&#123;</span><br><span class="line">    agentId: <span class="built_in">string</span>                   <span class="comment">// 成员 Agent ID</span></span><br><span class="line">    name: <span class="built_in">string</span>                      <span class="comment">// 显示名称</span></span><br><span class="line">    agentType?: <span class="built_in">string</span>                <span class="comment">// 角色类型</span></span><br><span class="line">    model?: <span class="built_in">string</span>                    <span class="comment">// 使用的模型</span></span><br><span class="line">    prompt?: <span class="built_in">string</span>                   <span class="comment">// 初始任务</span></span><br><span class="line">    color?: <span class="built_in">string</span>                    <span class="comment">// UI 颜色</span></span><br><span class="line">    planModeRequired?: <span class="built_in">boolean</span>        <span class="comment">// 是否需要 plan 审批</span></span><br><span class="line">    joinedAt: <span class="built_in">number</span>                  <span class="comment">// 加入时间</span></span><br><span class="line">    tmuxPaneId: <span class="built_in">string</span>                <span class="comment">// 终端 pane ID</span></span><br><span class="line">    cwd: <span class="built_in">string</span>                       <span class="comment">// 工作目录</span></span><br><span class="line">    worktreePath?: <span class="built_in">string</span>             <span class="comment">// Worktree 路径</span></span><br><span class="line">    sessionId?: <span class="built_in">string</span>                <span class="comment">// 会话 ID</span></span><br><span class="line">    subscriptions: <span class="built_in">string</span>[]           <span class="comment">// 消息订阅</span></span><br><span class="line">    backendType?: <span class="string">'tmux'</span>|<span class="string">'iterm2'</span>|<span class="string">'in-process'</span></span><br><span class="line">    isActive?: <span class="built_in">boolean</span>                <span class="comment">// false=空闲, true/undefined=活跃</span></span><br><span class="line">    mode?: PermissionMode             <span class="comment">// 当前权限模式</span></span><br><span class="line">  &#125;&gt;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="5-2-邮箱系统"><a href="#5-2-邮箱系统" class="headerlink" title="5.2 邮箱系统"></a>5.2 邮箱系统</h3><p><strong>存储路径</strong>：<code>~/.claude/teams/{team_name}/inboxes/{agent_name}.json</code></p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> TeammateMessage = &#123;</span><br><span class="line">  <span class="keyword">from</span>: <span class="built_in">string</span>        <span class="comment">// 发送者名称</span></span><br><span class="line">  text: <span class="built_in">string</span>        <span class="comment">// 消息内容（纯文本或 JSON）</span></span><br><span class="line">  timestamp: <span class="built_in">string</span>   <span class="comment">// ISO 时间戳</span></span><br><span class="line">  read: <span class="built_in">boolean</span>       <span class="comment">// 是否已读</span></span><br><span class="line">  color?: <span class="built_in">string</span>      <span class="comment">// 发送者颜色</span></span><br><span class="line">  summary?: <span class="built_in">string</span>    <span class="comment">// 5-10 词摘要</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>并发安全</strong>：使用 <code>proper-lockfile</code> 文件锁，10 次重试，5-100ms 指数退避。</p>
-<h3 id="5-3-收件箱轮询"><a href="#5-3-收件箱轮询" class="headerlink" title="5.3 收件箱轮询"></a>5.3 收件箱轮询</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/hooks/useInboxPoller.ts</span></span><br><span class="line"><span class="comment">// 轮询间隔：1000ms</span></span><br><span class="line"></span><br><span class="line">useEffect(<span class="function"><span class="params">()</span> =&gt;</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> interval = setInterval(<span class="keyword">async</span> () =&gt; &#123;</span><br><span class="line">    <span class="keyword">const</span> messages = <span class="keyword">await</span> readUnreadMessages(agentName, teamName)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">const</span> msg of messages) &#123;</span><br><span class="line">      <span class="keyword">if</span> (isShutdownRequest(msg.text)) &#123;</span><br><span class="line">        <span class="comment">// 处理关停请求</span></span><br><span class="line">      &#125; <span class="keyword">else</span> <span class="keyword">if</span> (isPlanApprovalResponse(msg.text)) &#123;</span><br><span class="line">        <span class="comment">// 处理 plan 审批</span></span><br><span class="line">      &#125; <span class="keyword">else</span> <span class="keyword">if</span> (isPermissionRequest(msg.text)) &#123;</span><br><span class="line">        <span class="comment">// 路由到权限系统</span></span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// 纯文本消息 → 提交为新对话轮</span></span><br><span class="line">        onSubmitMessage(formatted)</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;, INBOX_POLL_INTERVAL_MS)</span><br><span class="line">&#125;, [])</span><br></pre></td></tr></table></figure>
-<h3 id="5-4-消息路由"><a href="#5-4-消息路由" class="headerlink" title="5.4 消息路由"></a>5.4 消息路由</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">SendMessage(&#123; to, message &#125;)</span><br><span class="line">  │</span><br><span class="line">  ├─ to &#x3D;&#x3D;&#x3D; &quot;*&quot; → 广播</span><br><span class="line">  │   └─ 遍历所有队友，逐个写入 mailbox</span><br><span class="line">  │</span><br><span class="line">  ├─ agentNameRegistry.has(to) → in-process 子代理</span><br><span class="line">  │   └─ 通过 AppState pending messages 队列路由</span><br><span class="line">  │</span><br><span class="line">  ├─ teamFile.members.find(to) → 进程级队友</span><br><span class="line">  │   └─ writeToMailbox(to, message, teamName)</span><br><span class="line">  │</span><br><span class="line">  ├─ to.startsWith(&quot;bridge:&quot;) → 远程会话</span><br><span class="line">  │   └─ postInterClaudeMessage(sessionId, message)</span><br><span class="line">  │</span><br><span class="line">  └─ to.startsWith(&quot;uds:&quot;) → Unix Domain Socket</span><br><span class="line">      └─ sendToUdsSocket(socketPath, message)</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="六、Worktree-隔离"><a href="#六、Worktree-隔离" class="headerlink" title="六、Worktree 隔离"></a>六、Worktree 隔离</h2><h3 id="6-1-创建流程"><a href="#6-1-创建流程" class="headerlink" title="6.1 创建流程"></a>6.1 创建流程</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/utils/worktree.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">createAgentWorktree</span>(<span class="params">slug</span>) </span>&#123;</span><br><span class="line">  <span class="comment">// 1. 校验 slug（防目录逃逸攻击）</span></span><br><span class="line">  validateWorktreeSlug(slug)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 2. 创建 git worktree</span></span><br><span class="line">  git worktree add &#123;path&#125; -b &#123;branch&#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 3. 符号链接大目录（节省磁盘）</span></span><br><span class="line">  symlink(node_modules, worktree/node_modules)</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 4. 应用 sparse-checkout（如配置）</span></span><br><span class="line">  <span class="keyword">if</span> (sparseCheckoutPaths) &#123;</span><br><span class="line">    git sparse-checkout <span class="keyword">set</span> &#123;paths&#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 5. 返回 WorktreeSession</span></span><br><span class="line">  <span class="keyword">return</span> &#123; worktreePath, worktreeBranch, headCommit &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="6-2-清理机制"><a href="#6-2-清理机制" class="headerlink" title="6.2 清理机制"></a>6.2 清理机制</h3><ul>
-<li>Agent 完成后自动检测是否有改动（<code>hasWorktreeChanges()</code>）</li>
-<li>有改动：返回 worktree 路径和分支名给用户</li>
-<li>无改动：自动删除 worktree（<code>removeAgentWorktree()</code>）</li>
-<li>异常退出：通过 <code>registerTeamForSessionCleanup()</code> 确保清理</li>
-</ul>
-<hr>
-<h2 id="七、权限同步机制"><a href="#七、权限同步机制" class="headerlink" title="七、权限同步机制"></a>七、权限同步机制</h2><h3 id="7-1-团队级权限"><a href="#7-1-团队级权限" class="headerlink" title="7.1 团队级权限"></a>7.1 团队级权限</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> TeamAllowedPath = &#123;</span><br><span class="line">  path: <span class="built_in">string</span>        <span class="comment">// 绝对目录路径</span></span><br><span class="line">  toolName: <span class="built_in">string</span>    <span class="comment">// 适用的工具（如 "Edit", "Write"）</span></span><br><span class="line">  addedBy: <span class="built_in">string</span>     <span class="comment">// 添加者名称</span></span><br><span class="line">  addedAt: <span class="built_in">number</span>     <span class="comment">// 添加时间</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>队友启动时，自动继承团队级权限规则。</p>
-<h3 id="7-2-Bubble-模式"><a href="#7-2-Bubble-模式" class="headerlink" title="7.2 Bubble 模式"></a>7.2 Bubble 模式</h3><p>Fork Agent 使用 <code>bubble</code> 权限模式 — 权限提示冒泡到父代理终端：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Fork Agent 需要权限</span><br><span class="line">  │</span><br><span class="line">  └─ bubble 模式 → 权限请求发送到父代理</span><br><span class="line">       │</span><br><span class="line">       └─ 父代理的 ToolUseConfirm 对话框显示</span><br><span class="line">            │</span><br><span class="line">            ├─ 用户批准 → 结果回传给 Fork Agent</span><br><span class="line">            └─ 用户拒绝 → Fork Agent 收到拒绝</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="八、关键源文件索引"><a href="#八、关键源文件索引" class="headerlink" title="八、关键源文件索引"></a>八、关键源文件索引</h2><div class="table-container">
+<h2 id="Teams-邮箱通信"><a href="#Teams-邮箱通信" class="headerlink" title="Teams 邮箱通信"></a>Teams 邮箱通信</h2><p>Teammate 之间通过文件系统邮箱实现异步通信。每个团队有一个 TeamFile（<code>~/.claude/teams/{team_name}/config.json</code>），记录团队元数据和成员信息。每个成员有一个独立的收件箱文件（<code>~/.claude/teams/{team_name}/inboxes/{agent_name}.json</code>）。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> TeammateMessage = &#123;</span><br><span class="line">  <span class="keyword">from</span>: <span class="built_in">string</span>        <span class="comment">// 发送者名称</span></span><br><span class="line">  text: <span class="built_in">string</span>        <span class="comment">// 消息内容</span></span><br><span class="line">  timestamp: <span class="built_in">string</span>   <span class="comment">// ISO 时间戳</span></span><br><span class="line">  read: <span class="built_in">boolean</span>       <span class="comment">// 是否已读</span></span><br><span class="line">  summary?: <span class="built_in">string</span>    <span class="comment">// 5-10 词摘要</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>收件箱轮询间隔 1000ms。收到消息后，系统判断消息类型：关停请求、plan 审批响应、权限请求、还是普通文本消息。普通文本消息会被提交为新的对话轮，触发 Agent 处理。并发安全通过 <code>proper-lockfile</code> 文件锁保证，10 次重试，5-100ms 指数退避。</p>
+<p>消息路由根据目标地址分为五种情况：<code>to === &quot;*&quot;</code> 广播给所有队友；<code>agentNameRegistry</code> 中的名称路由到进程内子代理；<code>teamFile.members</code> 中的名称写入对应队友的 mailbox；<code>bridge:</code> 前缀路由到远程会话；<code>uds:</code> 前缀通过 Unix Domain Socket 发送。</p>
+<h2 id="Worktree-隔离"><a href="#Worktree-隔离" class="headerlink" title="Worktree 隔离"></a>Worktree 隔离</h2><p>当 Agent 需要修改文件时，系统创建 git worktree 作为隔离环境。创建流程包括 slug 校验（防目录逃逸攻击）、git worktree 创建、符号链接大目录（node_modules 等节省磁盘）、以及可选的 sparse-checkout 配置。</p>
+<p>Agent 完成后自动检测 worktree 是否有改动。有改动时返回 worktree 路径和分支名给用户，用户可以审查后决定是否合并。无改动时自动删除 worktree。异常退出通过 <code>registerTeamForSessionCleanup()</code> 确保清理。</p>
+<h2 id="权限同步"><a href="#权限同步" class="headerlink" title="权限同步"></a>权限同步</h2><p>团队级权限通过 <code>TeamAllowedPath</code> 定义，包含路径、适用工具、添加者和时间戳。队友启动时自动继承这些权限规则，不需要逐个配置。</p>
+<p>Fork Agent 使用 <code>bubble</code> 权限模式——权限提示冒泡到父代理终端。当 Fork 需要执行某个操作时，权限请求发送到父代理的 ToolUseConfirm 对话框，用户批准后结果回传给 Fork，拒绝则 Fork 收到拒绝通知。这个设计确保 Fork 的权限不会超过父代理的授权范围。</p>
+<h2 id="关键源文件"><a href="#关键源文件" class="headerlink" title="关键源文件"></a>关键源文件</h2><div class="table-container">
 <table>
 <thead>
 <tr>
@@ -517,29 +474,14 @@
 <td><code>src/utils/worktree.ts</code></td>
 <td>Git worktree 隔离</td>
 </tr>
-<tr>
-<td><code>src/tasks/LocalAgentTask/LocalAgentTask.tsx</code></td>
-<td>本地 Agent 任务</td>
-</tr>
 </tbody>
 </table>
 </div>
 <hr>
-<h2 id="九、总结"><a href="#九、总结" class="headerlink" title="九、总结"></a>九、总结</h2><p>Claude Code 的多 Agent 系统设计体现了几个核心原则：</p>
-<ol>
-<li><strong>分层编排</strong>：四种 Agent 类型，满足不同场景需求</li>
-<li><strong>上下文隔离</strong>：子代理默认独立上下文，显式 opt-in 共享</li>
-<li><strong>缓存优化</strong>：Fork Agent 通过字节一致前缀实现 prompt cache 共享</li>
-<li><strong>邮箱通信</strong>：Teams 通过文件系统邮箱实现异步协作</li>
-<li><strong>权限同步</strong>：团队级权限自动继承，Bubble 模式支持权限冒泡</li>
-<li><strong>Worktree 隔离</strong>：安全的实验性修改环境</li>
-</ol>
-<p>这个设计使得 Claude Code 能够处理单 Agent 无法完成的复杂任务，同时保持系统的稳定性和可观测性。</p>
-<hr>
 <p><strong>系列文章导航：</strong></p>
 <ul>
 <li>上一篇：<a href="/2026/04/06/087_claude-code-tool-system/">工具系统设计：从定义到执行的七步管道</a></li>
-<li>下一篇：<a href="/2026/04/06/080_claude-code-context-compression/">Context 管理：四级压缩与无限对话的秘密</a></li>
+<li>下一篇：<a href="/2026/04/06/080_claude-code-context-compression/">Context 压缩的四级策略</a></li>
 </ul>
 
     </div>
@@ -899,12 +841,12 @@
         
     <div class="post-nav">
       <div class="post-nav-item">
-    <a href="/2026/04/06/079_claude-code-computer-use/" rel="prev" title="Computer Use：桌面控制的九层安全关卡">
-      <i class="fa fa-chevron-left"></i> Computer Use：桌面控制的九层安全关卡
+    <a href="/2026/04/06/081_claude-code-memory-system/" rel="prev" title="跨会话记忆：四种类型与自动提取机制">
+      <i class="fa fa-chevron-left"></i> 跨会话记忆：四种类型与自动提取机制
     </a></div>
       <div class="post-nav-item">
-    <a href="/2026/04/06/080_claude-code-context-compression/" rel="next" title="Context 管理：四级压缩与无限对话的秘密">
-      Context 管理：四级压缩与无限对话的秘密 <i class="fa fa-chevron-right"></i>
+    <a href="/2026/04/06/083_claude-code-permission-security/" rel="next" title="权限决策的五层防线">
+      权限决策的五层防线 <i class="fa fa-chevron-right"></i>
     </a></div>
     </div>
       </footer>
@@ -966,7 +908,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#导读：为什么需要多-Agent？"><span class="nav-number">1.</span> <span class="nav-text">导读：为什么需要多 Agent？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、五种-Agent-类型和职责"><span class="nav-number">2.</span> <span class="nav-text">一、五种 Agent 类型和职责</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-Agent-类型概览"><span class="nav-number">2.1.</span> <span class="nav-text">1.1 Agent 类型概览</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-内置-Agent-类型"><span class="nav-number">2.2.</span> <span class="nav-text">1.2 内置 Agent 类型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-3-Agent-定义结构"><span class="nav-number">2.3.</span> <span class="nav-text">1.3 Agent 定义结构</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、Agent-生成流程：四条路径"><span class="nav-number">3.</span> <span class="nav-text">二、Agent 生成流程：四条路径</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-入口：AgentTool-call"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 入口：AgentTool.call()</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-路径1：Teammate-生成"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 路径1：Teammate 生成</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-路径2：异步-Subagent"><span class="nav-number">3.3.</span> <span class="nav-text">2.3 路径2：异步 Subagent</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-路径3：Fork-Subagent"><span class="nav-number">3.4.</span> <span class="nav-text">2.4 路径3：Fork Subagent</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-5-路径4：同步-Subagent"><span class="nav-number">3.5.</span> <span class="nav-text">2.5 路径4：同步 Subagent</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、工具池系统：三层过滤"><span class="nav-number">4.</span> <span class="nav-text">三、工具池系统：三层过滤</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-第一层：全局禁止"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 第一层：全局禁止</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-第二层：Agent-类型过滤"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 第二层：Agent 类型过滤</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-第三层：Agent-定义过滤"><span class="nav-number">4.3.</span> <span class="nav-text">3.3 第三层：Agent 定义过滤</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、上下文传递机制"><span class="nav-number">5.</span> <span class="nav-text">四、上下文传递机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-CacheSafeParams-—-缓存安全参数"><span class="nav-number">5.1.</span> <span class="nav-text">4.1 CacheSafeParams — 缓存安全参数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-SubagentContext-—-子代理上下文隔离"><span class="nav-number">5.2.</span> <span class="nav-text">4.2 SubagentContext — 子代理上下文隔离</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、Agent-Teams：邮箱通信"><span class="nav-number">6.</span> <span class="nav-text">五、Agent Teams：邮箱通信</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-TeamFile-结构"><span class="nav-number">6.1.</span> <span class="nav-text">5.1 TeamFile 结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-邮箱系统"><span class="nav-number">6.2.</span> <span class="nav-text">5.2 邮箱系统</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-收件箱轮询"><span class="nav-number">6.3.</span> <span class="nav-text">5.3 收件箱轮询</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-4-消息路由"><span class="nav-number">6.4.</span> <span class="nav-text">5.4 消息路由</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、Worktree-隔离"><span class="nav-number">7.</span> <span class="nav-text">六、Worktree 隔离</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-创建流程"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 创建流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-清理机制"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 清理机制</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、权限同步机制"><span class="nav-number">8.</span> <span class="nav-text">七、权限同步机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-团队级权限"><span class="nav-number">8.1.</span> <span class="nav-text">7.1 团队级权限</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-2-Bubble-模式"><span class="nav-number">8.2.</span> <span class="nav-text">7.2 Bubble 模式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、关键源文件索引"><span class="nav-number">9.</span> <span class="nav-text">八、关键源文件索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#九、总结"><span class="nav-number">10.</span> <span class="nav-text">九、总结</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#单-Agent-的瓶颈"><span class="nav-number">1.</span> <span class="nav-text">单 Agent 的瓶颈</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Agent-类型与职责"><span class="nav-number">2.</span> <span class="nav-text">Agent 类型与职责</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四条生成路径"><span class="nav-number">3.</span> <span class="nav-text">四条生成路径</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#工具池的三层过滤"><span class="nav-number">4.</span> <span class="nav-text">工具池的三层过滤</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#上下文传递与隔离"><span class="nav-number">5.</span> <span class="nav-text">上下文传递与隔离</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Teams-邮箱通信"><span class="nav-number">6.</span> <span class="nav-text">Teams 邮箱通信</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Worktree-隔离"><span class="nav-number">7.</span> <span class="nav-text">Worktree 隔离</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#权限同步"><span class="nav-number">8.</span> <span class="nav-text">权限同步</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#关键源文件"><span class="nav-number">9.</span> <span class="nav-text">关键源文件</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 

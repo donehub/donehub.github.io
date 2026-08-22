@@ -23,15 +23,15 @@
     var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
   </script>
 
-  <meta name="description" content="用 Claude Code 写代码写到一半，突然感觉它”变笨了”——回复变慢、忘记之前说过的东西、开始犯低级错误。老手遇到这种情况，会默默敲一行 &#x2F;compact，然后继续干活。今天我来分析一下 &#x2F;compact 具体干了些啥。">
+  <meta name="description" content="用 Claude Code 做用户模块重构，前 30 轮一切顺利，它清楚地记得数据库用的 PostgreSQL、接口风格是 RESTful、Redis 集群那天维护所以 session 要临时走 DB。到了第 50 轮左右，它突然问”找不到 MySQL MCP 信息，请你提供一下”。MCPSettings 就在文件中，它前面还知道这件事。上下文被撑爆之后，早期的关键约束在模型的注意力里被稀释了。这">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Claude Code &#x2F;compact 机制分析">
+<meta property="og:title" content="Claude Code Compact机制分析">
 <meta property="og:url" content="https://donehub.github.io/2026/04/02/075_claude-code-compact-command-deep-analysis/index.html">
 <meta property="og:site_name" content="DoneHub">
-<meta property="og:description" content="用 Claude Code 写代码写到一半，突然感觉它”变笨了”——回复变慢、忘记之前说过的东西、开始犯低级错误。老手遇到这种情况，会默默敲一行 &#x2F;compact，然后继续干活。今天我来分析一下 &#x2F;compact 具体干了些啥。">
+<meta property="og:description" content="用 Claude Code 做用户模块重构，前 30 轮一切顺利，它清楚地记得数据库用的 PostgreSQL、接口风格是 RESTful、Redis 集群那天维护所以 session 要临时走 DB。到了第 50 轮左右，它突然问”找不到 MySQL MCP 信息，请你提供一下”。MCPSettings 就在文件中，它前面还知道这件事。上下文被撑爆之后，早期的关键约束在模型的注意力里被稀释了。这">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2026-04-01T16:00:00.000Z">
-<meta property="article:modified_time" content="2026-07-05T05:38:00.247Z">
+<meta property="article:modified_time" content="2026-08-22T13:29:53.969Z">
 <meta property="article:author" content="Zou Rongsheng">
 <meta property="article:tag" content="上下文压缩">
 <meta name="twitter:card" content="summary">
@@ -49,7 +49,7 @@
   };
 </script>
 
-  <title>Claude Code /compact 机制分析 | DoneHub</title>
+  <title>Claude Code Compact机制分析 | DoneHub</title>
   
 
 
@@ -213,7 +213,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          Claude Code /compact 机制分析
+          Claude Code Compact机制分析
         </h1>
 
         <div class="post-meta">
@@ -230,7 +230,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-07-05 13:38:00" itemprop="dateModified" datetime="2026-07-05T13:38:00+08:00">2026-07-05</time>
+                <time title="修改时间：2026-08-22 21:29:53" itemprop="dateModified" datetime="2026-08-22T21:29:53+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -274,149 +274,153 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <blockquote>
-<p>用 Claude Code 写代码写到一半，突然感觉它”变笨了”——回复变慢、忘记之前说过的东西、开始犯低级错误。老手遇到这种情况，会默默敲一行 <code>/compact</code>，然后继续干活。今天我来分析一下 /compact 具体干了些啥。</p>
-</blockquote>
+        <p>用 Claude Code 做用户模块重构，前 30 轮一切顺利，它清楚地记得数据库用的 PostgreSQL、接口风格是 RESTful、Redis 集群那天维护所以 session 要临时走 DB。到了第 50 轮左右，它突然问”找不到 MySQL MCP 信息，请你提供一下”。MCPSettings 就在文件中，它前面还知道这件事。上下文被撑爆之后，早期的关键约束在模型的注意力里被稀释了。这篇文章要拆的是 <code>/compact</code> 敲下去之后，Claude Code 内部到底跑了一套什么流程。</p>
 <a id="more"></a>
-<h2 id="从一个真实场景说起"><a href="#从一个真实场景说起" class="headerlink" title="从一个真实场景说起"></a>从一个真实场景说起</h2><p>我之前用 Claude Code 做一个用户模块重构，前 30 轮一切顺利，它清楚地记得数据库用的 PostgreSQL、接口风格是 RESTful、Redis 集群那天维护所以 session 要临时走 DB。</p>
-<p>到了第 50 轮左右，它突然问我：”找不到 MySQL MCP 信息，请你提供一下？”</p>
-<p>我：？？？（MCPSettings 就在文件中，你前面还知道呢？！）</p>
-<p>上下文被撑爆了，早期的关键约束在模型的注意力里被”稀释”了。这就是为什么需要 <code>/compact</code>。</p>
-<p>但这篇文章不是教你怎么用这个命令——<code>/compact</code> ，这谁都会敲。我要拆的是<strong>它敲下去之后，Claude Code 内部到底跑了一套什么流程</strong>。</p>
-<hr>
-<h2 id="一、先搞清楚：上下文窗口里都装了啥"><a href="#一、先搞清楚：上下文窗口里都装了啥" class="headerlink" title="一、先搞清楚：上下文窗口里都装了啥"></a>一、先搞清楚：上下文窗口里都装了啥</h2><p>在聊压缩之前，得先明白上下文窗口这个”桌子”上摆了什么东西。</p>
-<p>很多人以为上下文就是一段一段的对话。但实际上，Claude Code 每次发请求给 API 的时候，组装的内容远比你想的复杂：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">┌──────────────────────────────────────────────────┐</span><br><span class="line">│                上下文窗口的真实构成                │</span><br><span class="line">├──────────────────────────────────────────────────┤</span><br><span class="line">│                                                  │</span><br><span class="line">│  ① 系统提示词（~20K tokens）                      │</span><br><span class="line">│     角色定义、行为约束、工具描述                    │</span><br><span class="line">│                                                  │</span><br><span class="line">│  ② CLAUDE.md 指令（动态注入）                     │</span><br><span class="line">│     用户级 + 项目级 + 目录级配置                   │</span><br><span class="line">│                                                  │</span><br><span class="line">│  ③ 对话历史                                      │</span><br><span class="line">│     用户消息 + 助手回复 + 工具调用 + 工具结果       │</span><br><span class="line">│                                                  │</span><br><span class="line">│  ④ 工具定义（~15K tokens）                        │</span><br><span class="line">│     48+ 工具的 schema 描述                        │</span><br><span class="line">│                                                  │</span><br><span class="line">│  ⑤ 当前状态                                      │</span><br><span class="line">│     TodoWrite 任务列表、最近文件读取内容            │</span><br><span class="line">│                                                  │</span><br><span class="line">└──────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
-<p>这里面的大头是 <strong>③对话历史</strong>——你每多聊一轮，就多几千 token。而且工具调用和返回结果的体积往往是对话本身的 3~5 倍。一个 <code>Read</code> 工具读个 500 行的文件，就是 2 万多 token。读 3 次不同文件，光工具结果就占了 6 万 token。</p>
-<p>所以当 Claude Code 觉得”桌子快放不下了”，它需要一套机制来清理桌面。这就是 <code>/compact</code> 要干的事。</p>
-<hr>
-<h2 id="二、不只是摘要：压缩的四层管道"><a href="#二、不只是摘要：压缩的四层管道" class="headerlink" title="二、不只是摘要：压缩的四层管道"></a>二、不只是摘要：压缩的四层管道</h2><p>很多人以为 <code>/compact</code> 就是”把历史对话做个总结”。太简单了。</p>
-<p>实际上，当你敲下 <code>/compact</code> 之后，Claude Code 内部会跑一个<strong>四层管道</strong>，从轻量到重量，逐级处理：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">敲下 &#x2F;compact</span><br><span class="line">    │</span><br><span class="line">    ▼</span><br><span class="line">┌─────────────────────┐</span><br><span class="line">│ 第 1 层：Micro 压缩  │  ← 先试试轻量手段</span><br><span class="line">└─────────┬───────────┘</span><br><span class="line">          │ 还不够？</span><br><span class="line">          ▼</span><br><span class="line">┌─────────────────────┐</span><br><span class="line">│ 第 2 层：Snip 裁剪   │  ← 去掉重复和冗余</span><br><span class="line">└─────────┬───────────┘</span><br><span class="line">          │ 还不够？</span><br><span class="line">          ▼</span><br><span class="line">┌─────────────────────────┐</span><br><span class="line">│ 第 3 层：Context Collapse │  ← 分段折叠旧消息</span><br><span class="line">└─────────┬───────────────┘</span><br><span class="line">          │ 还不够？</span><br><span class="line">          ▼</span><br><span class="line">┌─────────────────────┐</span><br><span class="line">│ 第 4 层：Full Compact │  ← 核弹级：全部摘要化</span><br><span class="line">└─────────────────────┘</span><br></pre></td></tr></table></figure>
-<p>每一层都是前一层的”加码”。系统会先尝试成本最低的手段，不够再加码。这和内存管理的思路很像——先回收缓存，再杀进程，最后才 OOM Killer。</p>
-<h3 id="2-1-第-1-层：Micro-压缩——不动缓存键的”微创手术”"><a href="#2-1-第-1-层：Micro-压缩——不动缓存键的”微创手术”" class="headerlink" title="2.1 第 1 层：Micro 压缩——不动缓存键的”微创手术”"></a>2.1 第 1 层：Micro 压缩——不动缓存键的”微创手术”</h3><p>这是最轻量的一层。它的核心特点是：<strong>修改消息内容，但不改变缓存键</strong>。</p>
-<p>什么意思呢？Claude API 有 prompt caching 机制——如果你连续两次请求的前缀相同，第二次可以复用第一次的缓存，大幅降低成本和延迟。Micro 压缩的改动是”无害的”，不会破坏缓存命中：</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 简化逻辑</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">microCompact</span>(<span class="params">messages: Message[]</span>): <span class="title">Message</span>[] </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> messages.map(<span class="function"><span class="params">msg</span> =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (msg.type === <span class="string">'tool_result'</span>) &#123;</span><br><span class="line">      <span class="comment">// 把超长的工具返回结果截短</span></span><br><span class="line">      <span class="keyword">if</span> (msg.content.length &gt; MICRO_COMPACT_THRESHOLD) &#123;</span><br><span class="line">        <span class="keyword">return</span> &#123;</span><br><span class="line">          ...msg,</span><br><span class="line">          content: msg.content.slice(<span class="number">0</span>, KEEP_CHARS) + </span><br><span class="line">            <span class="string">`\n... [<span class="subst">$&#123;msg.content.length&#125;</span> chars total, compacted]`</span></span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> msg</span><br><span class="line">  &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>注意这里只动了 <code>tool_result</code> 的内容长度，消息的结构、顺序、角色都没变——缓存键依然匹配。</p>
-<p><strong>效果</strong>：一般能释放 10%~20% 的空间。成本几乎为零。</p>
-<h3 id="2-2-第-2-层：Snip-裁剪——去重-去冗余"><a href="#2-2-第-2-层：Snip-裁剪——去重-去冗余" class="headerlink" title="2.2 第 2 层：Snip 裁剪——去重 + 去冗余"></a>2.2 第 2 层：Snip 裁剪——去重 + 去冗余</h3><p>Micro 压缩处理的是单条消息的长度。Snip 压缩处理的是<strong>消息之间的重复</strong>。</p>
-<p>写代码的过程中，同一个文件经常被反复读取。如果不处理，同一份文件内容可能在上下文里出现 3、4 次。Snip 的做法很直接：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">第 3 轮：[Read] src&#x2F;auth.ts → 500 行（完整保留）</span><br><span class="line">第 8 轮：[Read] src&#x2F;auth.ts → 500 行</span><br><span class="line">  → 替换为：[File content already shown above]</span><br><span class="line">第 15 轮：[Read] src&#x2F;auth.ts → 520 行（内容有更新）</span><br><span class="line">  → 保留（因为和第 3 轮不一样）</span><br></pre></td></tr></table></figure>
-<p>它不是无脑去重，而是会比较内容 hash——只有内容完全一样的才会被替换。文件有过修改的话，新版本会保留。</p>
-<p>另外，Snip 还会对一些特殊的工具输出做处理：</p>
-<ul>
-<li><code>Bash</code> 命令的 stdout 如果特别长，只保留最后 N 行（通常尾部比头部更有信息量）</li>
-<li><code>Grep</code> 结果如果太多，只保留匹配数量统计 + 前 20 条</li>
-<li><code>Write</code> 操作的结果，直接替换成 <code>[File written successfully]</code>（反正内容已经在文件系统里了）</li>
-</ul>
-<p><strong>效果</strong>：去重通常能释放 15%~30%，取决于任务中重复读取文件的频率。</p>
-<h3 id="2-3-第-3-层：Context-Collapse——分段折叠"><a href="#2-3-第-3-层：Context-Collapse——分段折叠" class="headerlink" title="2.3 第 3 层：Context Collapse——分段折叠"></a>2.3 第 3 层：Context Collapse——分段折叠</h3><p>前两层都是”无损压缩”——信息没丢，只是变短了。从这一层开始，进入<strong>有损压缩</strong>的领域。</p>
-<p>Context Collapse 的思路是：把早期的对话消息<strong>分组合并</strong>，每组生成一个小摘要。不是一口气全摘要，而是一段一段地折叠：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">第 1~5 轮 → [折叠] &quot;讨论了数据库选型，决定用 PostgreSQL&quot;</span><br><span class="line">第 6~10 轮 → [折叠] &quot;完成了认证模块设计，确定了 JWT 方案&quot;</span><br><span class="line">第 11~15 轮 → [折叠] &quot;实现了密码重置功能，遇到 SMTP 配置问题&quot;</span><br><span class="line">第 16~20 轮 → [原文保留]</span><br><span class="line">第 21~25 轮 → [原文保留]</span><br></pre></td></tr></table></figure>
-<p>越老的折叠得越狠，越新的保留得越完整。这符合直觉——你大概率不需要第 3 轮对话的逐字记录，但第 25 轮的内容可能直接关系到当前工作。</p>
-<p>折叠的粒度不是固定的，而是根据上下文压力动态调整。压力小的时候不折叠，压力大的时候折叠范围扩大。</p>
-<h3 id="2-4-第-4-层：Full-Compact——“核弹级”全量摘要"><a href="#2-4-第-4-层：Full-Compact——“核弹级”全量摘要" class="headerlink" title="2.4 第 4 层：Full Compact——“核弹级”全量摘要"></a>2.4 第 4 层：Full Compact——“核弹级”全量摘要</h3><p>如果前三层做完还不够，就到了最后一步——也是最重量级的一步。</p>
-<p>Full Compact 做的事情是：</p>
-<ol>
-<li>把当前上下文中<strong>所有</strong>历史消息（包括已经折叠过的摘要）打包</li>
-<li>发给 Claude，让它生成一个<strong>全局摘要</strong></li>
-<li>用这个摘要<strong>替换掉所有历史消息</strong></li>
-<li>只保留最近的几轮对话原文</li>
-</ol>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">压缩前：</span><br><span class="line">  [摘要1] + [摘要2] + ... + 第 45~50 轮原文</span><br><span class="line">  → 总计 180K tokens</span><br><span class="line"></span><br><span class="line">压缩后：</span><br><span class="line">  [全局摘要] + 第 48~50 轮原文</span><br><span class="line">  → 总计 30K tokens</span><br></pre></td></tr></table></figure>
-<p>这个全局摘要不是随便写的。Claude Code 会给模型一个专门的 compact prompt，指导它怎么组织摘要内容：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">请对以上对话生成一份结构化摘要，务必保留：</span><br><span class="line">1. 用户的原始目标和关键约束</span><br><span class="line">2. 已经做出的重要决策及其原因</span><br><span class="line">3. 已完成的步骤和修改的文件</span><br><span class="line">4. 正在进行但未完成的任务</span><br><span class="line">5. 遇到的问题和当前的解决方案</span><br><span class="line"></span><br><span class="line">对于代码修改，保留具体的文件路径和关键实现逻辑。</span><br><span class="line">丢弃无关的闲聊和已经过时的讨论。</span><br></pre></td></tr></table></figure>
-<p><strong>效果</strong>：能释放 60%~80% 的空间。代价是丢失细节——摘要中没提到的内容就真的没了。</p>
-<hr>
-<h2 id="三、Compact-之后：上下文重建"><a href="#三、Compact-之后：上下文重建" class="headerlink" title="三、Compact 之后：上下文重建"></a>三、Compact 之后：上下文重建</h2><p>很多人以为 compact 就是”压缩完事了”。其实压缩只是上半场，<strong>下半场是重建</strong>。</p>
-<p>压缩完成后，Claude Code 会做一系列”恢复”动作：</p>
-<h3 id="3-1-重新加载-CLAUDE-md"><a href="#3-1-重新加载-CLAUDE-md" class="headerlink" title="3.1 重新加载 CLAUDE.md"></a>3.1 重新加载 CLAUDE.md</h3><p>CLAUDE.md 中的指令始终在系统提示词里，不受压缩影响。但 Claude Code 会在压缩后<strong>重新检查</strong> CLAUDE.md 有没有更新。如果你在对话过程中改了 CLAUDE.md，compact 之后新内容会生效。</p>
-<h3 id="3-2-重新读取最近文件"><a href="#3-2-重新读取最近文件" class="headerlink" title="3.2 重新读取最近文件"></a>3.2 重新读取最近文件</h3><p>这是一个很容易被忽略的细节。压缩后，之前读过的文件内容都丢了（在摘要里只保留了文件名和大致描述）。如果模型在后续工作中需要这些文件的内容，它会<strong>重新发起 Read 调用</strong>。</p>
-<p>这就是为什么 compact 之后，你经常会看到 Claude Code 突然开始读一堆文件——它不是犯傻，是在重建文件缓存。</p>
-<h3 id="3-3-恢复任务列表"><a href="#3-3-恢复任务列表" class="headerlink" title="3.3 恢复任务列表"></a>3.3 恢复任务列表</h3><p>如果你用了 TodoWrite 管理任务进度，这个列表是独立于对话历史存储的。Compact 之后，任务列表会自动恢复到压缩前的状态——哪些完成了、哪些进行中、哪些待办，一字不差。</p>
-<p>这也是为什么我强烈建议用 TodoWrite 来管理长任务的进度——它是 compact 之后最重要的”状态锚点”。</p>
-<hr>
-<h2 id="四、自动触发：不用你敲，它自己也会压"><a href="#四、自动触发：不用你敲，它自己也会压" class="headerlink" title="四、自动触发：不用你敲，它自己也会压"></a>四、自动触发：不用你敲，它自己也会压</h2><p><code>/compact</code> 是手动触发的。但实际使用中，大多数压缩是<strong>自动触发</strong>的。</p>
-<p>Claude Code 会持续监控上下文的使用率。当达到一定阈值时，会自动启动压缩流程：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">上下文使用率    动作</span><br><span class="line">─────────────  ────────────────────────</span><br><span class="line">&lt; 60%          不压缩</span><br><span class="line">60%~75%        Micro 压缩 + Snip 裁剪</span><br><span class="line">75%~85%        Context Collapse</span><br><span class="line">&gt; 85%          Full Compact（全量摘要）</span><br><span class="line">95%+           紧急压缩，激进裁剪</span><br></pre></td></tr></table></figure>
-<p>具体的阈值不是固定的，会根据模型的最大上下文窗口动态计算。200K 的模型和 1M 的模型，触发点不一样。</p>
-<p>有一个坑要注意：Claude 3 Opus 曾经出过一个 bug——它的 1M 上下文窗口被错误地按 200K 计算，导致自动压缩触发得太早。用户明明还有 80 万 token 的空间，系统就开始压缩了。这个问题在 v2.1.117 才修复。</p>
-<hr>
-<h2 id="五、Hooks：压缩前后的”钩子”"><a href="#五、Hooks：压缩前后的”钩子”" class="headerlink" title="五、Hooks：压缩前后的”钩子”"></a>五、Hooks：压缩前后的”钩子”</h2><p>这是 Claude Code 的一个高级特性——你可以在压缩发生的前后，插入自定义逻辑。</p>
-<h3 id="5-1-PreCompact-Hook：压缩前最后一道防线"><a href="#5-1-PreCompact-Hook：压缩前最后一道防线" class="headerlink" title="5.1 PreCompact Hook：压缩前最后一道防线"></a>5.1 PreCompact Hook：压缩前最后一道防线</h3><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"hooks"</span>: &#123;</span><br><span class="line">    <span class="attr">"PreCompact"</span>: [&#123;</span><br><span class="line">      <span class="attr">"matcher"</span>: <span class="string">""</span>,</span><br><span class="line">      <span class="attr">"hooks"</span>: [&#123;</span><br><span class="line">        <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">        <span class="attr">"command"</span>: <span class="string">"echo '&#123;\"decision\":\"block\"&#125;' &amp;&amp; exit 2"</span></span><br><span class="line">      &#125;]</span><br><span class="line">    &#125;]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>PreCompact 在压缩<strong>执行前</strong>触发。它有两个关键能力：</p>
-<p><strong>能力 1：阻止压缩</strong>。如果 hook 返回退出码 2，或者输出 <code>{&quot;decision&quot;:&quot;block&quot;}</code>，压缩会被取消。这在什么场景下有用？比如你正在做一个关键操作，不希望压缩打断当前状态。</p>
-<p><strong>能力 2：注入额外上下文</strong>。Hook 的输出会被附加到压缩流程中。但要注意——这些内容在生成摘要时可能会被改写或丢弃，所以不要把关键信息只放在这里。</p>
-<h3 id="5-2-PostCompact-Hook：压缩后的”备忘录”"><a href="#5-2-PostCompact-Hook：压缩后的”备忘录”" class="headerlink" title="5.2 PostCompact Hook：压缩后的”备忘录”"></a>5.2 PostCompact Hook：压缩后的”备忘录”</h3><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"hooks"</span>: &#123;</span><br><span class="line">    <span class="attr">"PostCompact"</span>: [&#123;</span><br><span class="line">      <span class="attr">"matcher"</span>: <span class="string">""</span>,</span><br><span class="line">      <span class="attr">"hooks"</span>: [&#123;</span><br><span class="line">        <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">        <span class="attr">"command"</span>: <span class="string">"echo 'Compact summary: $&#123;COMPACT_SUMMARY&#125;'"</span></span><br><span class="line">      &#125;]</span><br><span class="line">    &#125;]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>PostCompact 在压缩<strong>完成后</strong>触发，接收两个参数：</p>
+<h2 id="上下文窗口里都装了啥"><a href="#上下文窗口里都装了啥" class="headerlink" title="上下文窗口里都装了啥"></a>上下文窗口里都装了啥</h2><p>在聊压缩之前，需要先明白上下文窗口的真实构成。Claude Code 每次发请求给 API 的时候，组装的内容远比”一段一段的对话”复杂得多。</p>
 <div class="table-container">
 <table>
 <thead>
 <tr>
-<th>字段</th>
+<th>组成部分</th>
+<th>大致体积</th>
 <th>说明</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>trigger</code></td>
-<td><code>&quot;manual&quot;</code>（你敲的 <code>/compact</code>）或 <code>&quot;auto&quot;</code>（系统自动触发）</td>
+<td>系统提示词</td>
+<td>~20K tokens</td>
+<td>角色定义、行为约束、工具描述</td>
 </tr>
 <tr>
-<td><code>compact_summary</code></td>
-<td>压缩生成的摘要文本</td>
+<td>CLAUDE.md 指令</td>
+<td>动态注入</td>
+<td>用户级 + 项目级 + 目录级配置</td>
+</tr>
+<tr>
+<td>对话历史</td>
+<td>持续增长</td>
+<td>用户消息 + 助手回复 + 工具调用 + 工具结果</td>
+</tr>
+<tr>
+<td>工具定义</td>
+<td>~15K tokens</td>
+<td>48+ 工具的 schema 描述</td>
+</tr>
+<tr>
+<td>当前状态</td>
+<td>较小</td>
+<td>TodoWrite 任务列表、最近文件读取内容</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p>注意 PostCompact <strong>不能修改压缩结果</strong>——它只能观察和利用。典型用法是把摘要写到日志文件里，方便事后审计。</p>
-<p>社区里有个很有意思的项目叫 <a href="https://github.com/Dicklesworthstone/post_compact_reminder" target="_blank" rel="noopener">Post Compact Reminder</a>，它在 PostCompact hook 里把用户的关键偏好重新注入一遍，防止压缩后模型”忘了”用户的习惯。思路很巧妙。</p>
-<hr>
-<h2 id="六、-compact-的隐藏参数"><a href="#六、-compact-的隐藏参数" class="headerlink" title="六、/compact 的隐藏参数"></a>六、/compact 的隐藏参数</h2><p>大多数时候，我们敲的就是 <code>/compact</code>，啥也不带。但其实这个命令支持带参数：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;compact 保留数据库选型和接口设计的讨论细节</span><br></pre></td></tr></table></figure>
-<p>这个参数会作为<strong>压缩指引</strong>传给生成摘要的模型。相当于告诉它：”在做摘要的时候，特别注意保留这方面的信息。”</p>
-<p>这在什么场景下有用？比如你正在做一个复杂的重构，其中涉及很多细节决策。你怕默认摘要把这些丢了，就可以主动指引一下。</p>
-<p>但别太依赖这个——指引太长的话，反而会稀释其他重要信息的权重。<strong>简短、精确、一句话说清你要保留什么</strong>，效果最好。</p>
-<hr>
-<h2 id="七、一些实战经验"><a href="#七、一些实战经验" class="headerlink" title="七、一些实战经验"></a>七、一些实战经验</h2><h3 id="7-1-什么时候该主动-compact"><a href="#7-1-什么时候该主动-compact" class="headerlink" title="7.1 什么时候该主动 /compact"></a>7.1 什么时候该主动 /compact</h3><p>别等到自动触发。<strong>主动 compact 的摘要质量通常比自动触发时更高</strong>——因为自动触发时上下文已经快满了，模型用来”思考”摘要的空间本身就不够。</p>
-<p>我的经验法则：</p>
-<ul>
-<li>感觉模型”变慢”了 → 该 compact 了</li>
-<li>模型开始重复之前的建议 → 该 compact 了</li>
-<li>对话超过 30 轮 → 考虑 compact 一下</li>
-<li>完成了一个大阶段 → 在阶段切换时 compact</li>
-</ul>
-<h3 id="7-2-Compact-之前的准备工作"><a href="#7-2-Compact-之前的准备工作" class="headerlink" title="7.2 Compact 之前的准备工作"></a>7.2 Compact 之前的准备工作</h3><p>在敲 <code>/compact</code> 之前，花 30 秒做这几件事：</p>
-<ol>
-<li><strong>用 TodoWrite 更新任务进度</strong>——确保当前状态被记录下来</li>
-<li><strong>把关键决策写进 CLAUDE.md</strong>——这些内容不依赖对话历史</li>
-<li><strong>重要文件内容确认已经保存</strong>——compact 后模型需要重新读取</li>
-</ol>
-<h3 id="7-3-CLAUDE-md-里的-Compact-Instructions"><a href="#7-3-CLAUDE-md-里的-Compact-Instructions" class="headerlink" title="7.3 CLAUDE.md 里的 Compact Instructions"></a>7.3 CLAUDE.md 里的 Compact Instructions</h3><p>你可以在 CLAUDE.md 里加一个专门的段落，指导压缩行为：</p>
+<p>这里面的大头是对话历史。每多聊一轮就多几千 token，而且工具调用和返回结果的体积往往是对话本身的 3 到 5 倍。一个 <code>Read</code> 工具读个 500 行的文件就是 2 万多 token，读 3 次不同文件，光工具结果就占了 6 万 token。当 Claude Code 觉得空间快不够用了，它需要一套机制来清理，这就是 <code>/compact</code> 要做的事。</p>
+<h2 id="四层渐进式压缩管道"><a href="#四层渐进式压缩管道" class="headerlink" title="四层渐进式压缩管道"></a>四层渐进式压缩管道</h2><p><code>/compact</code> 并不是简单地”把历史对话做个总结”。敲下这个命令之后，Claude Code 内部会跑一个四层管道，从轻量到重量逐级处理。系统会先尝试成本最低的手段，不够再加码，这和内存管理的思路类似：先回收缓存，再杀进程，最后才动用 OOM Killer。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>名称</th>
+<th>核心策略</th>
+<th>有损/无损</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第 1 层</td>
+<td>Micro 压缩</td>
+<td>截短单条超长工具返回</td>
+<td>无损</td>
+</tr>
+<tr>
+<td>第 2 层</td>
+<td>Snip 裁剪</td>
+<td>去重 + 去冗余</td>
+<td>无损</td>
+</tr>
+<tr>
+<td>第 3 层</td>
+<td>Context Collapse</td>
+<td>分段折叠旧消息</td>
+<td>有损</td>
+</tr>
+<tr>
+<td>第 4 层</td>
+<td>Full Compact</td>
+<td>全量摘要替换历史</td>
+<td>有损</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="Micro-压缩：不动缓存键的微创操作"><a href="#Micro-压缩：不动缓存键的微创操作" class="headerlink" title="Micro 压缩：不动缓存键的微创操作"></a>Micro 压缩：不动缓存键的微创操作</h3><p>最轻量的一层，核心特点是修改消息内容但不改变缓存键。Claude API 有 prompt caching 机制，连续两次请求的前缀相同时，第二次可以复用缓存来降低成本和延迟。Micro 压缩的改动是”无害的”，不会破坏缓存命中。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 简化逻辑</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">microCompact</span>(<span class="params">messages: Message[]</span>): <span class="title">Message</span>[] </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> messages.map(<span class="function"><span class="params">msg</span> =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (msg.type === <span class="string">'tool_result'</span>) &#123;</span><br><span class="line">      <span class="comment">// 把超长的工具返回结果截短</span></span><br><span class="line">      <span class="keyword">if</span> (msg.content.length &gt; MICRO_COMPACT_THRESHOLD) &#123;</span><br><span class="line">        <span class="keyword">return</span> &#123;</span><br><span class="line">          ...msg,</span><br><span class="line">          content: msg.content.slice(<span class="number">0</span>, KEEP_CHARS) + </span><br><span class="line">            <span class="string">`\n... [<span class="subst">$&#123;msg.content.length&#125;</span> chars total, compacted]`</span></span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> msg</span><br><span class="line">  &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里只动了 <code>tool_result</code> 的内容长度，消息的结构、顺序、角色都没变，缓存键依然匹配。这一层一般能释放 10% 到 20% 的空间，成本几乎为零。</p>
+<h3 id="Snip-裁剪：去重和去冗余"><a href="#Snip-裁剪：去重和去冗余" class="headerlink" title="Snip 裁剪：去重和去冗余"></a>Snip 裁剪：去重和去冗余</h3><p>Micro 压缩处理的是单条消息的长度，Snip 压缩处理的是消息之间的重复。写代码的过程中，同一个文件经常被反复读取，不处理的话同一份文件内容可能在上下文里出现 3、4 次。Snip 的做法很直接：对于内容完全相同的重复读取，替换为 <code>[File content already shown above]</code>；文件有过修改的新版本则保留原样，通过内容 hash 来判断。</p>
+<p>除了去重，Snip 还会对几类特殊的工具输出做裁剪。<code>Bash</code> 命令的 stdout 如果特别长，只保留最后 N 行，因为尾部通常比头部更有信息量。<code>Grep</code> 结果如果太多，只保留匹配数量统计加前 20 条。<code>Write</code> 操作的结果直接替换成 <code>[File written successfully]</code>，因为内容已经在文件系统里了。这一层的释放幅度通常在 15% 到 30%，取决于任务中重复读取文件的频率。</p>
+<h3 id="Context-Collapse：分段折叠"><a href="#Context-Collapse：分段折叠" class="headerlink" title="Context Collapse：分段折叠"></a>Context Collapse：分段折叠</h3><p>前两层都是无损压缩，信息没丢只是变短了。从这一层开始进入有损压缩的领域。</p>
+<p>Context Collapse 把早期的对话消息分组合并，每组生成一个小摘要。不是一口气全摘要，而是一段一段地折叠。第 1 到 5 轮可能折叠为”讨论了数据库选型，决定用 PostgreSQL”，第 6 到 10 轮折叠为”完成了认证模块设计，确定了 JWT 方案”，而最近的几轮原文保留。越老的折叠得越狠，越新的保留得越完整，因为第 3 轮对话的逐字记录大概率用不到，但第 25 轮的内容可能直接关系到当前工作。</p>
+<p>折叠的粒度不是固定的，而是根据上下文压力动态调整。压力小的时候不折叠，压力大的时候折叠范围扩大。</p>
+<h3 id="Full-Compact：全量摘要"><a href="#Full-Compact：全量摘要" class="headerlink" title="Full Compact：全量摘要"></a>Full Compact：全量摘要</h3><p>如果前三层做完还不够，就到了最重量级的一步。Full Compact 把当前所有历史消息（包括已经折叠过的摘要）打包发给 Claude，让它生成一个全局摘要，然后用这个摘要替换掉所有历史消息，只保留最近的几轮对话原文。压缩前可能是 180K tokens，压缩后降到 30K tokens 左右。</p>
+<p>这个全局摘要不是随便写的。Claude Code 会给模型一个专门的 compact prompt，指导它保留用户的原始目标和关键约束、已经做出的重要决策及其原因、已完成的步骤和修改的文件、正在进行但未完成的任务、遇到的问题和当前的解决方案。对于代码修改，要求保留具体的文件路径和关键实现逻辑，同时丢弃无关的闲聊和已经过时的讨论。</p>
+<p>这一层能释放 60% 到 80% 的空间，代价是丢失细节。摘要中没提到的内容就真的没了。</p>
+<h2 id="压缩之后的上下文重建"><a href="#压缩之后的上下文重建" class="headerlink" title="压缩之后的上下文重建"></a>压缩之后的上下文重建</h2><p>压缩只是上半场，下半场是重建。压缩完成后，Claude Code 会做一系列恢复动作。</p>
+<p>CLAUDE.md 中的指令始终在系统提示词里，不受压缩影响。但 Claude Code 会在压缩后重新检查 CLAUDE.md 有没有更新，如果在对话过程中改了 CLAUDE.md，compact 之后新内容会生效。</p>
+<p>一个容易被忽略的细节是文件内容的重建。压缩后，之前读过的文件内容都丢了，在摘要里只保留了文件名和大致描述。如果模型在后续工作中需要这些文件的内容，它会重新发起 Read 调用。这就是为什么 compact 之后经常会看到 Claude Code 突然开始读一堆文件，它不是在犯傻，是在重建文件缓存。</p>
+<p>TodoWrite 的任务列表是独立于对话历史存储的。Compact 之后，任务列表会自动恢复到压缩前的状态，哪些完成了、哪些进行中、哪些待办，一字不差。这也是为什么建议用 TodoWrite 来管理长任务的进度，它是 compact 之后最重要的状态锚点。</p>
+<h2 id="自动触发机制"><a href="#自动触发机制" class="headerlink" title="自动触发机制"></a>自动触发机制</h2><p><code>/compact</code> 是手动触发的，但实际使用中大多数压缩是自动触发的。Claude Code 会持续监控上下文的使用率，当达到一定阈值时自动启动压缩流程。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>上下文使用率</th>
+<th>动作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&lt; 60%</td>
+<td>不压缩</td>
+</tr>
+<tr>
+<td>60%~75%</td>
+<td>Micro 压缩 + Snip 裁剪</td>
+</tr>
+<tr>
+<td>75%~85%</td>
+<td>Context Collapse</td>
+</tr>
+<tr>
+<td>&gt; 85%</td>
+<td>Full Compact（全量摘要）</td>
+</tr>
+<tr>
+<td>95%+</td>
+<td>紧急压缩，激进裁剪</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>具体的阈值不是固定的，会根据模型的最大上下文窗口动态计算。200K 的模型和 1M 的模型触发点不一样。</p>
+<p>这里有一个历史 bug 值得一提：Claude 3 Opus 的 1M 上下文窗口曾被错误地按 200K 计算，导致自动压缩触发得太早。用户明明还有 80 万 token 的空间，系统就开始压缩了。这个问题在 v2.1.117 才修复。</p>
+<h2 id="Hooks：压缩前后的扩展点"><a href="#Hooks：压缩前后的扩展点" class="headerlink" title="Hooks：压缩前后的扩展点"></a>Hooks：压缩前后的扩展点</h2><p>Claude Code 允许在压缩发生的前后插入自定义逻辑。</p>
+<p>PreCompact Hook 在压缩执行前触发。它有一个关键能力：如果 hook 返回退出码 2 或者输出 <code>{&quot;decision&quot;:&quot;block&quot;}</code>，压缩会被取消。这在正在做关键操作、不希望压缩打断当前状态的场景下有用。Hook 的输出也会被附加到压缩流程中，但这些内容在生成摘要时可能会被改写或丢弃，所以不要把关键信息只放在这里。</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"hooks"</span>: &#123;</span><br><span class="line">    <span class="attr">"PreCompact"</span>: [&#123;</span><br><span class="line">      <span class="attr">"matcher"</span>: <span class="string">""</span>,</span><br><span class="line">      <span class="attr">"hooks"</span>: [&#123;</span><br><span class="line">        <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">        <span class="attr">"command"</span>: <span class="string">"echo '&#123;\"decision\":\"block\"&#125;' &amp;&amp; exit 2"</span></span><br><span class="line">      &#125;]</span><br><span class="line">    &#125;]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>PostCompact Hook 在压缩完成后触发，接收 <code>trigger</code> 字段（<code>&quot;manual&quot;</code> 或 <code>&quot;auto&quot;</code>）和 <code>compact_summary</code> 字段（压缩生成的摘要文本）。PostCompact 不能修改压缩结果，只能观察和利用。典型用法是把摘要写到日志文件里方便事后审计。</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"hooks"</span>: &#123;</span><br><span class="line">    <span class="attr">"PostCompact"</span>: [&#123;</span><br><span class="line">      <span class="attr">"matcher"</span>: <span class="string">""</span>,</span><br><span class="line">      <span class="attr">"hooks"</span>: [&#123;</span><br><span class="line">        <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">        <span class="attr">"command"</span>: <span class="string">"echo 'Compact summary: $&#123;COMPACT_SUMMARY&#125;'"</span></span><br><span class="line">      &#125;]</span><br><span class="line">    &#125;]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>社区里有一个项目叫 <a href="https://github.com/Dicklesworthstone/post_compact_reminder" target="_blank" rel="noopener">Post Compact Reminder</a>，它在 PostCompact hook 里把用户的关键偏好重新注入一遍，防止压缩后模型忘了用户的习惯。思路很巧妙。</p>
+<h2 id="隐藏参数和实战技巧"><a href="#隐藏参数和实战技巧" class="headerlink" title="隐藏参数和实战技巧"></a>隐藏参数和实战技巧</h2><p><code>/compact</code> 支持带参数，比如 <code>/compact 保留数据库选型和接口设计的讨论细节</code>。这个参数会作为压缩指引传给生成摘要的模型，告诉它在做摘要时特别注意保留这方面的信息。在做复杂重构、涉及很多细节决策的时候，主动指引一下可以防止默认摘要把这些内容丢掉。不过指引太长反而会稀释其他重要信息的权重，简短精确地一句话说清要保留什么，效果最好。</p>
+<p>关于什么时候该主动 compact，有几条经验。感觉模型变慢了，或者模型开始重复之前的建议，都是上下文快要溢出的信号。对话超过 30 轮就应该考虑 compact，在一个大阶段完成时做 compact 效果尤其好，因为阶段切换时的摘要天然比较完整。主动 compact 的摘要质量通常比自动触发时更高，因为自动触发时上下文已经快满了，模型用来思考摘要的空间本身就不够。</p>
+<p>在敲 <code>/compact</code> 之前，花 30 秒做几件事会明显提升压缩效果。用 TodoWrite 更新任务进度确保当前状态被记录下来，把关键决策写进 CLAUDE.md 让这些内容不依赖对话历史，确认重要文件内容已经保存因为 compact 后模型需要重新读取。</p>
+<p>CLAUDE.md 里可以加一个专门的 Compact Instructions 段落来指导压缩行为：</p>
 <figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">## Compact Instructions</span></span><br><span class="line">压缩时务必保留：</span><br><span class="line"><span class="bullet">- </span>当前处理的任务和进度</span><br><span class="line"><span class="bullet">- </span>数据库使用 PostgreSQL 15</span><br><span class="line"><span class="bullet">- </span>API 风格是 RESTful，不用 GraphQL</span><br><span class="line"><span class="bullet">- </span>Redis 集群维护期间 session 走 DB</span><br><span class="line"><span class="bullet">- </span>已修改的文件清单</span><br></pre></td></tr></table></figure>
-<p>这些指令在每次压缩时都会被传给摘要模型。相当于给摘要加了个”白名单”。</p>
-<h3 id="7-4-不要连续-compact"><a href="#7-4-不要连续-compact" class="headerlink" title="7.4 不要连续 compact"></a>7.4 不要连续 compact</h3><p>有个坑：如果你刚 compact 完，又开始大量读文件、跑命令，上下文很快又满了，系统会再次触发压缩。如果连续 3 次压缩后上下文立刻又满，Claude Code 会停止压缩并给出一个错误提示，而不是陷入死循环。</p>
-<p>这个 bug 在 v2.1.79 之前是真实存在的——系统会陷入”压缩→填满→再压缩→再填满”的死循环。现在加了保护，但了解这个历史还是有用的。</p>
-<hr>
-<h2 id="八、-compact-丢掉了什么，怎么补救"><a href="#八、-compact-丢掉了什么，怎么补救" class="headerlink" title="八、/compact 丢掉了什么，怎么补救"></a>八、/compact 丢掉了什么，怎么补救</h2><p>说了这么多，最后得直面一个现实：<strong>compact 一定会丢信息</strong>。摘要不可能 100% 还原原始对话。</p>
-<p>通常丢失的东西：</p>
-<ul>
-<li>具体的代码细节（只保留了”修改了 xxx 文件”，但具体改了什么丢了）</li>
-<li>早期的讨论过程（为什么选方案 A 不选方案 B 的推理过程）</li>
-<li>工具调用的完整返回值</li>
-<li>图片和截图内容</li>
-</ul>
-<p>补救思路：</p>
-<p><strong>1. 用文件代替记忆</strong>。重要的代码、配置、设计文档，直接写到文件里。Compact 后模型可以重新读取。不要依赖”模型还记得”。</p>
-<p><strong>2. 用 TodoWrite 记录关键状态</strong>。TodoWrite 的内容是独立存储的，不随 compact 丢失。把它当成你的”外部硬盘”。</p>
-<p><strong>3. 把约束写进 CLAUDE.md</strong>。”用 PostgreSQL 不用 MySQL”这种硬约束，写进 CLAUDE.md 最保险——它在每次请求都在系统提示词里，不可能被压缩掉。</p>
-<p><strong>4. 善用 Compact Instructions</strong>。在 CLAUDE.md 里告诉摘要模型哪些东西不能丢，比事后发现丢了再补要高效得多。</p>
-<hr>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p><code>/compact</code> 表面上是一个简单的命令，背后是一套四层渐进式压缩管道 + 状态重建机制 + Hook 扩展系统。它的设计思路可以总结为一句话：</p>
-<p><strong>能不动的不动，能少动的少动，必须动的尽量保留关键信息，关键信息之外再考虑细节。</strong></p>
-<p>这个优先级排序，和人类处理信息的方式其实很像——你的大脑也不会记住每件事的每个细节，但你会记住关键决策和当前任务的状态。Claude Code 的 compact 机制，本质上是在模拟这种”有选择地遗忘”的能力。</p>
-<p>理解了这些之后，你会更知道怎么跟它相处：什么时候该 compact，compact 之前该准备什么，compact 之后该怎么快速恢复状态。</p>
-<p>毕竟，工具再智能，也需要一个懂它的人来驱动。</p>
+<p>这些指令在每次压缩时都会被传给摘要模型，相当于给摘要加了个白名单。</p>
+<p>还有一个坑要避免：不要在 compact 之后立刻又大量读文件跑命令。如果上下文很快又满了，系统会再次触发压缩。连续 3 次压缩后上下文立刻又满的话，Claude Code 会停止压缩并给出错误提示，而不是陷入死循环。这个 bug 在 v2.1.79 之前是真实存在的，系统会陷入压缩然后填满、再压缩再填满的死循环。现在加了保护，但了解这个历史还是有用的。</p>
+<h2 id="信息丢失和补救"><a href="#信息丢失和补救" class="headerlink" title="信息丢失和补救"></a>信息丢失和补救</h2><p>compact 一定会丢信息，摘要不可能 100% 还原原始对话。通常丢失的东西包括具体的代码细节（只保留了”修改了 xxx 文件”但具体改了什么丢了）、早期的讨论过程（为什么选方案 A 不选方案 B 的推理过程）、工具调用的完整返回值、以及图片和截图内容。</p>
+<p>最直接的补救方式是用文件代替记忆。重要的代码、配置、设计文档直接写到文件里，compact 后模型可以重新读取，不要依赖模型还记得。TodoWrite 的内容是独立存储的，不随 compact 丢失，可以把它当成外部状态存储。硬约束类的信息比如”用 PostgreSQL 不用 MySQL”写进 CLAUDE.md 最保险，它在每次请求都在系统提示词里，不可能被压缩掉。Compact Instructions 则告诉摘要模型哪些东西不能丢，比事后发现丢了再补要高效得多。</p>
+<p>compact 机制的设计优先级很清晰：能不动的不动，能少动的少动，必须动的尽量保留关键信息，关键信息之外再考虑细节。理解了这个优先级排序，就知道什么时候该 compact、compact 之前该准备什么、compact 之后该怎么快速恢复状态。</p>
 
     </div>
 
@@ -775,8 +779,8 @@
         
     <div class="post-nav">
       <div class="post-nav-item">
-    <a href="/2026/04/01/072_china-gpu-self-develop-challenges/" rel="prev" title="中国显卡自研之路：追赶二十年差距，还要走多久？">
-      <i class="fa fa-chevron-left"></i> 中国显卡自研之路：追赶二十年差距，还要走多久？
+    <a href="/2026/04/01/073_chrome-devtools-mcp-guide/" rel="prev" title="Chrome DevTools MCP 入门实战：让 AI 助手操控浏览器">
+      <i class="fa fa-chevron-left"></i> Chrome DevTools MCP 入门实战：让 AI 助手操控浏览器
     </a></div>
       <div class="post-nav-item">
     <a href="/2026/04/03/076_mcp-future-perspective/" rel="next" title="MCP 要死了吗">
@@ -842,7 +846,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#从一个真实场景说起"><span class="nav-number">1.</span> <span class="nav-text">从一个真实场景说起</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、先搞清楚：上下文窗口里都装了啥"><span class="nav-number">2.</span> <span class="nav-text">一、先搞清楚：上下文窗口里都装了啥</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、不只是摘要：压缩的四层管道"><span class="nav-number">3.</span> <span class="nav-text">二、不只是摘要：压缩的四层管道</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-第-1-层：Micro-压缩——不动缓存键的”微创手术”"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 第 1 层：Micro 压缩——不动缓存键的”微创手术”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-第-2-层：Snip-裁剪——去重-去冗余"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 第 2 层：Snip 裁剪——去重 + 去冗余</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-第-3-层：Context-Collapse——分段折叠"><span class="nav-number">3.3.</span> <span class="nav-text">2.3 第 3 层：Context Collapse——分段折叠</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-第-4-层：Full-Compact——“核弹级”全量摘要"><span class="nav-number">3.4.</span> <span class="nav-text">2.4 第 4 层：Full Compact——“核弹级”全量摘要</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、Compact-之后：上下文重建"><span class="nav-number">4.</span> <span class="nav-text">三、Compact 之后：上下文重建</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-重新加载-CLAUDE-md"><span class="nav-number">4.1.</span> <span class="nav-text">3.1 重新加载 CLAUDE.md</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-重新读取最近文件"><span class="nav-number">4.2.</span> <span class="nav-text">3.2 重新读取最近文件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-恢复任务列表"><span class="nav-number">4.3.</span> <span class="nav-text">3.3 恢复任务列表</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、自动触发：不用你敲，它自己也会压"><span class="nav-number">5.</span> <span class="nav-text">四、自动触发：不用你敲，它自己也会压</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、Hooks：压缩前后的”钩子”"><span class="nav-number">6.</span> <span class="nav-text">五、Hooks：压缩前后的”钩子”</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-PreCompact-Hook：压缩前最后一道防线"><span class="nav-number">6.1.</span> <span class="nav-text">5.1 PreCompact Hook：压缩前最后一道防线</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-PostCompact-Hook：压缩后的”备忘录”"><span class="nav-number">6.2.</span> <span class="nav-text">5.2 PostCompact Hook：压缩后的”备忘录”</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#六、-compact-的隐藏参数"><span class="nav-number">7.</span> <span class="nav-text">六、&#x2F;compact 的隐藏参数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#七、一些实战经验"><span class="nav-number">8.</span> <span class="nav-text">七、一些实战经验</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-什么时候该主动-compact"><span class="nav-number">8.1.</span> <span class="nav-text">7.1 什么时候该主动 &#x2F;compact</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-2-Compact-之前的准备工作"><span class="nav-number">8.2.</span> <span class="nav-text">7.2 Compact 之前的准备工作</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-3-CLAUDE-md-里的-Compact-Instructions"><span class="nav-number">8.3.</span> <span class="nav-text">7.3 CLAUDE.md 里的 Compact Instructions</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-4-不要连续-compact"><span class="nav-number">8.4.</span> <span class="nav-text">7.4 不要连续 compact</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#八、-compact-丢掉了什么，怎么补救"><span class="nav-number">9.</span> <span class="nav-text">八、&#x2F;compact 丢掉了什么，怎么补救</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#总结"><span class="nav-number">10.</span> <span class="nav-text">总结</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#上下文窗口里都装了啥"><span class="nav-number">1.</span> <span class="nav-text">上下文窗口里都装了啥</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四层渐进式压缩管道"><span class="nav-number">2.</span> <span class="nav-text">四层渐进式压缩管道</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Micro-压缩：不动缓存键的微创操作"><span class="nav-number">2.1.</span> <span class="nav-text">Micro 压缩：不动缓存键的微创操作</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Snip-裁剪：去重和去冗余"><span class="nav-number">2.2.</span> <span class="nav-text">Snip 裁剪：去重和去冗余</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Context-Collapse：分段折叠"><span class="nav-number">2.3.</span> <span class="nav-text">Context Collapse：分段折叠</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Full-Compact：全量摘要"><span class="nav-number">2.4.</span> <span class="nav-text">Full Compact：全量摘要</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#压缩之后的上下文重建"><span class="nav-number">3.</span> <span class="nav-text">压缩之后的上下文重建</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#自动触发机制"><span class="nav-number">4.</span> <span class="nav-text">自动触发机制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Hooks：压缩前后的扩展点"><span class="nav-number">5.</span> <span class="nav-text">Hooks：压缩前后的扩展点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#隐藏参数和实战技巧"><span class="nav-number">6.</span> <span class="nav-text">隐藏参数和实战技巧</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#信息丢失和补救"><span class="nav-number">7.</span> <span class="nav-text">信息丢失和补救</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 

@@ -23,15 +23,15 @@
     var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
   </script>
 
-  <meta name="description" content="背景如果你问大模型：”明朝第一位皇帝是谁？”它会自信地回答：”朱元璋。” 但如果你问：”朱元璋的第三任妻子叫什么名字？”它可能回答：”马皇后。”——等等，马皇后是朱元璋的正妻，不是第三任妻子。模型编了一个看似合理、实则错误的答案。 这就是大模型的幻觉（Hallucination）：一本正经地胡说八道。 面试时如果只回答”因为它是个概率模型”，会被追问：概率模型怎么了？概率模型就一定会编东西吗？ 今">
+  <meta name="description" content="背景问大模型”明朝第一位皇帝是谁”，它会回答”朱元璋”。但问”朱元璋的第三任妻子叫什么名字”，它可能回答”马皇后”。马皇后是朱元璋的正妻，不是第三任妻子，模型在这里编了一个看似合理实则错误的答案。这就是大模型的幻觉（Hallucination）：生成内容时语气自信，但事实层面是错的。面试中如果只说”因为它是概率模型”，面试官不会满意。概率模型并不意味着必然会编造内容，需要拆开来看具体是哪几个环节出">
 <meta property="og:type" content="article">
 <meta property="og:title" content="大模型幻觉深度解析：为什么会一本正经胡说八道">
 <meta property="og:url" content="https://donehub.github.io/2026/03/28/071_llm-hallucination-deep-analysis/index.html">
 <meta property="og:site_name" content="DoneHub">
-<meta property="og:description" content="背景如果你问大模型：”明朝第一位皇帝是谁？”它会自信地回答：”朱元璋。” 但如果你问：”朱元璋的第三任妻子叫什么名字？”它可能回答：”马皇后。”——等等，马皇后是朱元璋的正妻，不是第三任妻子。模型编了一个看似合理、实则错误的答案。 这就是大模型的幻觉（Hallucination）：一本正经地胡说八道。 面试时如果只回答”因为它是个概率模型”，会被追问：概率模型怎么了？概率模型就一定会编东西吗？ 今">
+<meta property="og:description" content="背景问大模型”明朝第一位皇帝是谁”，它会回答”朱元璋”。但问”朱元璋的第三任妻子叫什么名字”，它可能回答”马皇后”。马皇后是朱元璋的正妻，不是第三任妻子，模型在这里编了一个看似合理实则错误的答案。这就是大模型的幻觉（Hallucination）：生成内容时语气自信，但事实层面是错的。面试中如果只说”因为它是概率模型”，面试官不会满意。概率模型并不意味着必然会编造内容，需要拆开来看具体是哪几个环节出">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2026-03-27T16:00:00.000Z">
-<meta property="article:modified_time" content="2026-08-21T16:27:01.213Z">
+<meta property="article:modified_time" content="2026-08-22T10:26:14.782Z">
 <meta property="article:author" content="Zou Rongsheng">
 <meta property="article:tag" content="AI">
 <meta name="twitter:card" content="summary">
@@ -230,7 +230,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-08-22 00:27:01" itemprop="dateModified" datetime="2026-08-22T00:27:01+08:00">2026-08-22</time>
+                <time title="修改时间：2026-08-22 18:26:14" itemprop="dateModified" datetime="2026-08-22T18:26:14+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -274,64 +274,35 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>如果你问大模型：”明朝第一位皇帝是谁？”它会自信地回答：”朱元璋。”</p>
-<p>但如果你问：”朱元璋的第三任妻子叫什么名字？”它可能回答：”马皇后。”——等等，马皇后是朱元璋的<strong>正妻</strong>，不是第三任妻子。模型编了一个看似合理、实则错误的答案。</p>
-<p>这就是<strong>大模型的幻觉（Hallucination）</strong>：一本正经地胡说八道。</p>
-<p>面试时如果只回答”因为它是个概率模型”，会被追问：概率模型怎么了？概率模型就一定会编东西吗？</p>
-<p>今天我们从五个层面拆解这个问题，每一层都能让你的理解更有深度。</p>
-<h2 id=""><a href="#" class="headerlink" title=""></a><a id="more"></a></h2><h2 id="第一层：训练目标-≠-说真话"><a href="#第一层：训练目标-≠-说真话" class="headerlink" title="第一层：训练目标 ≠ 说真话"></a>第一层：训练目标 ≠ 说真话</h2><p>这是最根本的一层。<strong>大模型的训练目标，从一开始就不是”说真话”，而是”预测下一个最可能的 token”。</strong></p>
-<p>听起来差不多？差别很大。</p>
-<h3 id="训练信号的本质"><a href="#训练信号的本质" class="headerlink" title="训练信号的本质"></a>训练信号的本质</h3><p>模型在训练过程中，从未接受过这样的监督信号：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">这句话是事实 ✓</span><br><span class="line">这句话是编的 ✗</span><br></pre></td></tr></table></figure>
-<p>它只知道：在这段文本里，前面出现了这些词，<strong>下一个词最可能是什么？</strong></p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">输入: &quot;明朝开国皇帝是&quot;</span><br><span class="line">训练目标: 预测下一个词是 &quot;朱&quot;（概率最高）</span><br><span class="line">         然后是 &quot;元&quot;（基于&quot;朱&quot;之后）</span><br><span class="line">         然后是 &quot;璋&quot;（基于&quot;朱元&quot;之后）</span><br></pre></td></tr></table></figure>
-<p>模型学的是<strong>语言的统计规律</strong>，不是<strong>世界的真实知识</strong>。</p>
-<h3 id="流畅-≠-正确"><a href="#流畅-≠-正确" class="headerlink" title="流畅 ≠ 正确"></a>流畅 ≠ 正确</h3><p>从训练目标来看，模型追求的是<strong>流畅连贯</strong>，不是事实正确。</p>
-<p>大多数情况下，流畅连贯的文本恰好也是真实的。所以大部分场景下，模型看起来在说真话。</p>
-<p>但一旦”说得通”和”说得对”发生冲突：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">问题: &quot;林黛玉倒拔鲁智深的故事发生在哪一回？&quot;</span><br><span class="line">模型可能回答: &quot;发生在《红楼梦》第X回...&quot;</span><br><span class="line">              ↑</span><br><span class="line">              编造了一个看似合理、实则完全不存在的故事</span><br></pre></td></tr></table></figure>
-<p>为什么？因为”林黛玉倒拔鲁智深”本身是个荒谬的问题，但模型会<strong>硬着头皮让它”说得通”</strong>——生成一个符合语言规律的回答，而不是指出这个问题本身是错的。</p>
-<hr>
-<h2 id="第二层：不知道自己不知道什么"><a href="#第二层：不知道自己不知道什么" class="headerlink" title="第二层：不知道自己不知道什么"></a>第二层：不知道自己不知道什么</h2><p>人类面对不确定的问题，会有”自知之明”：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">问: &quot;量子力学中薛定谔方程的第三种推导方式是什么？&quot;</span><br><span class="line">人: &quot;我不确定，这个我不太懂。&quot;</span><br></pre></td></tr></table></figure>
-<p>但大模型没有这个能力。</p>
-<h3 id="训练时的”强制回答”约束"><a href="#训练时的”强制回答”约束" class="headerlink" title="训练时的”强制回答”约束"></a>训练时的”强制回答”约束</h3><p>模型训练时被要求<strong>必须生成一段通顺的回答</strong>，而不是可以选择”我不知道”。</p>
-<p>训练数据里很少有这种模式：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">问题: XXX（超出知识范围）</span><br><span class="line">回答: 我不知道 &#x2F; 这个问题我无法回答</span><br></pre></td></tr></table></figure>
-<p>即使有，比例也极低。模型学到的是：<strong>有问题 → 必有回答</strong>。</p>
-<h3 id="硬着头皮编"><a href="#硬着头皮编" class="headerlink" title="硬着头皮编"></a>硬着头皮编</h3><p>所以，哪怕模型对问题毫无头绪，也会生成一段看似合理的内容：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">问: &quot;《三体》中章北海的第四个孩子叫什么？&quot;</span><br><span class="line">模型: &quot;章北海的第四个孩子叫章XX...&quot;</span><br><span class="line">      ↑</span><br><span class="line">      语气自信，实则章北海根本没有四个孩子</span><br></pre></td></tr></table></figure>
-<p><strong>越是不确定的问题，模型越可能编造</strong>——因为它没有”我不确定”这个选项。</p>
-<hr>
-<h2 id="第三层：知识是”压缩”的，不是”精确存储”的"><a href="#第三层：知识是”压缩”的，不是”精确存储”的" class="headerlink" title="第三层：知识是”压缩”的，不是”精确存储”的"></a>第三层：知识是”压缩”的，不是”精确存储”的</h2><p>大模型不是把所有知识像数据库一样一字不差存下来。</p>
-<h3 id="知识的存储方式"><a href="#知识的存储方式" class="headerlink" title="知识的存储方式"></a>知识的存储方式</h3><p>模型把海量文本<strong>压缩成参数里的统计模式</strong>。这个过程类似于：</p>
+        <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>问大模型”明朝第一位皇帝是谁”，它会回答”朱元璋”。但问”朱元璋的第三任妻子叫什么名字”，它可能回答”马皇后”。马皇后是朱元璋的正妻，不是第三任妻子，模型在这里编了一个看似合理实则错误的答案。这就是大模型的幻觉（Hallucination）：生成内容时语气自信，但事实层面是错的。面试中如果只说”因为它是概率模型”，面试官不会满意。概率模型并不意味着必然会编造内容，需要拆开来看具体是哪几个环节出了问题。</p>
+<h2 id=""><a href="#" class="headerlink" title=""></a><a id="more"></a></h2><h2 id="训练目标就不是说真话"><a href="#训练目标就不是说真话" class="headerlink" title="训练目标就不是说真话"></a>训练目标就不是说真话</h2><p>大模型的训练目标从一开始就不是说真话，而是预测下一个最可能的 token。这两件事听起来接近，实际差别很大。模型在训练过程中从未接受过这样的监督信号：这句话是事实、那句话是编的。它接收到的信号只有一个，给定前面的词，下一个词最可能是什么。比如输入是”明朝开国皇帝是”，训练目标是让模型输出”朱”，然后基于”朱”输出”元”，再基于”朱元”输出”璋”。模型学到的是语言的统计规律，不是世界的真实知识。</p>
+<p>从训练目标出发，模型追求的是流畅连贯，不是事实正确。大多数情况下，流畅连贯的文本恰好也是真实的，所以大部分场景下模型看起来在说真话。但一旦”说得通”和”说得对”发生冲突，幻觉就出现了。比如有人问”林黛玉倒拔鲁智深的故事发生在哪一回”，这个问题本身就是荒谬的，但模型不会指出问题有误，它会生成一个符合语言规律的回答，比如”发生在《红楼梦》第X回”，编造了一个完全不存在的情节。</p>
+<h2 id="不知道自己不知道什么"><a href="#不知道自己不知道什么" class="headerlink" title="不知道自己不知道什么"></a>不知道自己不知道什么</h2><p>人类面对不确定的问题会有自知之明，被问到完全不懂的领域，可以直接说”我不确定，这个我不太懂”。但大模型没有这个能力。模型在训练时被要求必须生成一段通顺的回答，而不是可以选择放弃。训练数据里极少出现这种模式：面对一个问题，回答是”我不知道”或”这个问题我无法回答”。即使有，比例也极低，模型从中学到的规律是有问题必有回答。</p>
+<p>所以哪怕模型对问题毫无头绪，它也会生成一段看似合理的内容。比如问”《三体》中章北海的第四个孩子叫什么”，模型可能给出一个具体的人名，语气自信，但章北海根本没有四个孩子。越是不确定的问题，模型越可能编造，因为它的训练过程里没有提供”我不确定”这个选项。</p>
+<h2 id="知识存储方式是压缩而非精确"><a href="#知识存储方式是压缩而非精确" class="headerlink" title="知识存储方式是压缩而非精确"></a>知识存储方式是压缩而非精确</h2><p>大模型不是把所有知识像数据库一样一字不差存下来，而是把海量文本压缩成参数中的统计模式。这两种存储方式的差异决定了模型在事实精确度上的先天不足。</p>
 <div class="table-container">
 <table>
 <thead>
 <tr>
-<th>方式</th>
+<th>存储方式</th>
 <th>特点</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>数据库存储</strong></td>
+<td>数据库存储</td>
 <td>精确、可检索、一字不差</td>
 </tr>
 <tr>
-<td><strong>模型参数存储</strong></td>
+<td>模型参数存储</td>
 <td>模糊、统计性、细节易混淆</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p>就像人记东西，只会记个大概，细节会模糊、会混淆。</p>
-<h3 id="压缩带来的问题"><a href="#压缩带来的问题" class="headerlink" title="压缩带来的问题"></a>压缩带来的问题</h3><p>模型学到的是<strong>模糊的关联、大概的规律</strong>，而不是<strong>精确的事实</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">模型可能学到的:</span><br><span class="line">- 朱元璋 → 明朝 → 开国皇帝 → 南京 → 马皇后（模糊关联）</span><br><span class="line">- 朱元璋 → 某年某月某日登基（大概规律）</span><br><span class="line"></span><br><span class="line">模型不太可能学到的:</span><br><span class="line">- 朱元璋的第三任妻子具体叫什么名字</span><br><span class="line">- 某个具体事件发生的精确日期</span><br></pre></td></tr></table></figure>
-<p>一旦需要精准细节（具体日期、数据、人名），就容易<strong>张冠李戴、脑补编造</strong>。</p>
-<hr>
-<h2 id="第四层：训练数据本身有”坑”"><a href="#第四层：训练数据本身有”坑”" class="headerlink" title="第四层：训练数据本身有”坑”"></a>第四层：训练数据本身有”坑”</h2><p>模型的知识全部来自训练数据。但互联网数据本身充满问题。</p>
-<h3 id="数据质量问题"><a href="#数据质量问题" class="headerlink" title="数据质量问题"></a>数据质量问题</h3><div class="table-container">
+<p>这和人类记东西的方式有相似之处：人记一件事只会记个大概，细节会模糊、会混淆，模型也一样。它学到的是模糊的关联和大概的规律，不是精确的事实。比如模型可能学到”朱元璋关联明朝、开国皇帝、南京、马皇后”这样的模糊知识网络，以及某些事件发生在某个大致时间段内的概率规律，但对于”朱元璋的第三任妻子具体叫什么名字”或”某个事件的精确日期”这类精准细节，它很难准确记住。一旦需要输出这些精准信息，模型就容易张冠李戴或凭空脑补。</p>
+<h2 id="训练数据本身有质量问题"><a href="#训练数据本身有质量问题" class="headerlink" title="训练数据本身有质量问题"></a>训练数据本身有质量问题</h2><p>模型的知识全部来自训练数据，而互联网数据本身就充满各种问题。</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -341,105 +312,122 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>错误信息</strong></td>
+<td>错误信息</td>
 <td>谣言、虚假新闻</td>
 </tr>
 <tr>
-<td><strong>偏见信息</strong></td>
+<td>偏见信息</td>
 <td>带倾向性的观点</td>
 </tr>
 <tr>
-<td><strong>过时信息</strong></td>
-<td>2023年的新闻，2026年问就不对了</td>
+<td>过时信息</td>
+<td>2023年的新闻放到2026年已经不对</td>
 </tr>
 <tr>
-<td><strong>随意编造</strong></td>
-<td>网友随口胡说的内容</td>
+<td>随意编造</td>
+<td>网友在论坛里随口编的段子</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p>这些都是模型的”教材”。模型分不清对错，只会把学到的”错误规律”当真话说。</p>
-<h3 id="垃圾进，垃圾出"><a href="#垃圾进，垃圾出" class="headerlink" title="垃圾进，垃圾出"></a>垃圾进，垃圾出</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">训练数据中有: &quot;诸葛亮发明了原子弹&quot;（某个网友编的段子）</span><br><span class="line">模型可能学到: 诸葛亮 → 发明 → 原弹（统计关联）</span><br><span class="line">问: &quot;诸葛亮发明了什么？&quot;</span><br><span class="line">答: &quot;诸葛亮发明了原子弹...&quot;</span><br><span class="line">    ↑</span><br><span class="line">    模型把段子当事实了</span><br></pre></td></tr></table></figure>
-<p>这不是模型”蠢”，而是<strong>训练数据本身就有问题</strong>。</p>
-<hr>
-<h2 id="第五层：生成时的”概率采样”容易跑偏"><a href="#第五层：生成时的”概率采样”容易跑偏" class="headerlink" title="第五层：生成时的”概率采样”容易跑偏"></a>第五层：生成时的”概率采样”容易跑偏</h2><p>大模型生成答案，不是逻辑推理，而是按概率”猜”下一个词。</p>
-<h3 id="一步步”猜”的问题"><a href="#一步步”猜”的问题" class="headerlink" title="一步步”猜”的问题"></a>一步步”猜”的问题</h3><p>每一步都选”最可能的词”，但<strong>一步错，步步错</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">第1步: 选对了 → 上下文正常</span><br><span class="line">第2步: 选对了 → 继续正常</span><br><span class="line">第3步: 选了个&quot;次优&quot;选项 → 小偏差</span><br><span class="line">第4步: 基于小偏差继续 → 偏差放大</span><br><span class="line">第5步: ... → 大错误</span><br></pre></td></tr></table></figure>
-<p>小偏差会<strong>累积成大错误</strong>，尤其是遇到模糊、冷门、矛盾的问题时。</p>
-<h3 id="概率分布越乱，越容易跑偏"><a href="#概率分布越乱，越容易跑偏" class="headerlink" title="概率分布越乱，越容易跑偏"></a>概率分布越乱，越容易跑偏</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">常见问题: 概率分布集中 → 选对的概率高</span><br><span class="line">冷门问题: 概率分布分散 → 选错的概率增加</span><br><span class="line">模糊问题: 多个候选概率接近 → 容易选到错误的那个</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="五层原因的叠加效应"><a href="#五层原因的叠加效应" class="headerlink" title="五层原因的叠加效应"></a>五层原因的叠加效应</h2><p>幻觉不是单一原因造成的，而是<strong>五层叠加</strong>：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">第1层: 训练目标追求流畅而非正确</span><br><span class="line">   ↓ 基础设定偏离</span><br><span class="line">第2层: 没有自知之明，不知道边界</span><br><span class="line">   ↓ 硬着头皮回答</span><br><span class="line">第3层: 知识压缩存储，细节模糊</span><br><span class="line">   ↓ 精确信息易错</span><br><span class="line">第4层: 训练数据本身有错</span><br><span class="line">   ↓ 学到错误内容</span><br><span class="line">第5层: 概率采样容易跑偏</span><br><span class="line">   ↓ 小错累积成大错</span><br><span class="line">   ↓</span><br><span class="line">最终输出: 一本正经胡说八道</span><br></pre></td></tr></table></figure>
-<hr>
-<h2 id="如何缓解幻觉？"><a href="#如何缓解幻觉？" class="headerlink" title="如何缓解幻觉？"></a>如何缓解幻觉？</h2><p>了解了原因，才能针对性地解决。</p>
-<h3 id="用户层面的技巧"><a href="#用户层面的技巧" class="headerlink" title="用户层面的技巧"></a>用户层面的技巧</h3><div class="table-container">
+<p>这些都是模型的教材，模型分不清对错，只会把学到的错误规律当作正确输出。假设训练数据中有一条网友编的段子”诸葛亮发明了原子弹”，模型可能从中提取到”诸葛亮”和”发明”之间的统计关联，当被问到”诸葛亮发明了什么”时，它有可能把段子当事实输出。这不是模型本身蠢，而是训练数据里就有这些问题，模型忠实地反映了数据的质量。</p>
+<h2 id="概率采样会逐步放大偏差"><a href="#概率采样会逐步放大偏差" class="headerlink" title="概率采样会逐步放大偏差"></a>概率采样会逐步放大偏差</h2><p>大模型生成答案的过程不是逻辑推理，而是按概率一步步猜下一个词。每一步都选当前最可能的词，但一步偏了，后面就基于错误的上下文继续生成，偏差会逐步放大。</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
-<th>技巧</th>
-<th>作用</th>
+<th>生成步骤</th>
+<th>状态</th>
+<th>结果</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>追问细节</strong></td>
-<td>让模型暴露不确定的地方</td>
+<td>第1步</td>
+<td>选对了</td>
+<td>上下文正常</td>
 </tr>
 <tr>
-<td><strong>要求引用来源</strong></td>
-<td>逼迫模型承认”不知道来源”</td>
+<td>第2步</td>
+<td>选对了</td>
+<td>继续正常</td>
 </tr>
 <tr>
-<td><strong>设置温度参数为 0</strong></td>
-<td>减少随机性，让模型更保守</td>
+<td>第3步</td>
+<td>选了次优选项</td>
+<td>出现小偏差</td>
 </tr>
 <tr>
-<td><strong>明确告知”如果不知道就说不知道”</strong></td>
-<td>给模型一个”放弃”的选项</td>
+<td>第4步</td>
+<td>基于偏差上下文继续</td>
+<td>偏差被放大</td>
+</tr>
+<tr>
+<td>第5步</td>
+<td>偏差累积</td>
+<td>输出严重偏离事实</td>
 </tr>
 </tbody>
 </table>
 </div>
-<h3 id="技术层面的方案"><a href="#技术层面的方案" class="headerlink" title="技术层面的方案"></a>技术层面的方案</h3><div class="table-container">
+<p>这种偏差放大效应在概率分布混乱的情况下更加明显。常见问题对应的概率分布比较集中，模型选对的概率高；冷门问题对应的概率分布分散，选错的概率增加；模糊问题中多个候选词的概率接近，模型容易选到错误的那个。小偏差逐步累积，最终就变成大错误。</p>
+<h2 id="五层原因的叠加"><a href="#五层原因的叠加" class="headerlink" title="五层原因的叠加"></a>五层原因的叠加</h2><p>幻觉不是单一原因造成的，而是五层因素叠加在一起。训练目标追求流畅而非正确，这是基础设定的偏离。模型没有自知之明，不知道自己知识的边界在哪里，所以会硬着头皮回答任何问题。知识以压缩方式存储，精确信息天然容易出错。训练数据本身包含错误和噪音，模型学到了这些错误规律。生成过程中的概率采样让前面的小偏差逐步累积成大错误。这五层叠加在一起，一本正经胡说八道就成了必然结果。</p>
+<h2 id="缓解幻觉的手段"><a href="#缓解幻觉的手段" class="headerlink" title="缓解幻觉的手段"></a>缓解幻觉的手段</h2><p>从用户层面，有一些实用技巧可以降低被幻觉误导的概率。追问细节可以让模型在不确定的地方暴露问题，要求引用来源会逼迫模型承认不知道出处，将温度参数设为0能减少随机性让模型更保守，明确告知模型”如果不知道就说不知道”等于给它一个放弃的选项。</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
-<th>方案</th>
+<th>层面</th>
+<th>方法</th>
 <th>原理</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>RAG（检索增强生成）</strong></td>
+<td>用户层</td>
+<td>追问细节</td>
+<td>让模型暴露不确定的地方</td>
+</tr>
+<tr>
+<td>用户层</td>
+<td>要求引用来源</td>
+<td>逼迫模型承认不知道出处</td>
+</tr>
+<tr>
+<td>用户层</td>
+<td>温度参数设为0</td>
+<td>减少随机性，输出更保守</td>
+</tr>
+<tr>
+<td>用户层</td>
+<td>明确允许说不知道</td>
+<td>给模型一个放弃的选项</td>
+</tr>
+<tr>
+<td>技术层</td>
+<td>RAG 检索增强生成</td>
 <td>先检索真实资料，再基于资料回答</td>
 </tr>
 <tr>
-<td><strong>知识图谱 grounding</strong></td>
-<td>把回答锚定到可验证的知识节点</td>
+<td>技术层</td>
+<td>知识图谱 grounding</td>
+<td>将回答锚定到可验证的知识节点</td>
 </tr>
 <tr>
-<td><strong>多模型交叉验证</strong></td>
-<td>让多个模型回答同一问题，对比差异</td>
+<td>技术层</td>
+<td>多模型交叉验证</td>
+<td>多个模型回答同一问题，对比差异</td>
 </tr>
 <tr>
-<td><strong>置信度输出</strong></td>
-<td>让模型输出对答案的置信程度</td>
-</tr>
-<tr>
-<td><strong>事实核查模块</strong></td>
-<td>对模型的回答做二次验证</td>
+<td>技术层</td>
+<td>事实核查模块</td>
+<td>对模型输出做二次验证</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p>这些方案各有优劣，但核心思路都是：<strong>引入外部真实信息，弥补模型内部的缺陷</strong>。</p>
-<hr>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>大模型”一本正经胡说八道”，不是它故意骗你，也不是它笨，而是<strong>底层设计、训练目标、知识存储、数据质量、生成机制五层原因叠加的必然结果</strong>。</p>
-<p>用一个公式概括：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">幻觉 &#x3D; 训练目标偏差 + 无自知之明 + 知识压缩 + 数据污染 + 概率跑偏</span><br></pre></td></tr></table></figure>
-<p>理解了这一点，你就会明白：<strong>大模型是一个流畅的语言生成器，不是精准的事实数据库</strong>。</p>
-<p>用模型时，把它当作一个<strong>能快速整理思路、启发想法的助手</strong>，而不是<strong>权威的知识来源</strong>。关键事实，还是要自己核实。</p>
+<p>这些方案的核心思路一致：引入外部真实信息，弥补模型内部的知识缺陷。</p>
+<p>大模型本质上是一个流畅的语言生成器，不是精准的事实数据库。把它当作能快速整理思路、启发想法的助手来用，关键事实还是要自己去核实。</p>
 <hr>
 <p><strong>参考资源</strong>：</p>
 <ul>
@@ -871,7 +859,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#背景"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#"><span class="nav-number">2.</span> <span class="nav-text"></span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第一层：训练目标-≠-说真话"><span class="nav-number">3.</span> <span class="nav-text">第一层：训练目标 ≠ 说真话</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#训练信号的本质"><span class="nav-number">3.1.</span> <span class="nav-text">训练信号的本质</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#流畅-≠-正确"><span class="nav-number">3.2.</span> <span class="nav-text">流畅 ≠ 正确</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第二层：不知道自己不知道什么"><span class="nav-number">4.</span> <span class="nav-text">第二层：不知道自己不知道什么</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#训练时的”强制回答”约束"><span class="nav-number">4.1.</span> <span class="nav-text">训练时的”强制回答”约束</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#硬着头皮编"><span class="nav-number">4.2.</span> <span class="nav-text">硬着头皮编</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第三层：知识是”压缩”的，不是”精确存储”的"><span class="nav-number">5.</span> <span class="nav-text">第三层：知识是”压缩”的，不是”精确存储”的</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#知识的存储方式"><span class="nav-number">5.1.</span> <span class="nav-text">知识的存储方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#压缩带来的问题"><span class="nav-number">5.2.</span> <span class="nav-text">压缩带来的问题</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第四层：训练数据本身有”坑”"><span class="nav-number">6.</span> <span class="nav-text">第四层：训练数据本身有”坑”</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#数据质量问题"><span class="nav-number">6.1.</span> <span class="nav-text">数据质量问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#垃圾进，垃圾出"><span class="nav-number">6.2.</span> <span class="nav-text">垃圾进，垃圾出</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#第五层：生成时的”概率采样”容易跑偏"><span class="nav-number">7.</span> <span class="nav-text">第五层：生成时的”概率采样”容易跑偏</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#一步步”猜”的问题"><span class="nav-number">7.1.</span> <span class="nav-text">一步步”猜”的问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#概率分布越乱，越容易跑偏"><span class="nav-number">7.2.</span> <span class="nav-text">概率分布越乱，越容易跑偏</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五层原因的叠加效应"><span class="nav-number">8.</span> <span class="nav-text">五层原因的叠加效应</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#如何缓解幻觉？"><span class="nav-number">9.</span> <span class="nav-text">如何缓解幻觉？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#用户层面的技巧"><span class="nav-number">9.1.</span> <span class="nav-text">用户层面的技巧</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#技术层面的方案"><span class="nav-number">9.2.</span> <span class="nav-text">技术层面的方案</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#总结"><span class="nav-number">10.</span> <span class="nav-text">总结</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#背景"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#"><span class="nav-number">2.</span> <span class="nav-text"></span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#训练目标就不是说真话"><span class="nav-number">3.</span> <span class="nav-text">训练目标就不是说真话</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#不知道自己不知道什么"><span class="nav-number">4.</span> <span class="nav-text">不知道自己不知道什么</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#知识存储方式是压缩而非精确"><span class="nav-number">5.</span> <span class="nav-text">知识存储方式是压缩而非精确</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#训练数据本身有质量问题"><span class="nav-number">6.</span> <span class="nav-text">训练数据本身有质量问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#概率采样会逐步放大偏差"><span class="nav-number">7.</span> <span class="nav-text">概率采样会逐步放大偏差</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五层原因的叠加"><span class="nav-number">8.</span> <span class="nav-text">五层原因的叠加</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#缓解幻觉的手段"><span class="nav-number">9.</span> <span class="nav-text">缓解幻觉的手段</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
