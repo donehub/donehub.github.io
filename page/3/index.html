@@ -195,7 +195,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/083_claude-code-permission-security/">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/080_claude-code-context-compression/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -209,7 +209,7 @@
       <header class="post-header">
         <h2 class="post-title" itemprop="name headline">
           
-            <a href="/2026/04/06/083_claude-code-permission-security/" class="post-title-link" itemprop="url">权限决策的五层防线</a>
+            <a href="/2026/04/06/080_claude-code-context-compression/" class="post-title-link" itemprop="url">Context 压缩的四级策略</a>
         </h2>
 
         <div class="post-meta">
@@ -226,7 +226,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-08-22 13:29:36" itemprop="dateModified" datetime="2026-08-22T13:29:36+08:00">2026-08-22</time>
+                <time title="修改时间：2026-08-22 21:58:26" itemprop="dateModified" datetime="2026-08-22T21:58:26+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -247,8 +247,8 @@
       </span>
       <span class="post-meta-item-text">Valine：</span>
     
-    <a title="valine" href="/2026/04/06/083_claude-code-permission-security/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/083_claude-code-permission-security/" itemprop="commentCount"></span>
+    <a title="valine" href="/2026/04/06/080_claude-code-context-compression/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/080_claude-code-context-compression/" itemprop="commentCount"></span>
     </a>
   </span>
   
@@ -263,443 +263,17 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <a id="more"></a>
-<h2 id="Agent-执行权限的核心矛盾"><a href="#Agent-执行权限的核心矛盾" class="headerlink" title="Agent 执行权限的核心矛盾"></a>Agent 执行权限的核心矛盾</h2><p>AI Agent 需要执行命令、修改文件、访问网络才能完成编程任务，但这些操作都具有破坏性风险。权限系统需要在”让 Agent 高效工作”和”防止危险操作”之间找到平衡点。过于宽松会导致不可逆的损害，过于严格会让 Agent 寸步难行，每次操作都需要人工确认。</p>
-<p>Claude Code 的权限系统通过五层决策机制解决这个问题。每一层都可以独立中断工具调用，从确定性的规则匹配到概率性的 AI 分类器，层层递进，最终由用户兜底。</p>
-<h2 id="五层决策架构"><a href="#五层决策架构" class="headerlink" title="五层决策架构"></a>五层决策架构</h2><p>权限决策按照固定的顺序执行，分为否决阶段、允许阶段和默认三个阶段。</p>
-<p>第一层是权限规则。系统检查工具名称和输入参数是否匹配 deny 或 allow 规则。deny 规则优先级最高，任何匹配都会立即拒绝。规则支持精确匹配（<code>Bash</code>）、参数模式匹配（<code>Bash(git *)</code>允许所有 git 命令，<code>Bash(rm -rf *)</code>禁止删除）、以及通配符（<code>File*</code>匹配所有文件工具）。规则来源有八种：用户全局设置、项目设置、本地设置、策略设置、功能标志、CLI 参数、命令和会话级临时规则。</p>
-<p>第二层是权限模式。七种模式对应不同的自动化程度：<code>default</code>模式下所有写操作需要确认；<code>acceptEdits</code>模式下工作目录内的编辑自动允许；<code>bypassPermissions</code>完全绕过权限检查；<code>dontAsk</code>自动拒绝所有操作；<code>plan</code>模式只读操作自动允许，写操作需要确认；<code>auto</code>模式由 AI 分类器决策；<code>bubble</code>模式将权限请求冒泡到父代理终端。</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>模式</th>
-<th>读操作</th>
-<th>写操作</th>
-<th>危险操作</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>default</code></td>
-<td>可能询问</td>
-<td>询问</td>
-<td>询问</td>
-</tr>
-<tr>
-<td><code>acceptEdits</code></td>
-<td>自动</td>
-<td>自动（工作目录内）</td>
-<td>询问</td>
-</tr>
-<tr>
-<td><code>bypassPermissions</code></td>
-<td>自动</td>
-<td>自动</td>
-<td>自动</td>
-</tr>
-<tr>
-<td><code>dontAsk</code></td>
-<td>自动拒绝</td>
-<td>自动拒绝</td>
-<td>自动拒绝</td>
-</tr>
-<tr>
-<td><code>plan</code></td>
-<td>自动</td>
-<td>询问</td>
-<td>询问</td>
-</tr>
-<tr>
-<td><code>auto</code></td>
-<td>分类器决策</td>
-<td>分类器决策</td>
-<td>询问</td>
-</tr>
-<tr>
-<td><code>bubble</code></td>
-<td>冒泡到父</td>
-<td>冒泡到父</td>
-<td>冒泡到父</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>第三层是钩子拦截。PreToolUse 钩子在工具执行前运行，可以拦截、修改或阻塞操作。钩子退出码 0 表示成功（可能修改了输入），退出码 2 表示阻塞（展示错误信息给模型），其他退出码展示给用户。</p>
-<p>第四层是安全分类器。在 <code>auto</code> 模式下，AI 分类器评估工具调用的安全性，返回 0-1 之间的分数。分数高于 0.8 自动允许，低于 0.2 自动拒绝，中间区间询问用户。分类器有拒绝计数机制，连续拒绝 3 次后回退到用户审批，防止陷入拒绝循环。</p>
-<p>第五层是用户确认。如果前四层都没有做出决定，系统弹出对话框展示操作详情，由用户最终判断。</p>
-<h2 id="决策原因追溯"><a href="#决策原因追溯" class="headerlink" title="决策原因追溯"></a>决策原因追溯</h2><p>每次权限决策都会记录原因，用于调试和审计：</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> DecisionReason =</span><br><span class="line">  | &#123; <span class="keyword">type</span>: <span class="string">'rule'</span>; source: PermissionRuleSource; pattern: <span class="built_in">string</span> &#125;</span><br><span class="line">  | &#123; <span class="keyword">type</span>: <span class="string">'mode'</span>; mode: PermissionMode &#125;</span><br><span class="line">  | &#123; <span class="keyword">type</span>: <span class="string">'hook'</span>; hookName: <span class="built_in">string</span> &#125;</span><br><span class="line">  | &#123; <span class="keyword">type</span>: <span class="string">'classifier'</span>; score: <span class="built_in">number</span> &#125;</span><br><span class="line">  | &#123; <span class="keyword">type</span>: <span class="string">'user'</span>; temporary: <span class="built_in">boolean</span> &#125;</span><br></pre></td></tr></table></figure>
-<p>这个设计让权限系统的行为完全可解释。当用户遇到意外的允许或拒绝时，可以通过决策原因追溯到具体是哪一层、哪条规则、哪个分数做出的判断。</p>
-<h2 id="Bash-命令的安全解析"><a href="#Bash-命令的安全解析" class="headerlink" title="Bash 命令的安全解析"></a>Bash 命令的安全解析</h2><p>Bash 工具是权限控制最复杂的场景，因为命令语法灵活，可以通过管道、重定向、命令替换等方式隐藏危险操作。</p>
-<p>安全包装器剥离是第一道处理。<code>nohup rm -rf /</code>、<code>timeout 10 rm -rf /</code>、<code>nice rm -rf /</code> 这些命令中的包装器不改变底层操作的危险性，系统会剥离 timeout、time、nice、stdbuf、nohup 等包装器，直接检查核心命令。</p>
-<p>复合命令分解是第二道处理。对于 <code>cmd1 &amp;&amp; cmd2 | cmd3</code> 这样的管道或链式命令，系统使用 tree-sitter 解析命令 AST，提取所有子命令，每个子命令独立检查权限。任何一个子命令被拒绝，整个命令就被拒绝。</p>
-<p>Tree-sitter AST 解析还能检测更隐蔽的危险模式：<code>eval</code>和<code>source</code>命令可以执行任意代码，<code>$(...)</code>和反引号命令替换可以注入恶意命令，<code>${...}</code>变量扩展可能泄露敏感信息，zsh 特殊内置命令有副作用。包含命令替换或复杂扩展的命令会被标记为”too-complex”，需要用户手动确认。</p>
-<p>路径约束检查是第三道处理。输出重定向的目标路径必须在允许的工作目录内，不能写入 <code>.git</code>、<code>.vscode</code>、<code>.claude</code> 等危险目录。系统还会检测 <code>cd</code> 加 <code>git</code> 的复合命令，防止裸仓库 RCE 攻击。</p>
-<h2 id="文件操作的安全约束"><a href="#文件操作的安全约束" class="headerlink" title="文件操作的安全约束"></a>文件操作的安全约束</h2><p>文件编辑有一个硬性前提：必须先读取文件。<code>readFileState</code> 记录每个文件的读取时间戳，编辑时检查文件是否在读取后被修改。如果文件在读取后被外部修改，编辑会被拒绝，防止覆盖并发更新。</p>
-<p>危险文件和目录有额外的保护。<code>.gitconfig</code>、<code>.gitmodules</code>、<code>.bashrc</code>、<code>.zshrc</code>、<code>.claude.json</code> 等文件，以及 <code>.git</code>、<code>.vscode</code>、<code>.idea</code>、<code>.claude</code> 等目录，修改这些路径会触发额外的安全检查。</p>
-<p>路径安全检查还覆盖了多种攻击向量：可疑的 Windows 路径字符（<code>&lt;&gt;:&quot;|?*</code>）、ADS（Alternate Data Stream）攻击（<code>::</code>语法）、短名称绕过（<code>~1</code>等 8.3 格式）、长路径前缀（<code>\\?\</code>）等。这些检查确保 Agent 不会通过路径混淆绕过权限控制。</p>
-<h2 id="Auto-模式的分类器逻辑"><a href="#Auto-模式的分类器逻辑" class="headerlink" title="Auto 模式的分类器逻辑"></a>Auto 模式的分类器逻辑</h2><p><code>auto</code> 模式让 AI 分类器代替用户做权限决策。分类器首先检查快速路径：如果操作在 <code>acceptEdits</code> 允许范围内，或者是已知的安全工具（只读操作），直接放行。否则调用分类器 API 评估操作的安全性。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">classifyWithAI</span>(<span class="params">tool, input, context</span>): <span class="title">Promise</span>&lt;<span class="title">PermissionResult</span>&gt; </span>&#123;</span><br><span class="line">  <span class="comment">// 快速路径：acceptEdits 或安全工具白名单</span></span><br><span class="line">  <span class="keyword">if</span> (isAcceptEditsAllowed(tool, input, context)) <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span> &#125;</span><br><span class="line">  <span class="keyword">if</span> (isSafeTool(tool)) <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span> &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 调用分类器 API</span></span><br><span class="line">  <span class="keyword">const</span> score = <span class="keyword">await</span> callClassifierAPI(tool.toAutoClassifierInput?.(input) || <span class="built_in">JSON</span>.stringify(input))</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (score &gt; <span class="number">0.8</span>) <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span>, decisionReason: &#123; <span class="keyword">type</span>: <span class="string">'classifier'</span>, score &#125; &#125;</span><br><span class="line">  <span class="keyword">if</span> (score &lt; <span class="number">0.2</span>) <span class="keyword">return</span> &#123; behavior: <span class="string">'deny'</span>, decisionReason: &#123; <span class="keyword">type</span>: <span class="string">'classifier'</span>, score &#125; &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 不确定区间，询问用户</span></span><br><span class="line">  <span class="keyword">return</span> &#123; behavior: <span class="string">'ask'</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>分类器的拒绝计数机制防止系统陷入死循环。如果连续 3 次被分类器拒绝，系统会回退到用户审批模式，让用户决定是否继续。这个设计避免了 Agent 在分类器边界案例上反复尝试、反复被拒的无效循环。</p>
-<h2 id="钩子拦截机制"><a href="#钩子拦截机制" class="headerlink" title="钩子拦截机制"></a>钩子拦截机制</h2><p>钩子让用户可以在工具执行前后插入自定义逻辑。PreToolUse 钩子在工具执行前运行，可以检查、修改输入参数，或者直接阻塞操作。PostToolUse 钩子在工具执行后运行，通常用于自动化检查（如 lint、format）。</p>
-<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"hooks"</span>: &#123;</span><br><span class="line">    <span class="attr">"PreToolUse"</span>: [&#123;</span><br><span class="line">      <span class="attr">"matcher"</span>: <span class="string">"Bash(rm *)"</span>,</span><br><span class="line">      <span class="attr">"hooks"</span>: [&#123;</span><br><span class="line">        <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">        <span class="attr">"command"</span>: <span class="string">"echo 'Deletion blocked' &amp;&amp; exit 2"</span></span><br><span class="line">      &#125;]</span><br><span class="line">    &#125;],</span><br><span class="line">    <span class="attr">"PostToolUse"</span>: [&#123;</span><br><span class="line">      <span class="attr">"matcher"</span>: <span class="string">"Edit"</span>,</span><br><span class="line">      <span class="attr">"hooks"</span>: [&#123;</span><br><span class="line">        <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">        <span class="attr">"command"</span>: <span class="string">"npm run lint"</span></span><br><span class="line">      &#125;]</span><br><span class="line">    &#125;]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>matcher 支持与权限规则相同的模式匹配语法，可以精确到具体的工具参数。这个机制让权限系统具备高度可扩展性，用户可以根据项目需求定义自己的安全策略，而不需要修改核心代码。</p>
-<h2 id="关键源文件"><a href="#关键源文件" class="headerlink" title="关键源文件"></a>关键源文件</h2><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>文件</th>
-<th>职责</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>src/types/permissions.ts</code></td>
-<td>权限类型定义</td>
-</tr>
-<tr>
-<td><code>src/utils/permissions/permissions.ts</code></td>
-<td>权限检查核心逻辑</td>
-</tr>
-<tr>
-<td><code>src/utils/permissions/filesystem.ts</code></td>
-<td>文件系统权限控制</td>
-</tr>
-<tr>
-<td><code>src/utils/permissions/shellRuleMatching.ts</code></td>
-<td>Shell 规则匹配</td>
-</tr>
-<tr>
-<td><code>src/utils/permissions/bashClassifier.ts</code></td>
-<td>Bash 分类器</td>
-</tr>
-<tr>
-<td><code>src/utils/permissions/yoloClassifier.ts</code></td>
-<td>Auto 模式分类器</td>
-</tr>
-<tr>
-<td><code>src/tools/BashTool/bashPermissions.ts</code></td>
-<td>Bash 权限检查</td>
-</tr>
-<tr>
-<td><code>src/tools/BashTool/pathValidation.ts</code></td>
-<td>Bash 路径验证</td>
-</tr>
-<tr>
-<td><code>src/tools/FileEditTool/FileEditTool.ts</code></td>
-<td>文件编辑工具实现</td>
-</tr>
-<tr>
-<td><code>src/services/tools/toolHooks.ts</code></td>
-<td>工具钩子</td>
-</tr>
-</tbody>
-</table>
-</div>
-<hr>
-<p><strong>系列文章导航：</strong></p>
-<ul>
-<li>上一篇：<a href="/2026/04/06/084_claude-code-skills-system/">Skills 系统：条件激活与动态发现</a></li>
-<li>下一篇：<a href="/2026/04/06/081_claude-code-memory-system/">跨会话记忆：四种类型与自动提取机制</a></li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
+          <h2 id="上下文窗口是真实存在的硬约束"><a href="#上下文窗口是真实存在的硬约束" class="headerlink" title="上下文窗口是真实存在的硬约束"></a>上下文窗口是真实存在的硬约束</h2><p>所有 LLM 都有上下文限制。Claude 3.5 Sonnet 标称 200k tokens，但系统提示词占约 20k，工具定义占约 15k，固定开销就吃掉 35k 左右。留给对话的空间大约 165k tokens，如果每轮对话平均 4k tokens，50 轮就会把窗口用尽。</p>
+<p>传统的截断策略粗暴丢弃早期消息，问题很明显：用户说过的重要信息凭空消失，模型可能重复询问已经回答过的问题，或者做出与前文矛盾的判断。长对话场景下，这种信息丢失会直接导致任务失败。</p>
+<p>Claude Code 用四级渐进式压缩应对这个问题。四级策略从轻到重依次触发，核心目标是在有限的 token 预算内尽可能保留对任务有用的信息。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/06/080_claude-code-context-compression/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
         
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/082_claude-code-multi-agent/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/04/06/082_claude-code-multi-agent/" class="post-title-link" itemprop="url">多 Agent 编排的四种路径</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2026-04-06 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-08-22 13:26:58" itemprop="dateModified" datetime="2026-08-22T13:26:58+08:00">2026-08-22</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
-                </span>
-            </span>
-
-          
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2026/04/06/082_claude-code-multi-agent/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/082_claude-code-multi-agent/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <a id="more"></a>
-<h2 id="单-Agent-的瓶颈"><a href="#单-Agent-的瓶颈" class="headerlink" title="单 Agent 的瓶颈"></a>单 Agent 的瓶颈</h2><p>考虑一个典型场景：把项目的所有 TypeScript 文件迁移到 strict 模式，同时更新 ESLint 配置，然后运行测试确认无回归。单 Agent 只能顺序执行——修改 tsconfig、修改 ESLint、修改文件、运行测试，每一步等上一步完成。对于一个有 200 个文件的项目，这个过程可能需要十几分钟。</p>
-<p>多 Agent 的价值在于把这类任务拆解为可并行的子任务。Explore Agent 扫描文件识别修改点，多个 Fork Agent 并行修改不同文件组，Plan Agent 协调顺序避免冲突，Verification Agent 运行测试验证结果。并行化、专业化、隔离性，这是多 Agent 编排解决的核心问题。</p>
-<h2 id="Agent-类型与职责"><a href="#Agent-类型与职责" class="headerlink" title="Agent 类型与职责"></a>Agent 类型与职责</h2><p>Claude Code 定义了四种 Agent 生成方式和五类内置角色。</p>
-<p>四种生成方式决定了 Agent 的运行环境和隔离程度：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>生成方式</th>
-<th>上下文来源</th>
-<th>执行环境</th>
-<th>通信方式</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Subagent（子代理）</td>
-<td>独立上下文</td>
-<td>同步/异步执行</td>
-<td>返回值传递</td>
-</tr>
-<tr>
-<td>Fork（分叉）</td>
-<td>继承父代理上下文</td>
-<td>共享 prompt cache</td>
-<td>返回值传递</td>
-</tr>
-<tr>
-<td>Teammate（队友）</td>
-<td>独立上下文</td>
-<td>tmux/iTerm2/进程内</td>
-<td>邮箱通信</td>
-</tr>
-<tr>
-<td>Remote（远程）</td>
-<td>独立上下文</td>
-<td>CCR 环境</td>
-<td>轮询结果</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>五类内置角色定义了工具权限和行为边界：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>角色</th>
-<th>用途</th>
-<th>工具池</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>General Purpose</td>
-<td>通用任务</td>
-<td>全部工具</td>
-</tr>
-<tr>
-<td>Explore</td>
-<td>代码库探索</td>
-<td>Read, Grep, Glob, WebSearch</td>
-</tr>
-<tr>
-<td>Plan</td>
-<td>制定计划</td>
-<td>全部工具，受限输出</td>
-</tr>
-<tr>
-<td>Verification</td>
-<td>验证结果</td>
-<td>Bash, Read, Grep</td>
-</tr>
-<tr>
-<td>Coordinator</td>
-<td>编排协调</td>
-<td>受限工具集</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>Agent 的定义结构统一：</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> AgentDefinition = &#123;</span><br><span class="line">  agentType: <span class="built_in">string</span>                       <span class="comment">// 类型标识</span></span><br><span class="line">  description: <span class="built_in">string</span>                     <span class="comment">// 描述</span></span><br><span class="line">  getSystemPrompt: <span class="function">(<span class="params">context</span>) =&gt;</span> <span class="built_in">string</span>    <span class="comment">// 系统提示词</span></span><br><span class="line">  tools?: <span class="built_in">string</span>[]                        <span class="comment">// 允许的工具（'*' = 全部）</span></span><br><span class="line">  disallowedTools?: <span class="built_in">string</span>[]              <span class="comment">// 禁止的工具</span></span><br><span class="line">  model?: <span class="built_in">string</span>                          <span class="comment">// 模型选择</span></span><br><span class="line">  permissionMode?: PermissionMode         <span class="comment">// 权限模式</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h2 id="四条生成路径"><a href="#四条生成路径" class="headerlink" title="四条生成路径"></a>四条生成路径</h2><p>所有 Agent 生成都从 <code>AgentTool.call()</code> 入口进入，根据输入参数路由到四条不同路径。</p>
-<p><strong>Teammate 生成</strong>——当 <code>team_name</code> 和 <code>name</code> 同时存在时触发。系统检测执行后端（tmux/iTerm2/进程内），生成唯一 agentId，分配 UI 颜色，创建执行环境，最后更新 TeamFile。进程内队友使用独立的 AbortController 和 AsyncLocalStorage 实现上下文隔离，但共享权限管道。</p>
-<p><strong>异步 Subagent</strong>——当 <code>run_in_background=true</code> 或 Agent 定义中 <code>background: true</code> 时触发。系统创建 LocalAgentTask，注册到 agentNameRegistry，创建 AbortController，然后异步分离执行。执行过程中通过 ProgressTracker 追踪进度，完成时提取结果、标记完成、清理 worktree、通知主代理。</p>
-<p><strong>Fork Subagent</strong>——当省略 <code>subagent_type</code> 且 Fork 实验开启时触发。这是性能最优的路径，通过构建字节级一致的 API 请求前缀实现 prompt cache 命中。Fork 子代理保留父代理完整的 assistant message，对每个 tool_use 创建占位 tool_result，最后追加唯一的 per-child directive。前缀字节一致意味着 API 层的 prompt cache 可以直接复用，省去了重新计算缓存的开销。</p>
-<p>Fork 子代理有严格的行为约束：不对话、不提问、不使用后续建议，直接调用工具，工具调用之间不输出文本，响应必须以 “Scope:” 开头，报告控制在 500 词以内。这些约束确保 Fork 是一个高效的工作进程而非对话伙伴。</p>
-<p><strong>同步 Subagent</strong>——默认路径。系统解析 Agent 定义，构建系统提示词，创建隔离的 ToolUseContext，启动查询循环，返回最终结果。</p>
-<h2 id="工具池的三层过滤"><a href="#工具池的三层过滤" class="headerlink" title="工具池的三层过滤"></a>工具池的三层过滤</h2><p>每个 Agent 能使用哪些工具，经过三层过滤决定。</p>
-<p>第一层是全局禁止。TaskOutput、ExitPlanMode、EnterPlanMode、AskUserQuestion、TaskStop、Agent 这六个工具对所有子代理禁用。前五个只有主代理有权操作，Agent 工具禁用是为了防止递归生成。</p>
-<p>第二层是 Agent 类型过滤。异步 Agent 限制为 15 个工具（Read、Grep、Glob、Bash/PowerShell、FileEdit、FileWrite、WebSearch、WebFetch、TodoWrite、NotebookEdit、Skill、SyntheticOutput、ToolSearch、EnterWorktree、ExitWorktree），MCP 工具始终允许。</p>
-<p>第三层是 Agent 定义过滤。如果定义了 <code>tools</code> 列表，取交集；如果定义了 <code>disallowedTools</code>，取差集；如果 <code>tools: [&#39;*&#39;]</code> 或未定义，通配全部允许。</p>
-<h2 id="上下文传递与隔离"><a href="#上下文传递与隔离" class="headerlink" title="上下文传递与隔离"></a>上下文传递与隔离</h2><p>Agent 之间的上下文传递需要在共享和隔离之间取得平衡。</p>
-<p>Fork Agent 的设计目标是最大化缓存共享。它在 API 请求中保持字节级一致的前缀（系统提示词、用户上下文、系统上下文、工具配置、对话历史、父代理的 assistant message 和占位 tool_result），只有末尾的 per-child directive 是差异部分。这意味着多个 Fork 子代理可以共享同一份 prompt cache，大幅降低 token 消耗和响应延迟。</p>
-<p>Subagent 的设计目标是默认隔离、显式共享。消息历史独立，文件读取缓存独立，内容替换状态独立，AbortController 独立但链接到父代理（父取消时子也取消）。如果子代理需要影响父状态，必须通过 <code>shareSetAppState</code> 等显式 opt-in 参数开启。</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>资源</th>
-<th>默认行为</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>readFileState</td>
-<td>克隆</td>
-<td>文件读取缓存独立</td>
-</tr>
-<tr>
-<td>messages</td>
-<td>新建</td>
-<td>消息历史独立</td>
-</tr>
-<tr>
-<td>abortController</td>
-<td>新建（链接父）</td>
-<td>父取消时子也取消</td>
-</tr>
-<tr>
-<td>setAppState</td>
-<td>No-op</td>
-<td>默认不影响父状态</td>
-</tr>
-<tr>
-<td>contentReplacementState</td>
-<td>克隆</td>
-<td>内容替换状态独立</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h2 id="Teams-邮箱通信"><a href="#Teams-邮箱通信" class="headerlink" title="Teams 邮箱通信"></a>Teams 邮箱通信</h2><p>Teammate 之间通过文件系统邮箱实现异步通信。每个团队有一个 TeamFile（<code>~/.claude/teams/{team_name}/config.json</code>），记录团队元数据和成员信息。每个成员有一个独立的收件箱文件（<code>~/.claude/teams/{team_name}/inboxes/{agent_name}.json</code>）。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> TeammateMessage = &#123;</span><br><span class="line">  <span class="keyword">from</span>: <span class="built_in">string</span>        <span class="comment">// 发送者名称</span></span><br><span class="line">  text: <span class="built_in">string</span>        <span class="comment">// 消息内容</span></span><br><span class="line">  timestamp: <span class="built_in">string</span>   <span class="comment">// ISO 时间戳</span></span><br><span class="line">  read: <span class="built_in">boolean</span>       <span class="comment">// 是否已读</span></span><br><span class="line">  summary?: <span class="built_in">string</span>    <span class="comment">// 5-10 词摘要</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>收件箱轮询间隔 1000ms。收到消息后，系统判断消息类型：关停请求、plan 审批响应、权限请求、还是普通文本消息。普通文本消息会被提交为新的对话轮，触发 Agent 处理。并发安全通过 <code>proper-lockfile</code> 文件锁保证，10 次重试，5-100ms 指数退避。</p>
-<p>消息路由根据目标地址分为五种情况：<code>to === &quot;*&quot;</code> 广播给所有队友；<code>agentNameRegistry</code> 中的名称路由到进程内子代理；<code>teamFile.members</code> 中的名称写入对应队友的 mailbox；<code>bridge:</code> 前缀路由到远程会话；<code>uds:</code> 前缀通过 Unix Domain Socket 发送。</p>
-<h2 id="Worktree-隔离"><a href="#Worktree-隔离" class="headerlink" title="Worktree 隔离"></a>Worktree 隔离</h2><p>当 Agent 需要修改文件时，系统创建 git worktree 作为隔离环境。创建流程包括 slug 校验（防目录逃逸攻击）、git worktree 创建、符号链接大目录（node_modules 等节省磁盘）、以及可选的 sparse-checkout 配置。</p>
-<p>Agent 完成后自动检测 worktree 是否有改动。有改动时返回 worktree 路径和分支名给用户，用户可以审查后决定是否合并。无改动时自动删除 worktree。异常退出通过 <code>registerTeamForSessionCleanup()</code> 确保清理。</p>
-<h2 id="权限同步"><a href="#权限同步" class="headerlink" title="权限同步"></a>权限同步</h2><p>团队级权限通过 <code>TeamAllowedPath</code> 定义，包含路径、适用工具、添加者和时间戳。队友启动时自动继承这些权限规则，不需要逐个配置。</p>
-<p>Fork Agent 使用 <code>bubble</code> 权限模式——权限提示冒泡到父代理终端。当 Fork 需要执行某个操作时，权限请求发送到父代理的 ToolUseConfirm 对话框，用户批准后结果回传给 Fork，拒绝则 Fork 收到拒绝通知。这个设计确保 Fork 的权限不会超过父代理的授权范围。</p>
-<h2 id="关键源文件"><a href="#关键源文件" class="headerlink" title="关键源文件"></a>关键源文件</h2><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>文件</th>
-<th>职责</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>src/tools/AgentTool/AgentTool.tsx</code></td>
-<td>主工具实现，路由分发</td>
-</tr>
-<tr>
-<td><code>src/tools/AgentTool/runAgent.ts</code></td>
-<td>执行引擎，查询循环</td>
-</tr>
-<tr>
-<td><code>src/tools/AgentTool/agentToolUtils.ts</code></td>
-<td>工具池解析，结果终结</td>
-</tr>
-<tr>
-<td><code>src/tools/AgentTool/forkSubagent.ts</code></td>
-<td>Fork 语义，消息继承</td>
-</tr>
-<tr>
-<td><code>src/tools/AgentTool/loadAgentsDir.ts</code></td>
-<td>Agent 定义类型，解析加载</td>
-</tr>
-<tr>
-<td><code>src/tools/AgentTool/builtInAgents.ts</code></td>
-<td>内置 Agent 注册表</td>
-</tr>
-<tr>
-<td><code>src/tools/shared/spawnMultiAgent.ts</code></td>
-<td>队友生成入口</td>
-</tr>
-<tr>
-<td><code>src/utils/swarm/spawnInProcess.ts</code></td>
-<td>进程内队友生成</td>
-</tr>
-<tr>
-<td><code>src/utils/swarm/teamHelpers.ts</code></td>
-<td>团队文件读写</td>
-</tr>
-<tr>
-<td><code>src/utils/teammateMailbox.ts</code></td>
-<td>邮箱消息队列</td>
-</tr>
-<tr>
-<td><code>src/utils/forkedAgent.ts</code></td>
-<td>缓存安全参数，子代理上下文</td>
-</tr>
-<tr>
-<td><code>src/utils/worktree.ts</code></td>
-<td>Git worktree 隔离</td>
-</tr>
-</tbody>
-</table>
-</div>
-<hr>
-<p><strong>系列文章导航：</strong></p>
-<ul>
-<li>上一篇：<a href="/2026/04/06/087_claude-code-tool-system/">工具系统设计：从定义到执行的七步管道</a></li>
-<li>下一篇：<a href="/2026/04/06/080_claude-code-context-compression/">Context 压缩的四级策略</a></li>
-</ul>
-
       
     </div>
 
@@ -749,7 +323,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-08-22 13:25:05" itemprop="dateModified" datetime="2026-08-22T13:25:05+08:00">2026-08-22</time>
+                <time title="修改时间：2026-08-22 21:58:29" itemprop="dateModified" datetime="2026-08-22T21:58:29+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -786,156 +360,16 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <a id="more"></a>
-<h2 id="问题的起点"><a href="#问题的起点" class="headerlink" title="问题的起点"></a>问题的起点</h2><p>编程助手每次对话都从零开始，用户不得不反复说明同样的背景信息：自己的角色定位、编码偏好、项目当前的决策状态。这些信息无法从代码仓库中推断出来，但如果不记住它们，AI 就无法提供真正连贯的协助。</p>
+          <h2 id="问题的起点"><a href="#问题的起点" class="headerlink" title="问题的起点"></a>问题的起点</h2><p>编程助手每次对话都从零开始，用户不得不反复说明同样的背景信息：自己的角色定位、编码偏好、项目当前的决策状态。这些信息无法从代码仓库中推断出来，但如果不记住它们，AI 就无法提供真正连贯的协助。</p>
 <p>Claude Code 的 Memory 系统通过持久化的结构化知识库解决这个问题。它不是聊天记录的归档，而是一个有明确类型定义、自动提取、智能检索的知识管理系统。</p>
-<h2 id="四种记忆类型"><a href="#四种记忆类型" class="headerlink" title="四种记忆类型"></a>四种记忆类型</h2><p>Memory 将知识分为四类，每类有明确的边界和用途：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>类型</th>
-<th>记录内容</th>
-<th>典型示例</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>User（用户画像）</td>
-<td>角色、目标、技能水平、偏好</td>
-<td>“用户是数据科学家，关注日志系统”</td>
-</tr>
-<tr>
-<td>Feedback（行为反馈）</td>
-<td>对 Claude 工作方式的纠正或肯定</td>
-<td>“集成测试用真实数据库，不用 mock”</td>
-</tr>
-<tr>
-<td>Project（项目动态）</td>
-<td>谁在做什么、为什么、截止日期</td>
-<td>“3/5 起合并冻结，移动团队发版”</td>
-</tr>
-<tr>
-<td>Reference（外部引用）</td>
-<td>外部系统的指针：仪表板、工单、Slack 频道</td>
-<td>“Pipeline bug 在 Linear INGEST 项目”</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>这个分类覆盖了编码协作中需要从人脑传递给 AI 的全部上下文类型。用户画像决定模型的交互方式，行为反馈约束技术决策，项目动态提供时间维度的背景，外部引用打通内部工具链。</p>
-<h3 id="不存什么"><a href="#不存什么" class="headerlink" title="不存什么"></a>不存什么</h3><p>Memory 有一个清晰的过滤原则：只记录无法从代码仓库中推断出来的东西。</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>记住</th>
-<th>不记住</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>你是数据科学家，关注日志系统</td>
-<td>代码架构、文件结构</td>
-</tr>
-<tr>
-<td>“不要 mock 数据库”</td>
-<td>Git 历史、谁改了什么</td>
-</tr>
-<tr>
-<td>周四后冻结非关键合并</td>
-<td>已有的 CLAUDE.md 内容</td>
-</tr>
-<tr>
-<td>Bug 跟踪在 Linear 的 INGEST 项目</td>
-<td>调试方案（修复已在代码里）</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>代码本身能表达的信息不需要 Memory 重复记录。Git 历史、文件结构、依赖关系这些都是代码仓库自带的上下文，Memory 只填充代码无法覆盖的空白。</p>
-<h2 id="存储格式"><a href="#存储格式" class="headerlink" title="存储格式"></a>存储格式</h2><p>Memory 文件存放在 <code>~/.claude/projects/{项目路径哈希}/memory/</code> 目录下，采用 YAML frontmatter + Markdown 格式：</p>
-<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">---</span><br><span class="line">name: testing_policy</span><br><span class="line">description: 集成测试必须用真实数据库，不能用 mock</span><br><span class="line">type: feedback</span><br><span class="line">---</span><br><span class="line"></span><br><span class="line"><span class="strong">**规则：**</span> 集成测试必须连接真实数据库，禁止使用 mock。</span><br><span class="line"></span><br><span class="line"><span class="strong">**Why:**</span> 去年第四季度出现过 mock 测试通过但生产迁移失败的问题。</span><br><span class="line"></span><br><span class="line"><span class="strong">**How to apply:**</span> 所有标记为 integration test 的测试文件都要使用测试数据库连接。</span><br></pre></td></tr></table></figure>
-<p>这个格式要求每条记忆都包含三个要素：是什么、为什么、怎么用。”Why”和”How to apply”两个字段确保记忆不是孤立的事实记录，而是有行动指导意义的知识单元。</p>
-<h3 id="MEMORY-md-索引"><a href="#MEMORY-md-索引" class="headerlink" title="MEMORY.md 索引"></a>MEMORY.md 索引</h3><p>目录下有一个 MEMORY.md 文件充当索引，它始终加载到上下文中：</p>
-<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># Memory Index</span></span><br><span class="line"></span><br><span class="line"><span class="bullet">- </span>[<span class="string">用户角色</span>](<span class="link">user_role.md</span>) — 数据科学家，关注可观测性/日志</span><br><span class="line"><span class="bullet">- </span>[<span class="string">测试策略</span>](<span class="link">feedback_testing.md</span>) — 集成测试用真实数据库，不 mock</span><br><span class="line"><span class="bullet">- </span>[<span class="string">合并冻结</span>](<span class="link">project_freeze.md</span>) — 2026-03-05 起冻结非关键合并</span><br><span class="line"><span class="bullet">- </span>[<span class="string">Bug 追踪</span>](<span class="link">reference_linear.md</span>) — 流水线 bug 在 Linear INGEST 项目</span><br></pre></td></tr></table></figure>
-<p>这个索引文件有硬限制：最多 200 行或 25KB，超出会被截断。这个设计迫使索引保持精炼，详细内容只在需要时通过智能检索加载。</p>
-<h2 id="自动提取机制"><a href="#自动提取机制" class="headerlink" title="自动提取机制"></a>自动提取机制</h2><p>Memory 不需要用户手动维护。系统每次模型完成回复（无 tool_use）时自动检查是否需要提取新记忆。</p>
-<p>提取流程经过四道门控：确认是主代理执行、自动记忆功能已开启、频率控制（默认每轮检查一次）、以及互斥检查（主代理自己在当前轮次已经写过记忆则跳过）。通过门控后，系统启动一个分叉代理来执行提取，这个分叉代理共享父会话的提示词缓存，最多执行 5 个 turn，工具权限被严格限制。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">createAutoMemCanUseTool</span>(<span class="params">memoryDir: <span class="built_in">string</span></span>): <span class="title">CanUseToolFn</span> </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="function">(<span class="params">toolName, input</span>) =&gt;</span> &#123;</span><br><span class="line">    <span class="comment">// 允许读取类工具，用于扫描现有记忆</span></span><br><span class="line">    <span class="keyword">if</span> ([<span class="string">'Read'</span>, <span class="string">'Grep'</span>, <span class="string">'Glob'</span>].includes(toolName)) <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// Bash 只允许只读命令</span></span><br><span class="line">    <span class="keyword">if</span> (toolName === <span class="string">'Bash'</span> &amp;&amp; isReadOnlyCommand(input.command)) <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 写入工具仅限 memory 目录内</span></span><br><span class="line">    <span class="keyword">if</span> ([<span class="string">'Edit'</span>, <span class="string">'Write'</span>].includes(toolName)) &#123;</span><br><span class="line">      <span class="keyword">return</span> isInsideMemoryDir(input.file_path, memoryDir)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// MCP、Agent、非只读 Bash 全部拒绝</span></span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这个权限设计有明确的安全意图：提取代理只能读取项目文件和写入 memory 目录，不能修改项目代码、不能调用外部服务、不能启动子代理。即使提取过程出错，影响范围也被限制在 memory 目录内。</p>
-<p>互斥机制防止重复保存。如果主代理在当前轮次已经通过 Write/Edit 操作过 memory 目录，自动提取就会跳过，避免同一条信息被重复记录。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">hasMemoryWritesSince</span>(<span class="params">messages: Message[], sinceUuid: <span class="built_in">string</span></span>): <span class="title">boolean</span> </span>&#123;</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> msg of messages) &#123;</span><br><span class="line">    <span class="keyword">if</span> (msg.uuid === sinceUuid) <span class="keyword">break</span></span><br><span class="line">    <span class="keyword">if</span> (msg.type === <span class="string">'assistant'</span>) &#123;</span><br><span class="line">      <span class="keyword">for</span> (<span class="keyword">const</span> block of msg.content) &#123;</span><br><span class="line">        <span class="keyword">if</span> (block.type === <span class="string">'tool_use'</span> &amp;&amp;</span><br><span class="line">            [<span class="string">'Edit'</span>, <span class="string">'Write'</span>].includes(block.name) &amp;&amp;</span><br><span class="line">            isMemoryPath(block.input.file_path)) &#123;</span><br><span class="line">          <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">false</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h2 id="智能检索与新鲜度管理"><a href="#智能检索与新鲜度管理" class="headerlink" title="智能检索与新鲜度管理"></a>智能检索与新鲜度管理</h2><p>Memory 不是全量加载到上下文的。系统用 Sonnet 模型作为选择器，每次用户查询时动态筛选最相关的记忆。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">findRelevantMemories</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  query: <span class="built_in">string</span>, memoryDir: <span class="built_in">string</span>, recentTools: <span class="built_in">string</span>[] = [],</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">RelevantMemory</span>[]&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> files = <span class="keyword">await</span> scanMemoryFiles(memoryDir)</span><br><span class="line">  <span class="keyword">const</span> candidates = <span class="keyword">await</span> <span class="built_in">Promise</span>.all(files.map(<span class="function"><span class="params">f</span> =&gt;</span> parseMemoryFile(f)))</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 用 Sonnet 模型从候选中选择相关记忆</span></span><br><span class="line">  <span class="keyword">const</span> selected = <span class="keyword">await</span> sideQuery(&#123;</span><br><span class="line">    model: <span class="string">'claude-sonnet-4-5'</span>,</span><br><span class="line">    systemPrompt: MEMORY_SELECTOR_PROMPT,</span><br><span class="line">    messages: [&#123; role: <span class="string">'user'</span>, content: query &#125;],</span><br><span class="line">    context: &#123; candidates, recentTools &#125;,</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> selected.map(<span class="function"><span class="params">s</span> =&gt;</span> (&#123; path: s.path, mtimeMs: s.mtimeMs &#125;))</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>选择器最多选 5 条记忆，不确定是否有用的就不选。这个设计控制了额外引入的 token 开销，同时避免了无关记忆对模型的干扰。</p>
-<p>记忆是有时效性的。一条三个月前记录的”合并冻结”可能早已解除，半年前的项目决策可能已被推翻。系统对旧记忆附带新鲜度警告：</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">memoryFreshnessText</span>(<span class="params">mtimeMs: <span class="built_in">number</span></span>): <span class="title">string</span> </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> days = memoryAgeDays(mtimeMs)</span><br><span class="line">  <span class="keyword">if</span> (days &lt;= <span class="number">1</span>) <span class="keyword">return</span> <span class="string">''</span>  <span class="comment">// 今天/昨天：无警告</span></span><br><span class="line">  <span class="keyword">return</span> <span class="string">`This memory is <span class="subst">$&#123;days&#125;</span> days old. Memories are point-in-time</span></span><br><span class="line"><span class="string">observations that may become stale. Verify against current code before</span></span><br><span class="line"><span class="string">asserting as fact.`</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>超过一天的记忆就会被标注时效提醒，要求模型在引用前验证当前代码状态。这个机制解决了记忆系统的核心矛盾：既要跨会话保留信息，又要避免过时信息误导决策。</p>
-<h2 id="团队同步"><a href="#团队同步" class="headerlink" title="团队同步"></a>团队同步</h2><p>团队成员的 Memory 可以通过 API 同步共享：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">GET  &#x2F;api&#x2F;claude_code&#x2F;team_memory?repo&#x3D;&#123;owner&#x2F;repo&#125;  ← 拉取</span><br><span class="line">PUT  &#x2F;api&#x2F;claude_code&#x2F;team_memory?repo&#x3D;&#123;owner&#x2F;repo&#125;  ← 推送</span><br></pre></td></tr></table></figure>
-<p>同步采用服务器优先的语义：Pull 时服务器内容覆盖本地，Push 时只上传哈希不同的增量内容。本地删除不会删除远程记录，下次 Pull 时会被恢复。冲突通过 412 状态码触发重试，最多 2 次。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">pushTeamMemory</span>(<span class="params">state</span>): <span class="title">Promise</span>&lt;<span class="title">PushResult</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> localFiles = <span class="keyword">await</span> readLocalMemoryFiles()</span><br><span class="line">  <span class="keyword">const</span> localHashes = computeHashes(localFiles)</span><br><span class="line">  <span class="keyword">const</span> delta = computeDelta(localHashes, state.serverChecksums)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">const</span> response = <span class="keyword">await</span> api.pushTeamMemory(delta)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 412 冲突：获取最新 checksums 后重试</span></span><br><span class="line">  <span class="keyword">if</span> (response.status === <span class="number">412</span>) &#123;</span><br><span class="line">    <span class="keyword">const</span> latest = <span class="keyword">await</span> api.getTeamMemoryHashes()</span><br><span class="line">    <span class="keyword">const</span> newDelta = computeDelta(localHashes, latest)</span><br><span class="line">    <span class="keyword">return</span> pushTeamMemory(&#123; ...state, serverChecksums: latest &#125;)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> &#123; success: <span class="literal">true</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>安全方面，单文件上限 250KB，上传体上限 200KB，并使用 gitleaks 规则扫描凭证，检测到密钥或密码则跳过该文件，防止敏感信息泄露到团队共享空间。</p>
-<h2 id="AutoDream：后台记忆整合"><a href="#AutoDream：后台记忆整合" class="headerlink" title="AutoDream：后台记忆整合"></a>AutoDream：后台记忆整合</h2><p>随着对话积累，Memory 目录会逐渐膨胀。AutoDream 是一个后台任务，定期对记忆进行整合、去重和修剪。</p>
-<p>触发条件有四道门控：距离上次整合至少 24 小时、期间至少经历了 5 次会话、没有其他进程正在执行整合、以及 10 分钟的扫描节流。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">shouldTriggerAutoDream</span>(<span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">boolean</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (hoursSinceLastConsolidation &lt; minHours) <span class="keyword">return</span> <span class="literal">false</span>          <span class="comment">// 默认 24h</span></span><br><span class="line">  <span class="keyword">if</span> (sessionsSinceLastConsolidation &lt; minSessions) <span class="keyword">return</span> <span class="literal">false</span>    <span class="comment">// 默认 5 次</span></span><br><span class="line">  <span class="keyword">if</span> (otherProcessConsolidating) <span class="keyword">return</span> <span class="literal">false</span>                       <span class="comment">// 互斥锁</span></span><br><span class="line">  <span class="keyword">if</span> (timeSinceLastScan &lt; <span class="number">10</span> * <span class="number">60</span> * <span class="number">1000</span>) <span class="keyword">return</span> <span class="literal">false</span>              <span class="comment">// 10 分钟节流</span></span><br><span class="line">  <span class="keyword">return</span> <span class="literal">true</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>整合过程分四个阶段：定向（确定要审查的会话列表）、收集（从会话中提取候选记忆）、整合（合并、去重、更新记忆文件）、修剪（删除过时或重复的记忆）。这个流程类似于人类睡眠时的记忆整理过程，将碎片化的短期记忆整合为结构化的长期知识。</p>
-<h2 id="关键源文件"><a href="#关键源文件" class="headerlink" title="关键源文件"></a>关键源文件</h2><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>文件</th>
-<th>职责</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>src/memdir/paths.ts</code></td>
-<td>路径解析，优先级链</td>
-</tr>
-<tr>
-<td><code>src/memdir/memdir.ts</code></td>
-<td>提示词构建，MEMORY.md 截断</td>
-</tr>
-<tr>
-<td><code>src/memdir/memoryScan.ts</code></td>
-<td>扫描目录、解析 frontmatter</td>
-</tr>
-<tr>
-<td><code>src/memdir/memoryTypes.ts</code></td>
-<td>四种记忆类型定义</td>
-</tr>
-<tr>
-<td><code>src/memdir/findRelevantMemories.ts</code></td>
-<td>Sonnet 智能检索</td>
-</tr>
-<tr>
-<td><code>src/services/extractMemories/</code></td>
-<td>自动提取服务</td>
-</tr>
-<tr>
-<td><code>src/services/teamMemorySync/</code></td>
-<td>团队记忆同步</td>
-</tr>
-<tr>
-<td><code>src/services/autoDream/</code></td>
-<td>AutoDream 后台整合</td>
-</tr>
-<tr>
-<td><code>src/utils/frontmatterParser.ts</code></td>
-<td>YAML frontmatter 解析</td>
-</tr>
-</tbody>
-</table>
-</div>
-<hr>
-<p><strong>系列文章导航：</strong></p>
-<ul>
-<li>上一篇：<a href="/2026/04/06/083_claude-code-permission-security/">权限与安全：分层模型与人机协作</a></li>
-<li>下一篇：<a href="/2026/04/06/078_claude-code-channel-system/">Channel 系统：IM 远程控制 Agent</a></li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/06/081_claude-code-memory-system/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -954,7 +388,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/078_claude-code-channel-system/">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/083_claude-code-permission-security/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -968,7 +402,7 @@
       <header class="post-header">
         <h2 class="post-title" itemprop="name headline">
           
-            <a href="/2026/04/06/078_claude-code-channel-system/" class="post-title-link" itemprop="url">Channel 系统：IM 远程控制 Agent</a>
+            <a href="/2026/04/06/083_claude-code-permission-security/" class="post-title-link" itemprop="url">权限决策的五层防线</a>
         </h2>
 
         <div class="post-meta">
@@ -985,7 +419,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-08-22 18:27:12" itemprop="dateModified" datetime="2026-08-22T18:27:12+08:00">2026-08-22</time>
+                <time title="修改时间：2026-08-22 21:58:33" itemprop="dateModified" datetime="2026-08-22T21:58:33+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -1006,8 +440,8 @@
       </span>
       <span class="post-meta-item-text">Valine：</span>
     
-    <a title="valine" href="/2026/04/06/078_claude-code-channel-system/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/078_claude-code-channel-system/" itemprop="commentCount"></span>
+    <a title="valine" href="/2026/04/06/083_claude-code-permission-security/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/083_claude-code-permission-security/" itemprop="commentCount"></span>
     </a>
   </span>
   
@@ -1022,10 +456,11 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <p>你在手机上打开 Telegram，给 Claude Code 发一条消息，它就开始在电脑上工作。Channel 系统的本质是打破了 AI 编程助手只能在终端中交互的限制，让任何 IM 平台都能成为远程控制入口。它通过六层访问控制和权限中继机制来保障安全性，同时基于 MCP 协议实现了对多种 IM 平台的兼容。</p>
+          <h2 id="Agent-执行权限的核心矛盾"><a href="#Agent-执行权限的核心矛盾" class="headerlink" title="Agent 执行权限的核心矛盾"></a>Agent 执行权限的核心矛盾</h2><p>AI Agent 需要执行命令、修改文件、访问网络才能完成编程任务，但这些操作都具有破坏性风险。权限系统需要在”让 Agent 高效工作”和”防止危险操作”之间找到平衡点。过于宽松会导致不可逆的损害，过于严格会让 Agent 寸步难行，每次操作都需要人工确认。</p>
+<p>Claude Code 的权限系统通过五层决策机制解决这个问题。每一层都可以独立中断工具调用，从确定性的规则匹配到概率性的 AI 分类器，层层递进，最终由用户兜底。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2026/04/06/078_claude-code-channel-system/#more" rel="contents">
+              <a class="btn" href="/2026/04/06/083_claude-code-permission-security/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -1080,7 +515,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-08-22 13:31:16" itemprop="dateModified" datetime="2026-08-22T13:31:16+08:00">2026-08-22</time>
+                <time title="修改时间：2026-08-22 21:58:35" itemprop="dateModified" datetime="2026-08-22T21:58:35+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -1117,157 +552,111 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <a id="more"></a>
-<h2 id="不只是命令别名"><a href="#不只是命令别名" class="headerlink" title="不只是命令别名"></a>不只是命令别名</h2><p>Skills 的表面形态是斜杠命令（<code>/code-review</code>、<code>/commit</code>），但本质是一个完整的 AI 行为定义系统。一个 Skill 文件可以同时约束工具池、指定模型、注入 Hook、选择执行上下文（inline 或 fork），这些能力组合起来让 Skill 成为一个可复用的行为模板，而不是简单的 prompt 快捷方式。</p>
-<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">---</span><br><span class="line">name: code-review</span><br><span class="line">description: Expert code review with best practices</span><br><span class="line">allowed-tools: ['Read', 'Grep', 'WebSearch']</span><br><span class="line">model: sonnet</span><br><span class="line">context: fork</span><br><span class="line">hooks:</span><br><span class="line">  PreToolUse:</span><br><span class="line"><span class="bullet">    - </span>matcher: "Bash"</span><br><span class="line"><span class="code">      hooks:</span></span><br><span class="line"><span class="bullet">        - </span>type: command</span><br><span class="line"><span class="code">          command: "echo 'Review mode: read-only'"</span></span><br><span class="line">---</span><br><span class="line"></span><br><span class="line">You are a code reviewer. Analyze the code for:</span><br><span class="line"><span class="bullet">- </span>Security vulnerabilities</span><br><span class="line"><span class="bullet">- </span>Performance issues</span><br><span class="line"><span class="bullet">- </span>Code style and best practices</span><br></pre></td></tr></table></figure>
-<p>这个 Skill 定义了只读工具池（Read、Grep、WebSearch），使用 Sonnet 模型，在 Fork 上下文中执行（独立子代理），并通过 Hook 阻止 Bash 调用。四重约束确保 Skill 的行为边界清晰。</p>
-<h2 id="系统架构与模块职责"><a href="#系统架构与模块职责" class="headerlink" title="系统架构与模块职责"></a>系统架构与模块职责</h2><p>Skills 系统分为五个模块，各司其职：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>模块</th>
-<th>核心文件</th>
-<th>职责</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Discovery</td>
-<td><code>loadSkillsDir.ts</code></td>
-<td>从 6 种来源发现和加载 Skills</td>
-</tr>
-<tr>
-<td>Prompt</td>
-<td><code>prompt.ts</code> + <code>attachments.ts</code></td>
-<td>将 Skill 列表注入 system-reminder</td>
-</tr>
-<tr>
-<td>SkillTool</td>
-<td><code>SkillTool.ts</code></td>
-<td>验证、权限检查、执行 Skill</td>
-</tr>
-<tr>
-<td>Activation</td>
-<td><code>loadSkillsDir.ts</code></td>
-<td>条件激活和动态发现</td>
-</tr>
-<tr>
-<td>Context</td>
-<td><code>forkedAgent.ts</code></td>
-<td>上下文准备和修改</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>Discovery 模块负责从六个来源加载 Skills：内置 Skills（<code>src/skills/bundled/*.md</code>）、内置插件 Skills（<code>src/plugins/bundled/*/skills/*.md</code>）、管理 Skills（<code>${MANAGED_PATH}/.claude/skills/</code>）、用户全局 Skills（<code>~/.claude/skills/</code>）、项目级 Skills（<code>.claude/skills/</code>）和插件 Skills（<code>~/.claude/plugins/*/skills/</code>）。加载时按优先级排序，内置 Skills 优先级最高，插件 Skills 最低。</p>
-<p>去重机制通过文件身份标识（<code>realpath()</code> 解析符号链接）实现。如果同一个文件被多个来源引用（例如符号链接），只加载一次，以首次发现的来源为准。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> seenFileIds = <span class="keyword">new</span> Map&lt;<span class="built_in">string</span>, SettingSource&gt;()</span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">const</span> entry of allSkillsWithPaths) &#123;</span><br><span class="line">  <span class="keyword">const</span> fileId = <span class="keyword">await</span> getFileIdentity(entry.filePath)</span><br><span class="line">  <span class="keyword">const</span> existingSource = seenFileIds.get(fileId)</span><br><span class="line">  <span class="keyword">if</span> (existingSource !== <span class="literal">undefined</span>) <span class="keyword">continue</span></span><br><span class="line">  seenFileIds.set(fileId, entry.skill.source)</span><br><span class="line">  deduplicatedSkills.push(entry.skill)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h2 id="Frontmatter-字段与解析"><a href="#Frontmatter-字段与解析" class="headerlink" title="Frontmatter 字段与解析"></a>Frontmatter 字段与解析</h2><p>Skill 的行为由 Frontmatter YAML 定义，支持以下字段：</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> FrontmatterData = &#123;</span><br><span class="line">  <span class="string">'allowed-tools'</span>?: <span class="built_in">string</span> | <span class="built_in">string</span>[] | <span class="literal">null</span>   <span class="comment">// 允许的工具</span></span><br><span class="line">  description?: <span class="built_in">string</span> | <span class="literal">null</span>                  <span class="comment">// 描述</span></span><br><span class="line">  <span class="string">'argument-hint'</span>?: <span class="built_in">string</span> | <span class="literal">null</span>              <span class="comment">// 参数提示</span></span><br><span class="line">  when_to_use?: <span class="built_in">string</span> | <span class="literal">null</span>                  <span class="comment">// 使用场景说明</span></span><br><span class="line">  model?: <span class="built_in">string</span> | <span class="literal">null</span>                        <span class="comment">// haiku, sonnet, opus, inherit</span></span><br><span class="line">  <span class="string">'user-invocable'</span>?: <span class="built_in">string</span> | <span class="literal">null</span>             <span class="comment">// 用户可调用</span></span><br><span class="line">  <span class="string">'disable-model-invocation'</span>?: <span class="built_in">string</span> | <span class="literal">null</span>   <span class="comment">// 禁止模型调用</span></span><br><span class="line">  hooks?: HooksSettings | <span class="literal">null</span>                 <span class="comment">// Hook 配置</span></span><br><span class="line">  effort?: <span class="built_in">string</span> | <span class="literal">null</span>                       <span class="comment">// low, medium, high, max</span></span><br><span class="line">  context?: <span class="string">'inline'</span> | <span class="string">'fork'</span> | <span class="literal">null</span>           <span class="comment">// 执行上下文</span></span><br><span class="line">  agent?: <span class="built_in">string</span> | <span class="literal">null</span>                        <span class="comment">// Agent 类型</span></span><br><span class="line">  paths?: <span class="built_in">string</span> | <span class="built_in">string</span>[] | <span class="literal">null</span>             <span class="comment">// 条件激活路径</span></span><br><span class="line">  shell?: <span class="built_in">string</span> | <span class="literal">null</span>                        <span class="comment">// bash, powershell</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>解析流程分两步：首先 <code>parseFrontmatter()</code> 分离 YAML 和 Markdown 内容，处理特殊字符；然后 <code>parseSkillFrontmatterFields()</code> 提取各字段，包括模型别名解析、力度级别解析、Hook 配置验证和工具列表解析，最终生成 Command 对象。</p>
-<h2 id="条件激活：按需发现"><a href="#条件激活：按需发现" class="headerlink" title="条件激活：按需发现"></a>条件激活：按需发现</h2><p>条件激活是 Skills 系统最有特色的设计。带 <code>paths</code> frontmatter 的 Skills 不会在启动时暴露给模型，只有当用户操作匹配路径的文件时才会被动态发现。</p>
-<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">---</span><br><span class="line">name: react-component-test</span><br><span class="line">description: Generate tests for React components</span><br><span class="line">paths:</span><br><span class="line"><span class="bullet">  - </span>"src/components/<span class="emphasis">**/*</span>.tsx"</span><br><span class="line"><span class="bullet">  - </span>"src/components/<span class="emphasis">**/*</span>.jsx"</span><br><span class="line">allowed-tools: ['Read', 'Write', 'Bash']</span><br><span class="line">model: sonnet</span><br><span class="line">---</span><br><span class="line"></span><br><span class="line">Generate comprehensive tests for this React component...</span><br></pre></td></tr></table></figure>
-<p>这个 Skill 只有在你操作 <code>src/components/</code> 下的 <code>.tsx</code> 或 <code>.jsx</code> 文件时才会出现在可用列表中。启动时，系统将所有带 <code>paths</code> 的 Skills 放入 <code>conditionalSkills</code> Map。运行时，每次文件操作都会触发 <code>activateConditionalSkillsForPaths()</code>，用 ignore 库匹配文件路径。匹配成功后，Skill 从 <code>conditionalSkills</code> 移入 <code>dynamicSkills</code>，一旦激活，会话内持续有效。</p>
-<p>这个设计解决了两个问题。一是上下文效率：一个项目可能有几十个 Skills，全部加载会占用大量 token，条件激活确保只有相关的 Skills 被注入上下文。二是认知负担：模型看到的 Skill 列表越短，选择越精准，无关 Skill 不会干扰决策。</p>
-<p>动态发现还包含目录遍历逻辑。当操作深层目录文件时，系统从文件所在目录向上遍历到 cwd，检查每一级的 <code>.claude/skills/</code> 目录，自动发现新的 Skills。发现的目录按深度排序（最深优先），确保局部 Skills 优先级高于全局 Skills。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">discoverSkillDirsForPaths</span>(<span class="params">filePaths: <span class="built_in">string</span>[], cwd: <span class="built_in">string</span></span>): <span class="title">Promise</span>&lt;<span class="title">string</span>[]&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> filePath of filePaths) &#123;</span><br><span class="line">    <span class="keyword">let</span> currentDir = dirname(filePath)</span><br><span class="line">    <span class="keyword">while</span> (currentDir.startsWith(resolvedCwd + pathSep)) &#123;</span><br><span class="line">      <span class="keyword">const</span> skillDir = join(currentDir, <span class="string">'.claude'</span>, <span class="string">'skills'</span>)</span><br><span class="line">      <span class="keyword">if</span> (!dynamicSkillDirs.has(skillDir)) &#123;</span><br><span class="line">        dynamicSkillDirs.add(skillDir)</span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">await</span> exists(skillDir) &amp;&amp; !<span class="keyword">await</span> isGitignored(currentDir)) &#123;</span><br><span class="line">          newDirs.push(skillDir)</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">      currentDir = dirname(currentDir)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> newDirs.sort(<span class="function">(<span class="params">a, b</span>) =&gt;</span> b.split(pathSep).length - a.split(pathSep).length)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h2 id="上下文注入与预算控制"><a href="#上下文注入与预算控制" class="headerlink" title="上下文注入与预算控制"></a>上下文注入与预算控制</h2><p>Skills 通过 <code>system-reminder</code> 消息注入到对话中。系统对 Skill 列表的 token 占用有严格预算控制：上下文窗口的 1%，兜底 8000 字符，每条描述上限 250 字符。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> SKILL_BUDGET_CONTEXT_PERCENT = <span class="number">0.01</span></span><br><span class="line"><span class="keyword">const</span> DEFAULT_CHAR_BUDGET = <span class="number">8</span>_000</span><br><span class="line"><span class="keyword">const</span> MAX_LISTING_DESC_CHARS = <span class="number">250</span></span><br></pre></td></tr></table></figure>
-<p>截断策略优先保护内置 Skills。Bundled Skills 始终保留完整描述，其余 Skills 平分剩余预算。如果总字符超出预算，描述会被截断到 <code>maxDescLen</code> 字符。这个设计确保核心 Skills 的可发现性不会被自定义 Skills 挤压。</p>
-<h2 id="执行引擎：Inline-与-Fork"><a href="#执行引擎：Inline-与-Fork" class="headerlink" title="执行引擎：Inline 与 Fork"></a>执行引擎：Inline 与 Fork</h2><p>SkillTool 的执行流程分为六步：标准化输入（去除前导 <code>/</code>）、远程 Skill 检查（实验性）、查找 Command 对象、记录使用频率、判断执行路径、应用 contextModifier。</p>
-<p>执行路径根据 <code>command.context</code> 分为两种模式。Inline 模式将 Skill 的 prompt 注入当前对话，修改上下文（工具池、模型、effort），模型在当前会话中执行。Fork 模式启动独立子代理，Skill 在隔离的上下文中执行，结果通过 <code>tool_result</code> 返回。</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>特性</th>
-<th>Inline 模式</th>
-<th>Fork 模式</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>上下文</td>
-<td>注入当前对话</td>
-<td>独立子代理</td>
-</tr>
-<tr>
-<td>工具池修改</td>
-<td>修改当前会话</td>
-<td>子代理独立工具池</td>
-</tr>
-<tr>
-<td>结果传递</td>
-<td>新消息注入对话</td>
-<td>嵌入 tool_result</td>
-</tr>
-<tr>
-<td>适用场景</td>
-<td>需要对话连续性</td>
-<td>独立任务，无需上下文</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>Inline 模式适合需要对话连续性的场景（如 <code>/commit</code> 需要与用户交互确认提交信息），Fork 模式适合独立任务（如 <code>/verify</code> 运行测试后返回结果）。</p>
-<h2 id="Hook-集成"><a href="#Hook-集成" class="headerlink" title="Hook 集成"></a>Hook 集成</h2><p>Skills 可以通过 Frontmatter 声明 Hook，调用时自动注册为会话级 Hook。<code>once: true</code> 的 Hook 执行一次后自动移除。</p>
-<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">---</span><br><span class="line">name: test-runner</span><br><span class="line">hooks:</span><br><span class="line">  PostToolUse:</span><br><span class="line"><span class="bullet">    - </span>matcher: "Edit"</span><br><span class="line"><span class="code">      hooks:</span></span><br><span class="line"><span class="bullet">        - </span>type: command</span><br><span class="line"><span class="code">          command: "npm test"</span></span><br><span class="line"><span class="code">          once: true</span></span><br><span class="line">---</span><br></pre></td></tr></table></figure>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">registerSkillHooks</span>(<span class="params">setAppState, sessionId, hooks, skillName, skillRoot</span>): <span class="title">void</span> </span>&#123;</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> eventName of HOOK_EVENTS) &#123;</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">const</span> matcher of hooks[eventName] || []) &#123;</span><br><span class="line">      <span class="keyword">for</span> (<span class="keyword">const</span> hook of matcher.hooks) &#123;</span><br><span class="line">        <span class="keyword">const</span> onHookSuccess = hook.once</span><br><span class="line">          ? <span class="function"><span class="params">()</span> =&gt;</span> removeSessionHook(setAppState, sessionId, eventName, hook)</span><br><span class="line">          : <span class="literal">undefined</span></span><br><span class="line"></span><br><span class="line">        addSessionHook(</span><br><span class="line">          setAppState, sessionId, eventName,</span><br><span class="line">          matcher.matcher || <span class="string">''</span>,</span><br><span class="line">          hook, onHookSuccess, skillRoot,</span><br><span class="line">        )</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>Hook 注册机制让 Skill 的行为可以扩展到工具生命周期。例如，一个 <code>test-runner</code> Skill 可以在每次文件编辑后自动运行测试，确保修改不会破坏现有功能。</p>
-<h2 id="权限控制"><a href="#权限控制" class="headerlink" title="权限控制"></a>权限控制</h2><p>Skill 调用的权限检查按优先级执行五步：Deny 规则检查（精确匹配或前缀匹配，如 <code>review:*</code> 匹配所有 review 开头的命令）、远程 Skill 自动允许、Allow 规则检查、安全属性自动允许（无 hooks、无 allowedTools、无 fork 的 Skill 自动放行）、默认询问用户。</p>
-<p>安全属性白名单包含 Skill 的基础元数据（type、name、description、source 等）。如果 Skill 只包含这些属性，不涉及工具池修改、Hook 注入或 Fork 执行，系统认为它是安全的，自动允许。</p>
-<h2 id="关键源文件"><a href="#关键源文件" class="headerlink" title="关键源文件"></a>关键源文件</h2><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>文件</th>
-<th>职责</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>src/tools/SkillTool/SkillTool.ts</code></td>
-<td>SkillTool 定义、验证、权限、执行</td>
-</tr>
-<tr>
-<td><code>src/tools/SkillTool/prompt.ts</code></td>
-<td>工具提示词、Skill 列表格式化</td>
-</tr>
-<tr>
-<td><code>src/skills/loadSkillsDir.ts</code></td>
-<td>目录 Skill 发现、加载、去重、条件激活</td>
-</tr>
-<tr>
-<td><code>src/skills/bundledSkills.ts</code></td>
-<td>内置 Skill 注册系统</td>
-</tr>
-<tr>
-<td><code>src/skills/bundled/index.ts</code></td>
-<td>内置 Skills 初始化入口</td>
-</tr>
-<tr>
-<td><code>src/commands.ts</code></td>
-<td>命令聚合、排序、过滤</td>
-</tr>
-<tr>
-<td><code>src/utils/forkedAgent.ts</code></td>
-<td>Fork 上下文准备、结果提取</td>
-</tr>
-<tr>
-<td><code>src/utils/hooks/registerSkillHooks.ts</code></td>
-<td>Skill Hook 注册</td>
-</tr>
-</tbody>
-</table>
-</div>
-<hr>
-<p><strong>系列文章导航：</strong></p>
-<ul>
-<li>上一篇：<a href="/2026/04/06/085_claude-code-system-prompt/">System Prompt 工程：动态组装与缓存优化</a></li>
-<li>下一篇：<a href="/2026/04/06/083_claude-code-permission-security/">权限决策的五层防线</a></li>
-</ul>
+          <h2 id="不只是命令别名"><a href="#不只是命令别名" class="headerlink" title="不只是命令别名"></a>不只是命令别名</h2><p>Skills 的表面形态是斜杠命令（<code>/code-review</code>、<code>/commit</code>），但本质是一个完整的 AI 行为定义系统。一个 Skill 文件可以同时约束工具池、指定模型、注入 Hook、选择执行上下文（inline 或 fork），这些能力组合起来让 Skill 成为一个可复用的行为模板，而不是简单的 prompt 快捷方式。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/06/084_claude-code-skills-system/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
 
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/082_claude-code-multi-agent/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/04/06/082_claude-code-multi-agent/" class="post-title-link" itemprop="url">多 Agent 编排的四种路径</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-04-06 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-08-22 21:58:31" itemprop="dateModified" datetime="2026-08-22T21:58:31+08:00">2026-08-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/082_claude-code-multi-agent/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/082_claude-code-multi-agent/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="单-Agent-的瓶颈"><a href="#单-Agent-的瓶颈" class="headerlink" title="单 Agent 的瓶颈"></a>单 Agent 的瓶颈</h2><p>考虑一个典型场景：把项目的所有 TypeScript 文件迁移到 strict 模式，同时更新 ESLint 配置，然后运行测试确认无回归。单 Agent 只能顺序执行——修改 tsconfig、修改 ESLint、修改文件、运行测试，每一步等上一步完成。对于一个有 200 个文件的项目，这个过程可能需要十几分钟。</p>
+<p>多 Agent 的价值在于把这类任务拆解为可并行的子任务。Explore Agent 扫描文件识别修改点，多个 Fork Agent 并行修改不同文件组，Plan Agent 协调顺序避免冲突，Verification Agent 运行测试验证结果。并行化、专业化、隔离性，这是多 Agent 编排解决的核心问题。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/06/082_claude-code-multi-agent/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1317,7 +706,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-08-22 13:33:00" itemprop="dateModified" datetime="2026-08-22T13:33:00+08:00">2026-08-22</time>
+                <time title="修改时间：2026-08-22 21:58:34" itemprop="dateModified" datetime="2026-08-22T21:58:34+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -1354,492 +743,16 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <a id="more"></a>
-<h2 id="20k-tokens-的缓存难题"><a href="#20k-tokens-的缓存难题" class="headerlink" title="20k tokens 的缓存难题"></a>20k tokens 的缓存难题</h2><p>Claude Code 的系统提示词约 20k tokens，每次 API 调用都要发送。这个数字本身不夸张，但叠加两个约束就变成了工程问题。第一个约束是动态性：系统提示词需要包含当前日期、项目结构、Git 状态、MCP 服务器指令、CLAUDE.md 用户指令，这些内容每轮对话都可能变化。第二个约束是成本：20k tokens 的提示词如果不做缓存优化，每个会话的延迟和 API 费用会成倍增加。</p>
+          <h2 id="20k-tokens-的缓存难题"><a href="#20k-tokens-的缓存难题" class="headerlink" title="20k tokens 的缓存难题"></a>20k tokens 的缓存难题</h2><p>Claude Code 的系统提示词约 20k tokens，每次 API 调用都要发送。这个数字本身不夸张，但叠加两个约束就变成了工程问题。第一个约束是动态性：系统提示词需要包含当前日期、项目结构、Git 状态、MCP 服务器指令、CLAUDE.md 用户指令，这些内容每轮对话都可能变化。第二个约束是成本：20k tokens 的提示词如果不做缓存优化，每个会话的延迟和 API 费用会成倍增加。</p>
 <p>解决方案是将系统提示词拆分为静态可缓存区域和动态可变区域，通过缓存边界标记分隔。静态部分（角色定义、系统规则、任务指导、工具说明、风格约束）在全球范围内共享缓存，动态部分（会话指引、记忆系统、环境信息、MCP 指令、Token 预算）按会话级缓存。这样每次 API 调用时，静态部分可以直接复用缓存，只有动态部分需要重新计算。</p>
-<h2 id="缓存边界与-Section-类型"><a href="#缓存边界与-Section-类型" class="headerlink" title="缓存边界与 Section 类型"></a>缓存边界与 Section 类型</h2><p>系统提示词的组装依赖一个显式的缓存边界标记：</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> SYSTEM_PROMPT_DYNAMIC_BOUNDARY = <span class="string">'__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__'</span></span><br></pre></td></tr></table></figure>
-<p>边界之上的内容是跨用户、跨组织通用的，使用 <code>scope: &#39;global&#39;</code> 缓存。边界之下是用户或会话特定的内容，使用 <code>scope: &#39;ephemeral&#39;</code> 缓存。API 层在构建请求时，沿着这个边界将提示词分割为两个 block，分别标记 <code>cache_control</code>，让服务端可以独立缓存这两部分。</p>
-<p>提示词的每个组成部分被封装为一个 Section，分为两种类型。缓存 Section 计算一次后整个会话复用：</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">systemPromptSection(<span class="string">'memory'</span>, <span class="keyword">async</span> () =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> buildMemoryLines()</span><br><span class="line">&#125;, &#123; scope: <span class="string">'ephemeral'</span> &#125;)</span><br></pre></td></tr></table></figure>
-<p>缓存破坏 Section 每轮重新计算。适用于 MCP 指令（服务器可能中途连接或断开）、当前日期（每轮都不同）、Git 状态（可能快速变化）、Token 预算（每轮重新计算）等场景：</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">DANGEROUS_uncachedSystemPromptSection(<span class="string">'mcp_instructions'</span>, <span class="keyword">async</span> () =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> getMcpInstructions()</span><br><span class="line">&#125;, <span class="string">'MCP servers can connect/disconnect mid-session'</span>)</span><br></pre></td></tr></table></figure>
-<p>两种类型的区分是缓存效率的关键。如果把动态内容放在静态区域，会导致整个静态缓存频繁失效；如果把静态内容标记为动态，则白白放弃缓存机会。缓存边界的显式标记让这个问题有了清晰的工程解法。</p>
-<h2 id="三级缓存体系"><a href="#三级缓存体系" class="headerlink" title="三级缓存体系"></a>三级缓存体系</h2><p>系统提示词的缓存分为三级，覆盖不同的时间尺度。</p>
-<p>Global Cache 跨组织共享，存储静态系统提示词（角色定义、规则、工具说明等），永不失效。这部分内容在所有用户、所有会话中完全相同，缓存命中率接近 100%。</p>
-<p>Ephemeral Cache 会话级缓存，存储动态系统提示词（记忆内容、环境信息等）。CLAUDE.md 文件变化时失效重建，MCP 连接状态变化时也会触发重建。</p>
-<p>Section Cache 轮级缓存，每个 Section 独立记忆化。即使某个 Section 被标记为缓存破坏，其内部仍然有 memoize 优化，同一轮内多次访问不会重复计算。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">buildSystemPromptBlocks</span>(<span class="params">systemPrompt: SystemPrompt</span>): <span class="title">ContentBlockParam</span>[] </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> blocks: ContentBlockParam[] = []</span><br><span class="line">  <span class="keyword">const</span> [staticPart, dynamicPart] = splitAtBoundary(systemPrompt)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (staticPart) &#123;</span><br><span class="line">    blocks.push(&#123;</span><br><span class="line">      <span class="keyword">type</span>: <span class="string">'text'</span>, text: staticPart,</span><br><span class="line">      cache_control: &#123; <span class="keyword">type</span>: <span class="string">'ephemeral'</span> &#125;,</span><br><span class="line">    &#125;)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (dynamicPart) &#123;</span><br><span class="line">    blocks.push(&#123;</span><br><span class="line">      <span class="keyword">type</span>: <span class="string">'text'</span>, text: dynamicPart,</span><br><span class="line">      cache_control: &#123; <span class="keyword">type</span>: <span class="string">'ephemeral'</span> &#125;,</span><br><span class="line">    &#125;)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> blocks</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这个三级设计的实际效果是：一个典型会话中，静态部分（约 12k tokens）的缓存命中率接近 100%，动态部分（约 8k tokens）在 CLAUDE.md 不变的情况下也能保持高命中率。只有在 MCP 连接变化或 Git 状态频繁更新的场景下，动态缓存才会频繁重建。</p>
-<h2 id="优先级解析链"><a href="#优先级解析链" class="headerlink" title="优先级解析链"></a>优先级解析链</h2><p>系统提示词有多个来源，最终内容通过 <code>buildEffectiveSystemPrompt()</code> 按优先级决定：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">Override System Prompt     ← 最高优先级，完全替换</span><br><span class="line">  ↓</span><br><span class="line">Coordinator System Prompt  ← 协调者模式专用</span><br><span class="line">  ↓</span><br><span class="line">Agent System Prompt        ← agentDefinition.getSystemPrompt()</span><br><span class="line">  ↓                          proactive 模式：追加到默认</span><br><span class="line">  ↓                          其他模式：替换默认</span><br><span class="line">Custom System Prompt       ← --system-prompt 参数</span><br><span class="line">  ↓</span><br><span class="line">Default System Prompt      ← Claude Code 标准提示词</span><br><span class="line">  ↓</span><br><span class="line">Append System Prompt       ← 始终追加到末尾</span><br></pre></td></tr></table></figure>
-<p>Override 和 Coordinator 是独占模式，直接替换整个提示词。Agent 提示词有两种行为：proactive 模式追加到默认提示词后（保留默认规则），其他模式完全替换默认提示词。Custom 和 Append 的区别在于：Custom 插入在默认提示词之后，Append 始终在最末尾。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">buildEffectiveSystemPrompt</span>(<span class="params">options</span>): <span class="title">Promise</span>&lt;<span class="title">SystemPrompt</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (options.overrideSystemPrompt) <span class="keyword">return</span> asSystemPrompt(options.overrideSystemPrompt)</span><br><span class="line">  <span class="keyword">if</span> (isCoordinatorMode() &amp;&amp; options.coordinatorSystemPrompt) <span class="keyword">return</span> asSystemPrompt(options.coordinatorSystemPrompt)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">const</span> sections: SystemPromptSection[] = <span class="keyword">await</span> buildDefaultSections()</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (options.agentDefinition?.getSystemPrompt) &#123;</span><br><span class="line">    <span class="keyword">const</span> agentPrompt = <span class="keyword">await</span> options.agentDefinition.getSystemPrompt(options)</span><br><span class="line">    <span class="keyword">if</span> (options.agentDefinition.promptMode === <span class="string">'proactive'</span>) &#123;</span><br><span class="line">      sections.push(&#123; <span class="keyword">type</span>: <span class="string">'text'</span>, text: agentPrompt &#125;)</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      <span class="keyword">return</span> asSystemPrompt(agentPrompt)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (options.customSystemPrompt) sections.push(&#123; <span class="keyword">type</span>: <span class="string">'text'</span>, text: options.customSystemPrompt &#125;)</span><br><span class="line">  <span class="keyword">if</span> (options.appendSystemPrompt) sections.push(&#123; <span class="keyword">type</span>: <span class="string">'text'</span>, text: options.appendSystemPrompt &#125;)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> resolveSystemPromptSections(sections)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这个优先级链覆盖了从测试覆盖（Override）到多 Agent 编排（Agent Prompt）到用户定制（Custom/Append）的所有场景。</p>
-<h2 id="CLAUDE-md-加载与递归引用"><a href="#CLAUDE-md-加载与递归引用" class="headerlink" title="CLAUDE.md 加载与递归引用"></a>CLAUDE.md 加载与递归引用</h2><p>CLAUDE.md 是用户自定义指令系统，按路径层级从低到高加载：</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>路径</th>
-<th>作用域</th>
-<th>优先级</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>/etc/claude-code/CLAUDE.md</code></td>
-<td>全局管理配置</td>
-<td>最低</td>
-</tr>
-<tr>
-<td><code>~/.claude/CLAUDE.md</code></td>
-<td>用户全局指令</td>
-<td>低</td>
-</tr>
-<tr>
-<td><code>项目根目录/CLAUDE.md</code></td>
-<td>项目级指令</td>
-<td>中</td>
-</tr>
-<tr>
-<td><code>项目根目录/.claude/CLAUDE.md</code></td>
-<td>项目级指令</td>
-<td>中</td>
-</tr>
-<tr>
-<td><code>项目根目录/.claude/rules/*.md</code></td>
-<td>项目规则文件</td>
-<td>中</td>
-</tr>
-<tr>
-<td><code>项目根目录/CLAUDE.local.md</code></td>
-<td>本地私有指令</td>
-<td>最高</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>本地私有指令（<code>.local.md</code>）通常加入 <code>.gitignore</code>，用于存放个人偏好（如”用中文回复”），不会被提交到仓库。项目级指令则可以提交到仓库，作为团队共享的编码规范。</p>
-<p>CLAUDE.md 支持 <code>@path</code> 语法递归引用其他文件，实现指令的模块化组织：</p>
-<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># 项目配置</span></span><br><span class="line"></span><br><span class="line"><span class="section">## 编码规范</span></span><br><span class="line">@./docs/coding-standards.md</span><br><span class="line"></span><br><span class="line"><span class="section">## API 文档</span></span><br><span class="line">@./docs/api-spec.md</span><br></pre></td></tr></table></figure>
-<p>递归引用有循环检测机制。系统维护一个 visited Set，每次加载前检查路径是否已访问过。如果检测到循环引用，打印警告并返回空字符串，防止无限递归。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">loadClaudeMdFile</span>(<span class="params">path: <span class="built_in">string</span>, visited: Set&lt;<span class="built_in">string</span>&gt; = <span class="keyword">new</span> Set()</span>): <span class="title">Promise</span>&lt;<span class="title">string</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (visited.has(path)) &#123;</span><br><span class="line">    <span class="built_in">console</span>.warn(<span class="string">`Circular reference detected: <span class="subst">$&#123;path&#125;</span>`</span>)</span><br><span class="line">    <span class="keyword">return</span> <span class="string">''</span></span><br><span class="line">  &#125;</span><br><span class="line">  visited.add(path)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">let</span> content = <span class="keyword">await</span> readFile(path, <span class="string">'utf-8'</span>)</span><br><span class="line">  <span class="keyword">const</span> references = extractReferences(content)</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> ref of references) &#123;</span><br><span class="line">    <span class="keyword">const</span> refPath = resolveReference(path, ref)</span><br><span class="line">    <span class="keyword">const</span> refContent = <span class="keyword">await</span> loadClaudeMdFile(refPath, visited)</span><br><span class="line">    content = content.replace(<span class="string">`@<span class="subst">$&#123;ref&#125;</span>`</span>, refContent)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> content</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h2 id="Agent-提示词增强"><a href="#Agent-提示词增强" class="headerlink" title="Agent 提示词增强"></a>Agent 提示词增强</h2><p>子代理的系统提示词在基础定义之上还有两层增强。第一层是环境详情注入，包括工作目录、启用工具列表、模型信息和环境变量。第二层是行为约束注入，Fork Agent 会收到额外的行为规则：不对话、不提问、工具调用之间不输出文本、响应必须以 “Scope:” 开头、报告控制在 500 词以内。</p>
-<p>这些约束确保 Fork Agent 是一个高效的工作进程，不会在 Fork 上下文中产生不必要的对话开销。</p>
-<h2 id="提示词结构概览"><a href="#提示词结构概览" class="headerlink" title="提示词结构概览"></a>提示词结构概览</h2><p>最终的系统提示词由静态和动态两部分组成，以缓存边界分隔。静态部分包含角色定义（”You are an interactive agent…”）、系统规则（工具执行方式、权限模式）、任务指导（使用工具、遵循代码规范、不总结已完成任务）、工具说明（各工具的功能描述）和风格约束。动态部分包含当前日期、项目上下文（工作目录、Git 分支、Git 状态）、CLAUDE.md 用户指令、MCP 服务器指令和 Token 预算信息。</p>
-<p>这个结构的关键设计决策是缓存边界的位置。工具说明放在静态区域（因为工具定义很少变化），而 Token 预算放在动态区域（因为每轮都需要重新计算）。这个分割点的选择直接决定了缓存效率。</p>
-<h2 id="关键源文件"><a href="#关键源文件" class="headerlink" title="关键源文件"></a>关键源文件</h2><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>文件</th>
-<th>职责</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>src/constants/prompts.ts</code></td>
-<td>系统提示词组装</td>
-</tr>
-<tr>
-<td><code>src/constants/systemPromptSections.ts</code></td>
-<td>Section 定义和缓存</td>
-</tr>
-<tr>
-<td><code>src/utils/systemPrompt.ts</code></td>
-<td>优先级解析</td>
-</tr>
-<tr>
-<td><code>src/utils/claudemd.ts</code></td>
-<td>CLAUDE.md 加载</td>
-</tr>
-<tr>
-<td><code>src/context.ts</code></td>
-<td>系统和用户上下文</td>
-</tr>
-<tr>
-<td><code>src/utils/api.ts</code></td>
-<td>缓存边界分割</td>
-</tr>
-<tr>
-<td><code>src/services/api/claude.ts</code></td>
-<td>API 缓存块构建</td>
-</tr>
-</tbody>
-</table>
-</div>
-<hr>
-<p><strong>系列文章导航：</strong></p>
-<ul>
-<li>上一篇：<a href="/2026/04/06/080_claude-code-context-compression/">Context 压缩的四级策略</a></li>
-<li>下一篇：<a href="/2026/04/06/084_claude-code-skills-system/">条件激活与动态发现的 Skills 系统</a></li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/06/085_claude-code-system-prompt/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
         
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/087_claude-code-tool-system/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/04/06/087_claude-code-tool-system/" class="post-title-link" itemprop="url">从定义到执行的七步工具管道</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2026-04-06 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-08-22 14:19:56" itemprop="dateModified" datetime="2026-08-22T14:19:56+08:00">2026-08-22</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
-                </span>
-            </span>
-
-          
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2026/04/06/087_claude-code-tool-system/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/087_claude-code-tool-system/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <a id="more"></a>
-<h2 id="工具不只是函数调用"><a href="#工具不只是函数调用" class="headerlink" title="工具不只是函数调用"></a>工具不只是函数调用</h2><p>在多数 AI Agent 框架中，工具只是一个带装饰器的函数：接收参数，返回结果。Claude Code 的工具设计远超这个层次。每个工具是一个自描述的实体，通过统一接口向框架暴露身份、能力声明、生命周期钩子、渲染逻辑和智能特性。框架不需要了解工具的内部实现，只需调用标准接口即可完成验证、权限检查、执行和结果处理。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> Tool&lt;Input, Output&gt; = &#123;</span><br><span class="line">  <span class="comment">// 身份</span></span><br><span class="line">  name: <span class="built_in">string</span></span><br><span class="line">  aliases?: <span class="built_in">string</span>[]</span><br><span class="line">  searchHint?: <span class="built_in">string</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 能力声明</span></span><br><span class="line">  isEnabled(): <span class="built_in">boolean</span></span><br><span class="line">  isConcurrencySafe(input): <span class="built_in">boolean</span></span><br><span class="line">  isReadOnly(input): <span class="built_in">boolean</span></span><br><span class="line">  isDestructive(input): <span class="built_in">boolean</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 生命周期</span></span><br><span class="line">  validateInput(input, context)</span><br><span class="line">  checkPermissions(input, context)</span><br><span class="line">  call(input, context, canUseTool, parentMessage, onProgress)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 输出与渲染</span></span><br><span class="line">  renderToolUseMessage(input)</span><br><span class="line">  renderToolResultMessage(content)</span><br><span class="line">  mapToolResultToToolResultBlockParam()</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 智能特性</span></span><br><span class="line">  inputSchema: Zod schema</span><br><span class="line">  maxResultSizeChars: <span class="built_in">number</span></span><br><span class="line">  getToolUseSummary?(input): <span class="built_in">string</span></span><br><span class="line">  shouldDefer?: <span class="built_in">boolean</span></span><br><span class="line">  toAutoClassifierInput?(input): <span class="built_in">string</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><code>src/Tool.ts</code> 约 792 行，定义了这个完整接口。能力声明（isReadOnly、isDestructive、isConcurrencySafe）让框架在不了解工具实现的前提下做出调度和权限决策。例如，并行执行只选择 <code>isConcurrencySafe</code> 返回 true 的工具，权限系统的快速路径依赖 <code>isReadOnly</code> 判断。</p>
-<h2 id="工具注册：三阶段流水线"><a href="#工具注册：三阶段流水线" class="headerlink" title="工具注册：三阶段流水线"></a>工具注册：三阶段流水线</h2><p>工具池的构建经过三个阶段。第一阶段收集全部 48+ 个内置工具，同时应用 Feature Flag 过滤（如 Fork Subagent 功能未开启时移除 Agent 工具）。第二阶段根据运行时上下文过滤：权限模式（<code>dontAsk</code> 模式只保留只读工具）、REPL 模式兼容性、以及工具自身的 <code>isEnabled()</code> 检查。第三阶段合并 MCP 工具，已连接的 MCP 服务器提供的工具以 <code>mcp__{serverName}__{toolName}</code> 格式命名，与内置工具合并后去重排序。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="function"><span class="keyword">function</span> <span class="title">assembleToolPool</span>(<span class="params">baseTools, mcpClients</span>): <span class="title">Tools</span> </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> mcpTools = []</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">const</span> client of mcpClients) &#123;</span><br><span class="line">    <span class="keyword">if</span> (client.type !== <span class="string">'connected'</span>) <span class="keyword">continue</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">const</span> mcpTool of client.tools) &#123;</span><br><span class="line">      <span class="keyword">const</span> name = <span class="string">`mcp__<span class="subst">$&#123;normalizeNameForMCP(client.name)&#125;</span>__<span class="subst">$&#123;mcpTool.name&#125;</span>`</span></span><br><span class="line">      mcpTools.push(convertMcpToolToTool(name, mcpTool, client))</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 内置优先，去重，排序（保证缓存稳定性）</span></span><br><span class="line">  <span class="keyword">return</span> mergeAndDeduplicate(baseTools, mcpTools)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>排序的目的是缓存稳定性。如果工具顺序每次都不同，API 层的 prompt cache 会因为工具定义顺序变化而失效。固定排序确保工具定义在多次请求间保持一致。</p>
-<h2 id="七步执行管道"><a href="#七步执行管道" class="headerlink" title="七步执行管道"></a>七步执行管道</h2><p>一次工具调用从模型发出 <code>tool_use</code> 块开始，经过七步管道到达实际执行。</p>
-<p><strong>Step 1 工具查找</strong>：先精确匹配工具名称，匹配失败则尝试别名（向后兼容），最后检查 MCP 工具命名空间。<code>findToolByName()</code> 返回工具对象或 undefined。</p>
-<p><strong>Step 2 输入解析</strong>：使用 Zod schema 对模型生成的输入做类型验证。验证失败时，将 Zod 的错误信息格式化后返回给模型，让模型修正输入重新尝试。这一步在权限检查之前执行，确保无效输入不会触发权限对话框。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> parseResult = tool.inputSchema.safeParse(input)</span><br><span class="line"><span class="keyword">if</span> (!parseResult.success) &#123;</span><br><span class="line">  <span class="keyword">return</span> &#123;</span><br><span class="line">    <span class="keyword">type</span>: <span class="string">'tool_result'</span>,</span><br><span class="line">    content: formatZodValidationError(parseResult.error),</span><br><span class="line">    is_error: <span class="literal">true</span>,</span><br><span class="line">    tool_use_id: toolUseId,</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>Step 3 自定义验证</strong>：Zod 处理类型层面的验证，某些工具需要业务层面的额外检查。FileEditTool 验证文件存在性、文件大小（上限 1 GiB）、是否已读取、以及读取后是否被外部修改。这些检查在权限检查之前完成，避免为无效操作弹出权限确认。</p>
-<p><strong>Step 4 Pre-Tool 钩子</strong>：执行用户定义的 PreToolUse 钩子。退出码 0 表示成功（可能修改了输入参数），退出码 2 表示阻塞（错误信息返回给模型），其他退出码展示给用户。钩子可以拦截工具调用、修改输入参数、或直接放行。</p>
-<p><strong>Step 5 权限检查</strong>：五层权限决策（规则、模式、钩子、分类器、用户确认）。deny 规则优先级最高，bypass 模式直接放行，最终未决的操作用 <code>behavior: &#39;ask&#39;</code> 弹出确认对话框。权限检查的结果包含决策原因（rule/mode/hook/classifier/user），用于调试和审计。</p>
-<p><strong>Step 6 实际执行</strong>：调用 <code>tool.call()</code>，传入验证后的输入、上下文、权限回调、父消息和进度回调。执行时间被记录到统计中。错误会被分类（网络错误、超时、权限错误等），分类结果影响模型的后续决策。</p>
-<p><strong>Step 7 Post-Tool 钩子</strong>：执行用户定义的 PostToolUse 钩子，通常用于自动化检查（lint、format、test）。钩子接收工具名称、输入和结果（包括是否为错误），可以据此触发后续操作。</p>
-<p>七步管道的顺序有明确的逻辑：验证前置确保权限检查不会为无效输入触发，钩子在权限之前可以修改输入，权限在执行之前拦截危险操作，Post 钩子在执行之后处理副作用。</p>
-<h2 id="工具延迟加载"><a href="#工具延迟加载" class="headerlink" title="工具延迟加载"></a>工具延迟加载</h2><p>48+ 个内置工具的 schema 约 15000 tokens。如果全部加载到每次 API 请求中，对短对话来说开销过大。延迟加载机制让不常用的工具只在初始提示词中列出名称，模型需要时通过 ToolSearch 工具获取完整 schema。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">模型看到: &quot;The following tools are available but deferred: NotebookEdit, ...&quot;</span><br><span class="line">模型调用: ToolSearch(&#123; query: &quot;notebook&quot; &#125;)</span><br><span class="line">返回:     NotebookEdit 的完整 schema 和使用说明</span><br><span class="line">模型调用: NotebookEdit(&#123; ... &#125;)</span><br></pre></td></tr></table></figure>
-<p>工具通过 <code>shouldDefer: true</code> 和 <code>searchHint</code> 声明延迟加载属性。初始提示词只包含核心工具（约 5000 tokens），延迟加载后节省约 66% 的工具相关 token。对于长对话，这个节省会被对话本身稀释；但对于频繁的短请求（如一次性查询），延迟加载的收益显著。</p>
-<h2 id="工具结果管理"><a href="#工具结果管理" class="headerlink" title="工具结果管理"></a>工具结果管理</h2><p>大型工具结果（超过 20000 字符）不会直接注入上下文，而是保存到磁盘，上下文中只保留前 4096 字符的预览和文件路径。模型可以通过 Read 工具查看完整内容。这个设计防止单次工具调用吃掉大量上下文预算。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> TOOL_RESULT_PERSIST_THRESHOLD_CHARS = <span class="number">20</span>_000</span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">processToolResultBlock</span>(<span class="params">tool, result, toolUseID</span>): <span class="title">Promise</span>&lt;<span class="title">ToolResultBlockParam</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (result.length &gt; TOOL_RESULT_PERSIST_THRESHOLD_CHARS) &#123;</span><br><span class="line">    <span class="keyword">const</span> filePath = getToolResultPath(toolUseID)</span><br><span class="line">    <span class="keyword">await</span> writeFile(filePath, result)</span><br><span class="line">    <span class="keyword">const</span> preview = result.slice(<span class="number">0</span>, <span class="number">4096</span>)</span><br><span class="line">    <span class="keyword">return</span> &#123;</span><br><span class="line">      content: <span class="string">`<span class="subst">$&#123;preview&#125;</span>\n\n[Output saved to <span class="subst">$&#123;filePath&#125;</span>. Use Read tool to view full output.]`</span>,</span><br><span class="line">      tool_use_id: toolUseID,</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> &#123; content: result, tool_use_id: toolUseID &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>文件读取状态缓存（FileStateCache）记录每个文件的读取时间戳和内容，用于 FileEditTool 检测并发修改。编辑前验证文件自上次读取后未被外部修改，防止覆盖其他人的更新。</p>
-<h2 id="关键源文件"><a href="#关键源文件" class="headerlink" title="关键源文件"></a>关键源文件</h2><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>文件</th>
-<th>职责</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>src/Tool.ts</code></td>
-<td>Tool 类型定义和构建器</td>
-</tr>
-<tr>
-<td><code>src/tools.ts</code></td>
-<td>工具发现和注册</td>
-</tr>
-<tr>
-<td><code>src/services/tools/toolExecution.ts</code></td>
-<td>执行管道</td>
-</tr>
-<tr>
-<td><code>src/services/tools/toolOrchestration.ts</code></td>
-<td>并行/串行策略</td>
-</tr>
-<tr>
-<td><code>src/services/tools/toolHooks.ts</code></td>
-<td>钩子执行</td>
-</tr>
-<tr>
-<td><code>src/utils/toolResultStorage.ts</code></td>
-<td>结果存储</td>
-</tr>
-<tr>
-<td><code>src/utils/fileStateCache.ts</code></td>
-<td>文件状态缓存</td>
-</tr>
-</tbody>
-</table>
-</div>
-<hr>
-<p><strong>系列文章导航：</strong></p>
-<ul>
-<li>上一篇：<a href="/2026/04/06/077_claude-code-async-generator-state-machine/">打破 ReAct 迷思：Async Generator 状态机</a></li>
-<li>下一篇：<a href="/2026/04/06/082_claude-code-multi-agent/">多 Agent 编排的四种路径</a></li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/088_claude-code-why-better/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Zou Rongsheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="DoneHub">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/04/06/088_claude-code-why-better/" class="post-title-link" itemprop="url">超越 Prompt 的 Agent 运行时</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2026-04-06 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-08-22 14:21:28" itemprop="dateModified" datetime="2026-08-22T14:21:28+08:00">2026-08-22</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
-                </span>
-            </span>
-
-          
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="fa fa-comment-o"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2026/04/06/088_claude-code-why-better/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/088_claude-code-why-better/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <a id="more"></a>
-<h2 id="同样的模型，不同的体验"><a href="#同样的模型，不同的体验" class="headerlink" title="同样的模型，不同的体验"></a>同样的模型，不同的体验</h2><p>一个反直觉的现象：用 GPT-4 模型搭配 OpenAI 的 Codex CLI，效果尚可；用 GPT-4 模型搭配 Anthropic 的 Claude Code，效果更好。自家模型配自家 Agent 应该是最佳组合，但实际表现不如搭配竞争对手的 Agent。</p>
-<p>常见的猜测是”Claude Code 的 Prompt 更好”。Prompt 确实有影响，但不是决定性因素。Claude Code 的源码揭示了一个更根本的差异：它不是一个 Prompt 工具，而是一个完整的 Agent 运行时框架。这个框架理解模型的能力边界、工具的执行风险、上下文的压缩策略和用户的意图流转。模型是大脑，Claude Code 是躯体——这个类比虽然粗略，但抓住了核心关系。</p>
-<h2 id="主流竞品概览"><a href="#主流竞品概览" class="headerlink" title="主流竞品概览"></a>主流竞品概览</h2><p>当前市面上的 AI Code Agent 产品分为两类：终端型 CLI 工具和 AI 原生 IDE。</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>产品</th>
-<th>公司</th>
-<th>形态</th>
-<th>核心特点</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Claude Code</td>
-<td>Anthropic</td>
-<td>CLI</td>
-<td>Agent 运行时，MCP 扩展</td>
-</tr>
-<tr>
-<td>Codex CLI</td>
-<td>OpenAI</td>
-<td>CLI</td>
-<td>同类型竞品，GPT 模型驱动</td>
-</tr>
-<tr>
-<td>Cursor</td>
-<td>Anysphere</td>
-<td>AI IDE</td>
-<td>VS Code fork，深度上下文感知</td>
-</tr>
-<tr>
-<td>Trae</td>
-<td>字节跳动</td>
-<td>AI IDE</td>
-<td>自适应学习</td>
-</tr>
-<tr>
-<td>GitHub Copilot</td>
-<td>Microsoft</td>
-<td>IDE 扩展</td>
-<td>行业先驱，生态成熟</td>
-</tr>
-<tr>
-<td>Qoder</td>
-<td>阿里云</td>
-<td>IDE 扩展</td>
-<td>通义灵码，阿里云生态</td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>Claude Code 与 Codex CLI 是直接竞品，都是终端型 CLI 工具。IDE 类产品（Cursor、Trae、Copilot、Qoder）的交互方式不同，但底层都面临相似的 Agent 工程问题。</p>
-<h2 id="架构选择：状态机-vs-ReAct"><a href="#架构选择：状态机-vs-ReAct" class="headerlink" title="架构选择：状态机 vs ReAct"></a>架构选择：状态机 vs ReAct</h2><p>大多数 Code Agent 采用 ReAct（Reasoning + Acting）模式：Thought → Action → Observation 循环。这个模式简单直观，但存在三个结构性问题：容易陷入思考死循环、工具失败后缺乏恢复机制、上下文无限膨胀直到截断。</p>
-<p>Claude Code 选择 Async Generator 状态机替代 ReAct 循环。每次 <code>step()</code> 调用推进一个状态，状态推进有明确边界，不会无限循环。状态机内置 6 种错误恢复策略，工具失败后可以自动重试、降级或回退。Generator 模式天然支持流式交互，模型输出和工具执行可以交错进行，不需要等待完整的 Thought-Action-Observation 周期。</p>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>特性</th>
-<th>ReAct 模式</th>
-<th>状态机模式</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>死循环风险</td>
-<td>高（循环无边界）</td>
-<td>低（状态推进有终点）</td>
-</tr>
-<tr>
-<td>错误恢复</td>
-<td>无（失败即终止）</td>
-<td>有（6 种恢复策略）</td>
-</tr>
-<tr>
-<td>流式交互</td>
-<td>困难（需等待完整周期）</td>
-<td>原生支持（Generator）</td>
-</tr>
-<tr>
-<td>上下文管理</td>
-<td>简单截断</td>
-<td>四级压缩</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h2 id="工具执行的安全管道"><a href="#工具执行的安全管道" class="headerlink" title="工具执行的安全管道"></a>工具执行的安全管道</h2><p>多数 Agent 的工具执行是直接调用：传入参数，执行，返回结果。没有验证、没有权限检查、没有后处理。这种设计在受控环境下可以工作，但在真实开发场景中风险很高——一个错误的 <code>rm -rf</code> 命令可能造成不可逆的损害。</p>
-<p>Claude Code 的工具执行经过七步管道：查找 → 输入解析（Zod schema）→ 自定义验证 → Pre-Tool 钩子 → 权限检查（五层决策链）→ 实际执行 → Post-Tool 钩子。验证在权限之前执行，确保无效输入不会触发权限对话框；权限在执行之前拦截危险操作；钩子允许用户在任意阶段注入自定义逻辑。</p>
-<p>工具延迟加载机制进一步降低了 token 开销。48+ 个内置工具的 schema 约 15000 tokens，延迟加载后初始提示词只包含核心工具（约 5000 tokens），节省 66%。不常用的工具通过 ToolSearch 按需加载完整 schema。</p>
-<p>MCP 协议提供了无限扩展能力。任何开发者可以用任何语言编写 MCP Server，扩展 Agent 的工具集。这个开放架构让 Claude Code 的能力边界不再受限于内置工具数量。</p>
-<h2 id="上下文管理的四级策略"><a href="#上下文管理的四级策略" class="headerlink" title="上下文管理的四级策略"></a>上下文管理的四级策略</h2><p>多数 Agent 的上下文管理是暴力截断：超过 token 限制时丢弃最早的消息。这种方式简单但粗暴，重要信息可能丢失，模型会”忘记”之前的关键决策。</p>
-<p>Claude Code 的四级渐进式压缩从轻到重依次触发：Snip（去重截断，每轮自动）→ Micro（原地优化缓存内容）→ Context Collapse（渐进式分段摘要，优先处理最旧消息）→ Auto Compact（模型生成全局摘要，替换所有历史）。每一级都尽可能保留对任务有用的信息（决策、文件修改、待办事项），而不是简单地丢弃。</p>
-<p>这套压缩机制使得长对话成为可能。在 50 轮以上的编码会话中，前两级压缩通常就能回收足够的空间；只有特别长的任务才会触发后两级。压缩后的上下文仍然能支撑模型继续工作，因为关键信息被保留在摘要中。</p>
-<h2 id="多代理协作"><a href="#多代理协作" class="headerlink" title="多代理协作"></a>多代理协作</h2><p>多数 Code Agent 是单 Agent 设计：一个模型加一套工具完成所有任务。复杂任务难以分解，单一模型容易思维固化，无法并行处理。</p>
-<p>Claude Code 定义了四种 Agent 生成方式：Subagent（同步/异步子代理，短生命周期）、Fork（继承父代理上下文，共享 prompt cache）、Teammate（独立上下文，通过邮箱异步通信）、Remote（CCR 环境远程执行）。Fork Agent 的字节级一致前缀设计让多个子代理共享同一份 prompt cache，大幅降低 token 消耗。Teams 邮箱通信支持并行任务分发和结果汇总。</p>
-<p>四种方式的组合覆盖了从简单子任务到复杂并行协作的全部场景。Explore Agent 扫描代码库，多个 Fork Agent 并行修改文件，Plan Agent 协调顺序，Verification Agent 运行测试——这是一个完整的协作框架，而不是简单的任务分发。</p>
-<h2 id="分层权限控制"><a href="#分层权限控制" class="headerlink" title="分层权限控制"></a>分层权限控制</h2><p>多数 Agent 的安全机制是简单的 allow/deny 开关。一旦开启危险命令权限，所有操作都被允许；关闭则全部禁止。没有中间地带。</p>
-<p>Claude Code 的五层权限决策链（规则 → 模式 → 钩子 → 分类器 → 用户确认）提供了精细控制。<code>git status</code> 自动允许（Git 白名单），<code>rm -rf node_modules</code> 需要确认（危险命令），<code>rm -rf /</code> 永远拒绝（deny 规则），写入 <code>.git/config</code> 被拒绝（敏感路径）。每个决策都有原因记录，用于调试和审计。</p>
-<p><code>auto</code> 模式下的 AI 分类器可以自动判断操作的安全性。分数高于 0.8 自动允许，低于 0.2 自动拒绝，中间区间询问用户。连续拒绝 3 次后回退到用户审批，防止陷入拒绝循环。</p>
-<h2 id="Memory-系统"><a href="#Memory-系统" class="headerlink" title="Memory 系统"></a>Memory 系统</h2><p>多数 Agent 每次对话从零开始，用户需要反复说明相同的背景信息。</p>
-<p>Claude Code 的 Memory 系统将知识分为四类：User（用户画像）、Feedback（行为反馈）、Project（项目动态）、Reference（外部引用）。记忆通过 YAML frontmatter + Markdown 格式持久化，自动提取机制在对话结束后分析并保存有价值的信息。智能检索用 Sonnet 模型动态选择相关记忆，新鲜度警告对旧记忆标注时效提醒。</p>
-<p>这个系统让 Agent 能够跨会话积累知识。用户的编码偏好、项目的架构决策、团队的工作分工——这些信息不需要每次重复说明，Memory 会记住它们。</p>
-<h2 id="Channel-远程控制"><a href="#Channel-远程控制" class="headerlink" title="Channel 远程控制"></a>Channel 远程控制</h2><p>多数 Agent 只能在本地终端交互，用户必须坐在电脑前才能让 Agent 工作。</p>
-<p>Claude Code 的 Channel 系统支持通过 Telegram 等 IM 工具远程控制。用户在手机上下达指令，Agent 在本地电脑上执行，结果回复到 IM。六层访问控制（能力声明、运行时开关、OAuth 认证、组织策略、会话白名单、Marketplace 验证）确保安全。</p>
-<p>这个设计解除了 Agent 的地理限制。外出时可以远程下达任务，紧急修复可以手机审批操作，进度可以通过 IM 实时反馈。</p>
-<h2 id="Terminal-UI"><a href="#Terminal-UI" class="headerlink" title="Terminal UI"></a>Terminal UI</h2><p>多数 Agent 的界面是简单的 stdout 输出，信息密集时难以阅读，无法交互式选择。</p>
-<p>Claude Code 用 React + Ink 构建终端 UI。Yoga 引擎提供 Flexbox 布局，双缓冲渲染避免闪烁，组件化设计（Header、MessageList、ToolBar、ContextPanel、InputBox、PermissionDialog）实现结构化展示。键盘导航支持交互式选择，权限对话框让用户可以逐条审批操作。</p>
-<h2 id="System-Prompt-的缓存优化"><a href="#System-Prompt-的缓存优化" class="headerlink" title="System Prompt 的缓存优化"></a>System Prompt 的缓存优化</h2><p>多数 Agent 的 System Prompt 是静态字符串，每次请求全量发送，无法缓存。</p>
-<p>Claude Code 的系统提示词约 20k tokens，通过缓存边界标记分为静态区域和动态区域。静态部分（角色定义、规则、工具说明）在全球范围内共享缓存，动态部分（日期、Git 状态、MCP 指令、CLAUDE.md）按会话级缓存。三级缓存体系（Global → Ephemeral → Section）覆盖不同的时间尺度。</p>
-<p>这个设计的实际效果是：静态部分缓存命中率接近 100%，动态部分在 CLAUDE.md 不变时也能保持高命中率。每个会话的延迟和 API 费用因此显著降低。</p>
-<h2 id="核心差异"><a href="#核心差异" class="headerlink" title="核心差异"></a>核心差异</h2><p>Claude Code 的竞争优势不在于单一功能，而在于系统工程的深度。状态机架构替代 ReAct 循环，七步工具管道替代裸执行，四级压缩替代暴力截断，五层权限替代简单开关，Memory 系统替代每次从零开始。每一个设计决策都指向同一个目标：让 Agent 在真实开发场景中可靠地工作。</p>
-<p>这些机制单独看都不复杂，但组合起来形成了一个完整的运行时框架。其他 Agent 提供的是模型的接口，Claude Code 提供的是模型的运行环境。</p>
-<hr>
-<p><strong>系列文章导航：</strong></p>
-<ul>
-<li>系列起点：<a href="/2026/04/07/089_claude-code-architecture-overview/">Claude Code 源码揭秘：整体架构概览</a></li>
-</ul>
-
       
     </div>
 
@@ -1889,7 +802,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2026-08-22 14:18:34" itemprop="dateModified" datetime="2026-08-22T14:18:34+08:00">2026-08-22</time>
+                <time title="修改时间：2026-08-22 21:58:39" itemprop="dateModified" datetime="2026-08-22T21:58:39+08:00">2026-08-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -1926,90 +839,207 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <a id="more"></a>
-<h2 id="终端里的-React-应用"><a href="#终端里的-React-应用" class="headerlink" title="终端里的 React 应用"></a>终端里的 React 应用</h2><p>Claude Code 的终端界面不是传统的 CLI 逐行输出，而是一个完整的 React 应用。它通过 Ink 框架（React 的终端渲染器）实现了组件化 UI、Flexbox 布局、双缓冲渲染和交互式对话框。选择 Ink 而非 ncurses 或 blessed 这类传统终端 UI 库，核心原因是复用 React 生态：组件化思想、状态管理、生命周期、以及开发者的熟悉度。</p>
+          <h2 id="终端里的-React-应用"><a href="#终端里的-React-应用" class="headerlink" title="终端里的 React 应用"></a>终端里的 React 应用</h2><p>Claude Code 的终端界面不是传统的 CLI 逐行输出，而是一个完整的 React 应用。它通过 Ink 框架（React 的终端渲染器）实现了组件化 UI、Flexbox 布局、双缓冲渲染和交互式对话框。选择 Ink 而非 ncurses 或 blessed 这类传统终端 UI 库，核心原因是复用 React 生态：组件化思想、状态管理、生命周期、以及开发者的熟悉度。</p>
 <p>Ink 的架构分为四层。React Components 通过自定义的 React Reconciler 转换为 Ink Host Config 调用，Host Config 使用 Yoga 布局引擎计算 Flexbox 布局（基于终端字符单位），最终 Terminal Renderer 将布局结果转换为 ANSI 转义序列输出到 stdout。这个架构让终端 UI 开发体验接近 Web 前端，同时保持了终端应用的性能特征。</p>
-<h2 id="核心组件与布局"><a href="#核心组件与布局" class="headerlink" title="核心组件与布局"></a>核心组件与布局</h2><p>组件树结构遵循典型的 GUI 应用模式：App 作为根组件，包含 Header（标题和状态指示）、Main（消息列表、工具栏、上下文面板）和 Footer（输入框和建议）。消息列表中的 AssistantMessage 嵌套 ToolCall 和 ToolResult 子组件，形成树状的消息结构。</p>
-<p>布局系统基于 Yoga 引擎，支持完整的 Flexbox 属性：flexDirection、justifyContent、alignItems、flexGrow、padding、margin、borderStyle 等。终端环境与浏览器的一个关键差异是尺寸单位——终端以字符为单位，padding: 1 表示 1 个字符的边距，而非像素。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; src&#x2F;components&#x2F;App.tsx</span><br><span class="line">function App() &#123;</span><br><span class="line">  const &#123; exit &#125; &#x3D; useApp()</span><br><span class="line">  const [messages, setMessages] &#x3D; useState&lt;Message[]&gt;([])</span><br><span class="line">  const [input, setInput] &#x3D; useState(&#39;&#39;)</span><br><span class="line"></span><br><span class="line">  useInput((char, key) &#x3D;&gt; &#123;</span><br><span class="line">    if (key.escape) exit()</span><br><span class="line">    else if (key.return) &#123; handleSubmit(input); setInput(&#39;&#39;) &#125;</span><br><span class="line">    else setInput(prev &#x3D;&gt; prev + char)</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  return (</span><br><span class="line">    &lt;Box flexDirection&#x3D;&quot;column&quot; height&#x3D;&quot;100%&quot;&gt;</span><br><span class="line">      &lt;Header &#x2F;&gt;</span><br><span class="line">      &lt;Box flexGrow&#x3D;&#123;1&#125;&gt;</span><br><span class="line">        &lt;MessageList messages&#x3D;&#123;messages&#125; &#x2F;&gt;</span><br><span class="line">        &lt;ContextPanel &#x2F;&gt;</span><br><span class="line">      &lt;&#x2F;Box&gt;</span><br><span class="line">      &lt;Footer input&#x3D;&#123;input&#125; &#x2F;&gt;</span><br><span class="line">    &lt;&#x2F;Box&gt;</span><br><span class="line">  )</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>文字测量是终端布局的基础。Yoga 引擎需要知道每段文本的宽度和高度才能正确计算布局。测量过程需要处理三个问题：ANSI 转义序列不计入宽度（它们是控制字符，不占显示空间）、多行文本需要逐行计算、中文字符占 2 列（全角字符）。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">measureText</span>(<span class="params">text: <span class="built_in">string</span></span>): </span>&#123; width: <span class="built_in">number</span>; height: <span class="built_in">number</span> &#125; &#123;</span><br><span class="line">  <span class="keyword">const</span> cleanText = stripAnsi(text)</span><br><span class="line">  <span class="keyword">const</span> lines = cleanText.split(<span class="string">'\n'</span>)</span><br><span class="line">  <span class="keyword">const</span> widths = lines.map(<span class="function"><span class="params">line</span> =&gt;</span></span><br><span class="line">    line.split(<span class="string">''</span>).reduce(<span class="function">(<span class="params">width, char</span>) =&gt;</span> width + (isFullWidth(char) ? <span class="number">2</span> : <span class="number">1</span>), <span class="number">0</span>)</span><br><span class="line">  )</span><br><span class="line">  <span class="keyword">return</span> &#123; width: <span class="built_in">Math</span>.max(...widths), height: lines.length &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h2 id="双缓冲渲染"><a href="#双缓冲渲染" class="headerlink" title="双缓冲渲染"></a>双缓冲渲染</h2><p>双缓冲是避免终端闪烁的关键技术。渲染流程分为五步：状态更新触发 Reconciler 更新 Yoga Tree，Layout 引擎重新计算布局，渲染到 Buffer A（生成 ANSI 序列），交换缓冲区（Buffer A 变为 Previous Frame，Buffer B 变为 Current Frame），Diff 对比两帧差异只输出变化的区域。</p>
-<p>Diff 算法逐行对比 Previous 和 Current 帧，只有内容不同的行才会生成 ANSI 光标移动和写入指令。这个设计将每帧的输出量从整个屏幕缩小到变化的行，大幅减少终端 I/O。</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">diffScreens</span>(<span class="params">prev: <span class="built_in">string</span>[], curr: <span class="built_in">string</span>[]</span>): <span class="title">DiffOutput</span>[] </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> outputs: DiffOutput[] = []</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">let</span> y = <span class="number">0</span>; y &lt; <span class="built_in">Math</span>.max(prev.length, curr.length); y++) &#123;</span><br><span class="line">    <span class="keyword">const</span> prevLine = prev[y] || <span class="string">''</span></span><br><span class="line">    <span class="keyword">const</span> currLine = curr[y] || <span class="string">''</span></span><br><span class="line">    <span class="keyword">if</span> (prevLine !== currLine) &#123;</span><br><span class="line">      outputs.push(&#123; <span class="keyword">type</span>: <span class="string">'move'</span>, x: <span class="number">0</span>, y &#125;)</span><br><span class="line">      outputs.push(&#123; <span class="keyword">type</span>: <span class="string">'clear_line'</span> &#125;)</span><br><span class="line">      outputs.push(&#123; <span class="keyword">type</span>: <span class="string">'write'</span>, content: currLine &#125;)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> outputs</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>渲染还有节流机制，间隔 16ms（约 60fps）。多次状态更新如果在同一个渲染间隔内发生，会合并为一次渲染，避免频繁的终端刷新。</p>
-<h2 id="交互式组件"><a href="#交互式组件" class="headerlink" title="交互式组件"></a>交互式组件</h2><p>终端中的交互依赖 <code>useInput</code> Hook 捕获键盘事件。InputBox 组件处理字符输入、光标移动（左右箭头）、退格删除和回车提交，通过拼接字符串的方式维护光标位置和文本内容。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">function InputBox(&#123; onSubmit &#125;) &#123;</span><br><span class="line">  const [value, setValue] &#x3D; useState(&#39;&#39;)</span><br><span class="line">  const [cursorPosition, setCursorPosition] &#x3D; useState(0)</span><br><span class="line"></span><br><span class="line">  useInput((char, key) &#x3D;&gt; &#123;</span><br><span class="line">    if (key.leftArrow) setCursorPosition(Math.max(0, cursorPosition - 1))</span><br><span class="line">    else if (key.rightArrow) setCursorPosition(Math.min(value.length, cursorPosition + 1))</span><br><span class="line">    else if (key.backspace) &#123;</span><br><span class="line">      setValue(prev &#x3D;&gt; prev.slice(0, cursorPosition - 1) + prev.slice(cursorPosition))</span><br><span class="line">      setCursorPosition(Math.max(0, cursorPosition - 1))</span><br><span class="line">    &#125;</span><br><span class="line">    else if (key.return) &#123; onSubmit(value); setValue(&#39;&#39;); setCursorPosition(0) &#125;</span><br><span class="line">    else &#123;</span><br><span class="line">      setValue(prev &#x3D;&gt; prev.slice(0, cursorPosition) + char + prev.slice(cursorPosition))</span><br><span class="line">      setCursorPosition(cursorPosition + 1)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  return (</span><br><span class="line">    &lt;Box borderStyle&#x3D;&quot;single&quot; padding&#x3D;&#123;1&#125;&gt;</span><br><span class="line">      &lt;Text bold&gt;▶ &lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;Text&gt;&#123;value.slice(0, cursorPosition)&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;Text backgroundColor&#x3D;&quot;cyan&quot;&gt;&#123;value[cursorPosition] || &#39; &#39;&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;Text&gt;&#123;value.slice(cursorPosition + 1)&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">    &lt;&#x2F;Box&gt;</span><br><span class="line">  )</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>SelectMenu 组件用上下箭头导航选项列表，回车确认。PermissionDialog 组件用左右箭头在 Allow/Deny 之间切换，回车提交。这些组件的共同模式是：<code>useState</code> 管理选中状态，<code>useInput</code> 捕获键盘事件，条件渲染高亮当前选中项。</p>
-<h2 id="工具调用与结果可视化"><a href="#工具调用与结果可视化" class="headerlink" title="工具调用与结果可视化"></a>工具调用与结果可视化</h2><p>ToolCall 组件根据工具执行状态（pending/running/success/error）显示不同颜色的边框和图标。运行中显示输入参数摘要，成功显示耗时，错误显示错误信息。ToolResult 组件对长输出做截断处理（默认 500 字符），用户可以通过回车键展开完整内容。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">function ToolCall(&#123; toolName, input, status &#125;) &#123;</span><br><span class="line">  const statusColor &#x3D; &#123; pending: &#39;yellow&#39;, running: &#39;blue&#39;, success: &#39;green&#39;, error: &#39;red&#39; &#125;</span><br><span class="line"></span><br><span class="line">  return (</span><br><span class="line">    &lt;Box flexDirection&#x3D;&quot;column&quot; borderStyle&#x3D;&quot;single&quot; borderColor&#x3D;&#123;statusColor[status]&#125;&gt;</span><br><span class="line">      &lt;Box&gt;</span><br><span class="line">        &lt;Text bold color&#x3D;&#123;statusColor[status]&#125;&gt;⚙ &#123;toolName&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">        &lt;Text dimColor&gt; (&#123;status&#125;)&lt;&#x2F;Text&gt;</span><br><span class="line">      &lt;&#x2F;Box&gt;</span><br><span class="line">      &#123;status &#x3D;&#x3D;&#x3D; &#39;running&#39; &amp;&amp; (</span><br><span class="line">        &lt;Box marginLeft&#x3D;&#123;2&#125;&gt;</span><br><span class="line">          &lt;Text dimColor&gt;Input: &#123;JSON.stringify(input).slice(0, 100)&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">        &lt;&#x2F;Box&gt;</span><br><span class="line">      )&#125;</span><br><span class="line">      &#123;status &#x3D;&#x3D;&#x3D; &#39;success&#39; &amp;&amp; (</span><br><span class="line">        &lt;Box marginLeft&#x3D;&#123;2&#125;&gt;</span><br><span class="line">          &lt;Text color&#x3D;&quot;green&quot;&gt;✓ Completed in &#123;duration&#125;ms&lt;&#x2F;Text&gt;</span><br><span class="line">        &lt;&#x2F;Box&gt;</span><br><span class="line">      )&#125;</span><br><span class="line">      &#123;status &#x3D;&#x3D;&#x3D; &#39;error&#39; &amp;&amp; (</span><br><span class="line">        &lt;Box marginLeft&#x3D;&#123;2&#125;&gt;</span><br><span class="line">          &lt;Text color&#x3D;&quot;red&quot;&gt;✗ &#123;error.message&#125;&lt;&#x2F;Text&gt;</span><br><span class="line">        &lt;&#x2F;Box&gt;</span><br><span class="line">      )&#125;</span><br><span class="line">    &lt;&#x2F;Box&gt;</span><br><span class="line">  )</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这种状态驱动的可视化设计让用户能直观感知每个工具调用的进度和结果，不需要阅读原始日志。</p>
-<h2 id="长列表的虚拟滚动"><a href="#长列表的虚拟滚动" class="headerlink" title="长列表的虚拟滚动"></a>长列表的虚拟滚动</h2><p>当对话历史很长时，消息列表可能包含数百条消息。虚拟滚动组件只渲染可见区域的条目，通过 <code>scrollTop</code> 状态控制可见窗口，上下箭头滚动时更新 <code>scrollTop</code> 并重新计算可见条目。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">function VirtualList(&#123; items, height &#125;) &#123;</span><br><span class="line">  const [scrollTop, setScrollTop] &#x3D; useState(0)</span><br><span class="line">  const visibleItems &#x3D; items.slice(scrollTop, scrollTop + height)</span><br><span class="line"></span><br><span class="line">  useInput((char, key) &#x3D;&gt; &#123;</span><br><span class="line">    if (key.upArrow) setScrollTop(Math.max(0, scrollTop - 1))</span><br><span class="line">    else if (key.downArrow) setScrollTop(Math.min(items.length - height, scrollTop + 1))</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  return (</span><br><span class="line">    &lt;Box flexDirection&#x3D;&quot;column&quot; height&#x3D;&#123;height&#125;&gt;</span><br><span class="line">      &#123;visibleItems.map((item, index) &#x3D;&gt; (</span><br><span class="line">        &lt;Box key&#x3D;&#123;scrollTop + index&#125;&gt;&lt;Text&gt;&#123;item.content&#125;&lt;&#x2F;Text&gt;&lt;&#x2F;Box&gt;</span><br><span class="line">      ))&#125;</span><br><span class="line">    &lt;&#x2F;Box&gt;</span><br><span class="line">  )</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>虚拟滚动将渲染成本从 O(n) 降到 O(visible)，在长对话场景下避免了终端刷新的卡顿。</p>
-<h2 id="非交互模式"><a href="#非交互模式" class="headerlink" title="非交互模式"></a>非交互模式</h2><p>Claude Code 会自动检测运行环境，在非 TTY 环境（管道、CI 环境、<code>--non-interactive</code> 参数）下切换为简单输出模式。检测逻辑依次检查 stdout 是否是 TTY、是否设置了 <code>CI=true</code> 环境变量、是否包含 <code>--non-interactive</code> 参数。</p>
-<p>非交互模式下，消息以纯文本形式输出：用户消息前加 <code>&gt;</code>，助手消息直接输出，工具调用显示 <code>[Tool: name]</code> 和输入参数，工具结果显示前 500 字符，错误显示 <code>[Error] message</code>。这种降级确保 Claude Code 可以作为管道命令使用（<code>echo &quot;fix bug&quot; | claude</code>），输出可以被其他工具解析。</p>
-<h2 id="颜色和样式系统"><a href="#颜色和样式系统" class="headerlink" title="颜色和样式系统"></a>颜色和样式系统</h2><p>颜色系统定义了统一的语义映射：用户消息用 cyan，助手消息用 white，工具状态用四色（pending 黄色、running 蓝色、success 绿色、error 红色），状态指示用 active 绿色、idle 灰色、error 红色。这些颜色通过 ANSI 转义序列实现，支持 bold、dim 等修饰。</p>
-<p>边框样式有三种：single（单线）、double（双线）、rounded（圆角）。权限对话框使用双线边框和黄色主题，视觉上区别于普通组件，强调其重要性。</p>
-<h2 id="关键源文件"><a href="#关键源文件" class="headerlink" title="关键源文件"></a>关键源文件</h2><div class="table-container">
-<table>
-<thead>
-<tr>
-<th>文件</th>
-<th>职责</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>src/components/App.tsx</code></td>
-<td>主应用入口</td>
-</tr>
-<tr>
-<td><code>src/components/Header.tsx</code></td>
-<td>标题栏和状态指示</td>
-</tr>
-<tr>
-<td><code>src/components/MessageList.tsx</code></td>
-<td>消息列表渲染</td>
-</tr>
-<tr>
-<td><code>src/components/ToolCall.tsx</code></td>
-<td>工具调用可视化</td>
-</tr>
-<tr>
-<td><code>src/components/InputBox.tsx</code></td>
-<td>输入框组件</td>
-</tr>
-<tr>
-<td><code>src/components/PermissionDialog.tsx</code></td>
-<td>权限对话框</td>
-</tr>
-<tr>
-<td><code>src/renderers/nonInteractive.ts</code></td>
-<td>非交互模式渲染</td>
-</tr>
-<tr>
-<td><code>src/styles/colors.ts</code></td>
-<td>颜色系统</td>
-</tr>
-<tr>
-<td><code>ink/lib/renderer.ts</code></td>
-<td>双缓冲渲染引擎</td>
-</tr>
-<tr>
-<td><code>ink/lib/measureText.ts</code></td>
-<td>文字测量</td>
-</tr>
-</tbody>
-</table>
-</div>
-<hr>
-<p><strong>系列文章导航：</strong></p>
-<ul>
-<li>上一篇：<a href="/2026/04/06/079_claude-code-computer-use/">Computer Use：桌面控制的九层安全关卡</a></li>
-<li>系列完结</li>
-</ul>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/06/086_claude-code-terminal-ui/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
 
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/088_claude-code-why-better/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/04/06/088_claude-code-why-better/" class="post-title-link" itemprop="url">超越 Prompt 的 Agent 运行时</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-04-06 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-08-22 21:58:48" itemprop="dateModified" datetime="2026-08-22T21:58:48+08:00">2026-08-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/088_claude-code-why-better/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/088_claude-code-why-better/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="同样的模型，不同的体验"><a href="#同样的模型，不同的体验" class="headerlink" title="同样的模型，不同的体验"></a>同样的模型，不同的体验</h2><p>一个反直觉的现象：用 GPT-4 模型搭配 OpenAI 的 Codex CLI，效果尚可；用 GPT-4 模型搭配 Anthropic 的 Claude Code，效果更好。自家模型配自家 Agent 应该是最佳组合，但实际表现不如搭配竞争对手的 Agent。</p>
+<p>常见的猜测是”Claude Code 的 Prompt 更好”。Prompt 确实有影响，但不是决定性因素。Claude Code 的源码揭示了一个更根本的差异：它不是一个 Prompt 工具，而是一个完整的 Agent 运行时框架。这个框架理解模型的能力边界、工具的执行风险、上下文的压缩策略和用户的意图流转。模型是大脑，Claude Code 是躯体——这个类比虽然粗略，但抓住了核心关系。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/06/088_claude-code-why-better/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/2026/04/06/087_claude-code-tool-system/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/04/06/087_claude-code-tool-system/" class="post-title-link" itemprop="url">从定义到执行的七步工具管道</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-04-06 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-08-22 21:58:43" itemprop="dateModified" datetime="2026-08-22T21:58:43+08:00">2026-08-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2026/04/06/087_claude-code-tool-system/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2026/04/06/087_claude-code-tool-system/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="工具不只是函数调用"><a href="#工具不只是函数调用" class="headerlink" title="工具不只是函数调用"></a>工具不只是函数调用</h2><p>在多数 AI Agent 框架中，工具只是一个带装饰器的函数：接收参数，返回结果。Claude Code 的工具设计远超这个层次。每个工具是一个自描述的实体，通过统一接口向框架暴露身份、能力声明、生命周期钩子、渲染逻辑和智能特性。框架不需要了解工具的内部实现，只需调用标准接口即可完成验证、权限检查、执行和结果处理。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2026/04/06/087_claude-code-tool-system/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
