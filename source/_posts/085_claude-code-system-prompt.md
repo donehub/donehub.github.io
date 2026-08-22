@@ -1,114 +1,84 @@
 ---
-title: System Prompt 工程：动态组装与缓存优化
+title: 系统提示词的动态组装与三级缓存
 date: 2026-04-06
 tags: System Prompt
 categories: Claude Code
 ---
 
-> Claude Code 的系统提示词不是一个静态字符串，而是一个动态组装的管道。通过分层构建、缓存边界、Section 类型等设计，实现了跨会话的缓存复用，大幅降低了延迟和成本。这是 Prompt 工程的教科书级案例。
-
 <!-- more -->
 
-## 导读：系统提示词的挑战
+## 20k tokens 的缓存难题
 
-系统提示词是 Agent 的"操作系统"——它定义了 Agent 的角色、规则、能力和约束。但系统提示词面临几个挑战：
+Claude Code 的系统提示词约 20k tokens，每次 API 调用都要发送。这个数字本身不夸张，但叠加两个约束就变成了工程问题。第一个约束是动态性：系统提示词需要包含当前日期、项目结构、Git 状态、MCP 服务器指令、CLAUDE.md 用户指令，这些内容每轮对话都可能变化。第二个约束是成本：20k tokens 的提示词如果不做缓存优化，每个会话的延迟和 API 费用会成倍增加。
 
-**挑战一：长度**
-Claude Code 的系统提示词约 20k tokens，每次 API 调用都要发送。
+解决方案是将系统提示词拆分为静态可缓存区域和动态可变区域，通过缓存边界标记分隔。静态部分（角色定义、系统规则、任务指导、工具说明、风格约束）在全球范围内共享缓存，动态部分（会话指引、记忆系统、环境信息、MCP 指令、Token 预算）按会话级缓存。这样每次 API 调用时，静态部分可以直接复用缓存，只有动态部分需要重新计算。
 
-**挑战二：动态性**
-系统提示词需要包含：
-- 当前日期
-- 项目结构
-- Git 状态
-- MCP 服务器指令
-- 用户自定义指令（CLAUDE.md）
+## 缓存边界与 Section 类型
 
-这些内容会变化，无法静态缓存。
-
-**挑战三：优先级**
-多个来源的指令需要按优先级合并：
-- 用户全局指令
-- 项目级指令
-- 本地私有指令
-
-Claude Code 的解决方案：**分层管道 + 缓存边界 + Section 类型**。
-
----
-
-## 一、分层构建架构
-
-### 1.1 提示词管道
-
-系统提示词通过分层管道动态组装：
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    静态可缓存区域                              │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │ 角色定义  │  系统规则  │  任务指导  │  工具说明  │  风格  │  │
-│  └───────────────────────────────────────────────────────┘  │
-├─────────────────────── 缓存边界 ────────────────────────────┤
-│                    动态可变区域                                │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │ 会话指引 │ 记忆系统 │ 环境信息 │ MCP 指令 │ Token 预算 │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 1.2 缓存边界
+系统提示词的组装依赖一个显式的缓存边界标记：
 
 ```typescript
-// src/constants/prompts.ts:114-116
-export const SYSTEM_PROMPT_DYNAMIC_BOUNDARY =
-  '__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__'
+export const SYSTEM_PROMPT_DYNAMIC_BOUNDARY = '__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__'
 ```
 
-**缓存边界的作用**：
-- **边界之上**：跨用户、跨组织通用的内容，使用 `scope: 'global'` 缓存
-- **边界之下**：用户/会话特定的内容，使用 `scope: 'ephemeral'` 缓存
+边界之上的内容是跨用户、跨组织通用的，使用 `scope: 'global'` 缓存。边界之下是用户或会话特定的内容，使用 `scope: 'ephemeral'` 缓存。API 层在构建请求时，沿着这个边界将提示词分割为两个 block，分别标记 `cache_control`，让服务端可以独立缓存这两部分。
 
-这意味着 Claude Code 的系统提示词**不需要每次都重新处理**——静态部分在全球范围内共享缓存，大幅降低延迟和成本。
-
----
-
-## 二、两种 Section 类型
-
-### 2.1 缓存 Section
-
-计算一次，整个会话复用：
+提示词的每个组成部分被封装为一个 Section，分为两种类型。缓存 Section 计算一次后整个会话复用：
 
 ```typescript
-// src/constants/systemPromptSections.ts
 systemPromptSection('memory', async () => {
-  return buildMemoryLines()  // 读取 CLAUDE.md、记忆文件等
-}, { scope: 'ephemeral' })  // 会话级缓存
+  return buildMemoryLines()
+}, { scope: 'ephemeral' })
 ```
 
-### 2.2 缓存破坏 Section
-
-每轮重新计算：
+缓存破坏 Section 每轮重新计算。适用于 MCP 指令（服务器可能中途连接或断开）、当前日期（每轮都不同）、Git 状态（可能快速变化）、Token 预算（每轮重新计算）等场景：
 
 ```typescript
-// src/constants/systemPromptSections.ts
 DANGEROUS_uncachedSystemPromptSection('mcp_instructions', async () => {
-  return getMcpInstructions()  // MCP 服务器可能中途连接/断开
+  return getMcpInstructions()
 }, 'MCP servers can connect/disconnect mid-session')
 ```
 
-**何时使用缓存破坏 Section**：
-- MCP 指令：服务器可能动态连接/断开
-- 当前日期：每轮都不同
-- Git 状态：可能快速变化
-- Token 预算：每轮重新计算
+两种类型的区分是缓存效率的关键。如果把动态内容放在静态区域，会导致整个静态缓存频繁失效；如果把静态内容标记为动态，则白白放弃缓存机会。缓存边界的显式标记让这个问题有了清晰的工程解法。
 
----
+## 三级缓存体系
 
-## 三、优先级解析链
+系统提示词的缓存分为三级，覆盖不同的时间尺度。
 
-### 3.1 系统提示词优先级
+Global Cache 跨组织共享，存储静态系统提示词（角色定义、规则、工具说明等），永不失效。这部分内容在所有用户、所有会话中完全相同，缓存命中率接近 100%。
 
-最终的系统提示词通过 `buildEffectiveSystemPrompt()` 按优先级决定：
+Ephemeral Cache 会话级缓存，存储动态系统提示词（记忆内容、环境信息等）。CLAUDE.md 文件变化时失效重建，MCP 连接状态变化时也会触发重建。
+
+Section Cache 轮级缓存，每个 Section 独立记忆化。即使某个 Section 被标记为缓存破坏，其内部仍然有 memoize 优化，同一轮内多次访问不会重复计算。
+
+```typescript
+function buildSystemPromptBlocks(systemPrompt: SystemPrompt): ContentBlockParam[] {
+  const blocks: ContentBlockParam[] = []
+  const [staticPart, dynamicPart] = splitAtBoundary(systemPrompt)
+
+  if (staticPart) {
+    blocks.push({
+      type: 'text', text: staticPart,
+      cache_control: { type: 'ephemeral' },
+    })
+  }
+
+  if (dynamicPart) {
+    blocks.push({
+      type: 'text', text: dynamicPart,
+      cache_control: { type: 'ephemeral' },
+    })
+  }
+
+  return blocks
+}
+```
+
+这个三级设计的实际效果是：一个典型会话中，静态部分（约 12k tokens）的缓存命中率接近 100%，动态部分（约 8k tokens）在 CLAUDE.md 不变的情况下也能保持高命中率。只有在 MCP 连接变化或 Git 状态频繁更新的场景下，动态缓存才会频繁重建。
+
+## 优先级解析链
+
+系统提示词有多个来源，最终内容通过 `buildEffectiveSystemPrompt()` 按优先级决定：
 
 ```
 Override System Prompt     ← 最高优先级，完全替换
@@ -116,8 +86,8 @@ Override System Prompt     ← 最高优先级，完全替换
 Coordinator System Prompt  ← 协调者模式专用
   ↓
 Agent System Prompt        ← agentDefinition.getSystemPrompt()
-  ↓                          - proactive 模式：追加到默认
-  ↓                          - 其他：替换默认
+  ↓                          proactive 模式：追加到默认
+  ↓                          其他模式：替换默认
 Custom System Prompt       ← --system-prompt 参数
   ↓
 Default System Prompt      ← Claude Code 标准提示词
@@ -125,76 +95,49 @@ Default System Prompt      ← Claude Code 标准提示词
 Append System Prompt       ← 始终追加到末尾
 ```
 
-### 3.2 代码实现
+Override 和 Coordinator 是独占模式，直接替换整个提示词。Agent 提示词有两种行为：proactive 模式追加到默认提示词后（保留默认规则），其他模式完全替换默认提示词。Custom 和 Append 的区别在于：Custom 插入在默认提示词之后，Append 始终在最末尾。
 
 ```typescript
-// src/utils/systemPrompt.ts:41-123
-export async function buildEffectiveSystemPrompt(
-  options: BuildSystemPromptOptions,
-): Promise<SystemPrompt> {
-  const sections: SystemPromptSection[] = []
-  
-  // 1. 检查 Override
-  if (options.overrideSystemPrompt) {
-    return asSystemPrompt(options.overrideSystemPrompt)
-  }
-  
-  // 2. 检查 Coordinator
-  if (isCoordinatorMode() && options.coordinatorSystemPrompt) {
-    return asSystemPrompt(options.coordinatorSystemPrompt)
-  }
-  
-  // 3. 构建 Section 序列
-  const defaultSections = await buildDefaultSections()
-  sections.push(...defaultSections)
-  
-  // 4. 处理 Agent 提示词
+export async function buildEffectiveSystemPrompt(options): Promise<SystemPrompt> {
+  if (options.overrideSystemPrompt) return asSystemPrompt(options.overrideSystemPrompt)
+  if (isCoordinatorMode() && options.coordinatorSystemPrompt) return asSystemPrompt(options.coordinatorSystemPrompt)
+
+  const sections: SystemPromptSection[] = await buildDefaultSections()
+
   if (options.agentDefinition?.getSystemPrompt) {
     const agentPrompt = await options.agentDefinition.getSystemPrompt(options)
     if (options.agentDefinition.promptMode === 'proactive') {
-      // 追加到默认提示词后
       sections.push({ type: 'text', text: agentPrompt })
     } else {
-      // 替换默认提示词
       return asSystemPrompt(agentPrompt)
     }
   }
-  
-  // 5. 追加 Custom 和 Append
-  if (options.customSystemPrompt) {
-    sections.push({ type: 'text', text: options.customSystemPrompt })
-  }
-  if (options.appendSystemPrompt) {
-    sections.push({ type: 'text', text: options.appendSystemPrompt })
-  }
-  
+
+  if (options.customSystemPrompt) sections.push({ type: 'text', text: options.customSystemPrompt })
+  if (options.appendSystemPrompt) sections.push({ type: 'text', text: options.appendSystemPrompt })
+
   return resolveSystemPromptSections(sections)
 }
 ```
 
----
+这个优先级链覆盖了从测试覆盖（Override）到多 Agent 编排（Agent Prompt）到用户定制（Custom/Append）的所有场景。
 
-## 四、CLAUDE.md 加载机制
+## CLAUDE.md 加载与递归引用
 
-### 4.1 加载优先级
+CLAUDE.md 是用户自定义指令系统，按路径层级从低到高加载：
 
-CLAUDE.md 是用户自定义指令系统，按优先级从低到高加载：
+| 路径 | 作用域 | 优先级 |
+|------|--------|--------|
+| `/etc/claude-code/CLAUDE.md` | 全局管理配置 | 最低 |
+| `~/.claude/CLAUDE.md` | 用户全局指令 | 低 |
+| `项目根目录/CLAUDE.md` | 项目级指令 | 中 |
+| `项目根目录/.claude/CLAUDE.md` | 项目级指令 | 中 |
+| `项目根目录/.claude/rules/*.md` | 项目规则文件 | 中 |
+| `项目根目录/CLAUDE.local.md` | 本地私有指令 | 最高 |
 
-```
-/etc/claude-code/CLAUDE.md          ← 全局管理配置（最低优先级）
-  ↓
-~/.claude/CLAUDE.md                 ← 用户全局指令
-  ↓
-项目根目录/CLAUDE.md                 ← 项目级指令
-项目根目录/.claude/CLAUDE.md
-项目根目录/.claude/rules/*.md
-  ↓
-项目根目录/CLAUDE.local.md           ← 本地私有指令（最高优先级）
-```
+本地私有指令（`.local.md`）通常加入 `.gitignore`，用于存放个人偏好（如"用中文回复"），不会被提交到仓库。项目级指令则可以提交到仓库，作为团队共享的编码规范。
 
-### 4.2 递归引用
-
-支持 `@path` 语法递归引用其他文件：
+CLAUDE.md 支持 `@path` 语法递归引用其他文件，实现指令的模块化组织：
 
 ```markdown
 # 项目配置
@@ -206,193 +149,41 @@ CLAUDE.md 是用户自定义指令系统，按优先级从低到高加载：
 @./docs/api-spec.md
 ```
 
-### 4.3 循环引用检测
+递归引用有循环检测机制。系统维护一个 visited Set，每次加载前检查路径是否已访问过。如果检测到循环引用，打印警告并返回空字符串，防止无限递归。
 
 ```typescript
-// src/utils/claudemd.ts
-async function loadClaudeMdFile(
-  path: string,
-  visited: Set<string> = new Set(),
-): Promise<string> {
-  // 检测循环引用
+async function loadClaudeMdFile(path: string, visited: Set<string> = new Set()): Promise<string> {
   if (visited.has(path)) {
     console.warn(`Circular reference detected: ${path}`)
     return ''
   }
   visited.add(path)
-  
+
   let content = await readFile(path, 'utf-8')
-  
-  // 处理 @path 引用
   const references = extractReferences(content)
   for (const ref of references) {
     const refPath = resolveReference(path, ref)
     const refContent = await loadClaudeMdFile(refPath, visited)
     content = content.replace(`@${ref}`, refContent)
   }
-  
+
   return content
 }
 ```
 
----
+## Agent 提示词增强
 
-## 五、Agent 特有的提示词增强
+子代理的系统提示词在基础定义之上还有两层增强。第一层是环境详情注入，包括工作目录、启用工具列表、模型信息和环境变量。第二层是行为约束注入，Fork Agent 会收到额外的行为规则：不对话、不提问、工具调用之间不输出文本、响应必须以 "Scope:" 开头、报告控制在 500 词以内。
 
-### 5.1 环境详情注入
+这些约束确保 Fork Agent 是一个高效的工作进程，不会在 Fork 上下文中产生不必要的对话开销。
 
-子代理会额外注入环境详情：
+## 提示词结构概览
 
-```typescript
-// src/tools/AgentTool/runAgent.ts
-function getAgentSystemPrompt(agentDef, toolUseContext) {
-  let prompt = agentDef.getSystemPrompt({ toolUseContext })
-  prompt = enhanceSystemPromptWithEnvDetails(prompt)
-  // 添加：工作目录、启用工具列表、模型信息、环境变量
-  return prompt
-}
-```
+最终的系统提示词由静态和动态两部分组成，以缓存边界分隔。静态部分包含角色定义（"You are an interactive agent..."）、系统规则（工具执行方式、权限模式）、任务指导（使用工具、遵循代码规范、不总结已完成任务）、工具说明（各工具的功能描述）和风格约束。动态部分包含当前日期、项目上下文（工作目录、Git 分支、Git 状态）、CLAUDE.md 用户指令、MCP 服务器指令和 Token 预算信息。
 
-### 5.2 Fork 约束注入
+这个结构的关键设计决策是缓存边界的位置。工具说明放在静态区域（因为工具定义很少变化），而 Token 预算放在动态区域（因为每轮都需要重新计算）。这个分割点的选择直接决定了缓存效率。
 
-Fork Agent 会注入行为约束：
-
-```typescript
-const FORK_BOILERPLATE_TAG = `
-You are a forked worker process. Your job is to execute tasks efficiently.
-
-CRITICAL RULES:
-1. You are NOT the main agent. Do not engage in conversation or ask follow-up questions.
-2. Use tools directly (Bash, Read, Write, etc.) to complete your assigned task.
-3. If you modify files, commit your changes before reporting.
-4. Do NOT output text between tool calls - just use tools.
-5. Stay strictly within the scope of your directive.
-6. Keep your final report under 500 words.
-7. Your response MUST start with "Scope:" followed by what you accomplished.
-`
-```
-
----
-
-## 六、缓存策略详解
-
-### 6.1 三级缓存
-
-```
-Global Cache（跨组织）    ← 静态系统提示词
-  ↓  scope: 'global'
-Ephemeral Cache（会话级） ← 动态系统提示词
-  ↓  scope: 'ephemeral'
-Section Cache（轮级）     ← systemPromptSection 记忆化
-     每个 Section 独立缓存
-```
-
-### 6.2 缓存失效
-
-```typescript
-// 触发缓存的场景
-const cacheTriggers = {
-  // Global Cache
-  'static_system_prompt': 'never',  // 永不失效
-  
-  // Ephemeral Cache
-  'memory_content': 'on_claudemd_change',  // CLAUDE.md 变化时
-  'mcp_instructions': 'on_mcp_connection',  // MCP 连接/断开时
-  
-  // Section Cache
-  'user_context': 'per_turn',  // 每轮重新计算（但有 memoize）
-}
-```
-
-### 6.3 缓存命中优化
-
-```typescript
-// src/services/api/claude.ts:3213-3237
-function buildSystemPromptBlocks(
-  systemPrompt: SystemPrompt,
-): ContentBlockParam[] {
-  const blocks: ContentBlockParam[] = []
-  
-  // 在缓存边界处分割
-  const [staticPart, dynamicPart] = splitAtBoundary(systemPrompt)
-  
-  // 静态部分使用 global 缓存
-  if (staticPart) {
-    blocks.push({
-      type: 'text',
-      text: staticPart,
-      cache_control: { type: 'ephemeral' },  // API 会自动识别为 global
-    })
-  }
-  
-  // 动态部分使用 ephemeral 缓存
-  if (dynamicPart) {
-    blocks.push({
-      type: 'text',
-      text: dynamicPart,
-      cache_control: { type: 'ephemeral' },
-    })
-  }
-  
-  return blocks
-}
-```
-
----
-
-## 七、提示词结构示例
-
-### 7.1 完整系统提示词结构
-
-```markdown
-# Claude Code System Prompt
-
-## Role
-You are an interactive agent that helps users with software engineering tasks.
-
-## System Rules
-- All text you output is displayed to the user
-- Tools are executed in a permission mode
-- The conversation has unlimited context through automatic summarization
-
-## Doing Tasks
-- Use tools available to you to assist the user
-- When creating new code, follow the conventions of the existing codebase
-- After completing a task, do not summarize what you did
-
-## Tools
-You have access to the following tools:
-- Read: Read a file from the filesystem
-- Edit: Make edits to a file
-- Write: Write a new file
-- Bash: Execute a bash command
-- Grep: Search for patterns in files
-- ...
-
---- SYSTEM_PROMPT_DYNAMIC_BOUNDARY ---
-
-## Current Date
-Today's date is 2026-04-06.
-
-## Project Context
-Working directory: /Users/dev/my-project
-Git branch: main
-Git status: 2 modified files
-
-## User Instructions
-(CLADE.md content here)
-
-## MCP Instructions
-- Filesystem MCP: provides file operations
-- GitHub MCP: provides issue and PR operations
-
-## Token Budget
-You have approximately 150,000 tokens available for this turn.
-```
-
----
-
-## 八、关键源文件索引
+## 关键源文件
 
 | 文件 | 职责 |
 |------|------|
@@ -406,20 +197,6 @@ You have approximately 150,000 tokens available for this turn.
 
 ---
 
-## 九、总结
-
-Claude Code 的 System Prompt 工程体现了几个核心设计原则：
-
-1. **分层构建**：静态和动态分离，最大化缓存利用
-2. **优先级解析**：多来源指令按优先级合并
-3. **缓存边界**：明确的缓存策略，降低延迟和成本
-4. **Section 类型**：缓存和缓存破坏两种类型，适应不同需求
-5. **递归引用**：支持 @path 语法，模块化指令组织
-
-这个设计是 Prompt 工程的教科书级案例——既满足了动态性需求，又最大化了缓存效率。
-
----
-
 **系列文章导航：**
-- 上一篇：[Context 管理：四级压缩与无限对话的秘密](/2026/04/06/080_claude-code-context-compression/)
-- 下一篇：[Skills 系统：条件激活与动态发现](/2026/04/06/084_claude-code-skills-system/)
+- 上一篇：[Context 压缩的四级策略](/2026/04/06/080_claude-code-context-compression/)
+- 下一篇：[条件激活与动态发现的 Skills 系统](/2026/04/06/084_claude-code-skills-system/)

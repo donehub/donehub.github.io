@@ -1,59 +1,34 @@
 ---
-title: Memory 系统：跨会话持久化知识库
+title: 跨会话记忆：四种类型与自动提取机制
 date: 2026-04-06
 tags: Memory
 categories: Claude Code
 ---
 
-> 让 Claude Code 跨会话记住你是谁、你偏好什么、项目正在发生什么——这是 Memory 系统的核心目标。它不是简单的聊天记录持久化，而是一个结构化的知识管理系统，通过四种记忆类型、自动提取机制、团队同步等功能，让 AI 真正"理解"你。
-
 <!-- more -->
 
-## 导读：为什么需要 Memory？
+## 问题的起点
 
-假设你今天让 Claude Code 帮你重构代码，明天让它继续优化。如果没有 Memory：
+编程助手每次对话都从零开始，用户不得不反复说明同样的背景信息：自己的角色定位、编码偏好、项目当前的决策状态。这些信息无法从代码仓库中推断出来，但如果不记住它们，AI 就无法提供真正连贯的协助。
 
-- Claude 不知道你昨天做了什么
-- Claude 不知道你的编码风格偏好
-- Claude 不知道项目正在进行的决策
+Claude Code 的 Memory 系统通过持久化的结构化知识库解决这个问题。它不是聊天记录的归档，而是一个有明确类型定义、自动提取、智能检索的知识管理系统。
 
-每次对话都从零开始，这是 AI 编程助手的一个根本性限制。
+## 四种记忆类型
 
-Claude Code 的 Memory 系统解决了这个问题：**让 AI 跨会话积累知识**。
+Memory 将知识分为四类，每类有明确的边界和用途：
 
----
+| 类型 | 记录内容 | 典型示例 |
+|------|----------|----------|
+| User（用户画像） | 角色、目标、技能水平、偏好 | "用户是数据科学家，关注日志系统" |
+| Feedback（行为反馈） | 对 Claude 工作方式的纠正或肯定 | "集成测试用真实数据库，不用 mock" |
+| Project（项目动态） | 谁在做什么、为什么、截止日期 | "3/5 起合并冻结，移动团队发版" |
+| Reference（外部引用） | 外部系统的指针：仪表板、工单、Slack 频道 | "Pipeline bug 在 Linear INGEST 项目" |
 
-## 一、四种记忆类型
+这个分类覆盖了编码协作中需要从人脑传递给 AI 的全部上下文类型。用户画像决定模型的交互方式，行为反馈约束技术决策，项目动态提供时间维度的背景，外部引用打通内部工具链。
 
-### 1.1 类型定义
+### 不存什么
 
-```
-┌─────────────────────────────────────────────────────┐
-│                   四种记忆类型                        │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  User（用户画像）                                    │
-│    └─ 角色、目标、技能水平、偏好                     │
-│    └─ 示例："用户是数据科学家，关注日志系统"        │
-│                                                     │
-│  Feedback（行为反馈）                                │
-│    └─ 对 Claude 工作方式的纠正或肯定                │
-│    └─ 示例："集成测试用真实数据库，不用 mock"        │
-│                                                     │
-│  Project（项目动态）                                 │
-│    └─ 谁在做什么、为什么、截止日期                  │
-│    └─ 示例："3/5 起合并冻结，移动团队发版"          │
-│                                                     │
-│  Reference（外部引用）                               │
-│    └─ 外部系统指针：仪表板、工单系统、Slack 频道    │
-│    └─ 示例："Pipeline bug 在 Linear 'INGEST' 项目"  │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
-
-### 1.2 不存储的内容
-
-Memory 系统有一个核心原则：**只记住无法从代码中推断出来的东西**。
+Memory 有一个清晰的过滤原则：只记录无法从代码仓库中推断出来的东西。
 
 | 记住 | 不记住 |
 |------|--------|
@@ -62,30 +37,11 @@ Memory 系统有一个核心原则：**只记住无法从代码中推断出来�
 | 周四后冻结非关键合并 | 已有的 CLAUDE.md 内容 |
 | Bug 跟踪在 Linear 的 INGEST 项目 | 调试方案（修复已在代码里） |
 
----
+代码本身能表达的信息不需要 Memory 重复记录。Git 历史、文件结构、依赖关系这些都是代码仓库自带的上下文，Memory 只填充代码无法覆盖的空白。
 
-## 二、Memory 存储格式
+## 存储格式
 
-### 2.1 文件结构
-
-```
-~/.claude/
-└── projects/
-    └── {项目路径哈希}/
-        └── memory/                    ← 自动记忆目录
-            ├── MEMORY.md              ← 索引文件
-            ├── user_role.md           ← 用户画像记忆
-            ├── feedback_testing.md    ← 行为反馈记忆
-            ├── project_freeze.md      ← 项目动态记忆
-            ├── reference_linear.md    ← 外部引用记忆
-            └── team/                  ← 团队共享记忆
-                ├── MEMORY.md
-                └── ...
-```
-
-### 2.2 记忆文件格式
-
-每个记忆文件使用 YAML frontmatter + Markdown：
+Memory 文件存放在 `~/.claude/projects/{项目路径哈希}/memory/` 目录下，采用 YAML frontmatter + Markdown 格式：
 
 ```markdown
 ---
@@ -101,9 +57,11 @@ type: feedback
 **How to apply:** 所有标记为 integration test 的测试文件都要使用测试数据库连接。
 ```
 
-### 2.3 MEMORY.md 索引文件
+这个格式要求每条记忆都包含三个要素：是什么、为什么、怎么用。"Why"和"How to apply"两个字段确保记忆不是孤立的事实记录，而是有行动指导意义的知识单元。
 
-MEMORY.md 是索引而不是内容，它**始终加载到上下文**中：
+### MEMORY.md 索引
+
+目录下有一个 MEMORY.md 文件充当索引，它始终加载到上下文中：
 
 ```markdown
 # Memory Index
@@ -114,78 +72,45 @@ MEMORY.md 是索引而不是内容，它**始终加载到上下文**中：
 - [Bug 追踪](reference_linear.md) — 流水线 bug 在 Linear INGEST 项目
 ```
 
-**限制**：最多 200 行或 25KB，超出会被截断。
+这个索引文件有硬限制：最多 200 行或 25KB，超出会被截断。这个设计迫使索引保持精炼，详细内容只在需要时通过智能检索加载。
 
----
+## 自动提取机制
 
-## 三、Memory 提取机制
+Memory 不需要用户手动维护。系统每次模型完成回复（无 tool_use）时自动检查是否需要提取新记忆。
 
-### 3.1 自动提取流程
-
-```
-触发时机：每次模型完成回复（无 tool_use）时
-         ↓
-守卫检查：主代理？功能门控开启？自动记忆启用？
-         ↓
-频率控制：turnsSinceLastExtraction++ (默认每 1 次)
-         ↓
-互斥检查：主代理自己写了记忆？→ 跳过
-         ↓
-扫描现有记忆 → 生成清单
-         ↓
-运行分叉代理（runForkedAgent）
-  - 共享父会话提示词缓存
-  - 最多 5 个 turn
-  - 限制工具权限
-         ↓
-写入新记忆文件 + 更新 MEMORY.md
-         ↓
-通知用户："Memory updated in ..."
-```
-
-### 3.2 工具权限限制
+提取流程经过四道门控：确认是主代理执行、自动记忆功能已开启、频率控制（默认每轮检查一次）、以及互斥检查（主代理自己在当前轮次已经写过记忆则跳过）。通过门控后，系统启动一个分叉代理来执行提取，这个分叉代理共享父会话的提示词缓存，最多执行 5 个 turn，工具权限被严格限制。
 
 ```typescript
-// src/services/extractMemories/extractMemories.ts
 function createAutoMemCanUseTool(memoryDir: string): CanUseToolFn {
   return (toolName, input) => {
-    // ✅ 允许：Read, Grep, Glob（无限制）
-    if (['Read', 'Grep', 'Glob'].includes(toolName)) {
-      return true
-    }
-    
-    // ✅ 允许：Bash（只读命令：ls, find, grep, cat...）
-    if (toolName === 'Bash' && isReadOnlyCommand(input.command)) {
-      return true
-    }
-    
-    // ✅ 允许：Edit/Write（仅 auto-memory 目录内）
+    // 允许读取类工具，用于扫描现有记忆
+    if (['Read', 'Grep', 'Glob'].includes(toolName)) return true
+
+    // Bash 只允许只读命令
+    if (toolName === 'Bash' && isReadOnlyCommand(input.command)) return true
+
+    // 写入工具仅限 memory 目录内
     if (['Edit', 'Write'].includes(toolName)) {
       return isInsideMemoryDir(input.file_path, memoryDir)
     }
-    
-    // ❌ 拒绝：MCP, Agent, 非只读 Bash
+
+    // MCP、Agent、非只读 Bash 全部拒绝
     return false
   }
 }
 ```
 
-### 3.3 互斥机制
+这个权限设计有明确的安全意图：提取代理只能读取项目文件和写入 memory 目录，不能修改项目代码、不能调用外部服务、不能启动子代理。即使提取过程出错，影响范围也被限制在 memory 目录内。
 
-防止重复保存：
+互斥机制防止重复保存。如果主代理在当前轮次已经通过 Write/Edit 操作过 memory 目录，自动提取就会跳过，避免同一条信息被重复记录。
 
 ```typescript
-function hasMemoryWritesSince(
-  messages: Message[],
-  sinceUuid: string,
-): boolean {
-  // 扫描 sinceUuid 之后的所有 assistant 消息
-  // 如果有任何 Edit/Write 指向 auto-memory 目录 → return true
+function hasMemoryWritesSince(messages: Message[], sinceUuid: string): boolean {
   for (const msg of messages) {
     if (msg.uuid === sinceUuid) break
     if (msg.type === 'assistant') {
       for (const block of msg.content) {
-        if (block.type === 'tool_use' && 
+        if (block.type === 'tool_use' &&
             ['Edit', 'Write'].includes(block.name) &&
             isMemoryPath(block.input.file_path)) {
           return true
@@ -197,214 +122,96 @@ function hasMemoryWritesSince(
 }
 ```
 
----
+## 智能检索与新鲜度管理
 
-## 四、Memory 在 Prompt 中的使用
-
-### 4.1 系统提示词注入
+Memory 不是全量加载到上下文的。系统用 Sonnet 模型作为选择器，每次用户查询时动态筛选最相关的记忆。
 
 ```typescript
-// src/memdir/memdir.ts
-async function loadMemoryPrompt(): Promise<string | null> {
-  const sections = []
-  
-  // 1. 记忆类型说明
-  sections.push(`## Types of memory`)
-  sections.push(...getMemoryTypeDescriptions())
-  
-  // 2. 不存储的内容
-  sections.push(`## What NOT to save`)
-  sections.push(...getWhatNotToSaveList())
-  
-  // 3. 如何保存记忆
-  sections.push(`## How to save memories`)
-  sections.push(getSaveInstructions())
-  
-  // 4. 何时查阅记忆
-  sections.push(`## When to access memories`)
-  sections.push(getAccessGuidelines())
-  
-  // 5. 引用前验证
-  sections.push(`## Before recommending`)
-  sections.push(getValidationGuidelines())
-  
-  // 6. MEMORY.md 索引内容
-  sections.push(`## MEMORY.md`)
-  sections.push(await loadMemoryIndex())
-  
-  return sections.join('\n\n')
-}
-```
-
-### 4.2 智能检索
-
-每次用户查询时动态选择相关记忆：
-
-```typescript
-// src/memdir/findRelevantMemories.ts
 async function findRelevantMemories(
-  query: string,
-  memoryDir: string,
-  recentTools: string[] = [],
+  query: string, memoryDir: string, recentTools: string[] = [],
 ): Promise<RelevantMemory[]> {
-  // 1. 扫描所有 .md 文件（排除 MEMORY.md）
   const files = await scanMemoryFiles(memoryDir)
-  
-  // 2. 解析 frontmatter（前 30 行）
-  const candidates = await Promise.all(
-    files.map(f => parseMemoryFile(f))
-  )
-  
-  // 3. Sonnet 模型选择
+  const candidates = await Promise.all(files.map(f => parseMemoryFile(f)))
+
+  // 用 Sonnet 模型从候选中选择相关记忆
   const selected = await sideQuery({
     model: 'claude-sonnet-4-5',
     systemPrompt: MEMORY_SELECTOR_PROMPT,
     messages: [{ role: 'user', content: query }],
     context: { candidates, recentTools },
   })
-  
-  // 4. 返回选中记忆
+
   return selected.map(s => ({ path: s.path, mtimeMs: s.mtimeMs }))
 }
 ```
 
-**Sonnet 选择器提示词**：
+选择器最多选 5 条记忆，不确定是否有用的就不选。这个设计控制了额外引入的 token 开销，同时避免了无关记忆对模型的干扰。
 
-```
-你是记忆选择器。从候选记忆中选择对处理用户查询有用的记忆。
-
-规则：
-- 最多选 5 个
-- 不确定是否有用就不要选
-- 如果提供了最近使用的工具列表，不要选这些工具的使用文档
-  （但要选择关于这些工具的警告/陷阱/已知问题）
-
-返回格式：
-- memory_path: 选择原因
-```
-
-### 4.3 新鲜度警告
+记忆是有时效性的。一条三个月前记录的"合并冻结"可能早已解除，半年前的项目决策可能已被推翻。系统对旧记忆附带新鲜度警告：
 
 ```typescript
 function memoryFreshnessText(mtimeMs: number): string {
   const days = memoryAgeDays(mtimeMs)
   if (days <= 1) return ''  // 今天/昨天：无警告
-  
-  return `This memory is ${days} days old. Memories are point-in-time 
-observations that may become stale. Verify against current code before 
+  return `This memory is ${days} days old. Memories are point-in-time
+observations that may become stale. Verify against current code before
 asserting as fact.`
 }
 ```
 
----
+超过一天的记忆就会被标注时效提醒，要求模型在引用前验证当前代码状态。这个机制解决了记忆系统的核心矛盾：既要跨会话保留信息，又要避免过时信息误导决策。
 
-## 五、团队 Memory 同步
+## 团队同步
 
-### 5.1 API 端点
+团队成员的 Memory 可以通过 API 同步共享：
 
 ```
 GET  /api/claude_code/team_memory?repo={owner/repo}  ← 拉取
 PUT  /api/claude_code/team_memory?repo={owner/repo}  ← 推送
 ```
 
-### 5.2 同步语义
-
-| 操作 | 行为 |
-|------|------|
-| **Pull** | 服务器内容覆盖本地文件（服务器优先） |
-| **Push** | 仅上传内容哈希不同的键（delta 上传） |
-| **删除** | 本地删除不会删除远程（下次 pull 会恢复） |
-
-### 5.3 冲突解决
+同步采用服务器优先的语义：Pull 时服务器内容覆盖本地，Push 时只上传哈希不同的增量内容。本地删除不会删除远程记录，下次 Pull 时会被恢复。冲突通过 412 状态码触发重试，最多 2 次。
 
 ```typescript
 async function pushTeamMemory(state): Promise<PushResult> {
-  // 1. 读取本地文件 → 计算哈希
   const localFiles = await readLocalMemoryFiles()
   const localHashes = computeHashes(localFiles)
-  
-  // 2. 对比 serverChecksums → 生成 delta
   const delta = computeDelta(localHashes, state.serverChecksums)
-  
-  // 3. 上传 delta
+
   const response = await api.pushTeamMemory(delta)
-  
-  // 4. 遇到 412 冲突：
+
+  // 412 冲突：获取最新 checksums 后重试
   if (response.status === 412) {
-    // 探测 GET ?view=hashes 获取最新 checksums
     const latest = await api.getTeamMemoryHashes()
-    // 重新计算 delta（排除队友已推送的相同内容）
-    const newDelta = recomputeDelta(localHashes, latest)
-    // 重试（最多 2 次）
+    const newDelta = computeDelta(localHashes, latest)
     return pushTeamMemory({ ...state, serverChecksums: latest })
   }
-  
+
   return { success: true }
 }
 ```
 
-### 5.4 安全限制
+安全方面，单文件上限 250KB，上传体上限 200KB，并使用 gitleaks 规则扫描凭证，检测到密钥或密码则跳过该文件，防止敏感信息泄露到团队共享空间。
 
-- **单文件最大**：250KB
-- **上传体最大**：200KB（分批上传）
-- **秘密扫描**：使用 gitleaks 规则扫描凭证，检测到则跳过该文件
+## AutoDream：后台记忆整合
 
----
+随着对话积累，Memory 目录会逐渐膨胀。AutoDream 是一个后台任务，定期对记忆进行整合、去重和修剪。
 
-## 六、AutoDream：后台记忆整合
-
-### 6.1 触发条件
+触发条件有四道门控：距离上次整合至少 24 小时、期间至少经历了 5 次会话、没有其他进程正在执行整合、以及 10 分钟的扫描节流。
 
 ```typescript
-// src/services/autoDream/autoDream.ts
 async function shouldTriggerAutoDream(): Promise<boolean> {
-  // 四重门控
-  if (hoursSinceLastConsolidation < minHours) return false  // 时间门：默认 24h
-  if (sessionsSinceLastConsolidation < minSessions) return false  // 会话门：默认 5 次
-  if (otherProcessConsolidating) return false  // 锁门：互斥
-  if (timeSinceLastScan < 10 * 60 * 1000) return false  // 扫描节流：10 分钟
-  
+  if (hoursSinceLastConsolidation < minHours) return false          // 默认 24h
+  if (sessionsSinceLastConsolidation < minSessions) return false    // 默认 5 次
+  if (otherProcessConsolidating) return false                       // 互斥锁
+  if (timeSinceLastScan < 10 * 60 * 1000) return false              // 10 分钟节流
   return true
 }
 ```
 
-### 6.2 四阶段流程
+整合过程分四个阶段：定向（确定要审查的会话列表）、收集（从会话中提取候选记忆）、整合（合并、去重、更新记忆文件）、修剪（删除过时或重复的记忆）。这个流程类似于人类睡眠时的记忆整理过程，将碎片化的短期记忆整合为结构化的长期知识。
 
-```
-┌─────────────────────────────────────────────────────┐
-│              AutoDream 四阶段流程                    │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  Phase 1: 定向（Orientation）                       │
-│    └─ 确定要审查的会话列表                          │
-│                                                     │
-│  Phase 2: 收集（Collection）                        │
-│    └─ 从会话中提取候选记忆                          │
-│                                                     │
-│  Phase 3: 整合（Consolidation）                     │
-│    └─ 合并、去重、更新记忆文件                      │
-│                                                     │
-│  Phase 4: 修剪（Pruning）                           │
-│    └─ 删除过时或重复的记忆                          │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
-
-### 6.3 DreamTask 状态
-
-```typescript
-type DreamTaskState = {
-  type: 'dream'
-  phase: 'starting' | 'updating'  // updating = 已开始编辑文件
-  sessionsReviewing: number       // 正在审查的会话数
-  filesTouched: string[]          // 编辑过的文件路径
-  turns: DreamTurn[]              // 对话轮次记录
-}
-```
-
----
-
-## 七、关键源文件索引
+## 关键源文件
 
 | 文件 | 职责 |
 |------|------|
@@ -417,23 +224,6 @@ type DreamTaskState = {
 | `src/services/teamMemorySync/` | 团队记忆同步 |
 | `src/services/autoDream/` | AutoDream 后台整合 |
 | `src/utils/frontmatterParser.ts` | YAML frontmatter 解析 |
-| `src/components/memory/` | UI 组件 |
-| `src/commands/memory/` | `/memory` 命令 |
-
----
-
-## 八、总结
-
-Claude Code 的 Memory 系统体现了几个核心设计原则：
-
-1. **结构化知识**：四种记忆类型，避免信息混淆
-2. **自动提取**：后台智能分析对话，提取有价值信息
-3. **智能检索**：Sonnet 模型动态选择相关记忆
-4. **新鲜度管理**：旧记忆附带警告，使用前需验证
-5. **团队同步**：服务器优先语义，支持协作
-6. **AutoDream**：后台"做梦"整理记忆
-
-这个设计让 AI 真正能够"记住"用户，而不是每次都从零开始。
 
 ---
 

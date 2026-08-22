@@ -1,148 +1,35 @@
 ---
-title: Terminal UI：React + Ink 的 TUI 实现
+title: React + Ink 构建的终端界面
 date: 2026-04-06
 tags: Terminal UI
 categories: Claude Code
 ---
 
-> Claude Code 的终端界面不是传统的 CLI——它是一个完整的 React 应用，运行在终端中。通过 Ink 框架（自定义 React Reconciler + Yoga 布局引擎），Claude Code 实现了组件化 UI、双缓冲渲染、交互式对话框等高级特性。这是 Terminal UI 开发的教科书级案例。
-
 <!-- more -->
 
-## 导读：终端里的 React 应用
+## 终端里的 React 应用
 
-当你打开 Claude Code，看到的不是普通的命令行输出：
+Claude Code 的终端界面不是传统的 CLI 逐行输出，而是一个完整的 React 应用。它通过 Ink 框架（React 的终端渲染器）实现了组件化 UI、Flexbox 布局、双缓冲渲染和交互式对话框。选择 Ink 而非 ncurses 或 blessed 这类传统终端 UI 库，核心原因是复用 React 生态：组件化思想、状态管理、生命周期、以及开发者的熟悉度。
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Claude Code                                                 │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│ ▶ What would you like me to help you with?                 │
-│                                                             │
-│ ┌─ Tools ─────────────────────────────────────────────────┐│
-│ │ Read  Edit  Write  Bash  Grep  Glob  WebSearch          ││
-│ └─────────────────────────────────────────────────────────┘│
-│                                                             │
-│ ┌─ Context ────────────────────────────────────────────────┐│
-│ │ Memory: 3 entries loaded                                 ││
-│ │ MCP: 2 servers connected                                 ││
-│ │ Token budget: 150,000                                    ││
-│ └─────────────────────────────────────────────────────────┘│
-│                                                             │
-│ [Type your message or press Enter for suggestions]         │
-└─────────────────────────────────────────────────────────────┘
-```
+Ink 的架构分为四层。React Components 通过自定义的 React Reconciler 转换为 Ink Host Config 调用，Host Config 使用 Yoga 布局引擎计算 Flexbox 布局（基于终端字符单位），最终 Terminal Renderer 将布局结果转换为 ANSI 转义序列输出到 stdout。这个架构让终端 UI 开发体验接近 Web 前端，同时保持了终端应用的性能特征。
 
-这是一个**完整的 GUI 应用**，运行在终端中。背后是 React + Ink 的魔法。
+## 核心组件与布局
 
----
+组件树结构遵循典型的 GUI 应用模式：App 作为根组件，包含 Header（标题和状态指示）、Main（消息列表、工具栏、上下文面板）和 Footer（输入框和建议）。消息列表中的 AssistantMessage 嵌套 ToolCall 和 ToolResult 子组件，形成树状的消息结构。
 
-## 一、Ink 框架基础
-
-### 1.1 React Reconciler 架构
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    React + Ink 架构                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  React Components                                           │
-│       ↓                                                     │
-│  React Reconciler（自定义）                                  │
-│       ↓                                                     │
-│  Ink Host Config                                            │
-│       ├─ createInstance() → 创建 Yoga Node                 │
-│       ├─ appendChild() → 添加子节点                         │
-│       ├─ removeChild() → 删除子节点                         │
-│       └─ commitUpdate() → 更新属性                          │
-│       ↓                                                     │
-│  Yoga Layout Engine                                         │
-│       ├─ Flexbox 布局计算                                   │
-│       ├─ 文字测量（基于终端字符）                            │
-│       └─ 位置计算                                           │
-│       ↓                                                     │
-│  Terminal Renderer                                          │
-│       ├─ ANSI 转义序列                                      │
-│       ├─ 双缓冲渲染                                         │
-│       └─ 输出合并                                           │
-│       ↓                                                     │
-│  stdout                                                     │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 1.2 为什么选择 Ink？
-
-| 优势 | 说明 |
-|------|------|
-| **React 生态** | 复用 React 的组件化思想、状态管理、生命周期 |
-| **Flexbox 布局** | Yoga 引擎提供完整的 Flexbox 支持 |
-| **跨平台** | Windows/macOS/Linux 终端一致性 |
-| **双缓冲** | 避免闪烁，平滑更新 |
-
----
-
-## 二、核心组件设计
-
-### 2.1 组件树结构
-
-```
-<App>
-  <Header>
-    <Title />
-    <StatusIndicator />
-  </Header>
-  
-  <Main>
-    <MessageList>
-      <UserMessage />
-      <AssistantMessage>
-        <ToolCall />
-        <ToolResult />
-      </AssistantMessage>
-    </MessageList>
-    
-    <ToolBar>
-      <ToolButton tool="Read" />
-      <ToolButton tool="Edit" />
-      ...
-    </ToolBar>
-    
-    <ContextPanel>
-      <MemoryStatus />
-      <MCPStatus />
-      <TokenBudget />
-    </ContextPanel>
-  </Main>
-  
-  <Footer>
-    <InputBox />
-    <Suggestions />
-  </Footer>
-</App>
-```
-
-### 2.2 基础组件实现
+布局系统基于 Yoga 引擎，支持完整的 Flexbox 属性：flexDirection、justifyContent、alignItems、flexGrow、padding、margin、borderStyle 等。终端环境与浏览器的一个关键差异是尺寸单位——终端以字符为单位，padding: 1 表示 1 个字符的边距，而非像素。
 
 ```tsx
 // src/components/App.tsx
-import { Box, Text, useInput, useApp } from 'ink'
-
 function App() {
   const { exit } = useApp()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
 
   useInput((char, key) => {
-    if (key.escape) {
-      exit()
-    } else if (key.return) {
-      handleSubmit(input)
-      setInput('')
-    } else {
-      setInput(prev => prev + char)
-    }
+    if (key.escape) exit()
+    else if (key.return) { handleSubmit(input); setInput('') }
+    else setInput(prev => prev + char)
   })
 
   return (
@@ -158,142 +45,61 @@ function App() {
 }
 ```
 
----
-
-## 三、布局系统
-
-### 3.1 Yoga Flexbox
-
-```tsx
-// Flexbox 属性完全支持
-<Box 
-  flexDirection="column"    // 垂直布局
-  justifyContent="center"   // 居中
-  alignItems="stretch"      // 拉伸
-  flexGrow={1}              // 占满剩余空间
-  padding={1}               // 1 字符边距
-  margin={2}                // 2 字符外边距
-  borderStyle="single"      // 单线边框
->
-  <Text>Content</Text>
-</Box>
-```
-
-### 3.2 文字测量
+文字测量是终端布局的基础。Yoga 引擎需要知道每段文本的宽度和高度才能正确计算布局。测量过程需要处理三个问题：ANSI 转义序列不计入宽度（它们是控制字符，不占显示空间）、多行文本需要逐行计算、中文字符占 2 列（全角字符）。
 
 ```typescript
-// ink/lib/measureText.ts
 function measureText(text: string): { width: number; height: number } {
-  // 1. 处理 ANSI 转义序列（不计入宽度）
   const cleanText = stripAnsi(text)
-  
-  // 2. 处理多行文本
   const lines = cleanText.split('\n')
-  
-  // 3. 每行宽度 = 字符数（考虑宽字符）
-  const widths = lines.map(line => {
-    // 中文字符占 2 列
-    return line.split('').reduce((width, char) => {
-      return width + (isFullWidth(char) ? 2 : 1)
-    }, 0)
-  })
-  
-  return {
-    width: Math.max(...widths),
-    height: lines.length,
-  }
+  const widths = lines.map(line =>
+    line.split('').reduce((width, char) => width + (isFullWidth(char) ? 2 : 1), 0)
+  )
+  return { width: Math.max(...widths), height: lines.length }
 }
 ```
 
----
+## 双缓冲渲染
 
-## 四、双缓冲渲染
+双缓冲是避免终端闪烁的关键技术。渲染流程分为五步：状态更新触发 Reconciler 更新 Yoga Tree，Layout 引擎重新计算布局，渲染到 Buffer A（生成 ANSI 序列），交换缓冲区（Buffer A 变为 Previous Frame，Buffer B 变为 Current Frame），Diff 对比两帧差异只输出变化的区域。
 
-### 4.1 渲染流程
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    双缓冲渲染流程                            │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  State Update                                               │
-│       ↓                                                     │
-│  Reconciler 更新 Yoga Tree                                  │
-│       ↓                                                     │
-│  Layout 计算                                                │
-│       ↓                                                     │
-│  Render to Buffer A                                         │
-│       ├─ 遍历 Yoga Tree                                    │
-│       ├─ 生成 ANSI 序列                                    │
-│       └─ 写入 Buffer A                                     │
-│       ↓                                                     │
-│  Swap Buffers                                               │
-│       ├─ Buffer A → Previous Frame                         │
-│       ├─ Buffer B → Current Frame                          │
-│       ↓                                                     │
-│  Diff & Output                                              │
-│       ├─ 对比 Previous vs Current                          │
-│       ├─ 只输出变化的区域                                   │
-│       └─ ANSI 光标移动 + 更新                               │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 4.2 Diff 算法
+Diff 算法逐行对比 Previous 和 Current 帧，只有内容不同的行才会生成 ANSI 光标移动和写入指令。这个设计将每帧的输出量从整个屏幕缩小到变化的行，大幅减少终端 I/O。
 
 ```typescript
-// ink/lib/diff.ts
 function diffScreens(prev: string[], curr: string[]): DiffOutput[] {
   const outputs: DiffOutput[] = []
-  
   for (let y = 0; y < Math.max(prev.length, curr.length); y++) {
     const prevLine = prev[y] || ''
     const currLine = curr[y] || ''
-    
     if (prevLine !== currLine) {
-      // 移动光标到该行
       outputs.push({ type: 'move', x: 0, y })
-      
-      // 清除该行
       outputs.push({ type: 'clear_line' })
-      
-      // 写入新内容
       outputs.push({ type: 'write', content: currLine })
     }
   }
-  
   return outputs
 }
 ```
 
----
+渲染还有节流机制，间隔 16ms（约 60fps）。多次状态更新如果在同一个渲染间隔内发生，会合并为一次渲染，避免频繁的终端刷新。
 
-## 五、交互式组件
+## 交互式组件
 
-### 5.1 InputBox 实现
+终端中的交互依赖 `useInput` Hook 捕获键盘事件。InputBox 组件处理字符输入、光标移动（左右箭头）、退格删除和回车提交，通过拼接字符串的方式维护光标位置和文本内容。
 
 ```tsx
-// src/components/InputBox.tsx
-import { Box, Text, useInput } from 'ink'
-import { useState } from 'react'
-
 function InputBox({ onSubmit }) {
   const [value, setValue] = useState('')
   const [cursorPosition, setCursorPosition] = useState(0)
 
   useInput((char, key) => {
-    if (key.leftArrow) {
-      setCursorPosition(Math.max(0, cursorPosition - 1))
-    } else if (key.rightArrow) {
-      setCursorPosition(Math.min(value.length, cursorPosition + 1))
-    } else if (key.backspace) {
+    if (key.leftArrow) setCursorPosition(Math.max(0, cursorPosition - 1))
+    else if (key.rightArrow) setCursorPosition(Math.min(value.length, cursorPosition + 1))
+    else if (key.backspace) {
       setValue(prev => prev.slice(0, cursorPosition - 1) + prev.slice(cursorPosition))
       setCursorPosition(Math.max(0, cursorPosition - 1))
-    } else if (key.return) {
-      onSubmit(value)
-      setValue('')
-      setCursorPosition(0)
-    } else {
+    }
+    else if (key.return) { onSubmit(value); setValue(''); setCursorPosition(0) }
+    else {
       setValue(prev => prev.slice(0, cursorPosition) + char + prev.slice(cursorPosition))
       setCursorPosition(cursorPosition + 1)
     }
@@ -310,77 +116,32 @@ function InputBox({ onSubmit }) {
 }
 ```
 
-### 5.2 SelectMenu 实现
+SelectMenu 组件用上下箭头导航选项列表，回车确认。PermissionDialog 组件用左右箭头在 Allow/Deny 之间切换，回车提交。这些组件的共同模式是：`useState` 管理选中状态，`useInput` 捕获键盘事件，条件渲染高亮当前选中项。
+
+## 工具调用与结果可视化
+
+ToolCall 组件根据工具执行状态（pending/running/success/error）显示不同颜色的边框和图标。运行中显示输入参数摘要，成功显示耗时，错误显示错误信息。ToolResult 组件对长输出做截断处理（默认 500 字符），用户可以通过回车键展开完整内容。
 
 ```tsx
-// src/components/SelectMenu.tsx
-import { Box, Text, useInput } from 'ink'
-
-function SelectMenu({ items, onSelect }) {
-  const [selectedIndex, setSelectedIndex] = useState(0)
-
-  useInput((char, key) => {
-    if (key.upArrow) {
-      setSelectedIndex(Math.max(0, selectedIndex - 1))
-    } else if (key.downArrow) {
-      setSelectedIndex(Math.min(items.length - 1, selectedIndex + 1))
-    } else if (key.return) {
-      onSelect(items[selectedIndex])
-    }
-  })
-
-  return (
-    <Box flexDirection="column">
-      {items.map((item, index) => (
-        <Box key={item.value}>
-          <Text color={index === selectedIndex ? 'cyan' : 'gray'}>
-            {index === selectedIndex ? '▶ ' : '  '}
-          </Text>
-          <Text bold={index === selectedIndex}>{item.label}</Text>
-        </Box>
-      ))}
-    </Box>
-  )
-}
-```
-
----
-
-## 六、工具调用可视化
-
-### 6.1 ToolCall 组件
-
-```tsx
-// src/components/ToolCall.tsx
 function ToolCall({ toolName, input, status }) {
-  const statusColor = {
-    pending: 'yellow',
-    running: 'blue',
-    success: 'green',
-    error: 'red',
-  }
+  const statusColor = { pending: 'yellow', running: 'blue', success: 'green', error: 'red' }
 
   return (
     <Box flexDirection="column" borderStyle="single" borderColor={statusColor[status]}>
       <Box>
-        <Text bold color={statusColor[status]}>
-          ⚙ {toolName}
-        </Text>
+        <Text bold color={statusColor[status]}>⚙ {toolName}</Text>
         <Text dimColor> ({status})</Text>
       </Box>
-      
       {status === 'running' && (
         <Box marginLeft={2}>
           <Text dimColor>Input: {JSON.stringify(input).slice(0, 100)}</Text>
         </Box>
       )}
-      
       {status === 'success' && (
         <Box marginLeft={2}>
           <Text color="green">✓ Completed in {duration}ms</Text>
         </Box>
       )}
-      
       {status === 'error' && (
         <Box marginLeft={2}>
           <Text color="red">✗ {error.message}</Text>
@@ -391,291 +152,47 @@ function ToolCall({ toolName, input, status }) {
 }
 ```
 
-### 6.2 ToolResult 组件
+这种状态驱动的可视化设计让用户能直观感知每个工具调用的进度和结果，不需要阅读原始日志。
+
+## 长列表的虚拟滚动
+
+当对话历史很长时，消息列表可能包含数百条消息。虚拟滚动组件只渲染可见区域的条目，通过 `scrollTop` 状态控制可见窗口，上下箭头滚动时更新 `scrollTop` 并重新计算可见条目。
 
 ```tsx
-// src/components/ToolResult.tsx
-function ToolResult({ output, truncated }) {
-  const [expanded, setExpanded] = useState(false)
-  
-  const displayOutput = expanded ? output : output.slice(0, 500)
-  
-  return (
-    <Box flexDirection="column">
-      <Box borderStyle="single" borderColor="gray">
-        <Text dimColor>Output:</Text>
-      </Box>
-      
-      <Box padding={1}>
-        <Text>{displayOutput}</Text>
-      </Box>
-      
-      {truncated && !expanded && (
-        <Box>
-          <Text dimColor>... ({output.length - 500} more characters)</Text>
-          <Text color="cyan" bold> [Press Enter to expand]</Text>
-        </Box>
-      )}
-    </Box>
-  )
-}
-```
-
----
-
-## 七、权限对话框
-
-### 7.1 PermissionDialog 组件
-
-```tsx
-// src/components/PermissionDialog.tsx
-function PermissionDialog({ toolName, description, onAllow, onDeny }) {
-  const [selected, setSelected] = useState<'allow' | 'deny'>('deny')
-
-  useInput((char, key) => {
-    if (key.leftArrow || key.rightArrow) {
-      setSelected(prev => prev === 'allow' ? 'deny' : 'allow')
-    } else if (key.return) {
-      if (selected === 'allow') {
-        onAllow()
-      } else {
-        onDeny()
-      }
-    }
-  })
-
-  return (
-    <Box 
-      flexDirection="column" 
-      borderStyle="double" 
-      borderColor="yellow"
-      padding={2}
-    >
-      <Box>
-        <Text bold color="yellow">⚠ Permission Required</Text>
-      </Box>
-      
-      <Box marginTop={1}>
-        <Text>Tool: <Text bold>{toolName}</Text></Text>
-      </Box>
-      
-      <Box marginTop={1}>
-        <Text>{description}</Text>
-      </Box>
-      
-      <Box marginTop={2} justifyContent="space-around">
-        <Box>
-          <Text 
-            backgroundColor={selected === 'deny' ? 'red' : undefined}
-            bold={selected === 'deny'}
-          >
-            [Deny]
-          </Text>
-        </Box>
-        <Box>
-          <Text 
-            backgroundColor={selected === 'allow' ? 'green' : undefined}
-            bold={selected === 'allow'}
-          >
-            [Allow]
-          </Text>
-        </Box>
-      </Box>
-      
-      <Box marginTop={1}>
-        <Text dimColor>← → to select, Enter to confirm</Text>
-      </Box>
-    </Box>
-  )
-}
-```
-
----
-
-## 八、非交互模式
-
-### 8.1 模式切换
-
-```typescript
-// src/cli.ts
-function detectInteractiveMode(): boolean {
-  // 1. 检查 stdout 是否是 TTY
-  if (!process.stdout.isTTY) {
-    return false
-  }
-
-  // 2. 检查 CI 环境
-  if (process.env.CI === 'true') {
-    return false
-  }
-
-  // 3. 检查 --non-interactive 参数
-  if (process.argv.includes('--non-interactive')) {
-    return false
-  }
-
-  return true
-}
-```
-
-### 8.2 非交互输出
-
-```typescript
-// src/renderers/nonInteractive.ts
-function renderNonInteractive(message: Message): void {
-  switch (message.type) {
-    case 'user':
-      console.log(`\n> ${message.content}`)
-      break
-      
-    case 'assistant':
-      console.log(`\n${message.content}`)
-      break
-      
-    case 'tool_use':
-      console.log(`\n[Tool: ${message.toolName}]`)
-      if (message.input) {
-        console.log(`  Input: ${JSON.stringify(message.input)}`)
-      }
-      break
-      
-    case 'tool_result':
-      console.log(`  Result: ${message.output.slice(0, 500)}`)
-      break
-      
-    case 'error':
-      console.error(`\n[Error] ${message.message}`)
-      break
-  }
-}
-```
-
----
-
-## 九、颜色和样式系统
-
-### 9.1 ANSI 颜色映射
-
-```typescript
-// src/styles/colors.ts
-const COLORS = {
-  // 用户消息
-  user: 'cyan',
-  
-  // AI 响应
-  assistant: 'white',
-  
-  // 工具调用
-  tool_pending: 'yellow',
-  tool_running: 'blue',
-  tool_success: 'green',
-  tool_error: 'red',
-  
-  // 状态指示
-  status_active: 'green',
-  status_idle: 'gray',
-  status_error: 'red',
-  
-  // 强调
-  emphasis: 'bold',
-  dim: 'dim',
-}
-
-// ANSI 转义序列
-const ANSI_COLORS = {
-  cyan: '\x1b[36m',
-  green: '\x1b[32m',
-  red: '\x1b[31m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  gray: '\x1b[90m',
-  bold: '\x1b[1m',
-  dim: '\x1b[2m',
-  reset: '\x1b[0m',
-}
-```
-
-### 9.2 边框样式
-
-```typescript
-// ink/lib/borders.ts
-const BORDERS = {
-  single: {
-    topLeft: '┌', top: '─', topRight: '┐',
-    left: '│', right: '│',
-    bottomLeft: '└', bottom: '─', bottomRight: '┘',
-  },
-  double: {
-    topLeft: '╔', top: '═', topRight: '╗',
-    left: '║', right: '║',
-    bottomLeft: '╚', bottom: '═', bottomRight: '╝',
-  },
-  rounded: {
-    topLeft: '╭', top: '─', topRight: '╮',
-    left: '│', right: '│',
-    bottomLeft: '╰', bottom: '─', bottomRight: '╯',
-  },
-}
-```
-
----
-
-## 十、性能优化
-
-### 10.1 渲染节流
-
-```typescript
-// ink/lib/renderer.ts
-const RENDER_INTERVAL = 16  // ~60fps
-
-function scheduleRender(callback: () => void): void {
-  if (renderScheduled) {
-    return
-  }
-  
-  renderScheduled = true
-  setTimeout(() => {
-    callback()
-    renderScheduled = false
-  }, RENDER_INTERVAL)
-}
-```
-
-### 10.2 虚拟滚动
-
-```typescript
-// src/components/VirtualList.tsx
 function VirtualList({ items, height }) {
   const [scrollTop, setScrollTop] = useState(0)
-  
-  // 只渲染可见区域
-  const visibleStart = scrollTop
-  const visibleEnd = scrollTop + height
-  const visibleItems = items.slice(visibleStart, visibleEnd)
+  const visibleItems = items.slice(scrollTop, scrollTop + height)
 
   useInput((char, key) => {
-    if (key.upArrow) {
-      setScrollTop(Math.max(0, scrollTop - 1))
-    } else if (key.downArrow) {
-      setScrollTop(Math.min(items.length - height, scrollTop + 1))
-    }
+    if (key.upArrow) setScrollTop(Math.max(0, scrollTop - 1))
+    else if (key.downArrow) setScrollTop(Math.min(items.length - height, scrollTop + 1))
   })
 
   return (
     <Box flexDirection="column" height={height}>
       {visibleItems.map((item, index) => (
-        <Box key={visibleStart + index}>
-          <Text>{item.content}</Text>
-        </Box>
+        <Box key={scrollTop + index}><Text>{item.content}</Text></Box>
       ))}
     </Box>
   )
 }
 ```
 
----
+虚拟滚动将渲染成本从 O(n) 降到 O(visible)，在长对话场景下避免了终端刷新的卡顿。
 
-## 十一、关键源文件索引
+## 非交互模式
+
+Claude Code 会自动检测运行环境，在非 TTY 环境（管道、CI 环境、`--non-interactive` 参数）下切换为简单输出模式。检测逻辑依次检查 stdout 是否是 TTY、是否设置了 `CI=true` 环境变量、是否包含 `--non-interactive` 参数。
+
+非交互模式下，消息以纯文本形式输出：用户消息前加 `>`，助手消息直接输出，工具调用显示 `[Tool: name]` 和输入参数，工具结果显示前 500 字符，错误显示 `[Error] message`。这种降级确保 Claude Code 可以作为管道命令使用（`echo "fix bug" | claude`），输出可以被其他工具解析。
+
+## 颜色和样式系统
+
+颜色系统定义了统一的语义映射：用户消息用 cyan，助手消息用 white，工具状态用四色（pending 黄色、running 蓝色、success 绿色、error 红色），状态指示用 active 绿色、idle 灰色、error 红色。这些颜色通过 ANSI 转义序列实现，支持 bold、dim 等修饰。
+
+边框样式有三种：single（单线）、double（双线）、rounded（圆角）。权限对话框使用双线边框和黄色主题，视觉上区别于普通组件，强调其重要性。
+
+## 关键源文件
 
 | 文件 | 职责 |
 |------|------|
@@ -689,21 +206,6 @@ function VirtualList({ items, height }) {
 | `src/styles/colors.ts` | 颜色系统 |
 | `ink/lib/renderer.ts` | 双缓冲渲染引擎 |
 | `ink/lib/measureText.ts` | 文字测量 |
-
----
-
-## 十二、总结
-
-Claude Code 的 Terminal UI 系统体现了几个核心设计原则：
-
-1. **React 组件化**：复用 React 生态，组件化 UI 设计
-2. **Flexbox 布局**：Yoga 引擎提供完整的 Flexbox 支持
-3. **双缓冲渲染**：避免闪烁，只更新变化的区域
-4. **交互式组件**：InputBox、SelectMenu、PermissionDialog
-5. **非交互模式**：自动检测环境，降级为简单输出
-6. **性能优化**：渲染节流、虚拟滚动
-
-这个设计让终端应用拥有了 GUI 级别的交互体验，是 Terminal UI 开发的教科书级案例。
 
 ---
 

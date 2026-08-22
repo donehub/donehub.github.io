@@ -1,545 +1,126 @@
 ---
-title: 多 Agent 编排：四种代理类型与协作机制
+title: 多 Agent 编排的四种路径
 date: 2026-04-06
 tags: Multi-Agent
 categories: Claude Code
 ---
 
-> Claude Code 的多 Agent 系统可能是其最被低估的设计之一。它不是简单的"子代理调用"，而是一个完整的协作框架：四种 Agent 类型（Subagent、Fork、Teammate、Remote）、Teams 邮箱通信、权限同步、Worktree 隔离。这个设计让 Claude Code 能够处理单 Agent 无法完成的复杂任务。
-
 <!-- more -->
 
-## 导读：为什么需要多 Agent？
+## 单 Agent 的瓶颈
 
-假设你让 Claude Code 做这件事：
+考虑一个典型场景：把项目的所有 TypeScript 文件迁移到 strict 模式，同时更新 ESLint 配置，然后运行测试确认无回归。单 Agent 只能顺序执行——修改 tsconfig、修改 ESLint、修改文件、运行测试，每一步等上一步完成。对于一个有 200 个文件的项目，这个过程可能需要十几分钟。
 
-> "帮我把这个项目的所有 TypeScript 文件迁移到 strict 模式，同时更新 ESLint 配置，然后运行所有测试确保没有回归。"
+多 Agent 的价值在于把这类任务拆解为可并行的子任务。Explore Agent 扫描文件识别修改点，多个 Fork Agent 并行修改不同文件组，Plan Agent 协调顺序避免冲突，Verification Agent 运行测试验证结果。并行化、专业化、隔离性，这是多 Agent 编排解决的核心问题。
 
-单 Agent 会怎么做？顺序执行：修改 tsconfig → 修改 ESLint → 修改文件 → 运行测试。每一步都要等待上一步完成。
+## Agent 类型与职责
 
-但如果使用多 Agent：
+Claude Code 定义了四种 Agent 生成方式和五类内置角色。
 
-1. **Explore Agent**：并行扫描所有 TypeScript 文件，识别需要修改的地方
-2. **多个 Fork Agent**：并行修改不同的文件组
-3. **Plan Agent**：协调修改顺序，避免冲突
-4. **Verification Agent**：运行测试，验证修改
+四种生成方式决定了 Agent 的运行环境和隔离程度：
 
-这就是多 Agent 编排的价值：**并行化、专业化、隔离性**。
+| 生成方式 | 上下文来源 | 执行环境 | 通信方式 |
+|----------|-----------|----------|----------|
+| Subagent（子代理） | 独立上下文 | 同步/异步执行 | 返回值传递 |
+| Fork（分叉） | 继承父代理上下文 | 共享 prompt cache | 返回值传递 |
+| Teammate（队友） | 独立上下文 | tmux/iTerm2/进程内 | 邮箱通信 |
+| Remote（远程） | 独立上下文 | CCR 环境 | 轮询结果 |
 
----
+五类内置角色定义了工具权限和行为边界：
 
-## 一、五种 Agent 类型和职责
+| 角色 | 用途 | 工具池 |
+|------|------|--------|
+| General Purpose | 通用任务 | 全部工具 |
+| Explore | 代码库探索 | Read, Grep, Glob, WebSearch |
+| Plan | 制定计划 | 全部工具，受限输出 |
+| Verification | 验证结果 | Bash, Read, Grep |
+| Coordinator | 编排协调 | 受限工具集 |
 
-### 1.1 Agent 类型概览
-
-```
-┌─────────────────────────────────────────────────┐
-│                  Agent Tool                      │
-│              (入口 & 路由分发)                    │
-├───────────┬───────────┬───────────┬─────────────┤
-│  Subagent │  Fork     │ Teammate  │   Remote    │
-│  (子代理)  │ (分叉)    │ (队友)    │   (远程)    │
-│           │           │           │             │
-│ 独立上下文 │ 继承上下文 │ 团队协作   │ CCR 环境   │
-│ 按类型过滤 │ 缓存共享   │ 邮箱通信   │ 远程执行   │
-│ 工具池     │ 字节一致   │ 权限同步   │ 轮询结果   │
-└───────────┴───────────┴───────────┴─────────────┘
-                        │
-                  ┌─────┴─────┐
-                  │ DreamTask │
-                  │ (记忆整合)  │
-                  │ 定时后台   │
-                  └───────────┘
-```
-
-### 1.2 内置 Agent 类型
-
-| Agent 类型 | 用途 | 工具池限制 |
-|------------|------|-----------|
-| **General Purpose** | 通用任务 | 全部工具 |
-| **Explore** | 代码库探索 | Read, Grep, Glob, WebSearch |
-| **Plan** | 制定计划 | 全部工具，但受限输出 |
-| **Verification** | 验证结果 | Bash, Read, Grep |
-| **Coordinator** | 编排协调 | 受限工具集 |
-
-### 1.3 Agent 定义结构
+Agent 的定义结构统一：
 
 ```typescript
-// src/tools/AgentTool/loadAgentsDir.ts
 type AgentDefinition = {
-  agentType: string              // Agent 类型标识
-  description: string            // 描述
-  getSystemPrompt: (context) => string  // 系统提示词
-  tools?: string[]               // 允许的工具（'*' = 全部）
-  disallowedTools?: string[]     // 禁止的工具
-  model?: string                 // 模型选择
-  permissionMode?: PermissionMode // 权限模式
-  isBuiltin?: boolean            // 是否内置
+  agentType: string                       // 类型标识
+  description: string                     // 描述
+  getSystemPrompt: (context) => string    // 系统提示词
+  tools?: string[]                        // 允许的工具（'*' = 全部）
+  disallowedTools?: string[]              // 禁止的工具
+  model?: string                          // 模型选择
+  permissionMode?: PermissionMode         // 权限模式
 }
 ```
 
----
+## 四条生成路径
 
-## 二、Agent 生成流程：四条路径
+所有 Agent 生成都从 `AgentTool.call()` 入口进入，根据输入参数路由到四条不同路径。
 
-### 2.1 入口：AgentTool.call()
+**Teammate 生成**——当 `team_name` 和 `name` 同时存在时触发。系统检测执行后端（tmux/iTerm2/进程内），生成唯一 agentId，分配 UI 颜色，创建执行环境，最后更新 TeamFile。进程内队友使用独立的 AbortController 和 AsyncLocalStorage 实现上下文隔离，但共享权限管道。
 
-`src/tools/AgentTool/AgentTool.tsx` 中的 `call()` 函数是所有 Agent 生成的入口：
+**异步 Subagent**——当 `run_in_background=true` 或 Agent 定义中 `background: true` 时触发。系统创建 LocalAgentTask，注册到 agentNameRegistry，创建 AbortController，然后异步分离执行。执行过程中通过 ProgressTracker 追踪进度，完成时提取结果、标记完成、清理 worktree、通知主代理。
 
-```
-AgentTool.call(input)
-  │
-  ├─ team_name + name? ──────→ 路径1: spawnTeammate()
-  │
-  ├─ run_in_background?  ────→ 路径2: registerAsyncAgent()
-  │     └─ agent.background?
-  │
-  ├─ 省略 subagent_type? ───→ 路径3: Fork (buildForkedMessages())
-  │     └─ fork 实验开启?
-  │
-  └─ 默认 ───────────────────→ 路径4: runAgent() 同步执行
-```
+**Fork Subagent**——当省略 `subagent_type` 且 Fork 实验开启时触发。这是性能最优的路径，通过构建字节级一致的 API 请求前缀实现 prompt cache 命中。Fork 子代理保留父代理完整的 assistant message，对每个 tool_use 创建占位 tool_result，最后追加唯一的 per-child directive。前缀字节一致意味着 API 层的 prompt cache 可以直接复用，省去了重新计算缓存的开销。
 
-### 2.2 路径1：Teammate 生成
+Fork 子代理有严格的行为约束：不对话、不提问、不使用后续建议，直接调用工具，工具调用之间不输出文本，响应必须以 "Scope:" 开头，报告控制在 500 词以内。这些约束确保 Fork 是一个高效的工作进程而非对话伙伴。
 
-**触发条件**：`team_name` 和 `name` 同时存在
+**同步 Subagent**——默认路径。系统解析 Agent 定义，构建系统提示词，创建隔离的 ToolUseContext，启动查询循环，返回最终结果。
 
-**流程**：
+## 工具池的三层过滤
 
-```typescript
-// src/tools/shared/spawnMultiAgent.ts
-async function spawnTeammate(config, context) {
-  // 1. 检测执行后端
-  const backend = detectBackend()  // tmux / iTerm2 / in-process
-  
-  // 2. 生成唯一 agentId
-  const agentId = formatAgentId(name, teamName)
-  
-  // 3. 分配颜色
-  const color = assignColor(name)
-  
-  // 4. 创建执行环境
-  if (backend === 'in-process') {
-    await spawnInProcessTeammate(config, context)
-  } else if (backend === 'tmux') {
-    await TmuxBackend.createPane(config)
-  } else if (backend === 'iTerm2') {
-    await ITerm2Backend.createWindow(config)
-  }
-  
-  // 5. 写入 TeamFile
-  await updateTeamFile(teamName, { members: [...members, newMember] })
-  
-  return { status: 'teammate_spawned', agentId, tmuxPaneId, ... }
-}
-```
+每个 Agent 能使用哪些工具，经过三层过滤决定。
 
-**In-Process 队友的隔离**：
+第一层是全局禁止。TaskOutput、ExitPlanMode、EnterPlanMode、AskUserQuestion、TaskStop、Agent 这六个工具对所有子代理禁用。前五个只有主代理有权操作，Agent 工具禁用是为了防止递归生成。
 
-```typescript
-// src/utils/swarm/spawnInProcess.ts
-async function spawnInProcessTeammate(config, context) {
-  // 1. 独立的 AbortController（不随 leader 中断）
-  const abortController = new AbortController()
-  
-  // 2. AsyncLocalStorage 上下文隔离
-  runWithTeammateContext(teammateContext, async () => {
-    // 3. 独立的任务状态
-    // 4. 独立的消息循环
-    // 5. 共享的权限管道（通过 mailbox）
-  })
-}
-```
+第二层是 Agent 类型过滤。异步 Agent 限制为 15 个工具（Read、Grep、Glob、Bash/PowerShell、FileEdit、FileWrite、WebSearch、WebFetch、TodoWrite、NotebookEdit、Skill、SyntheticOutput、ToolSearch、EnterWorktree、ExitWorktree），MCP 工具始终允许。
 
-### 2.3 路径2：异步 Subagent
+第三层是 Agent 定义过滤。如果定义了 `tools` 列表，取交集；如果定义了 `disallowedTools`，取差集；如果 `tools: ['*']` 或未定义，通配全部允许。
 
-**触发条件**：`run_in_background=true` 或 Agent 定义中 `background: true`
+## 上下文传递与隔离
 
-**流程**：
+Agent 之间的上下文传递需要在共享和隔离之间取得平衡。
 
-```
-registerAsyncAgent()
-  │
-  ├─ 创建 LocalAgentTask（status: 'running'）
-  ├─ 注册到 agentNameRegistry（如有 name）
-  ├─ 创建输出文件符号链接
-  ├─ 创建 AbortController（链接到父代理）
-  ├─ 发射 SDK event: task_started
-  │
-  └─ void runAsyncAgentLifecycle()  ← 异步分离执行
-       │
-       ├─ 创建 ProgressTracker
-       ├─ 遍历 makeStream() 生成器
-       │   ├─ 追加消息到 agentMessages[]
-       │   ├─ 更新进度（tokens、tools、activities）
-       │   └─ 发射 SDK progress events
-       │
-       └─ 完成时：
-           ├─ finalizeAgentTool()（提取结果）
-           ├─ completeAgentTask()（标记完成）
-           ├─ 清理 worktree（如有隔离）
-           └─ enqueuePendingNotification()（通知主代理）
-```
+Fork Agent 的设计目标是最大化缓存共享。它在 API 请求中保持字节级一致的前缀（系统提示词、用户上下文、系统上下文、工具配置、对话历史、父代理的 assistant message 和占位 tool_result），只有末尾的 per-child directive 是差异部分。这意味着多个 Fork 子代理可以共享同一份 prompt cache，大幅降低 token 消耗和响应延迟。
 
-### 2.4 路径3：Fork Subagent
+Subagent 的设计目标是默认隔离、显式共享。消息历史独立，文件读取缓存独立，内容替换状态独立，AbortController 独立但链接到父代理（父取消时子也取消）。如果子代理需要影响父状态，必须通过 `shareSetAppState` 等显式 opt-in 参数开启。
 
-**触发条件**：省略 `subagent_type` 且 Fork 实验开启
-
-**核心优化**：通过字节级一致的 API 请求前缀，实现 **prompt cache 命中**。
-
-```
-buildForkedMessages(directive, assistantMessage)
-  │
-  ├─ 保留父代理完整的 assistant message（所有 tool_use 块）
-  ├─ 构建 user message：
-  │   ├─ 对每个 tool_use 创建占位 tool_result（字节一致）
-  │   └─ 追加 per-child directive（唯一差异部分）
-  │
-  └─ 结果：字节级一致的 API 前缀 → prompt cache 命中！
-```
-
-**Fork 子代理的行为约束**（通过 `FORK_BOILERPLATE_TAG` 注入）：
-
-```
-1. 你是分叉的工作进程，不是主代理
-2. 不要对话、提问或建议后续步骤
-3. 直接使用工具（Bash、Read、Write 等）
-4. 如修改文件，在报告前提交更改
-5. 工具调用之间不要输出文本
-6. 严格限制在指令范围内
-7. 报告控制在 500 词以内
-8. 响应必须以 "Scope:" 开头
-```
-
-### 2.5 路径4：同步 Subagent
-
-**触发条件**：默认路径（无 team_name、无 background、非 fork）
-
-**流程**：
-
-```
-runAgent(promptMessages, toolUseContext, options)
-  │
-  ├─ 解析 Agent 定义（getSystemPrompt、tools、permissions）
-  ├─ 构建系统提示词（buildEffectiveSystemPrompt）
-  ├─ 创建隔离的 ToolUseContext（createSubagentContext）
-  ├─ 启动查询循环（query() async generator）
-  │   ├─ 发送 API 请求
-  │   ├─ 处理流式事件
-  │   ├─ 执行工具调用
-  │   └─ 累积消息和 usage
-  │
-  └─ 返回 AgentToolResult
-       ├─ content: 最后 assistant 消息的文本
-       ├─ totalToolUseCount
-       ├─ totalDurationMs
-       └─ totalTokens
-```
-
----
-
-## 三、工具池系统：三层过滤
-
-### 3.1 第一层：全局禁止
-
-`ALL_AGENT_DISALLOWED_TOOLS` — 对所有 Agent 禁止的工具：
-
-| 工具 | 禁止原因 |
-|------|----------|
-| TaskOutput | 仅主代理可读取任务输出 |
-| ExitPlanMode | 仅主代理可退出计划模式 |
-| EnterPlanMode | 仅主代理可进入计划模式 |
-| AskUserQuestion | 子代理不应直接问用户 |
-| TaskStop | 仅主代理可终止任务 |
-| Agent | 防止递归生成（Ant 内部例外） |
-
-### 3.2 第二层：Agent 类型过滤
-
-```typescript
-// src/tools/AgentTool/agentToolUtils.ts
-function filterToolsForAgent(tools, agentDef) {
-  // 1. 移除 ALL_AGENT_DISALLOWED_TOOLS
-  // 2. 如果非内置 Agent，额外移除 CUSTOM_AGENT_DISALLOWED_TOOLS
-  // 3. 如果是异步 Agent，限制为 ASYNC_AGENT_ALLOWED_TOOLS
-  // 4. MCP 工具始终允许
-}
-```
-
-**ASYNC_AGENT_ALLOWED_TOOLS**（15 个）：
-
-```
-Read, WebSearch, TodoWrite, Grep, WebFetch, Glob,
-Bash/PowerShell, FileEdit, FileWrite, NotebookEdit,
-Skill, SyntheticOutput, ToolSearch, EnterWorktree, ExitWorktree
-```
-
-### 3.3 第三层：Agent 定义过滤
-
-```typescript
-function resolveAgentTools(agentDef, availableTools) {
-  if (tools === ['*'] || undefined)  → 通配符，全部允许
-  if (tools === ['Read', 'Grep'])    → 仅允许列表中的工具
-  if (disallowedTools === ['Agent']) → 从可用工具中减去
-}
-```
-
-**过滤流程图**：
-
-```
-所有可用工具
-  │
-  ├─ 减去 ALL_AGENT_DISALLOWED_TOOLS ──→ 通用禁止
-  │
-  ├─ 非内置？减去 CUSTOM_AGENT_DISALLOWED_TOOLS
-  │
-  ├─ 异步？限制为 ASYNC_AGENT_ALLOWED_TOOLS
-  │
-  ├─ 有 tools 列表？取交集
-  │
-  ├─ 有 disallowedTools？取差集
-  │
-  └─ 最终工具池
-```
-
----
-
-## 四、上下文传递机制
-
-### 4.1 CacheSafeParams — 缓存安全参数
-
-```typescript
-// src/utils/forkedAgent.ts
-type CacheSafeParams = {
-  systemPrompt: SystemPrompt       // 系统提示词
-  userContext: { [k: string]: string }  // 目录结构、CLAUDE.md 等
-  systemContext: { [k: string]: string } // git status、环境信息
-  toolUseContext: ToolUseContext    // 工具配置、模型、选项
-  forkContextMessages: Message[]   // Fork 上下文消息（用于缓存共享）
-}
-```
-
-**缓存共享原理**：
-
-```
-┌─────────────────────────────────────────┐
-│         共享前缀（字节一致）              │
-│  ┌──────────────────────────────────┐   │
-│  │ System Prompt                    │   │
-│  │ User Context                     │   │
-│  │ System Context                   │   │
-│  │ Tool Use Context                 │   │
-│  │ 对话历史 Messages                │   │
-│  │ Assistant Message (all tool_use) │   │
-│  │ User Message (placeholder results)│  │
-│  └──────────────────────────────────┘   │
-├─────────────────────────────────────────┤
-│  唯一差异：per-child directive text      │
-└─────────────────────────────────────────┘
-```
-
-### 4.2 SubagentContext — 子代理上下文隔离
-
-```typescript
-type SubagentContextOverrides = {
-  options?: ToolUseContext['options']           // 自定义工具、模型
-  agentId?: AgentId                            // 子代理 ID
-  agentType?: string                           // Agent 类型
-  messages?: Message[]                         // 自定义消息历史
-  readFileState?: ToolUseContext['readFileState'] // 文件读取缓存
-  abortController?: AbortController            // 中止控制器
-
-  // 显式 opt-in 共享（默认隔离）
-  shareSetAppState?: boolean                   // 共享 AppState 写入
-  shareSetResponseLength?: boolean             // 共享响应长度度量
-  shareAbortController?: boolean               // 共享中止控制器
-
-  // 实验性注入
-  criticalSystemReminder_EXPERIMENTAL?: string // 每轮重新注入的提醒
-  contentReplacementState?: ContentReplacementState
-}
-```
-
-**隔离 vs 共享**：
-
-| 资源 | 默认 | 说明 |
-|------|------|------|
+| 资源 | 默认行为 | 说明 |
+|------|----------|------|
 | readFileState | 克隆 | 文件读取缓存独立 |
 | messages | 新建 | 消息历史独立 |
 | abortController | 新建（链接父） | 父取消时子也取消 |
 | setAppState | No-op | 默认不影响父状态 |
 | contentReplacementState | 克隆 | 内容替换状态独立 |
 
----
+## Teams 邮箱通信
 
-## 五、Agent Teams：邮箱通信
-
-### 5.1 TeamFile 结构
-
-```typescript
-// 存储路径：~/.claude/teams/{team_name}/config.json
-{
-  name: string                        // 团队名称
-  description?: string                // 团队描述
-  createdAt: number                   // 创建时间戳
-  leadAgentId: string                 // Team Lead 的 Agent ID
-  leadSessionId?: string              // Lead 的会话 UUID
-  hiddenPaneIds?: string[]            // UI 中隐藏的 pane
-  teamAllowedPaths?: TeamAllowedPath[] // 团队级共享权限
-  members: Array<{
-    agentId: string                   // 成员 Agent ID
-    name: string                      // 显示名称
-    agentType?: string                // 角色类型
-    model?: string                    // 使用的模型
-    prompt?: string                   // 初始任务
-    color?: string                    // UI 颜色
-    planModeRequired?: boolean        // 是否需要 plan 审批
-    joinedAt: number                  // 加入时间
-    tmuxPaneId: string                // 终端 pane ID
-    cwd: string                       // 工作目录
-    worktreePath?: string             // Worktree 路径
-    sessionId?: string                // 会话 ID
-    subscriptions: string[]           // 消息订阅
-    backendType?: 'tmux'|'iterm2'|'in-process'
-    isActive?: boolean                // false=空闲, true/undefined=活跃
-    mode?: PermissionMode             // 当前权限模式
-  }>
-}
-```
-
-### 5.2 邮箱系统
-
-**存储路径**：`~/.claude/teams/{team_name}/inboxes/{agent_name}.json`
+Teammate 之间通过文件系统邮箱实现异步通信。每个团队有一个 TeamFile（`~/.claude/teams/{team_name}/config.json`），记录团队元数据和成员信息。每个成员有一个独立的收件箱文件（`~/.claude/teams/{team_name}/inboxes/{agent_name}.json`）。
 
 ```typescript
 type TeammateMessage = {
   from: string        // 发送者名称
-  text: string        // 消息内容（纯文本或 JSON）
+  text: string        // 消息内容
   timestamp: string   // ISO 时间戳
   read: boolean       // 是否已读
-  color?: string      // 发送者颜色
   summary?: string    // 5-10 词摘要
 }
 ```
 
-**并发安全**：使用 `proper-lockfile` 文件锁，10 次重试，5-100ms 指数退避。
+收件箱轮询间隔 1000ms。收到消息后，系统判断消息类型：关停请求、plan 审批响应、权限请求、还是普通文本消息。普通文本消息会被提交为新的对话轮，触发 Agent 处理。并发安全通过 `proper-lockfile` 文件锁保证，10 次重试，5-100ms 指数退避。
 
-### 5.3 收件箱轮询
+消息路由根据目标地址分为五种情况：`to === "*"` 广播给所有队友；`agentNameRegistry` 中的名称路由到进程内子代理；`teamFile.members` 中的名称写入对应队友的 mailbox；`bridge:` 前缀路由到远程会话；`uds:` 前缀通过 Unix Domain Socket 发送。
 
-```typescript
-// src/hooks/useInboxPoller.ts
-// 轮询间隔：1000ms
+## Worktree 隔离
 
-useEffect(() => {
-  const interval = setInterval(async () => {
-    const messages = await readUnreadMessages(agentName, teamName)
-    
-    for (const msg of messages) {
-      if (isShutdownRequest(msg.text)) {
-        // 处理关停请求
-      } else if (isPlanApprovalResponse(msg.text)) {
-        // 处理 plan 审批
-      } else if (isPermissionRequest(msg.text)) {
-        // 路由到权限系统
-      } else {
-        // 纯文本消息 → 提交为新对话轮
-        onSubmitMessage(formatted)
-      }
-    }
-  }, INBOX_POLL_INTERVAL_MS)
-}, [])
-```
+当 Agent 需要修改文件时，系统创建 git worktree 作为隔离环境。创建流程包括 slug 校验（防目录逃逸攻击）、git worktree 创建、符号链接大目录（node_modules 等节省磁盘）、以及可选的 sparse-checkout 配置。
 
-### 5.4 消息路由
+Agent 完成后自动检测 worktree 是否有改动。有改动时返回 worktree 路径和分支名给用户，用户可以审查后决定是否合并。无改动时自动删除 worktree。异常退出通过 `registerTeamForSessionCleanup()` 确保清理。
 
-```
-SendMessage({ to, message })
-  │
-  ├─ to === "*" → 广播
-  │   └─ 遍历所有队友，逐个写入 mailbox
-  │
-  ├─ agentNameRegistry.has(to) → in-process 子代理
-  │   └─ 通过 AppState pending messages 队列路由
-  │
-  ├─ teamFile.members.find(to) → 进程级队友
-  │   └─ writeToMailbox(to, message, teamName)
-  │
-  ├─ to.startsWith("bridge:") → 远程会话
-  │   └─ postInterClaudeMessage(sessionId, message)
-  │
-  └─ to.startsWith("uds:") → Unix Domain Socket
-      └─ sendToUdsSocket(socketPath, message)
-```
+## 权限同步
 
----
+团队级权限通过 `TeamAllowedPath` 定义，包含路径、适用工具、添加者和时间戳。队友启动时自动继承这些权限规则，不需要逐个配置。
 
-## 六、Worktree 隔离
+Fork Agent 使用 `bubble` 权限模式——权限提示冒泡到父代理终端。当 Fork 需要执行某个操作时，权限请求发送到父代理的 ToolUseConfirm 对话框，用户批准后结果回传给 Fork，拒绝则 Fork 收到拒绝通知。这个设计确保 Fork 的权限不会超过父代理的授权范围。
 
-### 6.1 创建流程
-
-```typescript
-// src/utils/worktree.ts
-async function createAgentWorktree(slug) {
-  // 1. 校验 slug（防目录逃逸攻击）
-  validateWorktreeSlug(slug)
-  
-  // 2. 创建 git worktree
-  git worktree add {path} -b {branch}
-  
-  // 3. 符号链接大目录（节省磁盘）
-  symlink(node_modules, worktree/node_modules)
-  
-  // 4. 应用 sparse-checkout（如配置）
-  if (sparseCheckoutPaths) {
-    git sparse-checkout set {paths}
-  }
-  
-  // 5. 返回 WorktreeSession
-  return { worktreePath, worktreeBranch, headCommit }
-}
-```
-
-### 6.2 清理机制
-
-- Agent 完成后自动检测是否有改动（`hasWorktreeChanges()`）
-- 有改动：返回 worktree 路径和分支名给用户
-- 无改动：自动删除 worktree（`removeAgentWorktree()`）
-- 异常退出：通过 `registerTeamForSessionCleanup()` 确保清理
-
----
-
-## 七、权限同步机制
-
-### 7.1 团队级权限
-
-```typescript
-type TeamAllowedPath = {
-  path: string        // 绝对目录路径
-  toolName: string    // 适用的工具（如 "Edit", "Write"）
-  addedBy: string     // 添加者名称
-  addedAt: number     // 添加时间
-}
-```
-
-队友启动时，自动继承团队级权限规则。
-
-### 7.2 Bubble 模式
-
-Fork Agent 使用 `bubble` 权限模式 — 权限提示冒泡到父代理终端：
-
-```
-Fork Agent 需要权限
-  │
-  └─ bubble 模式 → 权限请求发送到父代理
-       │
-       └─ 父代理的 ToolUseConfirm 对话框显示
-            │
-            ├─ 用户批准 → 结果回传给 Fork Agent
-            └─ 用户拒绝 → Fork Agent 收到拒绝
-```
-
----
-
-## 八、关键源文件索引
+## 关键源文件
 
 | 文件 | 职责 |
 |------|------|
@@ -555,25 +136,9 @@ Fork Agent 需要权限
 | `src/utils/teammateMailbox.ts` | 邮箱消息队列 |
 | `src/utils/forkedAgent.ts` | 缓存安全参数，子代理上下文 |
 | `src/utils/worktree.ts` | Git worktree 隔离 |
-| `src/tasks/LocalAgentTask/LocalAgentTask.tsx` | 本地 Agent 任务 |
-
----
-
-## 九、总结
-
-Claude Code 的多 Agent 系统设计体现了几个核心原则：
-
-1. **分层编排**：四种 Agent 类型，满足不同场景需求
-2. **上下文隔离**：子代理默认独立上下文，显式 opt-in 共享
-3. **缓存优化**：Fork Agent 通过字节一致前缀实现 prompt cache 共享
-4. **邮箱通信**：Teams 通过文件系统邮箱实现异步协作
-5. **权限同步**：团队级权限自动继承，Bubble 模式支持权限冒泡
-6. **Worktree 隔离**：安全的实验性修改环境
-
-这个设计使得 Claude Code 能够处理单 Agent 无法完成的复杂任务，同时保持系统的稳定性和可观测性。
 
 ---
 
 **系列文章导航：**
 - 上一篇：[工具系统设计：从定义到执行的七步管道](/2026/04/06/087_claude-code-tool-system/)
-- 下一篇：[Context 管理：四级压缩与无限对话的秘密](/2026/04/06/080_claude-code-context-compression/)
+- 下一篇：[Context 压缩的四级策略](/2026/04/06/080_claude-code-context-compression/)
