@@ -23,7 +23,7 @@
     {##################}
     {### PAGE BLOCK ###}
     {##################}
-    <div class="post-block" lang="{{ page.lang or config.language }}">
+    <div class="post-block" lang="{{ page.lang or site_lang() }}">
       {% include '_partials/page/page-header.swig' %}
       {#################}
       {### PAGE BODY ###}
