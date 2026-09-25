@@ -80,19 +80,31 @@ hexo.extend.generator.register('post', function (locals) {
 
   return posts.map(function (post) {
     var layout = post.layout;
-    var path = resolvePath(post);
+    var resolvedPath = resolvePath(post);
     var layouts = ['post', 'page', 'index'];
 
+    // Override the computed `path` property on this post instance so that
+    // templates reading `post.path` or `post.permalink` get the correct
+    // language-prefixed URL.
+    if (resolvedPath !== post.path) {
+      Object.defineProperty(post, 'path', {
+        value: resolvedPath,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      });
+    }
+
     if (!layout || layout === 'false') {
-      return { path: path, data: post.content };
+      return { path: resolvedPath, data: post.content };
     }
 
     if (layout !== 'post') layouts.unshift(layout);
 
     return {
-      path: path,
+      path: resolvedPath,
       layout: layouts,
-      data: lodash.extend({ __post: true }, post, { path: path })
+      data: lodash.extend({ __post: true }, post, { path: resolvedPath })
     };
   });
 });
