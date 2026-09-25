@@ -1,0 +1,1686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="1. Component OverviewJetCache is a general-purpose cache access framework open-sourced by Alibaba (source). It does one thing: with a unified Cache&lt;K, V&gt; interface, it seamlessly combines local">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JetCache User Guide">
+<meta property="og:url" content="https://donehub.github.io/en/2026/06/17/103_JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="1. Component OverviewJetCache is a general-purpose cache access framework open-sourced by Alibaba (source). It does one thing: with a unified Cache&lt;K, V&gt; interface, it seamlessly combines local">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://donehub.github.io/img/jetcache-final.png">
+<meta property="article:published_time" content="2026-06-16T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T09:17:58.889Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="JetCache">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://donehub.github.io/img/jetcache-final.png">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/06/17/103_JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>JetCache User Guide | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/06/17/103_JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          JetCache User Guide
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-06-17 00:00:00" itemprop="dateCreated datePublished" datetime="2026-06-17T00:00:00+08:00">2026-06-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:17:58" itemprop="dateModified" datetime="2026-09-25T17:17:58+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Middleware/" itemprop="url" rel="index"><span itemprop="name">Middleware</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/06/17/103_JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/06/17/103_JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="1-Component-Overview"><a href="#1-Component-Overview" class="headerlink" title="1. Component Overview"></a>1. Component Overview</h1><p>JetCache is a general-purpose cache access framework open-sourced by Alibaba (<a href="https://github.com/alibaba/jetcache" target="_blank" rel="noopener">source</a>). It does one thing: with a unified <code>Cache&lt;K, V&gt;</code> interface, it seamlessly combines local in-memory cache with remote Redis cache, then provides standard cache protocol integration through both annotations and API — letting business code use caching in the most concise way possible.</p>
+<p>Compared to Spring Cache, JetCache’s core advantages:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Spring Cache</th>
+<th>JetCache</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TTL (time-to-live)</td>
+<td>Not natively supported, requires customization</td>
+<td><strong>Natively supported</strong> — write <code>expire</code> directly on the annotation</td>
+</tr>
+<tr>
+<td>Two-level cache</td>
+<td>Not supported</td>
+<td><strong>Natively supported</strong> <code>CacheType.BOTH</code> (local + remote)</td>
+</tr>
+<tr>
+<td>Auto cache refresh</td>
+<td>Not supported</td>
+<td><strong>Supported</strong> <code>@CacheRefresh</code> with globally unique distributed refresh</td>
+</tr>
+<tr>
+<td>Penetration protection</td>
+<td>Not supported</td>
+<td><strong>Supported</strong> <code>@CachePenetrationProtect</code></td>
+</tr>
+<tr>
+<td>Distributed lock</td>
+<td>Not supported</td>
+<td><strong>Built-in</strong> <code>tryLock</code> / <code>tryLockAndRun</code></td>
+</tr>
+<tr>
+<td>Async API</td>
+<td>Not supported</td>
+<td><strong>Supported</strong> (truly non-blocking with Lettuce client)</td>
+</tr>
+<tr>
+<td>Stats &amp; monitoring</td>
+<td>Requires third-party</td>
+<td><strong>Built-in</strong> hit rate, load count, and other statistics</td>
+</tr>
+<tr>
+<td>Update/delete cache annotations</td>
+<td>Exists but limited</td>
+<td><code>@CacheUpdate</code> / <code>@CacheInvalidate</code> with SpEL support</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><img data-src="/img/jetcache-final.png" alt="alt text"></p>
+<h1 id="2-Core-Concepts"><a href="#2-Core-Concepts" class="headerlink" title="2. Core Concepts"></a>2. Core Concepts</h1><a id="more"></a>
+<h2 id="2-1-Cache-Interface"><a href="#2-1-Cache-Interface" class="headerlink" title="2.1 Cache Interface"></a>2.1 Cache<K, V> Interface</h2><p>Whether the underlying implementation is Caffeine (local memory), Redis (remote), or a two-level combination, business code always faces the same interface:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">Cache</span>&lt;<span class="title">K</span>, <span class="title">V</span>&gt; </span>&#123;</span><br><span class="line">    <span class="function">V <span class="title">get</span><span class="params">(K key)</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">put</span><span class="params">(K key, V value)</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">boolean</span> <span class="title">remove</span><span class="params">(K key)</span></span>;</span><br><span class="line">    <span class="function">V <span class="title">computeIfAbsent</span><span class="params">(K key, Function&lt;K, V&gt; loader)</span></span>;</span><br><span class="line">    <span class="comment">// ... more methods</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Using it feels like working with a <code>Map</code> — very intuitive.</p>
+<h2 id="2-2-CacheType-—-Cache-Types"><a href="#2-2-CacheType-—-Cache-Types" class="headerlink" title="2.2 CacheType — Cache Types"></a>2.2 CacheType — Cache Types</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Meaning</th>
+<th>Use Case</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CacheType.LOCAL</code></td>
+<td>Pure local in-memory cache<br>(Caffeine or LinkedHashMap)</td>
+<td>Dictionary data, config items, rarely changing data</td>
+<td>No current use case for local cache</td>
+</tr>
+<tr>
+<td><code>CacheType.REMOTE</code></td>
+<td>Pure remote cache (Redis)</td>
+<td>General business scenarios, centralized Redis storage</td>
+<td>Our current usage</td>
+</tr>
+<tr>
+<td><code>CacheType.BOTH</code></td>
+<td>Two-level cache: local + remote</td>
+<td>High-frequency reads, local for volume + Redis as fallback</td>
+<td>No current use case for multi-level cache</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="2-3-Key-Generation-Rules"><a href="#2-3-Key-Generation-Rules" class="headerlink" title="2.3 Key Generation Rules"></a>2.3 Key Generation Rules</h2><p>The final key stored in Redis follows this format:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Redis key = keyPrefix + keyConvertor(K);</span><br></pre></td></tr></table></figure>
+<ul>
+<li><p><strong>keyPrefix</strong>: comes from <code>@Cached(name = &quot;toc:user:info:&quot;)</code>‘s <code>name</code>, or from <code>QuickConfig.newBuilder(&quot;toc:user:info:&quot;)</code>‘s parameter. Its job is to give different business domains a “namespace prefix” to avoid key collisions.</p>
+</li>
+<li><p><strong>keyConvertor</strong>: converts Java objects to Strings. The default uses <code>fastjson2</code> — String-type keys pass through directly, complex objects get JSON-serialized.</p>
+</li>
+</ul>
+<p>Example: <code>@Cached(name = &quot;toc:user:info:&quot;, key = &quot;#userId&quot;)</code> with userId = 12345 produces the Redis key <code>toc:user:info:12345</code>.</p>
+<h2 id="2-4-Area-—-Cache-Areas"><a href="#2-4-Area-—-Cache-Areas" class="headerlink" title="2.4 Area — Cache Areas"></a>2.4 Area — Cache Areas</h2><p>Area is JetCache’s multi-tenancy mechanism. There’s a default <code>&quot;default&quot;</code> area corresponding to <code>jetcache.local.default</code> and <code>jetcache.remote.default</code> in the config. If your project needs to connect to multiple Redis instances, you can configure multiple areas and specify <code>area = &quot;otherArea&quot;</code> in annotations. Most scenarios work fine with the default.</p>
+<hr>
+<h1 id="3-Quick-Integration-Spring-Boot"><a href="#3-Quick-Integration-Spring-Boot" class="headerlink" title="3. Quick Integration (Spring Boot)"></a>3. Quick Integration (Spring Boot)</h1><h2 id="Step-1-Add-Maven-Dependency"><a href="#Step-1-Add-Maven-Dependency" class="headerlink" title="Step 1: Add Maven Dependency"></a>Step 1: Add Maven Dependency</h2><p>Choose the starter matching your application’s Redis client (<strong>pick one</strong>):</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">&lt;!-- Option 1: Lettuce (recommended, supports async API) --&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>com.alicp.jetcache<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>jetcache-starter-redis-lettuce<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">version</span>&gt;</span>2.8.0<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">&lt;!-- Option 2: Jedis (classic choice) --&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>com.alicp.jetcache<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>jetcache-starter-redis<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">version</span>&gt;</span>2.8.0<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">&lt;!-- Option 3: Redisson (feature-rich) --&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>com.alicp.jetcache<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>jetcache-starter-redisson<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">version</span>&gt;</span>2.8.0<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<p><strong>Version notes</strong>: JetCache 2.8+ requires <strong>JDK 17+</strong>, <strong>Spring Boot 3.x+</strong>, and <strong>Spring Framework 6.x+</strong>. If your project is still on JDK 8, use version 2.7.x.</p>
+<h2 id="Step-2-Configure-application-yml"><a href="#Step-2-Configure-application-yml" class="headerlink" title="Step 2: Configure application.yml"></a>Step 2: Configure application.yml</h2><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">jetcache:</span></span><br><span class="line">  <span class="comment"># Stats interval (minutes). 0 = no stats. Production recommendation: 15</span></span><br><span class="line">  <span class="attr">statIntervalMinutes:</span> <span class="number">15</span></span><br><span class="line">  <span class="comment"># Whether key prefix includes areaName. New projects: set to false</span></span><br><span class="line">  <span class="attr">areaInCacheName:</span> <span class="literal">false</span></span><br><span class="line">  <span class="comment"># Deserialization whitelist (required for 2.8+)</span></span><br><span class="line">  <span class="attr">decodeFilterAllowPatterns:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">com.remotecarter.</span></span><br><span class="line"></span><br><span class="line">  <span class="comment"># Local cache config</span></span><br><span class="line">  <span class="attr">local:</span></span><br><span class="line">    <span class="attr">default:</span></span><br><span class="line">      <span class="attr">type:</span> <span class="string">caffeine</span>                        <span class="comment"># Recommended: caffeine. Can also use linkedhashmap</span></span><br><span class="line">      <span class="attr">limit:</span> <span class="number">100</span>                            <span class="comment"># Max elements per cache instance</span></span><br><span class="line">      <span class="attr">keyConvertor:</span> <span class="string">fastjson2</span>               <span class="comment"># Key conversion method</span></span><br><span class="line">      <span class="attr">expireAfterWriteInMillis:</span> <span class="number">60000</span>       <span class="comment"># Local cache default TTL (milliseconds)</span></span><br><span class="line"></span><br><span class="line">  <span class="comment"># Remote cache config</span></span><br><span class="line">  <span class="attr">remote:</span></span><br><span class="line">    <span class="attr">default:</span></span><br><span class="line">      <span class="attr">type:</span> <span class="string">redis.redisson</span>                   <span class="comment"># redis / redis.lettuce / redis.redisson</span></span><br><span class="line">      <span class="attr">keyConvertor:</span> <span class="string">fastjson2</span></span><br><span class="line">      <span class="comment"># Broadcast channel for two-level cache cross-node sync invalidation</span></span><br><span class="line">      <span class="comment"># When multiple services share Redis, use different channels per service to avoid broadcast storms</span></span><br><span class="line">      <span class="attr">broadcastChannel:</span> <span class="string">crm-user</span></span><br><span class="line">      <span class="attr">valueEncoder:</span> <span class="string">java</span>                    <span class="comment"># Serialization: java / kryo / kryo5</span></span><br><span class="line">      <span class="attr">valueDecoder:</span> <span class="string">java</span></span><br><span class="line">      <span class="attr">poolConfig:</span></span><br><span class="line">        <span class="attr">minIdle:</span> <span class="number">5</span></span><br><span class="line">        <span class="attr">maxIdle:</span> <span class="number">20</span></span><br><span class="line">        <span class="attr">maxTotal:</span> <span class="number">50</span></span><br><span class="line">      <span class="attr">host:</span> <span class="string">$&#123;REDIS_HOST:127.0.0.1&#125;</span></span><br><span class="line">      <span class="attr">port:</span> <span class="string">$&#123;REDIS_PORT:6379&#125;</span></span><br><span class="line">      <span class="comment"># If using Lettuce, you can also use the URI format</span></span><br><span class="line">      <span class="comment"># uri: redis://127.0.0.1:6379/0</span></span><br></pre></td></tr></table></figure>
+<h2 id="Step-3-Add-Annotations-to-the-Startup-Class"><a href="#Step-3-Add-Annotations-to-the-Startup-Class" class="headerlink" title="Step 3: Add Annotations to the Startup Class"></a>Step 3: Add Annotations to the Startup Class</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@SpringBootApplication</span></span><br><span class="line"><span class="meta">@EnableMethodCache</span>(basePackages = <span class="string">"com.remotecarter"</span>)<span class="comment">// Activate @Cached and similar annotations</span></span><br><span class="line"><span class="meta">@EnableCreateCacheAnnotation</span>                      <span class="comment">// Activate @CreateCache annotation (Deprecated in 2.7+, optional)</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">MyApplication</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        SpringApplication.run(MyApplication<span class="class">.<span class="keyword">class</span>, <span class="title">args</span>)</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li><p><strong><code>@EnableMethodCache(basePackages = &quot;...&quot;)</code></strong>: tells JetCache which packages to scan for Spring Beans with <code>@Cached</code>, <code>@CacheUpdate</code>, <code>@CacheInvalidate</code> annotations and create AOP proxies for them. <strong>basePackages must cover all packages using cache annotations</strong>.</p>
+</li>
+<li><p><strong><code>@EnableCreateCacheAnnotation</code></strong>: activates <code>@CreateCache</code> annotation support for injecting Cache instances directly on fields. Marked as Deprecated in the source — optional.</p>
+</li>
+</ul>
+<p>Integration complete. Now let’s cover usage.</p>
+<h1 id="4-Usage-Guide"><a href="#4-Usage-Guide" class="headerlink" title="4. Usage Guide"></a>4. Usage Guide</h1><h2 id="4-1-Annotation-Driven-Cache-Declarative"><a href="#4-1-Annotation-Driven-Cache-Declarative" class="headerlink" title="4.1 Annotation-Driven Cache (Declarative)"></a>4.1 Annotation-Driven Cache (Declarative)</h2><p>This is the most common approach. Add annotations to methods on your Service interface (or implementation class), and JetCache automatically handles cache reads, writes, and deletes via Spring AOP proxies.</p>
+<p><strong>Note</strong>: annotations can go on interface methods or class methods, but the annotated class must be a <strong>Spring Bean</strong>.</p>
+<h3 id="Cached-—-Cache-Reads"><a href="#Cached-—-Cache-Reads" class="headerlink" title="@Cached — Cache Reads"></a>@Cached — Cache Reads</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">UserService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Specify name and key</span></span><br><span class="line">    <span class="meta">@Cached</span>(name = <span class="string">"toc:user:info:"</span>, key = <span class="string">"#uuid"</span>, expire = <span class="number">3600</span>, cacheType = CacheType.REMOTE)</span><br><span class="line">    <span class="function">User <span class="title">getUserById</span><span class="params">(String uuid)</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Cache null values (prevent cache penetration)</span></span><br><span class="line">    <span class="meta">@Cached</span>(name = <span class="string">"toc:user:info:"</span>, key = <span class="string">"#uuid"</span>, expire = <span class="number">300</span>, cacheNullValue = <span class="keyword">true</span>)</span><br><span class="line">    <span class="function">User <span class="title">getUserById</span><span class="params">(String uuid)</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="Cached-—-Attribute-Reference"><a href="#Cached-—-Attribute-Reference" class="headerlink" title="@Cached — Attribute Reference"></a>@Cached — Attribute Reference</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>area</code></td>
+<td><code>&quot;default&quot;</code></td>
+<td>Cache area — rarely needs changing</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>Auto-generated (classname.methodname)</td>
+<td>Unique cache name, <strong>used as Redis key prefix</strong></td>
+</tr>
+<tr>
+<td><code>key</code></td>
+<td>Auto-generated (from all params)</td>
+<td>SpEL expression for key, e.g. <code>&quot;#userId&quot;</code> or <code>&quot;args[0]&quot;</code></td>
+</tr>
+<tr>
+<td><code>expire</code></td>
+<td>Follows global config</td>
+<td>Time-to-live</td>
+</tr>
+<tr>
+<td><code>timeUnit</code></td>
+<td><code>TimeUnit.SECONDS</code></td>
+<td>Time unit for expire</td>
+</tr>
+<tr>
+<td><code>cacheType</code></td>
+<td><code>CacheType.REMOTE</code></td>
+<td>LOCAL / REMOTE / BOTH</td>
+</tr>
+<tr>
+<td><code>localLimit</code></td>
+<td>100</td>
+<td>Max elements in local cache (effective for LOCAL/BOTH)</td>
+</tr>
+<tr>
+<td><code>localExpire</code></td>
+<td>Same as expire</td>
+<td>Separate TTL for local cache (effective for BOTH only)</td>
+</tr>
+<tr>
+<td><code>syncLocal</code></td>
+<td>false</td>
+<td>Broadcast invalidation of other JVMs’ local cache on update (BOTH only)</td>
+</tr>
+<tr>
+<td><code>serialPolicy</code></td>
+<td><code>java</code></td>
+<td>Serialization: <code>SerialPolicy.JAVA</code> or <code>SerialPolicy.KRYO</code></td>
+</tr>
+<tr>
+<td><code>keyConvertor</code></td>
+<td><code>fastjson2</code></td>
+<td>Key conversion method</td>
+</tr>
+<tr>
+<td><code>enabled</code></td>
+<td>true</td>
+<td>Whether caching is active. false = bypass cache, can be temporarily activated via <code>CacheContext.enableCache</code></td>
+</tr>
+<tr>
+<td><code>cacheNullValue</code></td>
+<td>false</td>
+<td>Whether to cache when method returns null</td>
+</tr>
+<tr>
+<td><code>condition</code></td>
+<td>None</td>
+<td>SpEL expression — cache is queried only if this evaluates to true (before method execution)</td>
+</tr>
+<tr>
+<td><code>postCondition</code></td>
+<td>None</td>
+<td>SpEL expression — cache is updated only if this evaluates to true (after method execution, can use <code>#result</code>)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="CacheUpdate-—-Update-Cache"><a href="#CacheUpdate-—-Update-Cache" class="headerlink" title="@CacheUpdate — Update Cache"></a>@CacheUpdate — Update Cache</h3><p>When data is modified, use this annotation to update the cache directly instead of waiting for TTL expiry:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">UserService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Cached</span>(name = <span class="string">"toc:user:info:"</span>, key = <span class="string">"#uuid"</span>, expire = <span class="number">3600</span>)</span><br><span class="line">    <span class="function">User <span class="title">getUserById</span><span class="params">(String uuid)</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Update cache: key and name must match @Cached</span></span><br><span class="line">    <span class="meta">@CacheUpdate</span>(name = <span class="string">"toc:user:info:"</span>, key = <span class="string">"#user.uuid"</span>, value = <span class="string">"#user"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">updateUser</span><span class="params">(User user)</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="CacheInvalidate-—-Delete-Cache"><a href="#CacheInvalidate-—-Delete-Cache" class="headerlink" title="@CacheInvalidate — Delete Cache"></a>@CacheInvalidate — Delete Cache</h3><p>When data is deleted, remove it from cache too:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@CacheInvalidate</span>(name = <span class="string">"toc:user:info:"</span>, key = <span class="string">"#uuid"</span>)</span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">deleteUser</span><span class="params">(String uuid)</span></span>;</span><br></pre></td></tr></table></figure>
+<p><strong>Important for both @CacheUpdate and @CacheInvalidate</strong>: their <code>name</code> and <code>area</code> must match exactly with the corresponding <code>@Cached</code> annotation, so JetCache knows which cache to operate on.</p>
+<h3 id="CacheRefresh-—-Auto-Refresh"><a href="#CacheRefresh-—-Auto-Refresh" class="headerlink" title="@CacheRefresh — Auto Refresh"></a>@CacheRefresh — Auto Refresh</h3><p>One of JetCache’s standout features. For data that’s expensive to load and doesn’t need strict real-time accuracy (like report summaries), configure auto-refresh to <strong>prevent concurrent requests from hammering the database the moment cache expires (cache stampede)</strong>:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">SummaryService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Cached</span>(expire = <span class="number">3600</span>, cacheType = CacheType.REMOTE)</span><br><span class="line">    <span class="meta">@CacheRefresh</span>(refresh = <span class="number">1800</span>, stopRefreshAfterLastAccess = <span class="number">3600</span>, timeUnit = TimeUnit.SECONDS)</span><br><span class="line">    <span class="function">BigDecimal <span class="title">salesVolumeSummary</span><span class="params">(<span class="keyword">int</span> timeId, <span class="keyword">long</span> categoryId)</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>refresh</code></td>
+<td>None</td>
+<td>Refresh interval</td>
+</tr>
+<tr>
+<td><code>timeUnit</code></td>
+<td><code>TimeUnit.SECONDS</code></td>
+<td>Time unit</td>
+</tr>
+<tr>
+<td><code>stopRefreshAfterLastAccess</code></td>
+<td>None (refreshes forever)</td>
+<td>Stop refreshing after this duration of no access</td>
+</tr>
+<tr>
+<td><code>refreshLockTimeout</code></td>
+<td>60 seconds</td>
+<td>Distributed lock timeout in Redis during refresh</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Key feature</strong>: when <code>cacheType</code> is REMOTE or BOTH, <strong>refresh is globally unique across the cluster</strong> — no matter how many servers, only one node refreshes a given key at a time, implemented via distributed lock.</p>
+<h3 id="CachePenetrationProtect-—-Penetration-Protection"><a href="#CachePenetrationProtect-—-Penetration-Protection" class="headerlink" title="@CachePenetrationProtect — Penetration Protection"></a>@CachePenetrationProtect — Penetration Protection</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Cached</span>(expire = <span class="number">3600</span>, cacheType = CacheType.REMOTE)</span><br><span class="line"><span class="meta">@CachePenetrationProtect</span></span><br><span class="line"><span class="function">User <span class="title">getUserById</span><span class="params">(<span class="keyword">long</span> userId)</span></span>;</span><br></pre></td></tr></table></figure>
+<p>When cache misses, <strong>only one thread within the same JVM loads the data for a given key</strong> — other threads wait for the result. This prevents a flood of concurrent requests from penetrating to the database in high-concurrency scenarios.</p>
+<p>The current implementation provides <strong>single-node protection</strong>, not distributed. If multiple nodes miss the same key simultaneously, each loads independently.</p>
+<p><strong>You can combine auto-refresh + penetration protection</strong>:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Cached</span>(name = <span class="string">"toc:user:info:"</span>, key = <span class="string">"#uuid"</span>, expire = <span class="number">3600</span>)</span><br><span class="line"><span class="meta">@CacheRefresh</span>(refresh = <span class="number">1800</span>, stopRefreshAfterLastAccess = <span class="number">3600</span>, timeUnit = TimeUnit.SECONDS)</span><br><span class="line"><span class="meta">@CachePenetrationProtect</span></span><br><span class="line"><span class="function">User <span class="title">getUserById</span><span class="params">(String uuid)</span></span>;</span><br></pre></td></tr></table></figure>
+<p>Auto-refreshes every 30 minutes (cluster-wide unique), stops refreshing after 30 minutes of no access, and has penetration protection as a safety net.</p>
+<h2 id="4-2-Programmatic-Cache-Cache-API"><a href="#4-2-Programmatic-Cache-Cache-API" class="headerlink" title="4.2 Programmatic Cache (Cache API)"></a>4.2 Programmatic Cache (Cache API)</h2><p>Annotations are concise but limited in flexibility — for example, if you need to decide keys dynamically at runtime or use caching in classes not managed by Spring. That’s when you use the <strong>Cache API</strong>.</p>
+<h3 id="CacheManager-QuickConfig-for-Cache-Instance-Creation"><a href="#CacheManager-QuickConfig-for-Cache-Instance-Creation" class="headerlink" title="CacheManager + QuickConfig for Cache Instance Creation"></a>CacheManager + QuickConfig for Cache Instance Creation</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">OrderService</span> <span class="keyword">implements</span> <span class="title">InitializingBean</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> CacheManager cacheManager;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> Cache&lt;String, OrderDO&gt; orderCache;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">afterPropertiesSet</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        QuickConfig qc = QuickConfig.newBuilder(<span class="string">"userCache"</span>)</span><br><span class="line">            .expire(Duration.ofSeconds(<span class="number">300</span>))</span><br><span class="line">            .cacheType(CacheType.BOTH)    <span class="comment">// Two-level cache</span></span><br><span class="line">            .syncLocal(<span class="keyword">true</span>)              <span class="comment">// Broadcast invalidation to other nodes on update</span></span><br><span class="line">            .localLimit(<span class="number">200</span>)              <span class="comment">// Max elements in local cache</span></span><br><span class="line">            .build();</span><br><span class="line">        orderCache = cacheManager.getOrCreateCache(qc);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>QuickConfig</code> supports these settings:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>expire(Duration)</code></td>
+<td>Time-to-live</td>
+</tr>
+<tr>
+<td><code>localExpire(Duration)</code></td>
+<td>Separate local cache TTL (BOTH)</td>
+</tr>
+<tr>
+<td><code>localLimit(Integer)</code></td>
+<td>Max local cache elements</td>
+</tr>
+<tr>
+<td><code>cacheType(CacheType)</code></td>
+<td>LOCAL / REMOTE / BOTH</td>
+</tr>
+<tr>
+<td><code>syncLocal(Boolean)</code></td>
+<td>Whether to sync local cache invalidation across nodes</td>
+</tr>
+<tr>
+<td><code>keyConvertor(Function)</code></td>
+<td>Key converter</td>
+</tr>
+<tr>
+<td><code>valueEncoder / valueDecoder</code></td>
+<td>Serialization/deserialization</td>
+</tr>
+<tr>
+<td><code>cacheNullValue(Boolean)</code></td>
+<td>Whether to cache null</td>
+</tr>
+<tr>
+<td><code>penetrationProtect(Boolean)</code></td>
+<td>Enable penetration protection</td>
+</tr>
+<tr>
+<td><code>penetrationProtectTimeout(Duration)</code></td>
+<td>Penetration protection timeout</td>
+</tr>
+<tr>
+<td><code>refreshPolicy(RefreshPolicy)</code></td>
+<td>Auto-refresh policy</td>
+</tr>
+<tr>
+<td><code>loader(CacheLoader)</code></td>
+<td>Load function on cache miss</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="Basic-Operations"><a href="#Basic-Operations" class="headerlink" title="Basic Operations"></a>Basic Operations</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Read</span></span><br><span class="line">UserDO user = userCache.get(<span class="string">"toc:user:info:12345"</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// Write</span></span><br><span class="line">userCache.put(<span class="string">"toc:user:info:12345"</span>, user);</span><br><span class="line"></span><br><span class="line"><span class="comment">// Write with custom TTL</span></span><br><span class="line">userCache.put(<span class="string">"toc:user:info:12345"</span>, user, <span class="number">10</span>, TimeUnit.MINUTES);</span><br><span class="line"></span><br><span class="line"><span class="comment">// Delete</span></span><br><span class="line">userCache.remove(<span class="string">"toc:user:info:12345"</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// Batch read</span></span><br><span class="line">Map&lt;String, UserDO&gt; users = userCache.getAll(Set.of(<span class="string">"toc:user:info:1"</span>, <span class="string">"toc:user:info:2"</span>, <span class="string">"toc:user:info:3"</span>));</span><br><span class="line"></span><br><span class="line"><span class="comment">// Batch write</span></span><br><span class="line">userCache.putAll(Map.of(<span class="string">"toc:user:info:1"</span>, o1, <span class="string">"toc:user:info:2"</span>, o2));</span><br><span class="line"></span><br><span class="line"><span class="comment">// Batch delete</span></span><br><span class="line">userCache.removeAll(Set.of(<span class="string">"toc:user:info:1"</span>, <span class="string">"toc:user:info:2"</span>));</span><br></pre></td></tr></table></figure>
+<h3 id="computeIfAbsent-—-Auto-Load-on-Cache-Miss"><a href="#computeIfAbsent-—-Auto-Load-on-Cache-Miss" class="headerlink" title="computeIfAbsent — Auto-Load on Cache Miss"></a>computeIfAbsent — Auto-Load on Cache Miss</h3><p>This is extremely practical — it’s an atomic <code>get</code> + <code>put</code> operation:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Returns cached value on hit; on miss, calls the loader and writes to cache</span></span><br><span class="line">OrderDO order = userCache.computeIfAbsent(<span class="string">"toc:user:info:12345"</span>, key -&gt; &#123;</span><br><span class="line">    <span class="keyword">return</span> userMapper.selectById(key);  <span class="comment">// Load from database</span></span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+<p>You can also set the loader at cache creation time, so every <code>get</code> auto-loads on miss:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Set loader at creation</span></span><br><span class="line">QuickConfig qc = QuickConfig.newBuilder(<span class="string">"userCache"</span>)</span><br><span class="line">    .expire(Duration.ofSeconds(<span class="number">300</span>))</span><br><span class="line">    .loader(key -&gt; userMapper.selectById(key))</span><br><span class="line">    .build();</span><br><span class="line">userCache = cacheManager.getOrCreateCache(qc);</span><br><span class="line"></span><br><span class="line"><span class="comment">// Now just call get — it auto-loads on miss</span></span><br><span class="line">UserDO user = userCache.get(<span class="string">"toc:user:info:12345"</span>);</span><br></pre></td></tr></table></figure>
+<h3 id="Uppercase-API-—-Operations-with-Full-Status-Codes"><a href="#Uppercase-API-—-Operations-with-Full-Status-Codes" class="headerlink" title="Uppercase API — Operations with Full Status Codes"></a>Uppercase API — Operations with Full Status Codes</h3><p>When lowercase <code>get()</code> returns null, you can’t distinguish between “not in cache” and “cache error.” The uppercase API returns <code>CacheGetResult</code> with full status information:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">CacheGetResult&lt;UserDO&gt; r = userCache.GET(<span class="string">"toc:user:info:12345"</span>);</span><br><span class="line"><span class="keyword">if</span> (r.isSuccess()) &#123;</span><br><span class="line">    UserDO user = r.getValue();</span><br><span class="line">    <span class="comment">// Handle business logic</span></span><br><span class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (r.getResultCode() == CacheResultCode.NOT_EXISTS) &#123;</span><br><span class="line">    <span class="comment">// Cache entry doesn't exist</span></span><br><span class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (r.getResultCode() == CacheResultCode.EXPIRED) &#123;</span><br><span class="line">    <span class="comment">// Cache entry has expired</span></span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="comment">// Cache access error (network exception, etc.)</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Other uppercase APIs: <code>GET_ALL</code>, <code>PUT</code>, <code>PUT_ALL</code>, <code>REMOVE</code>, <code>REMOVE_ALL</code>, <code>PUT_IF_ABSENT</code>.</p>
+<h3 id="Async-API"><a href="#Async-API" class="headerlink" title="Async API"></a>Async API</h3><p>When using the <strong>Lettuce</strong> client, the uppercase API supports true async non-blocking:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">CacheGetResult&lt;UserDO&gt; r = userCache.GET(<span class="string">"toc:user:info:12345"</span>);</span><br><span class="line"><span class="comment">// The operation may not have completed yet</span></span><br><span class="line">CompletionStage&lt;ResultData&gt; future = r.future();</span><br><span class="line">future.thenRun(() -&gt; &#123;</span><br><span class="line">    <span class="keyword">if</span> (r.isSuccess()) &#123;</span><br><span class="line">        System.out.println(r.getValue());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+<p>Note: lowercase <code>put()</code> and <code>removeAll()</code> have no return value and are automatically optimized for async calls under Lettuce, reducing RT. But <code>get()</code> needs to wait for the result, so it still blocks.</p>
+<h1 id="5-Key-Types-and-Strategies"><a href="#5-Key-Types-and-Strategies" class="headerlink" title="5. Key Types and Strategies"></a>5. Key Types and Strategies</h1><p>Understanding how JetCache generates and processes keys is essential for seeing the expected keys in Redis.</p>
+<h2 id="5-1-Redis-Key-Concatenation-Rules"><a href="#5-1-Redis-Key-Concatenation-Rules" class="headerlink" title="5.1 Redis Key Concatenation Rules"></a>5.1 Redis Key Concatenation Rules</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Redis key = keyPrefix + keyConvertor(Java Key object)</span><br></pre></td></tr></table></figure>
+<p>Examples:</p>
+<ul>
+<li><code>@Cached(name = &quot;toc:user:info:&quot;, key = &quot;#userId&quot;)</code> + userId = <code>12345</code> (long type)</li>
+<li>keyConvertor converts long to <code>&quot;Long12345&quot;</code></li>
+<li>Final Redis key = <code>toc:user:info:Long12345</code></li>
+</ul>
+<p>If the key is a String type:</p>
+<ul>
+<li><code>@Cached(name = &quot;toc:user:info:&quot;, key = &quot;#uuid&quot;)</code> + uuid = <code>&quot;X123456&quot;</code></li>
+<li>keyConvertor passes Strings through directly</li>
+<li>Final Redis key = <code>toc:user:info:X123456</code></li>
+</ul>
+<h2 id="5-2-Supported-Key-Types"><a href="#5-2-Supported-Key-Types" class="headerlink" title="5.2 Supported Key Types"></a>5.2 Supported Key Types</h2><p>From the <code>ExternalKeyUtil.buildKeyAfterConvert</code> source code, JetCache supports these key types:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Java Type</th>
+<th>Conversion Rule</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>String</code></td>
+<td><strong>Used directly</strong>, no conversion</td>
+<td><code>&quot;abc&quot;</code> → <code>abc</code></td>
+</tr>
+<tr>
+<td><code>Number</code> (Long, Integer, etc.)</td>
+<td>ClassName + value</td>
+<td><code>12345L</code> → <code>Long12345</code></td>
+</tr>
+<tr>
+<td><code>Date</code></td>
+<td>ClassName + yyyyMMddHHmmss,SSS</td>
+<td><code>new Date()</code> → <code>Date20260617100000,000</code></td>
+</tr>
+<tr>
+<td><code>Boolean</code></td>
+<td>toString</td>
+<td><code>true</code> → <code>true</code></td>
+</tr>
+<tr>
+<td><code>byte[]</code></td>
+<td>Used directly</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Other <code>Serializable</code> objects</td>
+<td>Java serialization</td>
+<td>Complex object → serialized bytes</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Practical recommendation</strong>: <strong>use String-type keys</strong>. If you use Long/Integer keys, the Redis key will include a <code>Long</code>/<code>Integer</code> prefix — functionally fine but not intuitive. Convert in SpEL: <code>key = &quot;&#39;&#39; + #userId&quot;</code> or <code>key = &quot;#userId.toString()&quot;</code>.</p>
+<h2 id="5-3-keyConvertor-Mechanism"><a href="#5-3-keyConvertor-Mechanism" class="headerlink" title="5.3 keyConvertor Mechanism"></a>5.3 keyConvertor Mechanism</h2><p>The keyConvertor converts Java objects to Strings suitable for Redis storage:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fastjson2</code></td>
+<td><strong>Default recommendation</strong>. Strings pass through directly; other objects use <code>JSON.toJSONString()</code></td>
+</tr>
+<tr>
+<td><code>jackson</code></td>
+<td>Converts to JSON using Jackson</td>
+</tr>
+<tr>
+<td><code>jackson3</code></td>
+<td>Jackson 3.x version</td>
+</tr>
+<tr>
+<td><code>none</code></td>
+<td>No conversion, uses <code>equals</code> comparison directly. Only for <code>@CreateCache</code> with <code>cacheType = LOCAL</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="5-4-SpEL-Expressions-for-Keys"><a href="#5-4-SpEL-Expressions-for-Keys" class="headerlink" title="5.4 SpEL Expressions for Keys"></a>5.4 SpEL Expressions for Keys</h2><p><code>@Cached</code>‘s <code>key</code> attribute supports Spring SpEL expressions:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Use parameter name directly (requires javac -parameters compilation)</span></span><br><span class="line"><span class="meta">@Cached</span>(name = <span class="string">"toc:user:info:"</span>, key = <span class="string">"#uuid"</span>, expire = <span class="number">3600</span>)</span><br><span class="line"><span class="function">User <span class="title">getUserById</span><span class="params">(String uuid)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Access by index (no -parameters needed)</span></span><br><span class="line"><span class="meta">@Cached</span>(name = <span class="string">"toc:user:info:"</span>, key = <span class="string">"args[0]"</span>, expire = <span class="number">3600</span>)</span><br><span class="line"><span class="function">User <span class="title">getUserById</span><span class="params">(String uuid)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Access object properties</span></span><br><span class="line"><span class="meta">@Cached</span>(name = <span class="string">"toc:user:info:"</span>, key = <span class="string">"#user.uuid"</span>, expire = <span class="number">3600</span>)</span><br><span class="line"><span class="function">User <span class="title">getUser</span><span class="params">(User user)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// String concatenation</span></span><br><span class="line"><span class="meta">@Cached</span>(name = <span class="string">"toc:user:archives:"</span>, key = <span class="string">"#appId + ':' + #uuid"</span>, expire = <span class="number">1800</span>)</span><br><span class="line"><span class="function">List&lt;Archives&gt; <span class="title">getArchives</span><span class="params">(String appId, String uuid)</span></span>;</span><br></pre></td></tr></table></figure>
+<p><strong>Note</strong>: using parameter names (like <code>#userId</code>) requires the <code>-parameters</code> compiler flag. Without it, use <code>args[0]</code> for index-based access.</p>
+<p><strong>Maven configuration:</strong></p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">plugin</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>org.apache.maven.plugins<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>maven-compiler-plugin<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">configuration</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">compilerArgument</span>&gt;</span>-parameters<span class="tag">&lt;/<span class="name">compilerArgument</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">configuration</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">plugin</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<p><strong>IntelliJ IDEA configuration</strong>: Settings → Build → Compiler → Java Compiler → Additional command-line parameters, enter <code>-parameters</code>.</p>
+<h2 id="5-5-Single-Value-vs-Multi-Value-Cache-Scenarios"><a href="#5-5-Single-Value-vs-Multi-Value-Cache-Scenarios" class="headerlink" title="5.5 Single-Value vs Multi-Value Cache Scenarios"></a>5.5 Single-Value vs Multi-Value Cache Scenarios</h2><p>JetCache uses a pure KV model (Redis STRING type underneath) and <strong>does not support Redis HASH sub-field operations</strong> (HGET/HSET). If you’ve been using Redisson’s <code>RMap</code> for Hash caching, you’ll need to adjust your approach when migrating to JetCache.</p>
+<p><strong>Scenario: <code>toc:user:archives:{uuid}</code> — one user with multiple KYC records</strong></p>
+<p>Redisson approach (Hash-level operations):</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Redisson: can read/write by kycType individually</span></span><br><span class="line">RMap&lt;String, String&gt; map = redissonClient.getMap(<span class="string">"user:archives:"</span> + uuid);</span><br><span class="line">map.put(<span class="string">"archive_real"</span>, jsonString);           <span class="comment">// HSET</span></span><br><span class="line">String json = map.get(<span class="string">"archive_real"</span>);         <span class="comment">// HGET</span></span><br></pre></td></tr></table></figure>
+<p>JetCache approach (whole-object caching):</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Option 1: entire List as value</span></span><br><span class="line"><span class="meta">@Cached</span>(name = <span class="string">"toc:user:archives:"</span>, key = <span class="string">"#appId + ':' + #uuid"</span>, expire = <span class="number">30</span>, timeUnit = TimeUnit.MINUTES)</span><br><span class="line"><span class="function">List&lt;ApiArchivesStatus&gt; <span class="title">getAllArchives</span><span class="params">(String appId, String uuid)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Query by kycType: fetch all, then filter in memory</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> ApiArchivesStatus <span class="title">getByKycType</span><span class="params">(String appId, String uuid, String kycType)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> getAllArchives(appId, uuid).stream()</span><br><span class="line">        .filter(s -&gt; kycType.equals(s.getKycType()))</span><br><span class="line">        .findFirst().orElse(<span class="keyword">null</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Option 2: Map as value (kycType as Map key)</span></span><br><span class="line"><span class="meta">@Cached</span>(name = <span class="string">"toc:user:archives:"</span>, key = <span class="string">"#appId + ':' + #uuid"</span>, expire = <span class="number">30</span>, timeUnit = TimeUnit.MINUTES)</span><br><span class="line"><span class="function">Map&lt;String, ApiArchivesStatus&gt; <span class="title">getArchivesMap</span><span class="params">(String appId, String uuid)</span></span>;</span><br></pre></td></tr></table></figure>
+<p>JetCache can’t perform Hash field-level operations — you need to cache “all data for a given uuid” as a single complete value. If your business requires sub-field read/write granularity, keep using Redisson RMap. If reads and writes are mostly whole-object, JetCache’s two-level cache and auto-refresh capabilities are more valuable.</p>
+<hr>
+<h1 id="6-Two-Level-Cache-BOTH"><a href="#6-Two-Level-Cache-BOTH" class="headerlink" title="6. Two-Level Cache (BOTH)"></a>6. Two-Level Cache (BOTH)</h1><p>Two-level cache is one of JetCache’s highlights, though we’re not using it yet. Simply put: <strong>local memory cache (L1) + Redis (L2) combined. Reads check L1 first, then L2. Writes go to both levels.</strong></p>
+<h2 id="6-1-How-It-Works"><a href="#6-1-How-It-Works" class="headerlink" title="6.1 How It Works"></a>6.1 How It Works</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">Read flow:</span><br><span class="line">  1. Check local cache (Caffeine/LinkedHashMap)</span><br><span class="line">  2. Local hit → return directly</span><br><span class="line">  3. Local miss → check Redis</span><br><span class="line">  4. Redis hit → backfill local cache → return</span><br><span class="line">  5. Redis miss → return NOT_EXISTS</span><br><span class="line"></span><br><span class="line">Write flow:</span><br><span class="line">  1. Write to both local cache and Redis simultaneously</span><br><span class="line"></span><br><span class="line">Delete flow:</span><br><span class="line">  1. Delete from both local cache and Redis simultaneously</span><br></pre></td></tr></table></figure>
+<h2 id="6-2-Configuration"><a href="#6-2-Configuration" class="headerlink" title="6.2 Configuration"></a>6.2 Configuration</h2><h3 id="Annotation-approach"><a href="#Annotation-approach" class="headerlink" title="Annotation approach:"></a>Annotation approach:</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Cached</span>(name = <span class="string">"toc:user:info:"</span>, key = <span class="string">"#uuid"</span>, expire = <span class="number">3600</span>,</span><br><span class="line">    cacheType = CacheType.BOTH,     <span class="comment">// Two-level cache</span></span><br><span class="line">    syncLocal = <span class="keyword">true</span>,               <span class="comment">// Broadcast invalidation to other nodes' local cache on update</span></span><br><span class="line">    localLimit = <span class="number">100</span>,               <span class="comment">// Max local elements</span></span><br><span class="line">    localExpire = <span class="number">60</span>                <span class="comment">// Local cache TTL 60 seconds (usually shorter than remote expire)</span></span><br><span class="line">)</span><br><span class="line"><span class="function">User <span class="title">getUserById</span><span class="params">(String uuid)</span></span>;</span><br></pre></td></tr></table></figure>
+<h3 id="Programmatic-approach"><a href="#Programmatic-approach" class="headerlink" title="Programmatic approach:"></a>Programmatic approach:</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">QuickConfig qc = QuickConfig.newBuilder(<span class="string">"userCache"</span>)</span><br><span class="line">    .expire(Duration.ofSeconds(<span class="number">3600</span>))</span><br><span class="line">    .cacheType(CacheType.BOTH)</span><br><span class="line">    .syncLocal(<span class="keyword">true</span>)</span><br><span class="line">    .localLimit(<span class="number">100</span>)</span><br><span class="line">    .localExpire(Duration.ofSeconds(<span class="number">60</span>))</span><br><span class="line">    .build();</span><br><span class="line">Cache&lt;Long, User&gt; userCache = cacheManager.getOrCreateCache(qc);</span><br></pre></td></tr></table></figure>
+<h2 id="6-3-syncLocal-—-Cross-Node-Sync-Invalidation"><a href="#6-3-syncLocal-—-Cross-Node-Sync-Invalidation" class="headerlink" title="6.3 syncLocal — Cross-Node Sync Invalidation"></a>6.3 syncLocal — Cross-Node Sync Invalidation</h2><p>This is the critical setting for two-level cache. Say you have 3 servers, each with its own local cache. If node A updates a user’s data, nodes B and C still have stale values in their local cache — that’s an inconsistency.</p>
+<p><code>syncLocal = true</code> solves this:</p>
+<ol>
+<li>When node A updates the cache, it publishes an invalidation message to the Redis <code>broadcastChannel</code></li>
+<li>Nodes B and C subscribe to this channel and clear their corresponding local cache entries upon receiving the message</li>
+<li>Next read causes B and C to pull fresh data from Redis</li>
+</ol>
+<p><strong>Prerequisite</strong>: <code>broadcastChannel</code> must be configured in your yml.</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">jetcache:</span></span><br><span class="line">  <span class="attr">remote:</span></span><br><span class="line">    <span class="attr">default:</span></span><br><span class="line">      <span class="attr">broadcastChannel:</span> <span class="string">crm-user</span>  <span class="comment"># This config is required</span></span><br></pre></td></tr></table></figure>
+<p><strong>Important</strong>: when multiple services share the same Redis, use different <code>broadcastChannel</code> values per service. Otherwise, one service’s cache updates will trigger local cache invalidation across all other services — manageable at small scale but catastrophic under heavy broadcast volume.</p>
+<h2 id="6-4-localExpire-—-Separating-Local-and-Remote-Expiry"><a href="#6-4-localExpire-—-Separating-Local-and-Remote-Expiry" class="headerlink" title="6.4 localExpire — Separating Local and Remote Expiry"></a>6.4 localExpire — Separating Local and Remote Expiry</h2><p>In two-level cache scenarios, the local cache TTL should typically be <strong>shorter</strong> than the remote cache. For example: remote set to 1 hour, local set to 1 minute. That way, even if broadcast messages are lost, the local cache auto-expires after 1 minute and re-fetches from Redis.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Recommended CacheType</th>
+<th>Reasoning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dictionary data, config items</td>
+<td><code>LOCAL</code></td>
+<td>Rarely changes, local memory is enough</td>
+</tr>
+<tr>
+<td>General business data</td>
+<td><code>REMOTE</code></td>
+<td>Centralized Redis, simple and reliable</td>
+</tr>
+<tr>
+<td>High-frequency reads + seconds-level inconsistency acceptable</td>
+<td><code>BOTH</code> + <code>syncLocal = true</code></td>
+<td>Local handles read pressure, Redis as fallback</td>
+</tr>
+<tr>
+<td>High-frequency reads + very large data</td>
+<td><code>BOTH</code> + <code>localLimit</code> to control size</td>
+<td>Prevent local memory overflow</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h1 id="7-Serialization-Configuration"><a href="#7-Serialization-Configuration" class="headerlink" title="7. Serialization Configuration"></a>7. Serialization Configuration</h1><p>Data in remote cache (Redis) is stored as byte streams. Storing requires <strong>serialization (encode)</strong>, retrieving requires <strong>deserialization (decode)</strong>. JetCache provides three serialization options:</p>
+<h2 id="7-1-valueEncoder-valueDecoder-Selection"><a href="#7-1-valueEncoder-valueDecoder-Selection" class="headerlink" title="7.1 valueEncoder / valueDecoder Selection"></a>7.1 valueEncoder / valueDecoder Selection</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>java</code> (default)</td>
+<td>Best compatibility, Java native</td>
+<td>Worst performance, largest byte size</td>
+</tr>
+<tr>
+<td><code>kryo</code> / <code>kryo5</code></td>
+<td>Good performance, small byte size</td>
+<td>Requires class registration, watch compatibility on upgrades</td>
+</tr>
+</tbody>
+</table>
+</div>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">jetcache:</span></span><br><span class="line">  <span class="attr">remote:</span></span><br><span class="line">    <span class="attr">default:</span></span><br><span class="line">      <span class="attr">valueEncoder:</span> <span class="string">java</span>    <span class="comment"># or kryo / kryo5</span></span><br><span class="line">      <span class="attr">valueDecoder:</span> <span class="string">java</span></span><br></pre></td></tr></table></figure>
+<p>Custom codec implementations are not recommended here — they risk causing multi-level cache inconsistency. Mismatched encoders/decoders will cause JetCache broadcast start exceptions.</p>
+<h2 id="7-2-Deserialization-Security-Filter-2-8"><a href="#7-2-Deserialization-Security-Filter-2-8" class="headerlink" title="7.2 Deserialization Security Filter (2.8+)"></a>7.2 Deserialization Security Filter (2.8+)</h2><p>JetCache 2.8.x enables a deserialization security filter by default — <strong>only whitelisted classes can be deserialized</strong>. This prevents deserialization vulnerability attacks. The default whitelist includes: <code>java.lang</code>, <code>java.util.</code>, <code>java.time.</code>, <code>java.math</code>, <code>com.alicp.jetcache.</code>.</p>
+<p>If your cached values include custom classes (like <code>UserDO</code>, <code>OrderDO</code>), <strong>you must add them to the whitelist</strong> or deserialization will fail:</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">jetcache:</span></span><br><span class="line">  <span class="attr">decodeFilterAllowPatterns:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">com.remotecarter.</span>                    <span class="comment"># Prefix match: all classes in this package and subpackages</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">com.remotecarter.UserDto</span>             <span class="comment"># Exact match: only this specific class</span></span><br></pre></td></tr></table></figure>
+<p><strong>Pattern matching rules:</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Match Type</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>com.remotecarter.</code><br></td>
+<td>Prefix match (ends with <code>.</code>)</td>
+<td>Matches <code>com.remotecarter.Foo</code>, <code>com.remotecarter.sub.Bar</code></td>
+</tr>
+<tr>
+<td><code>com.remotecarter</code></td>
+<td>Package match (no trailing <code>.</code>)</td>
+<td>Matches <code>com.remotecarter.Foo</code> only, not subpackages</td>
+</tr>
+<tr>
+<td><code>com.remotecarter.UserDto</code></td>
+<td>Exact match (full class name)</td>
+<td>Matches only <code>com.remotecarter.UserDto</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The built-in deny list includes known deserialization attack gadget chains (Commons Collections, Spring AOP, Hibernate, etc.) and dangerous classes like <code>Runtime</code> and <code>ProcessBuilder</code>. <strong>The deny list cannot be overridden by the allow list.</strong></p>
+<p>You can also configure this programmatically:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">DecodeFilter.getDefault().addAllowPatterns(<span class="string">"com.yourcompany."</span>);</span><br></pre></td></tr></table></figure>
+<h1 id="8-Real-World-Usage-Scenarios"><a href="#8-Real-World-Usage-Scenarios" class="headerlink" title="8. Real-World Usage Scenarios"></a>8. Real-World Usage Scenarios</h1><h2 id="Scenario-1-Single-Value-Cache-User-Info"><a href="#Scenario-1-Single-Value-Cache-User-Info" class="headerlink" title="Scenario 1: Single-Value Cache (User Info)"></a>Scenario 1: Single-Value Cache (User Info)</h2><p>The most common scenario — look up users by ID, cache in Redis.</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">UserService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Cached</span>(name = <span class="string">"toc:user:info:"</span>, key = <span class="string">"#uuid"</span>, expire = <span class="number">3600</span>, cacheType = CacheType.REMOTE)</span><br><span class="line">    <span class="function">User <span class="title">getUserById</span><span class="params">(String uuid)</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@CacheUpdate</span>(name = <span class="string">"toc:user:info:"</span>, key = <span class="string">"#user.uuid"</span>, value = <span class="string">"#user"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">updateUser</span><span class="params">(User user)</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@CacheInvalidate</span>(name = <span class="string">"toc:user:info:"</span>, key = <span class="string">"#uuid"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">deleteUser</span><span class="params">(String uuid)</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Redis keys look like: <code>toc:user:info:X12345</code>.</p>
+<h2 id="Scenario-2-Multi-Value-Cache-Hash-Alternative"><a href="#Scenario-2-Multi-Value-Cache-Hash-Alternative" class="headerlink" title="Scenario 2: Multi-Value Cache (Hash Alternative)"></a>Scenario 2: Multi-Value Cache (Hash Alternative)</h2><p>One user maps to multiple KYC records. Previously implemented with Redisson <code>RMap</code> (Hash), migrated to JetCache using <strong>whole-object caching</strong>:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Entire List as one cache entry</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">ArchivesCacheService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Cached</span>(name = <span class="string">"toc:user:archives:"</span>, key = <span class="string">"#appId + ':' + #uuid"</span>,</span><br><span class="line">            expire = <span class="number">30</span>, timeUnit = TimeUnit.MINUTES, cacheType = CacheType.REMOTE)</span><br><span class="line">    <span class="function">List&lt;ApiArchivesStatus&gt; <span class="title">getAllArchives</span><span class="params">(String appId, String uuid)</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@CacheUpdate</span>(name = <span class="string">"toc:user:archives:"</span>, key = <span class="string">"#appId + ':' + #uuid"</span>, value = <span class="string">"#list"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">saveAllArchives</span><span class="params">(String appId, String uuid, List&lt;ApiArchivesStatus&gt; list)</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@CacheInvalidate</span>(name = <span class="string">"toc:user:archives:"</span>, key = <span class="string">"#appId + ':' + #uuid"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">deleteArchives</span><span class="params">(String appId, String uuid)</span></span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Query by kycType</span></span><br><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ArchivesServiceImpl</span> </span>&#123;</span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> ArchivesCacheService archivesCacheService;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> ApiArchivesStatus <span class="title">getByKycType</span><span class="params">(String appId, String uuid, String kycType)</span> </span>&#123;</span><br><span class="line">        List&lt;ApiArchivesStatus&gt; list = archivesCacheService.getAllArchives(appId, uuid);</span><br><span class="line">        <span class="keyword">return</span> list.stream()</span><br><span class="line">            .filter(s -&gt; kycType.equals(s.getKycType()))</span><br><span class="line">            .findFirst()</span><br><span class="line">            .orElse(<span class="keyword">null</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// Can also use Map</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="Scenario-3-High-Frequency-Reads-Auto-Refresh-Report-Summaries"><a href="#Scenario-3-High-Frequency-Reads-Auto-Refresh-Report-Summaries" class="headerlink" title="Scenario 3: High-Frequency Reads + Auto Refresh (Report Summaries)"></a>Scenario 3: High-Frequency Reads + Auto Refresh (Report Summaries)</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">ReportService</span> </span>&#123;</span><br><span class="line">    <span class="meta">@Cached</span>(expire = <span class="number">7200</span>, cacheType = CacheType.BOTH, syncLocal = <span class="keyword">true</span>)</span><br><span class="line">    <span class="meta">@CacheRefresh</span>(refresh = <span class="number">1800</span>, stopRefreshAfterLastAccess = <span class="number">3600</span>, timeUnit = TimeUnit.SECONDS)</span><br><span class="line">    <span class="meta">@CachePenetrationProtect</span></span><br><span class="line">    <span class="function">ReportSummary <span class="title">getReportSummary</span><span class="params">(String reportId)</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Cache for 2 hours, auto-refresh every 30 minutes (cluster-wide unique), stop refreshing after 30 minutes of no access. Local + Redis two-level cache, with penetration protection as a safety net.</p>
+<h2 id="Scenario-4-Conditional-Caching"><a href="#Scenario-4-Conditional-Caching" class="headerlink" title="Scenario 4: Conditional Caching"></a>Scenario 4: Conditional Caching</h2><p><strong>Situations where you need to conditionally use cache:</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Only cache when type == 1</span></span><br><span class="line"><span class="meta">@Cached</span>(name = <span class="string">"data-"</span>, key = <span class="string">"#id"</span>, expire = <span class="number">3600</span>, condition = <span class="string">"#type == 1"</span>)</span><br><span class="line"><span class="function">DataObject <span class="title">getData</span><span class="params">(<span class="keyword">long</span> id, <span class="keyword">int</span> type)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Only cache when result is non-null</span></span><br><span class="line"><span class="meta">@Cached</span>(name = <span class="string">"data-"</span>, key = <span class="string">"#id"</span>, expire = <span class="number">3600</span>, postCondition = <span class="string">"#result != null"</span>)</span><br><span class="line"><span class="function">DataObject <span class="title">getData</span><span class="params">(<span class="keyword">long</span> id)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Temporarily disable cache for a specific scenario (e.g., data export shouldn't use cache)</span></span><br><span class="line"><span class="meta">@Cached</span>(name = <span class="string">"data-"</span>, key = <span class="string">"#id"</span>, expire = <span class="number">3600</span>, enabled = <span class="keyword">false</span>)</span><br><span class="line"><span class="function">DataObject <span class="title">getData</span><span class="params">(<span class="keyword">long</span> id)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Activate caching where needed</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">exportData</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    CacheContext.enableCache(() -&gt; &#123;</span><br><span class="line">        <span class="comment">// getData here will use cache</span></span><br><span class="line">        DataObject data = getData(<span class="number">123L</span>);</span><br><span class="line">        <span class="keyword">return</span> data;</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>If you need to toggle caching via hot config deployment:</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> com.remotecarter.appuser.config;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Value;</span><br><span class="line"><span class="keyword">import</span> org.springframework.cloud.context.config.annotation.RefreshScope;</span><br><span class="line"><span class="keyword">import</span> org.springframework.stereotype.Component;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="meta">@RefreshScope</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SwitchCache</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">volatile</span> <span class="keyword">boolean</span> CACHE_ON = <span class="keyword">true</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Value</span>(<span class="string">"$&#123;nacos.user.info.cacheOn:true&#125;"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">setCacheOn</span><span class="params">(<span class="keyword">boolean</span> cacheOn)</span> </span>&#123;</span><br><span class="line">        CACHE_ON = cacheOn;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">boolean</span> <span class="title">isCacheOn</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> CACHE_ON;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Cached</span>(name = <span class="string">"toc:user:info:"</span>,</span><br><span class="line">        key = <span class="string">"#uuid"</span>,</span><br><span class="line">        expire = <span class="number">3600</span>,</span><br><span class="line">        condition = <span class="string">"T(com.remotecarter.appuser.config.SwitchCache).isCacheOn()"</span>)</span><br><span class="line"><span class="class"><span class="keyword">interface</span> <span class="title">UserInfoDetailDTO</span> <span class="title">queryUserDetail</span>(<span class="title">String</span> <span class="title">uuid</span>)</span>;</span><br></pre></td></tr></table></figure>
+<h2 id="Best-Practices-and-Caveats"><a href="#Best-Practices-and-Caveats" class="headerlink" title="Best Practices and Caveats"></a>Best Practices and Caveats</h2><h3 id="1-Always-Set-TTL"><a href="#1-Always-Set-TTL" class="headerlink" title="1. Always Set TTL"></a>1. Always Set TTL</h3><p><code>@CacheUpdate</code> and <code>@CacheInvalidate</code> can fail due to network issues. Without a TTL, failed delete/update operations leave the cache permanently inconsistent. <strong>Always set a reasonable expire as a final consistency safety net</strong>.</p>
+<h3 id="2-Serialization-Choice"><a href="#2-Serialization-Choice" class="headerlink" title="2. Serialization Choice"></a>2. Serialization Choice</h3><ul>
+<li><p><strong>Development phase / unsure</strong>: use <code>java</code> — best compatibility</p>
+</li>
+<li><p><strong>Performance-focused</strong>: use <code>kryo</code> — smaller size, faster speed, but requires class registration</p>
+</li>
+<li><p><strong>JSON serialization</strong>: not recommended. JSON isn’t a dedicated Java serialization tool — when reflection can’t determine the type, it deserializes as JSONObject, causing compatibility issues</p>
+</li>
+</ul>
+<h3 id="3-broadcastChannel-Isolation"><a href="#3-broadcastChannel-Isolation" class="headerlink" title="3. broadcastChannel Isolation"></a>3. broadcastChannel Isolation</h3><p>When multiple services share the same Redis instance, different services must use different <code>broadcastChannel</code> values. Otherwise, service A’s cache update broadcasts will trigger service B’s local cache invalidation — seems harmless at first, but becomes a disaster under heavy broadcast volume.</p>
+<h3 id="4-AOP-Proxy-Pitfall"><a href="#4-AOP-Proxy-Pitfall" class="headerlink" title="4. AOP Proxy Pitfall"></a>4. AOP Proxy Pitfall</h3><p>JetCache annotations work through Spring AOP proxies. <strong>Internal method calls within the same class bypass the proxy, so caching won’t take effect</strong>:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">UserServiceImpl</span> <span class="keyword">implements</span> <span class="title">UserService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> User <span class="title">getUser</span><span class="params">(<span class="keyword">long</span> userId)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// Calling getUserById here — cache won't work!</span></span><br><span class="line">        <span class="comment">// Because this.getUserById() doesn't go through the proxy</span></span><br><span class="line">        <span class="keyword">return</span> getUserById(userId);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Cached</span>(expire = <span class="number">3600</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> User <span class="title">getUserById</span><span class="params">(<span class="keyword">long</span> userId)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> userMapper.selectById(userId);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>Solution</strong>: inject yourself via <code>@Autowired</code> and use the injected proxy instance:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">UserServiceImpl</span> <span class="keyword">implements</span> <span class="title">UserService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> UserService self;  <span class="comment">// Inject proxy instance</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> User <span class="title">getUser</span><span class="params">(<span class="keyword">long</span> userId)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> self.getUserById(userId);  <span class="comment">// Goes through proxy — cache works</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="5-parameters-Compiler-Flag"><a href="#5-parameters-Compiler-Flag" class="headerlink" title="5. -parameters Compiler Flag"></a>5. -parameters Compiler Flag</h3><p>If you want to use parameter names in SpEL (like <code>#uuid</code>), you must add <code>-parameters</code> at compile time. Otherwise, use <code>args[0]</code> for index-based access.</p>
+<h3 id="6-name-Naming-Convention"><a href="#6-name-Naming-Convention" class="headerlink" title="6. name Naming Convention"></a>6. name Naming Convention</h3><p><code>name</code> becomes the Redis key prefix. Recommendations:</p>
+<ul>
+<li>Use names with clear business meaning, like <code>&quot;toc:user:info:&quot;</code></li>
+<li>End with <code>-</code> or <code>:</code> as a separator, like <code>&quot;userCache-12345&quot;</code></li>
+<li>Don’t assign the same <code>name + area</code> to different <code>@Cached</code> annotations</li>
+</ul>
+<h3 id="7-Local-Cache-Memory-Control"><a href="#7-Local-Cache-Memory-Control" class="headerlink" title="7. Local Cache Memory Control"></a>7. Local Cache Memory Control</h3><p><code>localLimit</code> is a limit <strong>per cache instance</strong>, not total. If you have 10 cache instances created with <code>@CreateCache</code>, each with limit 100, local memory could hold up to 1,000 elements total. Watch this carefully with large objects.</p>
+<h1 id="9-FAQ"><a href="#9-FAQ" class="headerlink" title="9. FAQ"></a>9. FAQ</h1><h2 id="Q-Cached-annotation-on-another-method-in-the-same-class-isn’t-working"><a href="#Q-Cached-annotation-on-another-method-in-the-same-class-isn’t-working" class="headerlink" title="Q: @Cached annotation on another method in the same class isn’t working?"></a>Q: @Cached annotation on another method in the same class isn’t working?</h2><p>Spring AOP is proxy-based. Internal method calls within the same class don’t go through the proxy. See Best Practice #4 above for the solution.</p>
+<h2 id="Q-Used-a-parameter-name-as-key-but-cache-isn’t-working"><a href="#Q-Used-a-parameter-name-as-key-but-cache-isn’t-working" class="headerlink" title="Q: Used a parameter name as key, but cache isn’t working?"></a>Q: Used a parameter name as key, but cache isn’t working?</h2><p>Check if the <code>-parameters</code> compiler flag is configured. Without it, switch to <code>args[0]</code> for index-based access.</p>
+<h2 id="Q-Deserialization-errors-after-upgrading-to-2-8"><a href="#Q-Deserialization-errors-after-upgrading-to-2-8" class="headerlink" title="Q: Deserialization errors after upgrading to 2.8?"></a>Q: Deserialization errors after upgrading to 2.8?</h2><p>2.8+ enables the deserialization security filter by default. You need to configure <code>decodeFilterAllowPatterns</code> in your yml to include the packages containing your custom classes.</p>
+<h2 id="Q-How-to-connect-to-multiple-Redis-instances"><a href="#Q-How-to-connect-to-multiple-Redis-instances" class="headerlink" title="Q: How to connect to multiple Redis instances?"></a>Q: How to connect to multiple Redis instances?</h2><p>Configure multiple areas:</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">jetcache:</span></span><br><span class="line">  <span class="attr">remote:</span></span><br><span class="line">    <span class="attr">default:</span></span><br><span class="line">      <span class="attr">host:</span> <span class="string">redis-host-1</span></span><br><span class="line">      <span class="attr">port:</span> <span class="number">6379</span></span><br><span class="line">    <span class="attr">second:</span></span><br><span class="line">      <span class="attr">host:</span> <span class="string">redis-host-2</span></span><br><span class="line">      <span class="attr">port:</span> <span class="number">6380</span></span><br></pre></td></tr></table></figure>
+<p>Then specify the area in annotations: <code>@Cached(area = &quot;second&quot;, ...)</code>.</p>
+<h2 id="Q-What-happens-if-CacheUpdate-CacheInvalidate-fails"><a href="#Q-What-happens-if-CacheUpdate-CacheInvalidate-fails" class="headerlink" title="Q: What happens if @CacheUpdate / @CacheInvalidate fails?"></a>Q: What happens if @CacheUpdate / @CacheInvalidate fails?</h2><p>These operations can fail due to network issues. JetCache won’t throw an exception — it fails silently. That’s why <strong>setting a reasonable TTL is essential</strong> — even if update/delete fails, the cache auto-expires after TTL and reloads from the database.</p>
+<h2 id="Q-Local-cache-and-Redis-data-are-inconsistent"><a href="#Q-Local-cache-and-Redis-data-are-inconsistent" class="headerlink" title="Q: Local cache and Redis data are inconsistent?"></a>Q: Local cache and Redis data are inconsistent?</h2><p>Make sure you’ve configured <code>syncLocal = true</code> and <code>broadcastChannel</code>. Also set a <code>localExpire</code> shorter than the Redis expire as a fallback — even if broadcast messages are lost, local cache auto-expires after localExpire.</p>
+<h2 id="Q-Can-JetCache’s-distributed-lock-be-used"><a href="#Q-Can-JetCache’s-distributed-lock-be-used" class="headerlink" title="Q: Can JetCache’s distributed lock be used?"></a>Q: Can JetCache’s distributed lock be used?</h2><p>JetCache’s lock is based on Redis <code>SETNX</code> + TTL — it’s a <strong>non-strict distributed lock</strong>, suitable for “prevent duplicate execution” scenarios. It works. But from what we’ve seen, each domain has its own distributed lock implementation. I’d recommend using your own — JetCache’s core responsibility is defining the cache framework protocol.</p>
+<h2 id="Q-Complete-Configuration-Reference"><a href="#Q-Complete-Configuration-Reference" class="headerlink" title="Q: Complete Configuration Reference"></a>Q: Complete Configuration Reference</h2><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">jetcache:</span></span><br><span class="line">  <span class="comment"># ============ Global Config ============</span></span><br><span class="line">  <span class="attr">statIntervalMinutes:</span> <span class="number">15</span>                    <span class="comment"># Stats interval (minutes). 0 = disabled</span></span><br><span class="line">  <span class="attr">areaInCacheName:</span> <span class="literal">false</span>                     <span class="comment"># Whether key prefix includes area. New projects: false</span></span><br><span class="line">  <span class="attr">hidePackages:</span> <span class="string">com.remotecarter</span>                <span class="comment"># Package prefix stripped when auto-generating name</span></span><br><span class="line">  <span class="attr">useDefaultLocalExpireInMultiLevelCache:</span> <span class="literal">false</span>  <span class="comment"># Whether to use local builder's TTL for BOTH</span></span><br><span class="line"></span><br><span class="line">  <span class="comment"># ============ Deserialization Security (2.8+) ============</span></span><br><span class="line">  <span class="attr">decodeFilterEnabled:</span> <span class="literal">true</span>                  <span class="comment"># Master switch</span></span><br><span class="line">  <span class="attr">decodeFilterAllowPatterns:</span>                 <span class="comment"># Allow list</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">com.remotecarter.</span></span><br><span class="line">  <span class="attr">decodeFilterDenyPatterns:</span>                  <span class="comment"># Deny list (always takes priority over allow list)</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">com.dangerous.</span></span><br><span class="line"></span><br><span class="line">  <span class="comment"># ============ Local Cache Config ============</span></span><br><span class="line">  <span class="attr">local:</span></span><br><span class="line">    <span class="attr">default:</span>                                 <span class="comment"># Area name</span></span><br><span class="line">      <span class="attr">type:</span> <span class="string">caffeine</span>                         <span class="comment"># caffeine or linkedhashmap</span></span><br><span class="line">      <span class="attr">limit:</span> <span class="number">100</span>                             <span class="comment"># Max elements per cache instance</span></span><br><span class="line">      <span class="attr">keyConvertor:</span> <span class="string">fastjson2</span>                <span class="comment"># fastjson2 / jackson / jackson3 / none</span></span><br><span class="line">      <span class="attr">expireAfterWriteInMillis:</span> <span class="number">60000</span>        <span class="comment"># Default TTL (milliseconds)</span></span><br><span class="line">      <span class="attr">expireAfterAccessInMillis:</span> <span class="number">0</span>           <span class="comment"># TTL after access (0 = not used)</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># Can configure multiple areas</span></span><br><span class="line">    <span class="attr">otherArea:</span></span><br><span class="line">      <span class="attr">type:</span> <span class="string">linkedhashmap</span></span><br><span class="line">      <span class="attr">limit:</span> <span class="number">50</span></span><br><span class="line">      <span class="attr">keyConvertor:</span> <span class="string">none</span></span><br><span class="line"></span><br><span class="line">  <span class="comment"># ============ Remote Cache Config ============</span></span><br><span class="line">  <span class="attr">remote:</span></span><br><span class="line">    <span class="attr">default:</span>                                 <span class="comment"># Area name</span></span><br><span class="line">      <span class="attr">type:</span> <span class="string">redis.redisson</span>                   <span class="comment"># redis / redis.lettuce / redis.redisson / redis.springdata</span></span><br><span class="line">      <span class="attr">keyConvertor:</span> <span class="string">fastjson2</span>                <span class="comment"># Key conversion</span></span><br><span class="line">      <span class="attr">valueEncoder:</span> <span class="string">java</span>                     <span class="comment"># Serialization: java / kryo / kryo5</span></span><br><span class="line">      <span class="attr">valueDecoder:</span> <span class="string">java</span>                     <span class="comment"># Deserialization: java / kryo / kryo5</span></span><br><span class="line">      <span class="attr">broadcastChannel:</span> <span class="string">crm-user</span>             <span class="comment"># Two-level cache broadcast channel (not configured = disabled)</span></span><br><span class="line"></span><br><span class="line">      <span class="comment"># --- Jedis / Redisson connection pool config ---</span></span><br><span class="line">      <span class="attr">poolConfig:</span></span><br><span class="line">        <span class="attr">minIdle:</span> <span class="number">5</span></span><br><span class="line">        <span class="attr">maxIdle:</span> <span class="number">20</span></span><br><span class="line">        <span class="attr">maxTotal:</span> <span class="number">50</span></span><br><span class="line">      <span class="attr">host:</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span></span><br><span class="line">      <span class="attr">port:</span> <span class="number">6379</span></span><br><span class="line">      <span class="comment"># password: xxx                       # Set when password is required</span></span><br><span class="line"></span><br><span class="line">      <span class="comment"># --- Lettuce connection (pick one) ---</span></span><br><span class="line">      <span class="comment"># uri: redis://127.0.0.1:6379/0</span></span><br><span class="line"></span><br><span class="line">      <span class="attr">expireAfterWriteInMillis:</span> <span class="number">300000</span>       <span class="comment"># Default TTL (milliseconds)</span></span><br></pre></td></tr></table></figure>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/JetCache/" rel="tag"><i class="fa fa-tag"></i> JetCache</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/06/15/102_JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/" rel="prev" title="JD-HotKey User Guide">
+      <i class="fa fa-chevron-left"></i> JD-HotKey User Guide
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2026/07/12/104_chatgpt-5.6-introduction-en/" rel="next" title="GPT-5.6 Is Here">
+      GPT-5.6 Is Here <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Component-Overview"><span class="nav-number">1.</span> <span class="nav-text">1. Component Overview</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Core-Concepts"><span class="nav-number">2.</span> <span class="nav-text">2. Core Concepts</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-Cache-Interface"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 Cache Interface</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-CacheType-—-Cache-Types"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 CacheType — Cache Types</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-Key-Generation-Rules"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 Key Generation Rules</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-4-Area-—-Cache-Areas"><span class="nav-number">2.4.</span> <span class="nav-text">2.4 Area — Cache Areas</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Quick-Integration-Spring-Boot"><span class="nav-number">3.</span> <span class="nav-text">3. Quick Integration (Spring Boot)</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Step-1-Add-Maven-Dependency"><span class="nav-number">3.1.</span> <span class="nav-text">Step 1: Add Maven Dependency</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Step-2-Configure-application-yml"><span class="nav-number">3.2.</span> <span class="nav-text">Step 2: Configure application.yml</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Step-3-Add-Annotations-to-the-Startup-Class"><span class="nav-number">3.3.</span> <span class="nav-text">Step 3: Add Annotations to the Startup Class</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-Usage-Guide"><span class="nav-number">4.</span> <span class="nav-text">4. Usage Guide</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-Annotation-Driven-Cache-Declarative"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 Annotation-Driven Cache (Declarative)</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Cached-—-Cache-Reads"><span class="nav-number">4.1.1.</span> <span class="nav-text">@Cached — Cache Reads</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Cached-—-Attribute-Reference"><span class="nav-number">4.1.2.</span> <span class="nav-text">@Cached — Attribute Reference</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CacheUpdate-—-Update-Cache"><span class="nav-number">4.1.3.</span> <span class="nav-text">@CacheUpdate — Update Cache</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CacheInvalidate-—-Delete-Cache"><span class="nav-number">4.1.4.</span> <span class="nav-text">@CacheInvalidate — Delete Cache</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CacheRefresh-—-Auto-Refresh"><span class="nav-number">4.1.5.</span> <span class="nav-text">@CacheRefresh — Auto Refresh</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CachePenetrationProtect-—-Penetration-Protection"><span class="nav-number">4.1.6.</span> <span class="nav-text">@CachePenetrationProtect — Penetration Protection</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-Programmatic-Cache-Cache-API"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 Programmatic Cache (Cache API)</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#CacheManager-QuickConfig-for-Cache-Instance-Creation"><span class="nav-number">4.2.1.</span> <span class="nav-text">CacheManager + QuickConfig for Cache Instance Creation</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Basic-Operations"><span class="nav-number">4.2.2.</span> <span class="nav-text">Basic Operations</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#computeIfAbsent-—-Auto-Load-on-Cache-Miss"><span class="nav-number">4.2.3.</span> <span class="nav-text">computeIfAbsent — Auto-Load on Cache Miss</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Uppercase-API-—-Operations-with-Full-Status-Codes"><span class="nav-number">4.2.4.</span> <span class="nav-text">Uppercase API — Operations with Full Status Codes</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Async-API"><span class="nav-number">4.2.5.</span> <span class="nav-text">Async API</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-Key-Types-and-Strategies"><span class="nav-number">5.</span> <span class="nav-text">5. Key Types and Strategies</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-Redis-Key-Concatenation-Rules"><span class="nav-number">5.1.</span> <span class="nav-text">5.1 Redis Key Concatenation Rules</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-2-Supported-Key-Types"><span class="nav-number">5.2.</span> <span class="nav-text">5.2 Supported Key Types</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-3-keyConvertor-Mechanism"><span class="nav-number">5.3.</span> <span class="nav-text">5.3 keyConvertor Mechanism</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-4-SpEL-Expressions-for-Keys"><span class="nav-number">5.4.</span> <span class="nav-text">5.4 SpEL Expressions for Keys</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-5-Single-Value-vs-Multi-Value-Cache-Scenarios"><span class="nav-number">5.5.</span> <span class="nav-text">5.5 Single-Value vs Multi-Value Cache Scenarios</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-Two-Level-Cache-BOTH"><span class="nav-number">6.</span> <span class="nav-text">6. Two-Level Cache (BOTH)</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#6-1-How-It-Works"><span class="nav-number">6.1.</span> <span class="nav-text">6.1 How It Works</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-2-Configuration"><span class="nav-number">6.2.</span> <span class="nav-text">6.2 Configuration</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Annotation-approach"><span class="nav-number">6.2.1.</span> <span class="nav-text">Annotation approach:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Programmatic-approach"><span class="nav-number">6.2.2.</span> <span class="nav-text">Programmatic approach:</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-3-syncLocal-—-Cross-Node-Sync-Invalidation"><span class="nav-number">6.3.</span> <span class="nav-text">6.3 syncLocal — Cross-Node Sync Invalidation</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-4-localExpire-—-Separating-Local-and-Remote-Expiry"><span class="nav-number">6.4.</span> <span class="nav-text">6.4 localExpire — Separating Local and Remote Expiry</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#7-Serialization-Configuration"><span class="nav-number">7.</span> <span class="nav-text">7. Serialization Configuration</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#7-1-valueEncoder-valueDecoder-Selection"><span class="nav-number">7.1.</span> <span class="nav-text">7.1 valueEncoder &#x2F; valueDecoder Selection</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-2-Deserialization-Security-Filter-2-8"><span class="nav-number">7.2.</span> <span class="nav-text">7.2 Deserialization Security Filter (2.8+)</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#8-Real-World-Usage-Scenarios"><span class="nav-number">8.</span> <span class="nav-text">8. Real-World Usage Scenarios</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Scenario-1-Single-Value-Cache-User-Info"><span class="nav-number">8.1.</span> <span class="nav-text">Scenario 1: Single-Value Cache (User Info)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Scenario-2-Multi-Value-Cache-Hash-Alternative"><span class="nav-number">8.2.</span> <span class="nav-text">Scenario 2: Multi-Value Cache (Hash Alternative)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Scenario-3-High-Frequency-Reads-Auto-Refresh-Report-Summaries"><span class="nav-number">8.3.</span> <span class="nav-text">Scenario 3: High-Frequency Reads + Auto Refresh (Report Summaries)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Scenario-4-Conditional-Caching"><span class="nav-number">8.4.</span> <span class="nav-text">Scenario 4: Conditional Caching</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Best-Practices-and-Caveats"><span class="nav-number">8.5.</span> <span class="nav-text">Best Practices and Caveats</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-Always-Set-TTL"><span class="nav-number">8.5.1.</span> <span class="nav-text">1. Always Set TTL</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-Serialization-Choice"><span class="nav-number">8.5.2.</span> <span class="nav-text">2. Serialization Choice</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-broadcastChannel-Isolation"><span class="nav-number">8.5.3.</span> <span class="nav-text">3. broadcastChannel Isolation</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-AOP-Proxy-Pitfall"><span class="nav-number">8.5.4.</span> <span class="nav-text">4. AOP Proxy Pitfall</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-parameters-Compiler-Flag"><span class="nav-number">8.5.5.</span> <span class="nav-text">5. -parameters Compiler Flag</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-name-Naming-Convention"><span class="nav-number">8.5.6.</span> <span class="nav-text">6. name Naming Convention</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-Local-Cache-Memory-Control"><span class="nav-number">8.5.7.</span> <span class="nav-text">7. Local Cache Memory Control</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#9-FAQ"><span class="nav-number">9.</span> <span class="nav-text">9. FAQ</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-Cached-annotation-on-another-method-in-the-same-class-isn’t-working"><span class="nav-number">9.1.</span> <span class="nav-text">Q: @Cached annotation on another method in the same class isn’t working?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-Used-a-parameter-name-as-key-but-cache-isn’t-working"><span class="nav-number">9.2.</span> <span class="nav-text">Q: Used a parameter name as key, but cache isn’t working?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-Deserialization-errors-after-upgrading-to-2-8"><span class="nav-number">9.3.</span> <span class="nav-text">Q: Deserialization errors after upgrading to 2.8?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-How-to-connect-to-multiple-Redis-instances"><span class="nav-number">9.4.</span> <span class="nav-text">Q: How to connect to multiple Redis instances?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-What-happens-if-CacheUpdate-CacheInvalidate-fails"><span class="nav-number">9.5.</span> <span class="nav-text">Q: What happens if @CacheUpdate &#x2F; @CacheInvalidate fails?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-Local-cache-and-Redis-data-are-inconsistent"><span class="nav-number">9.6.</span> <span class="nav-text">Q: Local cache and Redis data are inconsistent?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-Can-JetCache’s-distributed-lock-be-used"><span class="nav-number">9.7.</span> <span class="nav-text">Q: Can JetCache’s distributed lock be used?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-Complete-Configuration-Reference"><span class="nav-number">9.8.</span> <span class="nav-text">Q: Complete Configuration Reference</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/06/17/103_JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/06/17/103_JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

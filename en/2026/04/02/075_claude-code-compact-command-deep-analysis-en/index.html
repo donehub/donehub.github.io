@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="I was using Claude Code to refactor a user module. The first 30 rounds went smoothly — it remembered clearly that the database was PostgreSQL, the API style was RESTful, and the Redis cluster was unde">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Inside Claude Code&#39;s &#x2F;compact Command: How Context Compression Actually Works">
+<meta property="og:url" content="https://donehub.github.io/en/2026/04/02/075_claude-code-compact-command-deep-analysis-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="I was using Claude Code to refactor a user module. The first 30 rounds went smoothly — it remembered clearly that the database was PostgreSQL, the API style was RESTful, and the Redis cluster was unde">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-04-01T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T09:16:56.180Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="上下文压缩">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/04/02/075_claude-code-compact-command-deep-analysis-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>Inside Claude Code's /compact Command: How Context Compression Actually Works | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/04/02/075_claude-code-compact-command-deep-analysis-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Inside Claude Code's /compact Command: How Context Compression Actually Works
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-04-02 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-02T00:00:00+08:00">2026-04-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:16:56" itemprop="dateModified" datetime="2026-09-25T17:16:56+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/04/02/075_claude-code-compact-command-deep-analysis-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/04/02/075_claude-code-compact-command-deep-analysis-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>I was using Claude Code to refactor a user module. The first 30 rounds went smoothly — it remembered clearly that the database was PostgreSQL, the API style was RESTful, and the Redis cluster was under maintenance that day so sessions should fall back to the DB temporarily. Then around round 50, it suddenly asked, “Can’t find the MySQL MCP info, could you provide it?” The MCP settings were right there in the file — it had known about them earlier. Once the context window gets overloaded, early critical constraints get diluted in the model’s attention. This article breaks down exactly what happens inside Claude Code when you hit <code>/compact</code>.</p>
+<a id="more"></a>
+<h2 id="What’s-Actually-in-the-Context-Window"><a href="#What’s-Actually-in-the-Context-Window" class="headerlink" title="What’s Actually in the Context Window"></a>What’s Actually in the Context Window</h2><p>Before talking about compression, you need to understand what the context window really contains. Every time Claude Code sends a request to the API, the assembled payload is far more complex than “a series of conversation messages.”</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Approximate Size</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>System prompt</td>
+<td>~20K tokens</td>
+<td>Role definition, behavior constraints, tool descriptions</td>
+</tr>
+<tr>
+<td>CLAUDE.md instructions</td>
+<td>Dynamically injected</td>
+<td>User-level + project-level + directory-level config</td>
+</tr>
+<tr>
+<td>Conversation history</td>
+<td>Continuously growing</td>
+<td>User messages + assistant replies + tool calls + tool results</td>
+</tr>
+<tr>
+<td>Tool definitions</td>
+<td>~15K tokens</td>
+<td>Schema descriptions for 48+ tools</td>
+</tr>
+<tr>
+<td>Current state</td>
+<td>Relatively small</td>
+<td>TodoWrite task list, recent file read content</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The biggest chunk is conversation history. Each round adds several thousand tokens, and tool calls with their results are often 3 to 5 times the size of the conversation itself. A single <code>Read</code> call on a 500-line file consumes over 20K tokens. Read three different files and your tool results alone eat up 60K tokens. When Claude Code senses that space is running out, it needs a mechanism to clean up — that’s what <code>/compact</code> does.</p>
+<h2 id="The-Four-Layer-Progressive-Compression-Pipeline"><a href="#The-Four-Layer-Progressive-Compression-Pipeline" class="headerlink" title="The Four-Layer Progressive Compression Pipeline"></a>The Four-Layer Progressive Compression Pipeline</h2><p><code>/compact</code> isn’t simply “summarize the conversation history.” When you run the command, Claude Code internally executes a four-layer pipeline, processing from lightweight to heavyweight. The system tries the cheapest option first and escalates only if needed — similar to memory management: first reclaim caches, then kill processes, and only as a last resort invoke the OOM Killer.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Name</th>
+<th>Core Strategy</th>
+<th>Lossy/Lossless</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Layer 1</td>
+<td>Micro compact</td>
+<td>Truncate oversized individual tool results</td>
+<td>Lossless</td>
+</tr>
+<tr>
+<td>Layer 2</td>
+<td>Snip</td>
+<td>Deduplication + redundancy removal</td>
+<td>Lossless</td>
+</tr>
+<tr>
+<td>Layer 3</td>
+<td>Context Collapse</td>
+<td>Fold old messages into segment summaries</td>
+<td>Lossy</td>
+</tr>
+<tr>
+<td>Layer 4</td>
+<td>Full Compact</td>
+<td>Global summary replaces all history</td>
+<td>Lossy</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="Micro-Compact-Minimal-Surgery-Without-Breaking-the-Cache-Key"><a href="#Micro-Compact-Minimal-Surgery-Without-Breaking-the-Cache-Key" class="headerlink" title="Micro Compact: Minimal Surgery Without Breaking the Cache Key"></a>Micro Compact: Minimal Surgery Without Breaking the Cache Key</h3><p>The lightest layer. Its defining characteristic is that it modifies message content without changing the cache key. The Claude API has a prompt caching mechanism: when the prefix of two consecutive requests is identical, the second request can reuse the cache to reduce cost and latency. Micro compact’s modifications are “harmless” — they don’t break cache hits.</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Simplified logic</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">microCompact</span>(<span class="params">messages: Message[]</span>): <span class="title">Message</span>[] </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> messages.map(<span class="function"><span class="params">msg</span> =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (msg.type === <span class="string">'tool_result'</span>) &#123;</span><br><span class="line">      <span class="comment">// Truncate oversized tool results</span></span><br><span class="line">      <span class="keyword">if</span> (msg.content.length &gt; MICRO_COMPACT_THRESHOLD) &#123;</span><br><span class="line">        <span class="keyword">return</span> &#123;</span><br><span class="line">          ...msg,</span><br><span class="line">          content: msg.content.slice(<span class="number">0</span>, KEEP_CHARS) + </span><br><span class="line">            <span class="string">`\n... [<span class="subst">$&#123;msg.content.length&#125;</span> chars total, compacted]`</span></span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> msg</span><br><span class="line">  &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Only the content length of <code>tool_result</code> messages is changed — message structure, ordering, and roles stay the same, so the cache key still matches. This layer typically frees up 10% to 20% of space at virtually zero cost.</p>
+<h3 id="Snip-Deduplication-and-Redundancy-Removal"><a href="#Snip-Deduplication-and-Redundancy-Removal" class="headerlink" title="Snip: Deduplication and Redundancy Removal"></a>Snip: Deduplication and Redundancy Removal</h3><p>Micro compact handles the length of individual messages. Snip handles duplication across messages. When writing code, the same file gets read repeatedly. Without processing, the same file content might appear three or four times in the context. Snip’s approach is direct: for identical repeated reads, it replaces the content with <code>[File content already shown above]</code>. Newer versions with modifications are preserved as-is, determined by content hashing.</p>
+<p>Beyond deduplication, Snip also trims several categories of special tool output. If a <code>Bash</code> command’s stdout is excessively long, only the last N lines are kept — the tail usually carries more signal than the head. If <code>Grep</code> results are too numerous, only the match count statistics plus the first 20 results are retained. <code>Write</code> operation results are replaced outright with <code>[File written successfully]</code> since the content already exists in the filesystem. This layer typically frees 15% to 30%, depending on how often the task re-reads the same files.</p>
+<h3 id="Context-Collapse-Segment-by-Segment-Folding"><a href="#Context-Collapse-Segment-by-Segment-Folding" class="headerlink" title="Context Collapse: Segment-by-Segment Folding"></a>Context Collapse: Segment-by-Segment Folding</h3><p>The first two layers are lossless — information isn’t lost, just shortened. Starting here, we enter lossy compression territory.</p>
+<p>Context Collapse groups early conversation messages and merges each group into a small summary. It doesn’t summarize everything at once — it folds segment by segment. Rounds 1 through 5 might collapse into “Discussed database selection, decided on PostgreSQL.” Rounds 6 through 10 become “Completed authentication module design, settled on JWT approach.” The most recent rounds are preserved verbatim. The older the content, the more aggressively it gets folded. The newer the content, the more completely it’s preserved — because the verbatim record of round 3 is unlikely to be needed, but round 25 might be directly relevant to the current work.</p>
+<p>The folding granularity isn’t fixed — it adjusts dynamically based on context pressure. When pressure is low, no folding happens. When pressure is high, the folding range expands.</p>
+<h3 id="Full-Compact-Global-Summary"><a href="#Full-Compact-Global-Summary" class="headerlink" title="Full Compact: Global Summary"></a>Full Compact: Global Summary</h3><p>If the first three layers aren’t enough, you reach the heaviest step. Full Compact takes all current history messages (including previously collapsed summaries) and sends them to Claude to generate a global summary. That summary then replaces all history, keeping only the most recent rounds verbatim. Pre-compact might be 180K tokens; post-compact drops to around 30K.</p>
+<p>This global summary isn’t just generated ad hoc. Claude Code gives the model a dedicated compact prompt that instructs it to preserve the user’s original goals and key constraints, important decisions already made and their reasoning, completed steps and modified files, in-progress but unfinished tasks, and encountered issues with current solutions. For code changes, it requires preserving specific file paths and key implementation logic while discarding irrelevant chitchat and outdated discussions.</p>
+<p>This layer frees 60% to 80% of space, at the cost of losing detail. Anything not mentioned in the summary is genuinely gone.</p>
+<h2 id="Context-Reconstruction-After-Compression"><a href="#Context-Reconstruction-After-Compression" class="headerlink" title="Context Reconstruction After Compression"></a>Context Reconstruction After Compression</h2><p>Compression is only the first half. The second half is reconstruction. After compression, Claude Code performs a series of recovery actions.</p>
+<p>CLAUDE.md instructions always live in the system prompt and are unaffected by compression. But Claude Code re-checks whether CLAUDE.md has been updated after compaction. If you modified CLAUDE.md during the conversation, the new content takes effect after compact.</p>
+<p>One easily overlooked detail is file content reconstruction. After compression, all previously read file content is lost — the summary only retains file names and rough descriptions. If the model needs those files’ content during subsequent work, it re-issues Read calls. This is why you often see Claude Code suddenly reading a bunch of files right after a compact. It’s not confused — it’s rebuilding its file cache.</p>
+<p>The TodoWrite task list is stored independently of conversation history. After compact, the task list automatically restores to its pre-compact state: which tasks are done, which are in progress, which are pending — all intact. This is exactly why using TodoWrite to manage long-running task progress is recommended. It’s the most important state anchor after a compact.</p>
+<h2 id="Automatic-Trigger-Mechanism"><a href="#Automatic-Trigger-Mechanism" class="headerlink" title="Automatic Trigger Mechanism"></a>Automatic Trigger Mechanism</h2><p><code>/compact</code> is manually triggered, but in practice most compression happens automatically. Claude Code continuously monitors context utilization and kicks off the compression pipeline when it hits certain thresholds.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Context Utilization</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&lt; 60%</td>
+<td>No compression</td>
+</tr>
+<tr>
+<td>60%–75%</td>
+<td>Micro compact + Snip</td>
+</tr>
+<tr>
+<td>75%–85%</td>
+<td>Context Collapse</td>
+</tr>
+<tr>
+<td>&gt; 85%</td>
+<td>Full Compact (global summary)</td>
+</tr>
+<tr>
+<td>95%+</td>
+<td>Emergency compression, aggressive trimming</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The exact thresholds aren’t fixed — they’re calculated dynamically based on the model’s maximum context window. A 200K model and a 1M model have different trigger points.</p>
+<p>One historical bug is worth mentioning: Claude 3 Opus’s 1M context window was incorrectly calculated as 200K, causing automatic compression to trigger too early. Users had 800K tokens of headroom left, but the system started compressing anyway. This was fixed in v2.1.117.</p>
+<h2 id="Hooks-Extension-Points-Around-Compression"><a href="#Hooks-Extension-Points-Around-Compression" class="headerlink" title="Hooks: Extension Points Around Compression"></a>Hooks: Extension Points Around Compression</h2><p>Claude Code allows custom logic to be injected before and after compression.</p>
+<p>The PreCompact Hook fires before compression executes. It has one critical capability: if the hook returns exit code 2 or outputs <code>{&quot;decision&quot;:&quot;block&quot;}</code>, the compression is canceled. This is useful when you’re in the middle of a critical operation and don’t want compression to disrupt the current state. The hook’s output is also appended to the compression pipeline, but this content may be rewritten or discarded when the summary is generated — so don’t put critical information only in the hook output.</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"hooks"</span>: &#123;</span><br><span class="line">    <span class="attr">"PreCompact"</span>: [&#123;</span><br><span class="line">      <span class="attr">"matcher"</span>: <span class="string">""</span>,</span><br><span class="line">      <span class="attr">"hooks"</span>: [&#123;</span><br><span class="line">        <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">        <span class="attr">"command"</span>: <span class="string">"echo '&#123;\"decision\":\"block\"&#125;' &amp;&amp; exit 2"</span></span><br><span class="line">      &#125;]</span><br><span class="line">    &#125;]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>The PostCompact Hook fires after compression completes. It receives the <code>trigger</code> field (<code>&quot;manual&quot;</code> or <code>&quot;auto&quot;</code>) and the <code>compact_summary</code> field (the generated summary text). PostCompact cannot modify the compression result — it can only observe and utilize it. A typical use case is writing the summary to a log file for post-hoc auditing.</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"hooks"</span>: &#123;</span><br><span class="line">    <span class="attr">"PostCompact"</span>: [&#123;</span><br><span class="line">      <span class="attr">"matcher"</span>: <span class="string">""</span>,</span><br><span class="line">      <span class="attr">"hooks"</span>: [&#123;</span><br><span class="line">        <span class="attr">"type"</span>: <span class="string">"command"</span>,</span><br><span class="line">        <span class="attr">"command"</span>: <span class="string">"echo 'Compact summary: $&#123;COMPACT_SUMMARY&#125;'"</span></span><br><span class="line">      &#125;]</span><br><span class="line">    &#125;]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>There’s a community project called <a href="https://github.com/Dicklesworthstone/post_compact_reminder" target="_blank" rel="noopener">Post Compact Reminder</a> that re-injects key user preferences in the PostCompact hook, preventing the model from forgetting user habits after compression. Clever approach.</p>
+<h2 id="Hidden-Parameters-and-Practical-Tips"><a href="#Hidden-Parameters-and-Practical-Tips" class="headerlink" title="Hidden Parameters and Practical Tips"></a>Hidden Parameters and Practical Tips</h2><p><code>/compact</code> accepts arguments. For example: <code>/compact preserve the discussion details on database selection and API design</code>. This argument is passed as a compression guide to the model generating the summary, telling it to pay special attention to preserving that information. During complex refactoring with many detailed decisions, proactively guiding the summary prevents the default behavior from dropping those details. That said, if the guide is too long, it dilutes the weight of other important information. A short, precise sentence about what to preserve works best.</p>
+<p>On when to manually compact, there are a few rules of thumb. If the model starts feeling slow, or begins repeating earlier suggestions, those are signals that the context is about to overflow. Once a conversation exceeds 30 rounds, consider compacting. It works particularly well at the end of a major phase, because phase transitions naturally produce more complete summaries. Manually triggered compact typically yields higher summary quality than automatic triggers, since by the time auto-trigger fires, the context is already nearly full — the model has less room to think about the summary itself.</p>
+<p>Before hitting <code>/compact</code>, spend 30 seconds doing a few things to noticeably improve compression quality. Update task progress with TodoWrite to ensure the current state is recorded. Write key decisions into CLAUDE.md so they don’t depend on conversation history. Confirm that important file content has been saved, because the model will need to re-read files after compact.</p>
+<p>You can add a dedicated Compact Instructions section in CLAUDE.md to guide compression behavior:</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">## Compact Instructions</span></span><br><span class="line">When compacting, make sure to preserve:</span><br><span class="line"><span class="bullet">- </span>Current task and progress</span><br><span class="line"><span class="bullet">- </span>Database is PostgreSQL 15</span><br><span class="line"><span class="bullet">- </span>API style is RESTful, not GraphQL</span><br><span class="line"><span class="bullet">- </span>Redis cluster maintenance means sessions go through DB</span><br><span class="line"><span class="bullet">- </span>List of modified files</span><br></pre></td></tr></table></figure>
+<p>These instructions are passed to the summary model on every compression, acting as a whitelist for the summary.</p>
+<p>One pitfall to avoid: don’t immediately start reading files and running commands in bulk right after a compact. If the context fills up again quickly, the system triggers another compression. If context fills up immediately after three consecutive compactions, Claude Code stops compressing and throws an error rather than entering an infinite loop. This bug genuinely existed before v2.1.79 — the system would get stuck in a compress-then-fill-compress-then-fill death spiral. Protection is in place now, but knowing the history is still useful.</p>
+<h2 id="Information-Loss-and-Recovery"><a href="#Information-Loss-and-Recovery" class="headerlink" title="Information Loss and Recovery"></a>Information Loss and Recovery</h2><p>Compact always loses information. A summary can never 100% reconstruct the original conversation. What typically gets lost: specific code details (the summary says “modified xxx file” but what exactly changed is gone), early discussion reasoning (why option A was chosen over option B), full tool call return values, and image/screenshot content.</p>
+<p>The most direct recovery strategy is to use files as memory. Write important code, configs, and design documents directly to files — the model can re-read them after compact. Don’t rely on the model still remembering. TodoWrite content is stored independently and survives compact — treat it as external state storage. Hard constraints like “use PostgreSQL, not MySQL” are safest written into CLAUDE.md. They live in the system prompt on every request and can never be compressed away. Compact Instructions tell the summary model what must not be lost — far more efficient than discovering losses after the fact and trying to patch them.</p>
+<p>The compact mechanism’s design priorities are clear: don’t touch what doesn’t need touching, touch as little as possible when you must, preserve key information for what must be touched, and only then consider details. Understanding this priority ordering tells you when to compact, what to prepare beforehand, and how to quickly recover state afterward.</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9/" rel="tag"><i class="fa fa-tag"></i> 上下文压缩</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/04/01/072_china-gpu-self-develop-challenges-en/" rel="prev" title="China's GPU Challenge: Twenty Years of Catching Up, and How Far Is Left?">
+      <i class="fa fa-chevron-left"></i> China's GPU Challenge: Twenty Years of Catching Up, and How Far Is Left?
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2026/04/03/076_mcp-future-perspective-en/" rel="next" title="Is MCP Dead? A Look at the Numbers">
+      Is MCP Dead? A Look at the Numbers <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#What’s-Actually-in-the-Context-Window"><span class="nav-number">1.</span> <span class="nav-text">What’s Actually in the Context Window</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#The-Four-Layer-Progressive-Compression-Pipeline"><span class="nav-number">2.</span> <span class="nav-text">The Four-Layer Progressive Compression Pipeline</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Micro-Compact-Minimal-Surgery-Without-Breaking-the-Cache-Key"><span class="nav-number">2.1.</span> <span class="nav-text">Micro Compact: Minimal Surgery Without Breaking the Cache Key</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Snip-Deduplication-and-Redundancy-Removal"><span class="nav-number">2.2.</span> <span class="nav-text">Snip: Deduplication and Redundancy Removal</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Context-Collapse-Segment-by-Segment-Folding"><span class="nav-number">2.3.</span> <span class="nav-text">Context Collapse: Segment-by-Segment Folding</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Full-Compact-Global-Summary"><span class="nav-number">2.4.</span> <span class="nav-text">Full Compact: Global Summary</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Context-Reconstruction-After-Compression"><span class="nav-number">3.</span> <span class="nav-text">Context Reconstruction After Compression</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Automatic-Trigger-Mechanism"><span class="nav-number">4.</span> <span class="nav-text">Automatic Trigger Mechanism</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Hooks-Extension-Points-Around-Compression"><span class="nav-number">5.</span> <span class="nav-text">Hooks: Extension Points Around Compression</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Hidden-Parameters-and-Practical-Tips"><span class="nav-number">6.</span> <span class="nav-text">Hidden Parameters and Practical Tips</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Information-Loss-and-Recovery"><span class="nav-number">7.</span> <span class="nav-text">Information Loss and Recovery</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/04/02/075_claude-code-compact-command-deep-analysis-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/04/02/075_claude-code-compact-command-deep-analysis-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

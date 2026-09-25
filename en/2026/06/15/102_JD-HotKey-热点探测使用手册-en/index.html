@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="1. Component OverviewJD-HotKey is a real-time hot key detection and caching middleware open-sourced by JD.com (source). It does one thing: in high-concurrency scenarios, it automatically discovers hot">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JD-HotKey User Guide">
+<meta property="og:url" content="https://donehub.github.io/en/2026/06/15/102_JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="1. Component OverviewJD-HotKey is a real-time hot key detection and caching middleware open-sourced by JD.com (source). It does one thing: in high-concurrency scenarios, it automatically discovers hot">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://donehub.github.io/img/jdhotkey1.png">
+<meta property="og:image" content="https://donehub.github.io/img/jdhotkey2.png">
+<meta property="article:published_time" content="2026-06-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T09:15:10.688Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="JD-HotKey">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://donehub.github.io/img/jdhotkey1.png">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/06/15/102_JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>JD-HotKey User Guide | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/06/15/102_JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          JD-HotKey User Guide
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-06-15 00:00:00" itemprop="dateCreated datePublished" datetime="2026-06-15T00:00:00+08:00">2026-06-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:15:10" itemprop="dateModified" datetime="2026-09-25T17:15:10+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Middleware/" itemprop="url" rel="index"><span itemprop="name">Middleware</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/06/15/102_JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/06/15/102_JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="1-Component-Overview"><a href="#1-Component-Overview" class="headerlink" title="1. Component Overview"></a>1. Component Overview</h1><p>JD-HotKey is a <strong>real-time hot key detection and caching middleware</strong> open-sourced by JD.com (<a href="https://gitee.com/jd-platform-opensource/hotkey" target="_blank" rel="noopener">source</a>). It does one thing: in high-concurrency scenarios, it <strong>automatically discovers hot keys and pushes them to every application node’s JVM memory within milliseconds</strong>, so hot requests are served directly from local memory instead of hitting Redis or the database.</p>
+<p>Classic scenario: a celebrity suddenly announces something, and a flood of requests hits the related products. You had no way to predict which product ID would go hot. A Redis node gets hammered by these requests and its CPU spikes — this is a textbook <strong>unpredictable burst hot key</strong>.</p>
+<p>That’s where JD-HotKey comes in: it automatically detects these hot spots, mirrors the data into every application server’s local memory, and subsequent requests are served straight from memory — <strong>RT drops from tens of milliseconds to under 1ms</strong>.</p>
+<p>Compared to using a local cache directly (like Caffeine), JD-HotKey’s core advantages:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Caffeine Local Cache</th>
+<th>JD-HotKey</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hot key detection</td>
+<td><strong>Manual configuration</strong> — you need to know which keys to cache upfront</td>
+<td><strong>Automatic detection</strong> — determines hot keys based on real-time access volume</td>
+</tr>
+<tr>
+<td>Dynamism</td>
+<td>Static, stays once configured</td>
+<td><strong>Automatically joins/exits hot status</strong>, releases memory when cold</td>
+</tr>
+<tr>
+<td>Multi-node consistency</td>
+<td>Each node is independent, unaware of others</td>
+<td><strong>Global unified detection</strong>, all nodes synchronize</td>
+</tr>
+<tr>
+<td>Use case</td>
+<td>Known high-frequency data (dictionaries, configs)</td>
+<td><strong>Unpredictable burst hot keys</strong> (flash sales, trending searches)</td>
+</tr>
+<tr>
+<td>Deployment complexity</td>
+<td>Low (pure SDK)</td>
+<td>Medium (requires etcd + worker)</td>
+</tr>
+<tr>
+<td>Hot user / hot endpoint detection</td>
+<td>Not supported</td>
+<td><strong>Supported</strong> (not limited to keys — endpoints and users too)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>In short: <strong>known hot keys are fine with local cache; unpredictable hot keys need JD-HotKey</strong>.</p>
+<h1 id="2-Core-Architecture"><a href="#2-Core-Architecture" class="headerlink" title="2. Core Architecture"></a>2. Core Architecture</h1><a id="more"></a>
+<h2 id="2-1-Overall-Architecture"><a href="#2-1-Overall-Architecture" class="headerlink" title="2.1 Overall Architecture"></a>2.1 Overall Architecture</h2><h3 id="2-1-1-Comprehensive-Architecture"><a href="#2-1-1-Comprehensive-Architecture" class="headerlink" title="2.1.1 Comprehensive Architecture"></a>2.1.1 Comprehensive Architecture</h3><p><img data-src="/img/jdhotkey1.png" alt="alt text"></p>
+<h3 id="2-1-2-Layered-Architecture"><a href="#2-1-2-Layered-Architecture" class="headerlink" title="2.1.2 Layered Architecture"></a>2.1.2 Layered Architecture</h3><p><img data-src="/img/jdhotkey2.png" alt="alt text"><br>The system consists of four core components:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Responsibility</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>etcd cluster</strong></td>
+<td>Config center + registry</td>
+<td>Stores hot key rules, worker node registration, hot key push relay</td>
+</tr>
+<tr>
+<td><strong>worker</strong></td>
+<td>Aggregation compute node</td>
+<td>Receives access statistics from all clients, performs hot key determination, pushes hot key notifications</td>
+</tr>
+<tr>
+<td><strong>client SDK</strong></td>
+<td>Embedded in business applications</td>
+<td>Collects access data, reports statistics, receives hot key notifications, caches hot data locally</td>
+</tr>
+<tr>
+<td><strong>dashboard</strong></td>
+<td>Visual management console</td>
+<td>Configure rules, view hot keys, manage applications</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="2-2-Data-Flow"><a href="#2-2-Data-Flow" class="headerlink" title="2.2 Data Flow"></a>2.2 Data Flow</h2><p>The entire hot key detection process works like an assembly line:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">1. Business request hits the app; client SDK increments the access counter for the key</span><br><span class="line">        ↓</span><br><span class="line">   ┌─────────────────────────────────────────────┐</span><br><span class="line">   │  TurnKeyCollector (dual-Map lock-free collect)│</span><br><span class="line">   │                                             │</span><br><span class="line">   │  Map[0]  ← even-numbered calls write here   │</span><br><span class="line">   │  Map[1]  ← odd-numbered calls write here    │</span><br><span class="line">   │  AtomicLong increment → % 2 → which Map     │</span><br><span class="line">   │  Reads and writes fully isolated, no blocking│</span><br><span class="line">   └─────────────────────────────────────────────┘</span><br><span class="line">        ↓</span><br><span class="line">2. Every 500ms, client batch-reports one Map&#39;s data to the worker</span><br><span class="line">   (reading one Map while writes go to the other — no interference)</span><br><span class="line">        ↓</span><br><span class="line">3. Worker aggregates data from all app nodes, runs the hot key algorithm</span><br><span class="line">        ↓</span><br><span class="line">4. A key&#39;s total access count within the time window &gt;&#x3D; threshold → marked as hot</span><br><span class="line">        ↓</span><br><span class="line">5. Worker pushes hot key to all clients in real time via etcd watch</span><br><span class="line">        ↓</span><br><span class="line">6. Client receives notification, caches hot data in local memory (Caffeine)</span><br><span class="line">        ↓</span><br><span class="line">7. Subsequent requests hit local cache — no Redis &#x2F; DB access</span><br><span class="line">        ↓</span><br><span class="line">8. When key cools down → worker notifies clients to remove local cache, freeing memory</span><br></pre></td></tr></table></figure>
+<p><strong>Key design: centralized computation.</strong> You might wonder why not just detect hot keys locally on each client. In a distributed environment, requests for a single key are spread across machines — a key accessed 5 times on each of 100 machines looks cold on any single node, but totals 500 accesses globally. <strong>Only centralized aggregation at the worker level can accurately identify global hot spots</strong>.</p>
+<p><strong>Worker internal processing</strong>: after receiving client data, the worker processes it through a <strong>responsibility chain</strong>:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">Netty receives message</span><br><span class="line">    ↓</span><br><span class="line">HeartBeatFilter (handle heartbeat messages directly)</span><br><span class="line">    ↓</span><br><span class="line">AppNameFilter (parse client App name)</span><br><span class="line">    ↓</span><br><span class="line">HotKeyFilter (exclude whitelist keys, enqueue valid data)</span><br><span class="line">    ↓</span><br><span class="line">KeyCounterFilter (process statistics data)</span><br><span class="line">    ↓</span><br><span class="line">LinkedBlockingQueue (capacity 2M, peak leveling buffer)</span><br><span class="line">    ↓</span><br><span class="line">KeyConsumer multi-thread consume → SlidingWindow.addCount() → determine hot keys</span><br><span class="line">    ↓</span><br><span class="line">Hot key → write to etcd + push to all Clients (batch push every 10ms)</span><br></pre></td></tr></table></figure>
+<p>The worker also maintains an internal <code>hotCache</code> (Caffeine-based, <strong>5-second TTL</strong>) for <strong>debouncing</strong> — the same key won’t be pushed repeatedly within 5 seconds, preventing excessive redundant pushes when a hot key persists.</p>
+<h2 id="2-3-etcd’s-Role"><a href="#2-3-etcd’s-Role" class="headerlink" title="2.3 etcd’s Role"></a>2.3 etcd’s Role</h2><p>etcd serves three roles in this system:</p>
+<ol>
+<li><p><strong>Rule storage</strong>: hot key rules you configure in the dashboard (which key prefix, what threshold, what window size) are persisted in etcd. Workers and clients detect rule changes by watching etcd.</p>
+</li>
+<li><p><strong>Worker registration</strong>: each worker registers its IP in etcd at startup; clients read etcd to discover which workers to connect to.</p>
+</li>
+<li><p><strong>Hot key push relay</strong>: after the worker identifies a hot key, it writes to etcd with a TTL expiry. Clients watch the corresponding etcd path and update their local cache immediately upon receiving the change event.</p>
+</li>
+</ol>
+<p><strong>A clever design</strong>: etcd natively supports automatic TTL-based key deletion. When a hot key is written to etcd, an expiry time is set (e.g., 60 seconds). Once expired, etcd auto-deletes it, and the deletion event triggers watch callbacks that notify all clients to clear their local cache. This achieves <strong>automatic hot key eviction</strong> without extra cleanup logic.</p>
+<p><strong>Why etcd over ZooKeeper?</strong> etcd natively supports TTL-based key auto-deletion (ZooKeeper doesn’t), has higher performance, lower resource usage, and a more modern API style (gRPC-based).</p>
+<p><strong>etcd version requirement</strong>: 3.4.x and above.</p>
+<h2 id="2-4-Sliding-Window-Algorithm"><a href="#2-4-Sliding-Window-Algorithm" class="headerlink" title="2.4 Sliding Window Algorithm"></a>2.4 Sliding Window Algorithm</h2><p>This is the core algorithm for hot key determination. JD-HotKey uses a <strong>dual-buffer Map</strong> to implement the sliding window:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">Worker&#39;s dual-Map mechanism:</span><br><span class="line"></span><br><span class="line">  ┌─────────────────────────────────────────────────┐</span><br><span class="line">  │  Map[0] (write Map) ← current time slice,       │</span><br><span class="line">  │                         receives new key reports  │</span><br><span class="line">  │  Map[1] (read Map)  ← previous time slice,       │</span><br><span class="line">  │                         read by consumer thread   │</span><br><span class="line">  │                                                 │</span><br><span class="line">  │  AtomicLong increment → % 2 → switch read&#x2F;write  │</span><br><span class="line">  │  Read-write separation → never blocks → high     │</span><br><span class="line">  │  concurrency throughput                          │</span><br><span class="line">  └─────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<ul>
+<li><strong>Dual-Map alternation</strong>: one Map handles writes for newly reported data, the other handles reads for statistics and cleanup. An <code>AtomicLong</code> modulo 2 switches read/write targets — a fully lock-free design.</li>
+<li><strong>Reads never block writes</strong>: while the consumer thread is tallying Map[0], the write thread is filling Map[1], with zero interference.</li>
+<li><strong>Evolution</strong>: originally used Disruptor, but in real high-concurrency testing, it caused occasional data delays and wasted CPU. They switched to <code>LinkedBlockingQueue</code> + read-write separation locks, which turned out to be more stable.</li>
+</ul>
+<p><strong>Key hash distribution</strong>: when clients report data, they hash the key (<code>hash(key) % workerCount</code>), so <strong>the same key always routes to the same worker</strong>. This ensures all statistics for a given key are concentrated on one worker, eliminating cross-worker aggregation. Workers don’t communicate with each other — they compute independently.</p>
+<h2 id="2-5-JdHotKeyStore-—-Core-API"><a href="#2-5-JdHotKeyStore-—-Core-API" class="headerlink" title="2.5 JdHotKeyStore — Core API"></a>2.5 JdHotKeyStore — Core API</h2><p><code>JdHotKeyStore</code> is the core operation class in the client SDK. It has only 4 static methods:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Purpose</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>isHotKey(key)</code></td>
+<td>Checks if key is hot, <strong>also reports access for that key</strong></td>
+<td>Most common — for interception or rate limiting scenarios</td>
+</tr>
+<tr>
+<td><code>get(key)</code></td>
+<td>Reads the cached <strong>value</strong> from local memory for a hot key</td>
+<td>Used with <code>smartSet</code></td>
+</tr>
+<tr>
+<td><code>smartSet(key, value)</code></td>
+<td>Sets the local cache value for a hot key</td>
+<td>Stores real data when key has been determined as hot</td>
+</tr>
+<tr>
+<td><code>getValue(key)</code></td>
+<td>Combined query: returns value if in local cache, returns null <strong>and auto-reports</strong> if not</td>
+<td>All-in-one query method</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Pay attention to the behavioral differences between these methods</strong> — many people confuse them at first:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">isHotKey(key)  → returns true&#x2F;false, also reports key access count (+1)</span><br><span class="line">get(key)       → reads value from local cache only, does not report</span><br><span class="line">smartSet(key, value) → writes to local cache only if key is hot (non-hot writes are ignored)</span><br><span class="line">getValue(key)  → read value + report (returns null if no local value, while also reporting)</span><br></pre></td></tr></table></figure>
+<p><strong>An internal detail</strong>: when the worker pushes a hot key notification to a client, the client first stores a <strong>magic value</strong> (<code>0x12fcf76</code>) in Caffeine as a placeholder, meaning “this key is now flagged as hot, but no actual business data has been filled in yet.” So <code>get(key)</code> may return this magic value or null — indicating the hot marker is active but data hasn’t been populated via <code>smartSet</code> yet. You need to load the data yourself and write it in.</p>
+<p><strong>Caffeine bucketing</strong>: the client doesn’t use a single Caffeine instance for all hot keys. Instead, it buckets by <strong>expiry duration (duration)</strong> — keys with the same TTL share one Caffeine instance. This allows hot keys under different rules to have different TTLs without interference.</p>
+<hr>
+<h1 id="3-Quick-Integration-Spring-Boot"><a href="#3-Quick-Integration-Spring-Boot" class="headerlink" title="3. Quick Integration (Spring Boot)"></a>3. Quick Integration (Spring Boot)</h1><h2 id="Step-1-Deploy-the-Infrastructure"><a href="#Step-1-Deploy-the-Infrastructure" class="headerlink" title="Step 1: Deploy the Infrastructure"></a>Step 1: Deploy the Infrastructure</h2><p>JD-HotKey depends on etcd. You need to prepare an etcd cluster first.</p>
+<h3 id="Installing-etcd-Dev-Environment"><a href="#Installing-etcd-Dev-Environment" class="headerlink" title="Installing etcd (Dev Environment)"></a>Installing etcd (Dev Environment)</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Docker (quick single-node startup)</span></span><br><span class="line">docker run -d --name etcd \</span><br><span class="line">  -p 2379:2379 \</span><br><span class="line">  -e ALLOW_NONE_AUTHENTICATION=yes \</span><br><span class="line">  bitnami/etcd:3.4</span><br><span class="line"></span><br><span class="line"><span class="comment"># Verify connection</span></span><br><span class="line">docker <span class="built_in">exec</span> etcd etcdctl endpoint health</span><br></pre></td></tr></table></figure>
+<h3 id="Deploying-the-Worker"><a href="#Deploying-the-Worker" class="headerlink" title="Deploying the Worker"></a>Deploying the Worker</h3><p>The worker is a standalone Java process responsible for aggregation computation.</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Build from source</span></span><br><span class="line"><span class="built_in">cd</span> worker</span><br><span class="line">mvn clean package -DskipTests</span><br><span class="line"></span><br><span class="line"><span class="comment"># Start worker (key parameters)</span></span><br><span class="line">java -jar worker/target/worker.jar \</span><br><span class="line">  --etcd=http://127.0.0.1:2379 \</span><br><span class="line">  --threads=16 \</span><br><span class="line">  --workerPath=/jd/hotkey/worker</span><br></pre></td></tr></table></figure>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>etcd</code></td>
+<td>etcd cluster address</td>
+</tr>
+<tr>
+<td><code>threads</code></td>
+<td>Worker thread count — adjust based on CPU cores</td>
+</tr>
+<tr>
+<td><code>workerPath</code></td>
+<td>Worker’s registration path in etcd</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="Deploying-the-Dashboard"><a href="#Deploying-the-Dashboard" class="headerlink" title="Deploying the Dashboard"></a>Deploying the Dashboard</h3><p>The dashboard is a web management console that needs MySQL and etcd connections.</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1. Create database, run db.sql init script</span></span><br><span class="line"><span class="comment"># 2. Update database and etcd config in application.yml</span></span><br><span class="line"><span class="comment"># 3. Start</span></span><br><span class="line">java -jar dashboard.jar</span><br><span class="line"></span><br><span class="line"><span class="comment"># Visit http://localhost:8081</span></span><br><span class="line"><span class="comment"># Default admin account configured per README instructions</span></span><br></pre></td></tr></table></figure>
+<h2 id="Step-2-Add-Maven-Dependency"><a href="#Step-2-Add-Maven-Dependency" class="headerlink" title="Step 2: Add Maven Dependency"></a>Step 2: Add Maven Dependency</h2><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>com.jd.platform.hotkey<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>hotkey-client<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">version</span>&gt;</span>0.0.4-SNAPSHOT<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br></pre></td></tr></table></figure>
+<p><strong>Dependency conflict notes</strong>:</p>
+<ul>
+<li>If your project uses Guava, upgrade to <strong>28.2-jre</strong> or above</li>
+<li>If your project uses Fastjson, downgrade to <strong>1.2.70</strong> (the version used internally by hotkey-client)</li>
+<li>Communication uses <strong>protobuf</strong> — watch version compatibility</li>
+</ul>
+<h2 id="Step-3-Initialize-the-Client"><a href="#Step-3-Initialize-the-Client" class="headerlink" title="Step 3: Initialize the Client"></a>Step 3: Initialize the Client</h2><p>Initialize the client at Spring Boot startup to connect to etcd and start the data pipeline:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">HotKeyConfig</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Value</span>(<span class="string">"$&#123;etcd.server&#125;"</span>)</span><br><span class="line">    <span class="keyword">private</span> String etcdServer;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Value</span>(<span class="string">"$&#123;spring.application.name&#125;"</span>)</span><br><span class="line">    <span class="keyword">private</span> String appName;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@PostConstruct</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">init</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        ClientStarter starter = <span class="keyword">new</span> ClientStarter.Builder()</span><br><span class="line">                .setAppName(appName)          <span class="comment">// App name, must match dashboard config</span></span><br><span class="line">                .setEtcdServer(etcdServer)    <span class="comment">// etcd cluster address</span></span><br><span class="line">                .build();</span><br><span class="line">        starter.startPipeline();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Configuration options supported by <code>ClientStarter.Builder</code>:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>setAppName</code></td>
+<td>None (required)</td>
+<td>Application name, used to match rules in dashboard</td>
+</tr>
+<tr>
+<td><code>setEtcdServer</code></td>
+<td>None (required)</td>
+<td>etcd cluster address, comma-separated for multiple</td>
+</tr>
+<tr>
+<td><code>setCaffeineSize</code></td>
+<td>200000</td>
+<td>Max capacity of local Caffeine cache</td>
+</tr>
+<tr>
+<td><code>setPushPeriod</code></td>
+<td>500ms</td>
+<td>Interval for batch-reporting statistics (minimum 50ms)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="Step-4-Configure-Hot-Key-Rules"><a href="#Step-4-Configure-Hot-Key-Rules" class="headerlink" title="Step 4: Configure Hot Key Rules"></a>Step 4: Configure Hot Key Rules</h2><p>Configure your hot key rules in the dashboard. Rules are stored as JSON with these parameters:</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="attr">"desc"</span>: <span class="string">"Product info hot key rule"</span>,</span><br><span class="line">    <span class="attr">"key"</span>: <span class="string">"goods:"</span>,</span><br><span class="line">    <span class="attr">"prefix"</span>: <span class="literal">true</span>,</span><br><span class="line">    <span class="attr">"threshold"</span>: <span class="number">100</span>,</span><br><span class="line">    <span class="attr">"duration"</span>: <span class="number">5</span>,</span><br><span class="line">    <span class="attr">"interval"</span>: <span class="number">1</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>key</code></td>
+<td>String</td>
+<td>Key match rule. Used as prefix match when <code>prefix = true</code></td>
+</tr>
+<tr>
+<td><code>prefix</code></td>
+<td>boolean</td>
+<td>Whether to use prefix matching. <code>true</code> matches all keys starting with <code>key</code></td>
+</tr>
+<tr>
+<td><code>threshold</code></td>
+<td>int</td>
+<td>Hot threshold — total access count exceeding this within the time window triggers hot status</td>
+</tr>
+<tr>
+<td><code>duration</code></td>
+<td>int</td>
+<td>Sliding window size (seconds)</td>
+</tr>
+<tr>
+<td><code>interval</code></td>
+<td>int</td>
+<td>Window slide step (seconds)</td>
+</tr>
+<tr>
+<td><code>desc</code></td>
+<td>String</td>
+<td>Rule description for management convenience</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The config above means: <strong>any key starting with <code>goods:</code> that receives more than 100 accesses within 5 seconds is flagged as hot</strong>.</p>
+<hr>
+<h1 id="4-Usage-Guide"><a href="#4-Usage-Guide" class="headerlink" title="4. Usage Guide"></a>4. Usage Guide</h1><h2 id="4-1-Scenario-1-Hot-Key-Interception-Rate-Limiting"><a href="#4-1-Scenario-1-Hot-Key-Interception-Rate-Limiting" class="headerlink" title="4.1 Scenario 1: Hot Key Interception + Rate Limiting"></a>4.1 Scenario 1: Hot Key Interception + Rate Limiting</h2><p>The simplest usage — check if it’s a hot key, and if so, apply special handling (degradation, rate limiting, or direct response):</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@RestController</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">GoodsController</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@GetMapping</span>(<span class="string">"/goods/&#123;id&#125;"</span>)</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Object <span class="title">getGoods</span><span class="params">(@PathVariable String id)</span> </span>&#123;</span><br><span class="line">        String key = <span class="string">"goods:"</span> + id;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// isHotKey also reports access volume for this key</span></span><br><span class="line">        <span class="keyword">if</span> (JdHotKeyStore.isHotKey(key)) &#123;</span><br><span class="line">            <span class="comment">// Degradation for hot keys: return cached data or a friendly message</span></span><br><span class="line">            <span class="keyword">return</span> <span class="string">"Traffic is high right now, please try again shortly"</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// Non-hot keys follow the normal flow</span></span><br><span class="line">        <span class="keyword">return</span> goodsService.getGoodsDetail(id);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="4-2-Scenario-2-Local-Caching-of-Hot-Data-Recommended"><a href="#4-2-Scenario-2-Local-Caching-of-Hot-Data-Recommended" class="headerlink" title="4.2 Scenario 2: Local Caching of Hot Data (Recommended)"></a>4.2 Scenario 2: Local Caching of Hot Data (Recommended)</h2><p>A more practical approach — after detecting a hot key, cache the data in local memory so subsequent requests read directly from memory:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">GoodsService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> RedisTemplate&lt;String, Object&gt; redisTemplate;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> GoodsMapper goodsMapper;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> GoodsDetail <span class="title">getGoodsDetail</span><span class="params">(String goodsId)</span> </span>&#123;</span><br><span class="line">        String key = <span class="string">"goods:"</span> + goodsId;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 1. Check if hot</span></span><br><span class="line">        <span class="keyword">if</span> (JdHotKeyStore.isHotKey(key)) &#123;</span><br><span class="line">            <span class="comment">// 2. Try reading from local cache first</span></span><br><span class="line">            GoodsDetail cached = (GoodsDetail) JdHotKeyStore.get(key);</span><br><span class="line">            <span class="keyword">if</span> (cached != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span> cached;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 3. Not in local cache — load from Redis</span></span><br><span class="line">            GoodsDetail goods = loadFromRedis(goodsId);</span><br><span class="line">            <span class="keyword">if</span> (goods != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="comment">// 4. Write to local hot cache (only succeeds if key is hot)</span></span><br><span class="line">                JdHotKeyStore.smartSet(key, goods);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> goods;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 5. Non-hot key — normal Redis path</span></span><br><span class="line">        <span class="keyword">return</span> loadFromRedis(goodsId);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> GoodsDetail <span class="title">loadFromRedis</span><span class="params">(String goodsId)</span> </span>&#123;</span><br><span class="line">        GoodsDetail goods = (GoodsDetail) redisTemplate.opsForValue().get(<span class="string">"goods:"</span> + goodsId);</span><br><span class="line">        <span class="keyword">if</span> (goods == <span class="keyword">null</span>) &#123;</span><br><span class="line">            goods = goodsMapper.selectById(goodsId);</span><br><span class="line">            <span class="keyword">if</span> (goods != <span class="keyword">null</span>) &#123;</span><br><span class="line">                redisTemplate.opsForValue().set(<span class="string">"goods:"</span> + goodsId, goods, <span class="number">300</span>, TimeUnit.SECONDS);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> goods;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>The <code>smartSet</code> design is clever</strong>: it only writes to local cache when the key has already been flagged as hot. If the key isn’t hot, the write is silently ignored — no risk of memory being bloated by non-hot data.</p>
+<h2 id="4-3-Scenario-3-Simplified-Logic-with-getValue"><a href="#4-3-Scenario-3-Simplified-Logic-with-getValue" class="headerlink" title="4.3 Scenario 3: Simplified Logic with getValue"></a>4.3 Scenario 3: Simplified Logic with getValue</h2><p><code>getValue</code> combines “check local cache + report” into a single step for cleaner code:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> GoodsDetail <span class="title">getGoodsDetail</span><span class="params">(String goodsId)</span> </span>&#123;</span><br><span class="line">    String key = <span class="string">"goods:"</span> + goodsId;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// getValue handles: return local value if present + report access volume</span></span><br><span class="line">    GoodsDetail cached = (GoodsDetail) JdHotKeyStore.getValue(key);</span><br><span class="line">    <span class="keyword">if</span> (cached != <span class="keyword">null</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> cached;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Not in local cache (may have just become hot without cached data yet)</span></span><br><span class="line">    <span class="comment">// Load from Redis and write in</span></span><br><span class="line">    GoodsDetail goods = loadFromRedis(goodsId);</span><br><span class="line">    <span class="keyword">if</span> (goods != <span class="keyword">null</span>) &#123;</span><br><span class="line">        JdHotKeyStore.smartSet(key, goods);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> goods;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="4-4-Scenario-4-Hot-User-Hot-Endpoint-Detection"><a href="#4-4-Scenario-4-Hot-User-Hot-Endpoint-Detection" class="headerlink" title="4.4 Scenario 4: Hot User / Hot Endpoint Detection"></a>4.4 Scenario 4: Hot User / Hot Endpoint Detection</h2><p>JD-HotKey isn’t limited to data keys — it can also detect hot users and hot endpoints:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Hot user detection (anti-scraping / anti-abuse)</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">handleRequest</span><span class="params">(String userId)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (JdHotKeyStore.isHotKey(<span class="string">"hot:user:"</span> + userId)) &#123;</span><br><span class="line">        <span class="comment">// This user's access frequency is abnormal — trigger rate limiting or captcha</span></span><br><span class="line">        log.warn(<span class="string">"Abnormally high-frequency user detected: &#123;&#125;"</span>, userId);</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> RateLimitException(<span class="string">"Too many requests, please try again later"</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// Normal business logic...</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Hot endpoint detection</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">handleApiCall</span><span class="params">(String apiPath)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (JdHotKeyStore.isHotKey(<span class="string">"hot:api:"</span> + apiPath)) &#123;</span><br><span class="line">        <span class="comment">// Endpoint receiving excessive requests — trigger circuit breaker or degradation</span></span><br><span class="line">        log.warn(<span class="string">"Endpoint receiving high-frequency access: &#123;&#125;"</span>, apiPath);</span><br><span class="line">        <span class="keyword">return</span> fallbackResponse;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// Normal business logic...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Just configure the corresponding rules in the dashboard: <code>key = &quot;hot:user:&quot;</code> and <code>key = &quot;hot:api:&quot;</code>.</p>
+<hr>
+<h1 id="5-Performance-Data"><a href="#5-Performance-Data" class="headerlink" title="5. Performance Data"></a>5. Performance Data</h1><h2 id="5-1-Worker-Performance-Evolution"><a href="#5-1-Worker-Performance-Evolution" class="headerlink" title="5.1 Worker Performance Evolution"></a>5.1 Worker Performance Evolution</h2><p>JD-HotKey’s performance didn’t come overnight — it went through a <strong>17x improvement</strong> from first version to final:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>QPS</th>
+<th>CPU</th>
+<th>Key Optimization</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>V1 (initial)</td>
+<td>~20K</td>
+<td>&gt;20%</td>
+<td>Disruptor + Fastjson, hit JDK thread bug causing massive thread creation</td>
+</tr>
+<tr>
+<td>V2</td>
+<td>~100K</td>
+<td>7-10%</td>
+<td>Replaced Disruptor with <code>LinkedBlockingQueue</code></td>
+</tr>
+<tr>
+<td>V3</td>
+<td>~160K</td>
+<td>~40%</td>
+<td>8-core single machine tuning</td>
+</tr>
+<tr>
+<td>V4</td>
+<td>250-300K</td>
+<td>~70%</td>
+<td>8 producer + 8 consumer threads</td>
+</tr>
+<tr>
+<td><strong>V5 (final)</strong></td>
+<td><strong>Stable 300K, peak 370K</strong></td>
+<td><strong>~50%</strong></td>
+<td>Serialization switched from Fastjson to <strong>Protobuf</strong>, 16 cores</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>The biggest performance leap came from switching serialization</strong>: moving from Fastjson to Protobuf significantly improved serialization efficiency while actually reducing CPU usage.</p>
+<h2 id="5-2-Push-Performance"><a href="#5-2-Push-Performance" class="headerlink" title="5.2 Push Performance"></a>5.2 Push Performance</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Push Rate</th>
+<th>Latency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>100-120K/sec</td>
+<td><strong>Instant delivery, no delay</strong></td>
+</tr>
+<tr>
+<td>200K/sec</td>
+<td>~1 second delay</td>
+</tr>
+<tr>
+<td>400-600K/sec (8 IO threads)</td>
+<td>Stable push</td>
+</tr>
+<tr>
+<td><strong>700K/sec (16 IO threads)</strong></td>
+<td><strong>Stable push</strong></td>
+</tr>
+<tr>
+<td>800K/sec (peak)</td>
+<td>Frequent GC, eventually OOM</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="5-3-Production-Data"><a href="#5-3-Production-Data" class="headerlink" title="5.3 Production Data"></a>5.3 Production Data</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Data</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Peak cluster throughput during promotions</td>
+<td><strong>15 million/sec</strong></td>
+</tr>
+<tr>
+<td>Local cache hits as % of total traffic</td>
+<td><strong>&gt;50%</strong></td>
+</tr>
+<tr>
+<td>Daily key detection volume</td>
+<td><strong>Billions</strong></td>
+</tr>
+<tr>
+<td>1 Worker (16 cores) can support</td>
+<td><strong>~1,000 business services</strong></td>
+</tr>
+<tr>
+<td>Workers needed for millions of hot keys</td>
+<td><strong>~30</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>For comparison</strong>: a typical Redis request has RT of 1-5ms, and a database request 5-50ms. JD-HotKey serves hot requests directly from JVM memory, bringing <strong>RT down to nanoseconds</strong>.</p>
+<hr>
+<h1 id="6-Comparison-with-Alternatives"><a href="#6-Comparison-with-Alternatives" class="headerlink" title="6. Comparison with Alternatives"></a>6. Comparison with Alternatives</h1><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>JD-HotKey</th>
+<th>Caffeine Local Cache</th>
+<th>Redis Hot Key Detection</th>
+<th>JetCache BOTH</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hot key detection</td>
+<td><strong>Automatic</strong></td>
+<td>Manual config</td>
+<td><code>redis-cli --hotkeys</code> (sampling)</td>
+<td>Manual config</td>
+</tr>
+<tr>
+<td>Timeliness</td>
+<td>Second-level auto detection</td>
+<td>Static, manual updates needed</td>
+<td>Real-time but limited accuracy</td>
+<td>Broadcast notification</td>
+</tr>
+<tr>
+<td>Dynamism</td>
+<td><strong>Auto join / exit</strong></td>
+<td>No change once configured</td>
+<td>Manual cleanup needed</td>
+<td>Broadcast invalidation</td>
+</tr>
+<tr>
+<td>Multi-node consistency</td>
+<td><strong>Global unified detection</strong></td>
+<td>Each node independent</td>
+<td>Redis level</td>
+<td>Broadcast notification</td>
+</tr>
+<tr>
+<td>Detection scope</td>
+<td>Key / user / endpoint</td>
+<td>Configured keys only</td>
+<td>Redis keys only</td>
+<td>Configured keys only</td>
+</tr>
+<tr>
+<td>Deployment complexity</td>
+<td>Medium (etcd + worker)</td>
+<td>Low (pure SDK)</td>
+<td>Low (built into Redis)</td>
+<td>Low (pure SDK)</td>
+</tr>
+<tr>
+<td>Operational cost</td>
+<td>Medium (etcd cluster maintenance)</td>
+<td>None</td>
+<td>None</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Best for</td>
+<td><strong>Unpredictable burst hot keys</strong></td>
+<td>Known high-frequency data</td>
+<td>Redis hot node investigation</td>
+<td>Known high-frequency reads</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="When-to-Use-JD-HotKey"><a href="#When-to-Use-JD-HotKey" class="headerlink" title="When to Use JD-HotKey"></a>When to Use JD-HotKey</h3><ul>
+<li><strong>Burst hot keys</strong>: trending searches, breaking news, flash sale products — you can’t predict which keys will go hot</li>
+<li><strong>Promotion events</strong>: 618, Singles’ Day — hot patterns are unpredictable</li>
+<li><strong>Site-wide hot key protection</strong>: don’t want to manually analyze which keys are hot — let the system find them</li>
+<li><strong>Hot user / hot endpoint detection</strong>: anti-scraping, anti-abuse</li>
+</ul>
+<h3 id="When-You-Don’t-Need-JD-HotKey"><a href="#When-You-Don’t-Need-JD-HotKey" class="headerlink" title="When You Don’t Need JD-HotKey"></a>When You Don’t Need JD-HotKey</h3><ul>
+<li><strong>Hot data is fixed and known</strong>: just use Caffeine or JetCache BOTH</li>
+<li><strong>Data volume is small, Redis isn’t under pressure</strong>: no need to introduce another component</li>
+<li><strong>Limited team operational capacity</strong>: deploying and maintaining an etcd cluster has a learning curve</li>
+</ul>
+<hr>
+<h1 id="7-Best-Practices-and-Caveats"><a href="#7-Best-Practices-and-Caveats" class="headerlink" title="7. Best Practices and Caveats"></a>7. Best Practices and Caveats</h1><h2 id="7-1-Threshold-Tuning"><a href="#7-1-Threshold-Tuning" class="headerlink" title="7.1 Threshold Tuning"></a>7.1 Threshold Tuning</h2><p>Set the threshold too low → too many keys flagged as hot → local memory overflows. Set it too high → hot keys get missed → Redis gets hammered.</p>
+<p><strong>Recommendations</strong>:</p>
+<ul>
+<li>Core business (e.g., product details): lower threshold (e.g., 50 accesses in 5 seconds)</li>
+<li>Edge business: higher threshold (e.g., 200 accesses in 5 seconds)</li>
+<li>Use the dashboard to configure <strong>tiered thresholds</strong> — different rules for different business domains</li>
+</ul>
+<h2 id="7-2-Memory-Control"><a href="#7-2-Memory-Control" class="headerlink" title="7.2 Memory Control"></a>7.2 Memory Control</h2><p>Data stored via <code>smartSet</code> occupies the application’s JVM memory. Keep in mind:</p>
+<ul>
+<li><code>CaffeineSize</code> defaults to 200,000 — adjust based on available memory and data size per entry</li>
+<li>For large objects (e.g., full product detail JSON), reduce the capacity accordingly</li>
+<li>Expired hot keys are automatically removed from local cache — no manual cleanup needed</li>
+</ul>
+<h2 id="7-3-etcd-Cluster-Resilience"><a href="#7-3-etcd-Cluster-Resilience" class="headerlink" title="7.3 etcd Cluster Resilience"></a>7.3 etcd Cluster Resilience</h2><p>etcd is a core dependency, but the client has resilience built in:</p>
+<ul>
+<li>During brief etcd unavailability, <strong>already-pushed hot key data continues working from local cache</strong></li>
+<li>Only new hot key detection and rule changes won’t take effect</li>
+<li>Deploy etcd with at least 3 nodes for high availability</li>
+</ul>
+<h2 id="7-4-Dependency-Conflict-Resolution"><a href="#7-4-Dependency-Conflict-Resolution" class="headerlink" title="7.4 Dependency Conflict Resolution"></a>7.4 Dependency Conflict Resolution</h2><p>This is the most common pitfall during integration:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Conflicting Dependency</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>guava</td>
+<td>Upgrade to <strong>28.2-jre</strong> or above</td>
+</tr>
+<tr>
+<td>fastjson</td>
+<td>Downgrade to <strong>1.2.70</strong> (the version used internally by hotkey-client)</td>
+</tr>
+<tr>
+<td>protobuf</td>
+<td>Watch version compatibility — refer to hotkey-client’s pom</td>
+</tr>
+<tr>
+<td>Netty</td>
+<td>Ensure no version conflict with Netty in your project</td>
+</tr>
+<tr>
+<td>JDK version</td>
+<td>Use <strong>JDK 1.8.0_191+</strong> (earlier versions return host CPU count instead of container limit for <code>availableProcessors()</code> in containerized environments, causing abnormal thread configuration)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Recommendation</strong>: after adding the dependency, run your unit tests to confirm there are no class conflicts. Pay special attention to guava and fastjson versions — those are the most common sources of problems.</p>
+<h2 id="7-5-Pair-with-Degradation-Strategies"><a href="#7-5-Pair-with-Degradation-Strategies" class="headerlink" title="7.5 Pair with Degradation Strategies"></a>7.5 Pair with Degradation Strategies</h2><p>Hot key detection isn’t bulletproof. Pair it with degradation logic:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> GoodsDetail <span class="title">getGoodsDetail</span><span class="params">(String goodsId)</span> </span>&#123;</span><br><span class="line">    String key = <span class="string">"goods:"</span> + goodsId;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">if</span> (JdHotKeyStore.isHotKey(key)) &#123;</span><br><span class="line">            GoodsDetail cached = (GoodsDetail) JdHotKeyStore.get(key);</span><br><span class="line">            <span class="keyword">if</span> (cached != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span> cached;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">        <span class="comment">// Degrade to normal flow when hotkey component fails</span></span><br><span class="line">        log.warn(<span class="string">"Hot key check failed, degrading"</span>, e);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Normal flow: Redis → DB</span></span><br><span class="line">    <span class="keyword">return</span> loadFromRedis(goodsId);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="7-6-Monitoring-and-Alerting"><a href="#7-6-Monitoring-and-Alerting" class="headerlink" title="7.6 Monitoring and Alerting"></a>7.6 Monitoring and Alerting</h2><p>Recommended metrics to monitor:</p>
+<ul>
+<li><strong>Hot key count</strong>: sudden spikes may indicate abnormal traffic</li>
+<li><strong>Hot key trend changes</strong>: discover unusual patterns</li>
+<li><strong>Worker health</strong>: check worker registration in etcd</li>
+<li><strong>Client report delay</strong>: whether network issues are causing report backlogs</li>
+</ul>
+<hr>
+<h1 id="8-FAQ"><a href="#8-FAQ" class="headerlink" title="8. FAQ"></a>8. FAQ</h1><h2 id="Q-What’s-the-relationship-between-worker-and-server"><a href="#Q-What’s-the-relationship-between-worker-and-server" class="headerlink" title="Q: What’s the relationship between worker and server?"></a>Q: What’s the relationship between worker and server?</h2><p>In JD-HotKey, the worker is the actual processing node. Some articles call it the “server” — it’s the same thing. The worker receives client-reported data, performs hot key determination, and pushes results. It’s deployed independently, doesn’t depend on Spring Boot, and runs as a plain Java process.</p>
+<h2 id="Q-How-many-applications-can-one-etcd-cluster-support"><a href="#Q-How-many-applications-can-one-etcd-cluster-support" class="headerlink" title="Q: How many applications can one etcd cluster support?"></a>Q: How many applications can one etcd cluster support?</h2><p>Theoretically unlimited, but isolation by business domain is recommended. Different applications use different <code>appName</code> values, and rules don’t interfere with each other. For large-scale deployments, use a dedicated etcd cluster.</p>
+<h2 id="Q-Does-isHotKey-report-on-every-call"><a href="#Q-Does-isHotKey-report-on-every-call" class="headerlink" title="Q: Does isHotKey report on every call?"></a>Q: Does isHotKey report on every call?</h2><p>Yes, every <code>isHotKey</code> call increments the counter in the client’s local dual Map. The client batch-reports aggregated data to the worker every <code>pushPeriod</code> (default 500ms). So it’s not a network request per call — it’s <strong>batch-aggregated reporting</strong>, which has minimal overhead.</p>
+<h2 id="Q-How-do-I-estimate-worker-throughput"><a href="#Q-How-do-I-estimate-worker-throughput" class="headerlink" title="Q: How do I estimate worker throughput?"></a>Q: How do I estimate worker throughput?</h2><p>The worker uses a <code>LinkedBlockingQueue</code> (capacity <strong>2 million</strong>) for message buffering with multi-threaded consumption. Rule of thumb: <strong>one 16-core worker can support approximately 1,000 business services</strong>. During peak promotions, handling millions of hot keys requires about 30 workers.</p>
+<h2 id="Q-What’s-the-difference-between-smartSet-and-using-Caffeine-directly"><a href="#Q-What’s-the-difference-between-smartSet-and-using-Caffeine-directly" class="headerlink" title="Q: What’s the difference between smartSet and using Caffeine directly?"></a>Q: What’s the difference between smartSet and using Caffeine directly?</h2><p><code>smartSet</code> uses Caffeine internally, but with a key difference: <strong>writes only succeed when the key has been flagged as hot</strong>. If you use Caffeine directly, every key gets cached, and memory can fill up with non-hot data. <code>smartSet</code> handles that filtering for you.</p>
+<p>There’s also a <code>forceSet</code> method that forces a cache write regardless of hot status, but it’s rarely needed.</p>
+<h2 id="Q-After-a-key-is-flagged-as-hot-how-does-data-get-populated-into-local-cache"><a href="#Q-After-a-key-is-flagged-as-hot-how-does-data-get-populated-into-local-cache" class="headerlink" title="Q: After a key is flagged as hot, how does data get populated into local cache?"></a>Q: After a key is flagged as hot, how does data get populated into local cache?</h2><p>JD-HotKey <strong>only tells you “this key is hot” and manages local cache storage</strong> — it doesn’t load data from your database for you. You implement the data loading logic in your code (see Scenario 2 for example code).</p>
+<p>The full flow:</p>
+<ol>
+<li>Worker identifies hot key → pushes notification to all clients</li>
+<li>Client stores a <strong>magic value</strong> (<code>0x12fcf76</code>) in Caffeine as a placeholder</li>
+<li>Business code calls <code>isHotKey(key)</code> → returns <code>true</code></li>
+<li>Business code calls <code>get(key)</code> → returns null (magic value placeholder, no actual data yet)</li>
+<li>Business code loads real data from Redis / DB</li>
+<li>Calls <code>smartSet(key, value)</code> to write to local cache</li>
+<li>Subsequent requests hit local cache directly</li>
+</ol>
+<h2 id="Q-How-does-this-relate-to-Redis-Cluster-hot-key-problems"><a href="#Q-How-does-this-relate-to-Redis-Cluster-hot-key-problems" class="headerlink" title="Q: How does this relate to Redis Cluster hot key problems?"></a>Q: How does this relate to Redis Cluster hot key problems?</h2><p>Redis Cluster’s hot key problem: one key’s access volume concentrates on a single shard node, maxing out its CPU/bandwidth. JD-HotKey’s approach is to <strong>intercept hot requests at the application layer</strong> — data is cached in JVM memory, so it never reaches Redis at all. They’re solutions at different levels.</p>
+<h2 id="Q-How-to-deploy-in-production"><a href="#Q-How-to-deploy-in-production" class="headerlink" title="Q: How to deploy in production?"></a>Q: How to deploy in production?</h2><p>Recommended architecture:</p>
+<ul>
+<li><strong>etcd</strong>: 3-node cluster (odd number, tolerates 1 node failure)</li>
+<li><strong>worker</strong>: at least 2 instances (workers don’t communicate — they compute independently. Clients route different keys to different workers via hashing, providing natural load balancing)</li>
+<li><strong>dashboard</strong>: 1-2 instances (web console, doesn’t carry core traffic)</li>
+<li><strong>client</strong>: embedded in every business application instance</li>
+</ul>
+<h2 id="Q-How-does-this-work-with-JetCache’s-two-level-cache-BOTH"><a href="#Q-How-does-this-work-with-JetCache’s-two-level-cache-BOTH" class="headerlink" title="Q: How does this work with JetCache’s two-level cache (BOTH)?"></a>Q: How does this work with JetCache’s two-level cache (BOTH)?</h2><p>They don’t conflict — they can be used together:</p>
+<ul>
+<li><strong>JetCache BOTH</strong>: for known high-frequency read data, provides L1 + L2 two-level cache + auto refresh</li>
+<li><strong>JD-HotKey</strong>: for unpredictable burst hot keys, auto-detects and caches</li>
+</ul>
+<p>Combined approach: JetCache handles regular caching, JD-HotKey provides burst hot key protection. When JD-HotKey flags a key as hot, data goes straight from JVM memory — it doesn’t even need to hit JetCache’s L2 (Redis).</p>
+<hr>
+<h1 id="9-Summary"><a href="#9-Summary" class="headerlink" title="9. Summary"></a>9. Summary</h1><p>JD-HotKey’s core value is <strong>automatic hot key detection</strong> — this is what sets it apart from other caching solutions. You don’t need to know in advance which keys will go hot. The system automatically determines hot status based on real access volume, auto-pushes, and auto-evicts when keys cool down.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Recommended Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Known fixed high-frequency data</td>
+<td>Caffeine or JetCache BOTH</td>
+</tr>
+<tr>
+<td>Unpredictable burst hot keys</td>
+<td><strong>JD-HotKey</strong></td>
+</tr>
+<tr>
+<td>Redis hot node protection</td>
+<td>JD-HotKey (application-layer interception) or Redis hot shard</td>
+</tr>
+<tr>
+<td>Hot user / hot endpoint detection</td>
+<td><strong>JD-HotKey</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>If your business has “could go hot at any moment without warning” scenarios (e-commerce flash sales, trending topics, breaking news), JD-HotKey can automatically identify and protect those hot keys, intercepting requests in JVM memory before they overwhelm Redis and your database.</p>
+<p>It’s not a silver bullet, though — etcd deployment and maintenance, dependency conflict resolution, and threshold tuning all require investment. I’d suggest piloting it on a non-critical service first, then rolling it out to your core paths once you’ve validated the results.</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/JD-HotKey/" rel="tag"><i class="fa fa-tag"></i> JD-HotKey</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/05/30/101_multi-agent-communication-deep-dive-en/" rel="prev" title="Multi-Agent Communication: A Deep Dive">
+      <i class="fa fa-chevron-left"></i> Multi-Agent Communication: A Deep Dive
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2026/06/17/103_JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/" rel="next" title="JetCache User Guide">
+      JetCache User Guide <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Component-Overview"><span class="nav-number">1.</span> <span class="nav-text">1. Component Overview</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Core-Architecture"><span class="nav-number">2.</span> <span class="nav-text">2. Core Architecture</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-Overall-Architecture"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 Overall Architecture</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-1-Comprehensive-Architecture"><span class="nav-number">2.1.1.</span> <span class="nav-text">2.1.1 Comprehensive Architecture</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-2-Layered-Architecture"><span class="nav-number">2.1.2.</span> <span class="nav-text">2.1.2 Layered Architecture</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-Data-Flow"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 Data Flow</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-etcd’s-Role"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 etcd’s Role</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-4-Sliding-Window-Algorithm"><span class="nav-number">2.4.</span> <span class="nav-text">2.4 Sliding Window Algorithm</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-5-JdHotKeyStore-—-Core-API"><span class="nav-number">2.5.</span> <span class="nav-text">2.5 JdHotKeyStore — Core API</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Quick-Integration-Spring-Boot"><span class="nav-number">3.</span> <span class="nav-text">3. Quick Integration (Spring Boot)</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Step-1-Deploy-the-Infrastructure"><span class="nav-number">3.1.</span> <span class="nav-text">Step 1: Deploy the Infrastructure</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Installing-etcd-Dev-Environment"><span class="nav-number">3.1.1.</span> <span class="nav-text">Installing etcd (Dev Environment)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Deploying-the-Worker"><span class="nav-number">3.1.2.</span> <span class="nav-text">Deploying the Worker</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Deploying-the-Dashboard"><span class="nav-number">3.1.3.</span> <span class="nav-text">Deploying the Dashboard</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Step-2-Add-Maven-Dependency"><span class="nav-number">3.2.</span> <span class="nav-text">Step 2: Add Maven Dependency</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Step-3-Initialize-the-Client"><span class="nav-number">3.3.</span> <span class="nav-text">Step 3: Initialize the Client</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Step-4-Configure-Hot-Key-Rules"><span class="nav-number">3.4.</span> <span class="nav-text">Step 4: Configure Hot Key Rules</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-Usage-Guide"><span class="nav-number">4.</span> <span class="nav-text">4. Usage Guide</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-Scenario-1-Hot-Key-Interception-Rate-Limiting"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 Scenario 1: Hot Key Interception + Rate Limiting</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-Scenario-2-Local-Caching-of-Hot-Data-Recommended"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 Scenario 2: Local Caching of Hot Data (Recommended)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-3-Scenario-3-Simplified-Logic-with-getValue"><span class="nav-number">4.3.</span> <span class="nav-text">4.3 Scenario 3: Simplified Logic with getValue</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-4-Scenario-4-Hot-User-Hot-Endpoint-Detection"><span class="nav-number">4.4.</span> <span class="nav-text">4.4 Scenario 4: Hot User &#x2F; Hot Endpoint Detection</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-Performance-Data"><span class="nav-number">5.</span> <span class="nav-text">5. Performance Data</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-Worker-Performance-Evolution"><span class="nav-number">5.1.</span> <span class="nav-text">5.1 Worker Performance Evolution</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-2-Push-Performance"><span class="nav-number">5.2.</span> <span class="nav-text">5.2 Push Performance</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-3-Production-Data"><span class="nav-number">5.3.</span> <span class="nav-text">5.3 Production Data</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-Comparison-with-Alternatives"><span class="nav-number">6.</span> <span class="nav-text">6. Comparison with Alternatives</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#When-to-Use-JD-HotKey"><span class="nav-number">6.0.1.</span> <span class="nav-text">When to Use JD-HotKey</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#When-You-Don’t-Need-JD-HotKey"><span class="nav-number">6.0.2.</span> <span class="nav-text">When You Don’t Need JD-HotKey</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#7-Best-Practices-and-Caveats"><span class="nav-number">7.</span> <span class="nav-text">7. Best Practices and Caveats</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#7-1-Threshold-Tuning"><span class="nav-number">7.1.</span> <span class="nav-text">7.1 Threshold Tuning</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-2-Memory-Control"><span class="nav-number">7.2.</span> <span class="nav-text">7.2 Memory Control</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-3-etcd-Cluster-Resilience"><span class="nav-number">7.3.</span> <span class="nav-text">7.3 etcd Cluster Resilience</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-4-Dependency-Conflict-Resolution"><span class="nav-number">7.4.</span> <span class="nav-text">7.4 Dependency Conflict Resolution</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-5-Pair-with-Degradation-Strategies"><span class="nav-number">7.5.</span> <span class="nav-text">7.5 Pair with Degradation Strategies</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-6-Monitoring-and-Alerting"><span class="nav-number">7.6.</span> <span class="nav-text">7.6 Monitoring and Alerting</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#8-FAQ"><span class="nav-number">8.</span> <span class="nav-text">8. FAQ</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-What’s-the-relationship-between-worker-and-server"><span class="nav-number">8.1.</span> <span class="nav-text">Q: What’s the relationship between worker and server?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-How-many-applications-can-one-etcd-cluster-support"><span class="nav-number">8.2.</span> <span class="nav-text">Q: How many applications can one etcd cluster support?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-Does-isHotKey-report-on-every-call"><span class="nav-number">8.3.</span> <span class="nav-text">Q: Does isHotKey report on every call?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-How-do-I-estimate-worker-throughput"><span class="nav-number">8.4.</span> <span class="nav-text">Q: How do I estimate worker throughput?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-What’s-the-difference-between-smartSet-and-using-Caffeine-directly"><span class="nav-number">8.5.</span> <span class="nav-text">Q: What’s the difference between smartSet and using Caffeine directly?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-After-a-key-is-flagged-as-hot-how-does-data-get-populated-into-local-cache"><span class="nav-number">8.6.</span> <span class="nav-text">Q: After a key is flagged as hot, how does data get populated into local cache?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-How-does-this-relate-to-Redis-Cluster-hot-key-problems"><span class="nav-number">8.7.</span> <span class="nav-text">Q: How does this relate to Redis Cluster hot key problems?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-How-to-deploy-in-production"><span class="nav-number">8.8.</span> <span class="nav-text">Q: How to deploy in production?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Q-How-does-this-work-with-JetCache’s-two-level-cache-BOTH"><span class="nav-number">8.9.</span> <span class="nav-text">Q: How does this work with JetCache’s two-level cache (BOTH)?</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#9-Summary"><span class="nav-number">9.</span> <span class="nav-text">9. Summary</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/06/15/102_JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/06/15/102_JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

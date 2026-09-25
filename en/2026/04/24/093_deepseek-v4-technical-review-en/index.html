@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="BackgroundOn April 24, 2026, DeepSeek officially released the V4 model series. This isn’t a routine version bump — it tackles a fundamental problem that’s plagued the AI industry for years: the long-c">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DeepSeek V4: A Technical Deep Dive">
+<meta property="og:url" content="https://donehub.github.io/en/2026/04/24/093_deepseek-v4-technical-review-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="BackgroundOn April 24, 2026, DeepSeek officially released the V4 model series. This isn’t a routine version bump — it tackles a fundamental problem that’s plagued the AI industry for years: the long-c">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-04-24T08:30:00.000Z">
+<meta property="article:modified_time" content="2026-04-24T08:30:00.000Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="AI">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/04/24/093_deepseek-v4-technical-review-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>DeepSeek V4: A Technical Deep Dive | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/04/24/093_deepseek-v4-technical-review-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          DeepSeek V4: A Technical Deep Dive
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-04-24 16:30:00" itemprop="dateCreated datePublished" datetime="2026-04-24T16:30:00+08:00">2026-04-24</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/DeepSeek/" itemprop="url" rel="index"><span itemprop="name">DeepSeek</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/04/24/093_deepseek-v4-technical-review-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/04/24/093_deepseek-v4-technical-review-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="Background"><a href="#Background" class="headerlink" title="Background"></a>Background</h2><p>On April 24, 2026, DeepSeek officially released the V4 model series. This isn’t a routine version bump — it tackles a fundamental problem that’s plagued the AI industry for years: <strong>the long-context efficiency bottleneck</strong>.</p>
+<p>This post breaks down the core technical innovations in DeepSeek V4 and explains why this release deserves attention.</p>
+<hr>
+<a id="more"></a>
+<h2 id="1-Model-Specs-Bigger-Without-Being-Pricier"><a href="#1-Model-Specs-Bigger-Without-Being-Pricier" class="headerlink" title="1. Model Specs: Bigger Without Being Pricier"></a>1. Model Specs: Bigger Without Being Pricier</h2><p>DeepSeek V4 ships in two variants:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Total Params</th>
+<th>Active Params</th>
+<th>Context Length</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>DeepSeek-V4-Pro</strong></td>
+<td>1.6T</td>
+<td>49B</td>
+<td>1M tokens</td>
+</tr>
+<tr>
+<td><strong>DeepSeek-V4-Flash</strong></td>
+<td>284B</td>
+<td>13B</td>
+<td>1M tokens</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Compared to the previous V3.2 (671B total, 37B active), V4-Pro has 2.4x the total parameters but only 32% more active parameters. More importantly, <strong>both natively support 1M token context</strong> — something no open-source model had achieved before.</p>
+<h3 id="The-“Bigger-but-Not-Pricier”-Principle"><a href="#The-“Bigger-but-Not-Pricier”-Principle" class="headerlink" title="The “Bigger but Not Pricier” Principle"></a>The “Bigger but Not Pricier” Principle</h3><p>Thanks to the MoE (Mixture-of-Experts) architecture, each inference step activates only a fraction of the parameters. V4-Pro’s activation rate is just <strong>3%</strong> (49B/1.6T), which means:</p>
+<ul>
+<li>Inference cost is close to a 50B-parameter dense model</li>
+<li>But it has the knowledge capacity and expressive power of 1.6T parameters</li>
+</ul>
+<p>This is the technical direction DeepSeek has pursued since V2. V4 takes that strategy to a new level.</p>
+<hr>
+<h2 id="2-Core-Architecture-Innovation-Breaking-the-O-n²-Curse"><a href="#2-Core-Architecture-Innovation-Breaking-the-O-n²-Curse" class="headerlink" title="2. Core Architecture Innovation: Breaking the O(n²) Curse"></a>2. Core Architecture Innovation: Breaking the O(n²) Curse</h2><p>Standard Transformer attention has O(n²) complexity — double the sequence length, quadruple the compute. At million-token scale, this becomes prohibitive.</p>
+<p>DeepSeek V4 solves this completely with a <strong>hybrid attention architecture</strong>.</p>
+<h3 id="2-1-CSA-Compressed-Sparse-Attention"><a href="#2-1-CSA-Compressed-Sparse-Attention" class="headerlink" title="2.1 CSA (Compressed Sparse Attention)"></a>2.1 CSA (Compressed Sparse Attention)</h3><p>CSA’s core idea: <strong>compress + sparse selection</strong>.</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Original sequence: n tokens</span><br><span class="line">     ↓ Compress (every m tokens merged into one KV entry)</span><br><span class="line">Compressed sequence: n&#x2F;m compressed KV entries</span><br><span class="line">     ↓ Sparse selection (Lightning Indexer picks top-k)</span><br><span class="line">Computed: k compressed KV entries</span><br></pre></td></tr></table></figure>
+<p>The specific flow:</p>
+<ol>
+<li><strong>KV Cache compression</strong>: Every m tokens’ KV entries are compressed into one entry via weighted aggregation, reducing sequence length to 1/m</li>
+<li><strong>Lightning Indexer</strong>: Generates indexer queries for each query token, computes similarity against compressed KV entries, selects the top-k most relevant compressed blocks</li>
+<li><strong>Core Attention</strong>: Full attention computation runs only on the selected k compressed blocks</li>
+</ol>
+<p>Key parameters (V4-Pro):</p>
+<ul>
+<li>Compression ratio m = 4 (every 4 tokens compressed to 1)</li>
+<li>Indexer heads = 64, head dimension = 128</li>
+<li>Top-k = 1024 (each query attends to only 1024 compressed blocks)</li>
+</ul>
+<h3 id="2-2-HCA-Heavily-Compressed-Attention"><a href="#2-2-HCA-Heavily-Compressed-Attention" class="headerlink" title="2.2 HCA (Heavily Compressed Attention)"></a>2.2 HCA (Heavily Compressed Attention)</h3><p>HCA is a more aggressive compression strategy for handling “historical information that doesn’t need fine-grained attention”:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Compression ratio m&#39; &#x3D; 128 (every 128 tokens merged into one KV entry)</span><br><span class="line">     ↓</span><br><span class="line">Full attention directly on compressed KV (no sparse selection)</span><br></pre></td></tr></table></figure>
+<p>HCA’s philosophy: <strong>distant information can be handled roughly; nearby information needs fine-grained attention</strong>.</p>
+<h3 id="2-3-Hybrid-Architecture-Design"><a href="#2-3-Hybrid-Architecture-Design" class="headerlink" title="2.3 Hybrid Architecture Design"></a>2.3 Hybrid Architecture Design</h3><p>V4 doesn’t use all CSA or all HCA — it <strong>alternates</strong> between them:</p>
+<ul>
+<li><strong>First 2 layers</strong>: Pure sliding window attention (preserving fine-grained detail for recent information)</li>
+<li><strong>Subsequent layers</strong>: CSA and HCA alternate, forming a “coarse-and-fine” information processing pipeline</li>
+</ul>
+<p>This design lets the model handle long contexts efficiently while maintaining precise retrieval of critical information.</p>
+<h3 id="2-4-Efficiency-Gains"><a href="#2-4-Efficiency-Gains" class="headerlink" title="2.4 Efficiency Gains"></a>2.4 Efficiency Gains</h3><p>The official data for 1M token context scenarios is compelling:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>V4-Pro vs V3.2</th>
+<th>V4-Flash vs V3.2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Per-token FLOPs</td>
+<td><strong>27%</strong> (3.7x savings)</td>
+<td><strong>10%</strong> (10x savings)</td>
+</tr>
+<tr>
+<td>KV Cache size</td>
+<td><strong>10%</strong> (9.5x savings)</td>
+<td><strong>7%</strong> (13.7x savings)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Translation: million-token context tasks that were previously too expensive to run can now <strong>run on a single GPU</strong>.</p>
+<hr>
+<h2 id="3-mHC-A-Mathematical-Upgrade-to-Residual-Connections"><a href="#3-mHC-A-Mathematical-Upgrade-to-Residual-Connections" class="headerlink" title="3. mHC: A Mathematical Upgrade to Residual Connections"></a>3. mHC: A Mathematical Upgrade to Residual Connections</h2><p>Residual connections <code>x + F(x)</code> are foundational to Transformers, but they cause problems when stacked deep:</p>
+<ul>
+<li>Signals can amplify layer by layer → numerical explosion</li>
+<li>Signals can attenuate layer by layer → vanishing gradients</li>
+</ul>
+<p>DeepSeek V4 introduces <strong>Manifold-Constrained Hyper-Connections (mHC)</strong> to solve this with mathematical constraints.</p>
+<h3 id="Core-Idea"><a href="#Core-Idea" class="headerlink" title="Core Idea"></a>Core Idea</h3><p>Traditional residual connection:<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">X_next &#x3D; X + F(X)  &#x2F;&#x2F; Simple addition</span><br></pre></td></tr></table></figure></p>
+<p>mHC:<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">X_next &#x3D; B·X + C·F(A·X)  &#x2F;&#x2F; A, B, C are linear mapping matrices</span><br><span class="line">         ↑</span><br><span class="line">      B is constrained to the doubly stochastic matrix manifold</span><br><span class="line">      (row sums&#x3D;1, column sums&#x3D;1, elements≥0)</span><br></pre></td></tr></table></figure></p>
+<p>Key constraint: <strong>B’s spectral norm ≤ 1</strong>, meaning signal propagation is “non-expansive” — it can’t explode.</p>
+<h3 id="What-“Manifold-Constraint”-Means"><a href="#What-“Manifold-Constraint”-Means" class="headerlink" title="What “Manifold Constraint” Means"></a>What “Manifold Constraint” Means</h3><p>The space of doubly stochastic matrices forms a <strong>manifold</strong> — specifically, the Birkhoff Polytope. mHC projects matrix B onto this manifold using the Sinkhorn-Knopp algorithm:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1. Take exponential of B (guarantees positive elements)</span><br><span class="line">2. Iteratively normalize rows, then columns</span><br><span class="line">3. Converges to a doubly stochastic matrix</span><br></pre></td></tr></table></figure>
+<p>This math ensures stability during deep stacking while preserving the model’s expressive power.</p>
+<hr>
+<h2 id="4-Muon-Optimizer-A-New-Recipe-for-Trillion-Parameter-Training"><a href="#4-Muon-Optimizer-A-New-Recipe-for-Trillion-Parameter-Training" class="headerlink" title="4. Muon Optimizer: A New Recipe for Trillion-Parameter Training"></a>4. Muon Optimizer: A New Recipe for Trillion-Parameter Training</h2><p>Training trillion-parameter models pushes AdamW past its limits. V4 introduces the <strong>Muon</strong> optimizer.</p>
+<h3 id="Core-Algorithm"><a href="#Core-Algorithm" class="headerlink" title="Core Algorithm"></a>Core Algorithm</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">G &#x3D; gradient</span><br><span class="line">M &#x3D; momentum_buffer</span><br><span class="line">M &#x3D; μ·M + G  &#x2F;&#x2F; Momentum accumulation</span><br><span class="line">O &#x3D; HybridNewtonSchulz(μ·M + G)  &#x2F;&#x2F; Nesterov trick + orthogonalization</span><br><span class="line">W &#x3D; W·(1 - ηλ) - η·O  &#x2F;&#x2F; Weight decay + update</span><br></pre></td></tr></table></figure>
+<p>The key step is the <strong>Hybrid Newton-Schulz iteration</strong>, which orthogonalizes the gradient matrix:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 10 iterations in two stages</span></span><br><span class="line"><span class="comment"># Stage 1 (first 8 steps): Fast convergence</span></span><br><span class="line">M_k = <span class="number">3.4445</span>·M_&#123;k<span class="number">-1</span>&#125; - <span class="number">4.7750</span>·(M·M^T)·M + <span class="number">2.0315</span>·(M·M^T)^<span class="number">2</span>·M</span><br><span class="line"></span><br><span class="line"><span class="comment"># Stage 2 (last 2 steps): Precise projection onto orthogonal matrix</span></span><br><span class="line">M_k = <span class="number">2</span>·M_&#123;k<span class="number">-1</span>&#125; - <span class="number">1.5</span>·(M·M^T)·M + <span class="number">0.5</span>·(M·M^T)^<span class="number">2</span>·M</span><br></pre></td></tr></table></figure>
+<p>Benefits of orthogonalization:</p>
+<ul>
+<li>Prevents “drift” — gradient directions become more definite</li>
+<li>Prevents “numerical explosion” — matrix spectral norm is bounded</li>
+<li>Faster convergence — no need for Adam’s second-moment estimation</li>
+</ul>
+<h3 id="Stability-Techniques"><a href="#Stability-Techniques" class="headerlink" title="Stability Techniques"></a>Stability Techniques</h3><p>V4 also uses two techniques to prevent loss spikes:</p>
+<ol>
+<li><strong>Anticipatory Routing</strong>: Routing decisions use “historical parameters” instead of “current parameters,” breaking vicious cycles in MoE routing</li>
+<li><strong>SwiGLU Clamping</strong>: The linear component of SwiGLU is clamped to [-10, 10], directly suppressing outliers</li>
+</ol>
+<hr>
+<h2 id="5-FP4-Quantization-Aware-Training-Built-for-Low-Precision"><a href="#5-FP4-Quantization-Aware-Training-Built-for-Low-Precision" class="headerlink" title="5. FP4 Quantization-Aware Training: Built for Low Precision"></a>5. FP4 Quantization-Aware Training: Built for Low Precision</h2><p>Previous quantization was “post-training remediation” — train the model in high precision, then forcibly reduce precision at inference, with inevitable performance loss.</p>
+<p>V4’s innovation: <strong>make the model adapt to FP4 during training</strong>.</p>
+<h3 id="Application-Scope"><a href="#Application-Scope" class="headerlink" title="Application Scope"></a>Application Scope</h3><ul>
+<li><strong>MoE expert weights</strong>: Most of the model’s parameters — FP4 compression saves significant VRAM</li>
+<li><strong>QK path</strong> (Lightning Indexer’s indexer component): Core computation for long-context retrieval — FP4 accelerates this</li>
+</ul>
+<h3 id="Key-Technical-Detail"><a href="#Key-Technical-Detail" class="headerlink" title="Key Technical Detail"></a>Key Technical Detail</h3><p><strong>Lossless FP4 → FP8 dequantization</strong>:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">FP4 (E2M1) → FP8 (E4M3)</span><br><span class="line">          ↑</span><br><span class="line">FP8 has 2 more exponent bits, larger dynamic range</span><br><span class="line">As long as scale factor differences within a block don&#39;t exceed threshold,</span><br><span class="line">information is fully preserved</span><br></pre></td></tr></table></figure>
+<p>This means:</p>
+<ul>
+<li>Training uses FP8 for computation (simulating FP4)</li>
+<li>Inference uses FP4 weights directly, zero performance loss</li>
+<li>The entire pipeline can reuse existing FP8 training frameworks</li>
+</ul>
+<hr>
+<h2 id="6-Training-Infrastructure-Engineering-at-Scale"><a href="#6-Training-Infrastructure-Engineering-at-Scale" class="headerlink" title="6. Training Infrastructure: Engineering at Scale"></a>6. Training Infrastructure: Engineering at Scale</h2><p>V4’s infrastructure investment reflects long-term engineering thinking.</p>
+<h3 id="6-1-TileLang-A-DSL-for-Kernel-Development"><a href="#6-1-TileLang-A-DSL-for-Kernel-Development" class="headerlink" title="6.1 TileLang: A DSL for Kernel Development"></a>6.1 TileLang: A DSL for Kernel Development</h3><p>Traditional CUDA kernel development is slow and hard to iterate on. V4 uses <strong>TileLang</strong>, a domain-specific language:</p>
+<ul>
+<li>Declarative syntax describes kernel logic, Z3 SMT Solver performs formal analysis (proving correctness), and high-performance CUDA code is generated automatically. Development speed and runtime performance, both achieved.</li>
+</ul>
+<h3 id="6-2-Deterministic-Training"><a href="#6-2-Deterministic-Training" class="headerlink" title="6.2 Deterministic Training"></a>6.2 Deterministic Training</h3><p>The same token produces bitwise-identical output regardless of its position in the batch. Special design avoids atomic addition nondeterminism, making training reproducible and debugging evidence-based. This is critical for debugging and problem diagnosis at large-scale training.</p>
+<h3 id="6-3-Fine-Grained-Overlap-for-MoE-Expert-Parallelism"><a href="#6-3-Fine-Grained-Overlap-for-MoE-Expert-Parallelism" class="headerlink" title="6.3 Fine-Grained Overlap for MoE Expert Parallelism"></a>6.3 Fine-Grained Overlap for MoE Expert Parallelism</h3><p>Expert Parallelism carries heavy communication overhead. V4 splits MoE layers into <strong>4 stages</strong>:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Dispatch (comm) → Linear-1 (compute) → Activation → Linear-2 (compute) → Combine (comm)</span><br></pre></td></tr></table></figure>
+<p>Key insight: <strong>compute time &gt; communication time</strong>, so communication can be hidden behind computation.</p>
+<p>V4 groups experts into “waves,” pipelining communication and compute within each wave, achieving <strong>1.5-1.96x speedup</strong>.</p>
+<hr>
+<h2 id="7-Benchmarks-A-New-Standard-for-Open-Source-Models"><a href="#7-Benchmarks-A-New-Standard-for-Open-Source-Models" class="headerlink" title="7. Benchmarks: A New Standard for Open-Source Models"></a>7. Benchmarks: A New Standard for Open-Source Models</h2><h3 id="Knowledge-Tasks"><a href="#Knowledge-Tasks" class="headerlink" title="Knowledge Tasks"></a>Knowledge Tasks</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Benchmark</th>
+<th>V4-Pro-Max</th>
+<th>K2.6</th>
+<th>GLM-5.1</th>
+<th>Gemini 3.1 Pro</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SimpleQA Verified</td>
+<td><strong>57.9</strong></td>
+<td>36.9</td>
+<td>38.1</td>
+<td>75.6</td>
+</tr>
+<tr>
+<td>Chinese-SimpleQA</td>
+<td><strong>84.4</strong></td>
+<td>75.9</td>
+<td>75.0</td>
+<td>85.9</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>V4-Pro-Max <strong>leads open-source competitors by 20+ points</strong> on knowledge tasks, though there’s still a gap to Gemini 3.1 Pro.</p>
+<h3 id="Agent-Capabilities-Best-in-Open-Source"><a href="#Agent-Capabilities-Best-in-Open-Source" class="headerlink" title="Agent Capabilities: Best in Open-Source"></a>Agent Capabilities: Best in Open-Source</h3><p>This is one of V4’s most significant capability jumps. Official disclosures:</p>
+<ul>
+<li><strong>Agentic Coding</strong>: V4-Pro reaches the best level among current open-source models</li>
+<li><strong>Internal testing</strong>: Has become the go-to Agentic Coding model for DeepSeek employees</li>
+<li><strong>Comparison</strong>: Outperforms Claude Sonnet 4.5, with delivery quality approaching Claude Opus 4.6 non-thinking mode</li>
+</ul>
+<p>V4 has been specifically optimized for mainstream Agent products like <strong>Claude Code, OpenClaw, OpenCode, and CodeBuddy</strong>, with notable improvements in code tasks and document generation.</p>
+<h3 id="Reasoning-and-Code"><a href="#Reasoning-and-Code" class="headerlink" title="Reasoning and Code"></a>Reasoning and Code</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Benchmark</th>
+<th>V4-Pro-Max</th>
+<th>GPT-5.4</th>
+<th>Gemini 3.1 Pro</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Codeforces Rating</td>
+<td><strong>3206</strong></td>
+<td>3168</td>
+<td>3052</td>
+</tr>
+<tr>
+<td>Apex Shortlist</td>
+<td><strong>90.2</strong></td>
+<td>78.1</td>
+<td>89.1</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>This is the first time an open-source model has caught up to closed-source models in code competitions</strong>. V4-Pro-Max ranks 23rd among human competitors on Codeforces.</p>
+<h3 id="Long-Context"><a href="#Long-Context" class="headerlink" title="Long Context"></a>Long Context</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Benchmark</th>
+<th>V4-Pro-Max</th>
+<th>Claude Opus 4.6</th>
+<th>Gemini 3.1 Pro</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MRCR 1M (MMR)</td>
+<td>83.5</td>
+<td><strong>92.9</strong></td>
+<td>76.3</td>
+</tr>
+<tr>
+<td>CorpusQA 1M</td>
+<td><strong>62.0</strong></td>
+<td>71.7</td>
+<td>53.8</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>V4-Pro surpasses Gemini 3.1 Pro on the real-world CorpusQA benchmark and approaches Claude Opus 4.6 on MRCR.</p>
+<hr>
+<h2 id="8-V4-Flash-The-Cost-Effective-Option"><a href="#8-V4-Flash-The-Cost-Effective-Option" class="headerlink" title="8. V4-Flash: The Cost-Effective Option"></a>8. V4-Flash: The Cost-Effective Option</h2><p>V4-Flash is an important complement, ensuring users with different needs find a suitable option.</p>
+<h3 id="Comparison-with-V4-Pro"><a href="#Comparison-with-V4-Pro" class="headerlink" title="Comparison with V4-Pro"></a>Comparison with V4-Pro</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>V4-Flash</th>
+<th>V4-Pro</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Active params</td>
+<td>13B</td>
+<td>49B</td>
+</tr>
+<tr>
+<td>Inference speed</td>
+<td>Faster</td>
+<td>Slower</td>
+</tr>
+<tr>
+<td>API cost</td>
+<td>Lower</td>
+<td>Higher</td>
+</tr>
+<tr>
+<td>World knowledge</td>
+<td>Slightly behind</td>
+<td>Far ahead of open-source</td>
+</tr>
+<tr>
+<td>Reasoning ability</td>
+<td>Close to Pro</td>
+<td>Best in open-source</td>
+</tr>
+<tr>
+<td>Agent simple tasks</td>
+<td>Comparable</td>
+<td>Better</td>
+</tr>
+<tr>
+<td>Agent hard tasks</td>
+<td>Noticeable gap</td>
+<td>Best</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Use cases</strong>:</p>
+<ul>
+<li><strong>V4-Flash</strong>: Daily conversation, simple code tasks, cost-sensitive scenarios</li>
+<li><strong>V4-Pro</strong>: Complex Agent tasks, deep reasoning, high-quality output requirements</li>
+</ul>
+<hr>
+<h2 id="9-Three-Inference-Modes-Flexible-Cost-Quality-Tradeoff"><a href="#9-Three-Inference-Modes-Flexible-Cost-Quality-Tradeoff" class="headerlink" title="9. Three Inference Modes: Flexible Cost-Quality Tradeoff"></a>9. Three Inference Modes: Flexible Cost-Quality Tradeoff</h2><p>V4 supports three inference modes, letting users choose based on their cost tolerance:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Characteristics</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Non-Think</strong></td>
+<td>Fast intuitive response, no thinking tokens</td>
+<td>Daily chat, low-stakes decisions</td>
+</tr>
+<tr>
+<td><strong>Think</strong></td>
+<td>Logical analysis, moderate thinking budget</td>
+<td>Complex problems, planning tasks</td>
+</tr>
+<tr>
+<td><strong>Think Max</strong></td>
+<td>Maximum reasoning, long thinking budget</td>
+<td>Math proofs, high-difficulty tasks</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Think Max mode injects a special instruction into the system prompt:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Reasoning Effort: Absolute maximum with no shortcuts permitted.</span><br><span class="line">You MUST be very thorough in your thinking...</span><br></pre></td></tr></table></figure>
+<p>This pushes the model to “take reasoning to the limit,” performing best on hard benchmarks like HLE and IMO.</p>
+<hr>
+<h2 id="10-API-Usage-Guide"><a href="#10-API-Usage-Guide" class="headerlink" title="10. API Usage Guide"></a>10. API Usage Guide</h2><h3 id="Model-Invocation"><a href="#Model-Invocation" class="headerlink" title="Model Invocation"></a>Model Invocation</h3><p>The DeepSeek API now offers both V4-Pro and V4-Flash, supporting the OpenAI ChatCompletions interface and Anthropic interface:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># OpenAI format</span></span><br><span class="line"><span class="keyword">from</span> openai <span class="keyword">import</span> OpenAI</span><br><span class="line"></span><br><span class="line">client = OpenAI(</span><br><span class="line">    api_key=<span class="string">"your-api-key"</span>,</span><br><span class="line">    base_url=<span class="string">"https://api.deepseek.com"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">response = client.chat.completions.create(</span><br><span class="line">    model=<span class="string">"deepseek-v4-pro"</span>,  <span class="comment"># or deepseek-v4-flash</span></span><br><span class="line">    messages=[&#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"Hello"</span>&#125;]</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<h3 id="Key-Parameters"><a href="#Key-Parameters" class="headerlink" title="Key Parameters"></a>Key Parameters</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td><code>deepseek-v4-pro</code> or <code>deepseek-v4-flash</code></td>
+</tr>
+<tr>
+<td><code>max_tokens</code></td>
+<td>Maximum output length, default 8K</td>
+</tr>
+<tr>
+<td><code>reasoning_effort</code></td>
+<td>Thinking intensity: <code>high</code> or <code>max</code> (thinking mode only)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="Thinking-Mode"><a href="#Thinking-Mode" class="headerlink" title="Thinking Mode"></a>Thinking Mode</h3><p>For complex Agent scenarios, use thinking mode with intensity set to <code>max</code>:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">response = client.chat.completions.create(</span><br><span class="line">    model=<span class="string">"deepseek-v4-pro"</span>,</span><br><span class="line">    messages=[&#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"Complex task..."</span>&#125;],</span><br><span class="line">    reasoning_effort=<span class="string">"max"</span>  <span class="comment"># Maximum reasoning</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<h3 id="⚠️-Important-Notice"><a href="#⚠️-Important-Notice" class="headerlink" title="⚠️ Important Notice"></a>⚠️ Important Notice</h3><p>Legacy API model names <code>deepseek-chat</code> and <code>deepseek-reasoner</code> will be <strong>discontinued on July 24, 2026</strong>:</p>
+<ul>
+<li>Currently <code>deepseek-chat</code> → points to V4-Flash non-thinking mode</li>
+<li>Currently <code>deepseek-reasoner</code> → points to V4-Flash thinking mode</li>
+</ul>
+<p>Migrate to the new model names as soon as possible.</p>
+<hr>
+<h2 id="11-Open-Source-and-Local-Deployment"><a href="#11-Open-Source-and-Local-Deployment" class="headerlink" title="11. Open Source and Local Deployment"></a>11. Open Source and Local Deployment</h2><h3 id="Weight-Downloads"><a href="#Weight-Downloads" class="headerlink" title="Weight Downloads"></a>Weight Downloads</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Link</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HuggingFace</td>
+<td><a href="https://huggingface.co/collections/deepseek-ai/deepseek-v4" target="_blank" rel="noopener">https://huggingface.co/collections/deepseek-ai/deepseek-v4</a></td>
+</tr>
+<tr>
+<td>ModelScope</td>
+<td><a href="https://modelscope.cn/collections/deepseek-ai/DeepSeek-V4" target="_blank" rel="noopener">https://modelscope.cn/collections/deepseek-ai/DeepSeek-V4</a></td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="Local-Deployment-Recommendations"><a href="#Local-Deployment-Recommendations" class="headerlink" title="Local Deployment Recommendations"></a>Local Deployment Recommendations</h3><p>Given V4-Pro’s 1.6T parameters, local deployment requires:</p>
+<ul>
+<li><strong>Multi-GPU inference</strong>: At least 8× A100 80GB or equivalent VRAM</li>
+<li><strong>Quantized inference</strong>: FP4 quantization significantly reduces VRAM requirements</li>
+<li><strong>V4-Flash</strong>: Can run on a single A100 80GB</li>
+</ul>
+<h3 id="Technical-Report"><a href="#Technical-Report" class="headerlink" title="Technical Report"></a>Technical Report</h3><p>For complete technical details, see the official technical report:</p>
+<ul>
+<li><a href="https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf" target="_blank" rel="noopener">DeepSeek V4 Technical Report (PDF)</a></li>
+</ul>
+<hr>
+<h2 id="12-Industry-Implications-The-New-Paradigm-V4-Brings"><a href="#12-Industry-Implications-The-New-Paradigm-V4-Brings" class="headerlink" title="12. Industry Implications: The New Paradigm V4 Brings"></a>12. Industry Implications: The New Paradigm V4 Brings</h2><h3 id="12-1-Long-Context-Is-No-Longer-a-Luxury"><a href="#12-1-Long-Context-Is-No-Longer-a-Luxury" class="headerlink" title="12.1 Long Context Is No Longer a Luxury"></a>12.1 Long Context Is No Longer a Luxury</h3><p>Previously, million-token context was “theoretically possible but economically unfeasible.” V4 brings costs down to <strong>10-30% of previous levels</strong>, making these scenarios viable:</p>
+<ul>
+<li><strong>Test-time Scaling</strong>: Inference can think for extended periods without context constraints</li>
+<li><strong>Long-horizon Agents</strong>: Complex multi-turn tasks (like software engineering pipelines) have enough “memory space”</li>
+<li><strong>Online learning</strong>: Continuously absorb new information without full retraining</li>
+</ul>
+<h3 id="12-2-Shifting-Open-Source-vs-Closed-Source-Dynamics"><a href="#12-2-Shifting-Open-Source-vs-Closed-Source-Dynamics" class="headerlink" title="12.2 Shifting Open-Source vs. Closed-Source Dynamics"></a>12.2 Shifting Open-Source vs. Closed-Source Dynamics</h3><p>V4 sends a signal: <strong>open-source models have caught up not just in capability, but in efficiency-per-dollar</strong>.</p>
+<p>V4-Flash with 13B active parameters reaches reasoning levels close to GPT-5.2. On code tasks, open-source has caught up to closed-source for the first time. The moat around closed-source models is shrinking.</p>
+<h3 id="12-3-Long-Term-Value-of-Architecture-Innovation"><a href="#12-3-Long-Term-Value-of-Architecture-Innovation" class="headerlink" title="12.3 Long-Term Value of Architecture Innovation"></a>12.3 Long-Term Value of Architecture Innovation</h3><p>V4’s innovations aren’t “benchmark tricks” — they’re <strong>fundamental architectural improvements</strong>:</p>
+<ul>
+<li>CSA/HCA solve Transformer’s O(n²) bottleneck</li>
+<li>mHC makes residual connections more stable and stackable deeper</li>
+<li>Muon optimizer could become the new standard for trillion-parameter training</li>
+</ul>
+<p>These innovations will inspire further research and push the entire industry forward.</p>
+<hr>
+<h2 id="13-Limitations-and-Outlook"><a href="#13-Limitations-and-Outlook" class="headerlink" title="13. Limitations and Outlook"></a>13. Limitations and Outlook</h2><p>The team openly acknowledges several limitations:</p>
+<ol>
+<li><strong>Relatively complex architecture</strong>: To reduce risk, many proven V3 components were retained; future versions will streamline</li>
+<li><strong>Training stability principles not fully understood</strong>: Anticipatory Routing and SwiGLU Clamping work, but the mathematical foundations are still being explored</li>
+<li><strong>Multimodal not yet integrated</strong>: Future versions will add vision capabilities</li>
+</ol>
+<p>Future directions:</p>
+<ul>
+<li>Further sparsity exploration (e.g., sparse embeddings)</li>
+<li>Low-latency architecture optimization (making long-context interactions smoother)</li>
+<li>Deep optimization for long-horizon Agents</li>
+</ul>
+<hr>
+<h2 id="Final-Thoughts"><a href="#Final-Thoughts" class="headerlink" title="Final Thoughts"></a>Final Thoughts</h2><p>The most striking aspect of DeepSeek V4 isn’t a couple benchmark-topping numbers — it’s the systematic resolution of the long-context efficiency problem. The CSA/HCA hybrid attention brings down O(n²) complexity, mHC makes deep stacking more stable, the Muon optimizer provides a new approach for trillion-parameter training, and FP4 quantization-aware training builds low-precision inference in from the start. Combined, these innovations turn million-token context from “theoretically possible” into “economically viable.”</p>
+<p>From an industry perspective, V4-Flash with 13B active parameters achieves reasoning levels close to GPT-5.2, and its Codeforces ranking catches up to closed-source models. For the first time, open-source models have genuine competitive ability on the efficiency dimension.</p>
+<p>V4 does have clear limitations: high architectural complexity, incomplete mathematical understanding of some stability techniques, and no multimodal integration yet. These are problems future versions need to solve. But in terms of this release, the density of architectural innovation DeepSeek has invested is the highest among domestic large model providers.</p>
+<hr>
+<p><strong>Resources</strong>:</p>
+<ul>
+<li><a href="https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf" target="_blank" rel="noopener">DeepSeek V4 Technical Report (PDF)</a></li>
+<li><a href="https://huggingface.co/collections/deepseek-ai/deepseek-v4" target="_blank" rel="noopener">Model Weights (HuggingFace)</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/AI/" rel="tag"><i class="fa fa-tag"></i> AI</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/04/19/092_bailian_coding_plan_usage_java_or_python-en/" rel="prev" title="Calling Alibaba Bailian Coding Plan from Java and Python Applications">
+      <i class="fa fa-chevron-left"></i> Calling Alibaba Bailian Coding Plan from Java and Python Applications
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2026/04/27/094_agent-memory-what-to-store-en/" rel="next" title="What Should an Agent Memory System Actually Store?">
+      What Should an Agent Memory System Actually Store? <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Background"><span class="nav-number">1.</span> <span class="nav-text">Background</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-Model-Specs-Bigger-Without-Being-Pricier"><span class="nav-number">2.</span> <span class="nav-text">1. Model Specs: Bigger Without Being Pricier</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#The-“Bigger-but-Not-Pricier”-Principle"><span class="nav-number">2.1.</span> <span class="nav-text">The “Bigger but Not Pricier” Principle</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-Core-Architecture-Innovation-Breaking-the-O-n²-Curse"><span class="nav-number">3.</span> <span class="nav-text">2. Core Architecture Innovation: Breaking the O(n²) Curse</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-CSA-Compressed-Sparse-Attention"><span class="nav-number">3.1.</span> <span class="nav-text">2.1 CSA (Compressed Sparse Attention)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-HCA-Heavily-Compressed-Attention"><span class="nav-number">3.2.</span> <span class="nav-text">2.2 HCA (Heavily Compressed Attention)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-Hybrid-Architecture-Design"><span class="nav-number">3.3.</span> <span class="nav-text">2.3 Hybrid Architecture Design</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-Efficiency-Gains"><span class="nav-number">3.4.</span> <span class="nav-text">2.4 Efficiency Gains</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-mHC-A-Mathematical-Upgrade-to-Residual-Connections"><span class="nav-number">4.</span> <span class="nav-text">3. mHC: A Mathematical Upgrade to Residual Connections</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Core-Idea"><span class="nav-number">4.1.</span> <span class="nav-text">Core Idea</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#What-“Manifold-Constraint”-Means"><span class="nav-number">4.2.</span> <span class="nav-text">What “Manifold Constraint” Means</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-Muon-Optimizer-A-New-Recipe-for-Trillion-Parameter-Training"><span class="nav-number">5.</span> <span class="nav-text">4. Muon Optimizer: A New Recipe for Trillion-Parameter Training</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Core-Algorithm"><span class="nav-number">5.1.</span> <span class="nav-text">Core Algorithm</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Stability-Techniques"><span class="nav-number">5.2.</span> <span class="nav-text">Stability Techniques</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-FP4-Quantization-Aware-Training-Built-for-Low-Precision"><span class="nav-number">6.</span> <span class="nav-text">5. FP4 Quantization-Aware Training: Built for Low Precision</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Application-Scope"><span class="nav-number">6.1.</span> <span class="nav-text">Application Scope</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Key-Technical-Detail"><span class="nav-number">6.2.</span> <span class="nav-text">Key Technical Detail</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-Training-Infrastructure-Engineering-at-Scale"><span class="nav-number">7.</span> <span class="nav-text">6. Training Infrastructure: Engineering at Scale</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-TileLang-A-DSL-for-Kernel-Development"><span class="nav-number">7.1.</span> <span class="nav-text">6.1 TileLang: A DSL for Kernel Development</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-Deterministic-Training"><span class="nav-number">7.2.</span> <span class="nav-text">6.2 Deterministic Training</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-Fine-Grained-Overlap-for-MoE-Expert-Parallelism"><span class="nav-number">7.3.</span> <span class="nav-text">6.3 Fine-Grained Overlap for MoE Expert Parallelism</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-Benchmarks-A-New-Standard-for-Open-Source-Models"><span class="nav-number">8.</span> <span class="nav-text">7. Benchmarks: A New Standard for Open-Source Models</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Knowledge-Tasks"><span class="nav-number">8.1.</span> <span class="nav-text">Knowledge Tasks</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Agent-Capabilities-Best-in-Open-Source"><span class="nav-number">8.2.</span> <span class="nav-text">Agent Capabilities: Best in Open-Source</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Reasoning-and-Code"><span class="nav-number">8.3.</span> <span class="nav-text">Reasoning and Code</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Long-Context"><span class="nav-number">8.4.</span> <span class="nav-text">Long Context</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-V4-Flash-The-Cost-Effective-Option"><span class="nav-number">9.</span> <span class="nav-text">8. V4-Flash: The Cost-Effective Option</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Comparison-with-V4-Pro"><span class="nav-number">9.1.</span> <span class="nav-text">Comparison with V4-Pro</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#9-Three-Inference-Modes-Flexible-Cost-Quality-Tradeoff"><span class="nav-number">10.</span> <span class="nav-text">9. Three Inference Modes: Flexible Cost-Quality Tradeoff</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#10-API-Usage-Guide"><span class="nav-number">11.</span> <span class="nav-text">10. API Usage Guide</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Model-Invocation"><span class="nav-number">11.1.</span> <span class="nav-text">Model Invocation</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Key-Parameters"><span class="nav-number">11.2.</span> <span class="nav-text">Key Parameters</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Thinking-Mode"><span class="nav-number">11.3.</span> <span class="nav-text">Thinking Mode</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#⚠️-Important-Notice"><span class="nav-number">11.4.</span> <span class="nav-text">⚠️ Important Notice</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#11-Open-Source-and-Local-Deployment"><span class="nav-number">12.</span> <span class="nav-text">11. Open Source and Local Deployment</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Weight-Downloads"><span class="nav-number">12.1.</span> <span class="nav-text">Weight Downloads</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Local-Deployment-Recommendations"><span class="nav-number">12.2.</span> <span class="nav-text">Local Deployment Recommendations</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Technical-Report"><span class="nav-number">12.3.</span> <span class="nav-text">Technical Report</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#12-Industry-Implications-The-New-Paradigm-V4-Brings"><span class="nav-number">13.</span> <span class="nav-text">12. Industry Implications: The New Paradigm V4 Brings</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#12-1-Long-Context-Is-No-Longer-a-Luxury"><span class="nav-number">13.1.</span> <span class="nav-text">12.1 Long Context Is No Longer a Luxury</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#12-2-Shifting-Open-Source-vs-Closed-Source-Dynamics"><span class="nav-number">13.2.</span> <span class="nav-text">12.2 Shifting Open-Source vs. Closed-Source Dynamics</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#12-3-Long-Term-Value-of-Architecture-Innovation"><span class="nav-number">13.3.</span> <span class="nav-text">12.3 Long-Term Value of Architecture Innovation</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#13-Limitations-and-Outlook"><span class="nav-number">14.</span> <span class="nav-text">13. Limitations and Outlook</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Final-Thoughts"><span class="nav-number">15.</span> <span class="nav-text">Final Thoughts</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/04/24/093_deepseek-v4-technical-review-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/04/24/093_deepseek-v4-technical-review-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

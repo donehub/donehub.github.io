@@ -324,7 +324,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2020/03/20/000_hexo-github-pages-guide-en/">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/08/25/106_oceanbase-dynamic-partition-analysis-en/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -338,7 +338,7 @@
       <header class="post-header">
         <h2 class="post-title" itemprop="name headline">
           
-            <a href="/en/2020/03/20/000_hexo-github-pages-guide-en/" class="post-title-link" itemprop="url">Building a Personal Blog with Hexo and GitHub Pages</a>
+            <a href="/en/2026/08/25/106_oceanbase-dynamic-partition-analysis-en/" class="post-title-link" itemprop="url">OceanBase Dynamic Partition Design</a>
         </h2>
 
         <div class="post-meta">
@@ -348,14 +348,14 @@
               </span>
               <span class="post-meta-item-text">Posted on</span>
 
-              <time title="Created: 2020-03-20 00:00:00" itemprop="dateCreated datePublished" datetime="2020-03-20T00:00:00+08:00">2020-03-20</time>
+              <time title="Created: 2026-08-25 00:00:00" itemprop="dateCreated datePublished" datetime="2026-08-25T00:00:00+08:00">2026-08-25</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2026-09-23 07:24:51" itemprop="dateModified" datetime="2026-09-23T07:24:51+08:00">2026-09-23</time>
+                <time title="Modified: 2026-09-25 18:15:30" itemprop="dateModified" datetime="2026-09-25T18:15:30+08:00">2026-09-25</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -363,7 +363,7 @@
               </span>
               <span class="post-meta-item-text">In</span>
                 <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Blog-Setup/" itemprop="url" rel="index"><span itemprop="name">Blog Setup</span></a>
+                  <a href="/categories/Database/" itemprop="url" rel="index"><span itemprop="name">Database</span></a>
                 </span>
             </span>
 
@@ -376,8 +376,8 @@
       </span>
       <span class="post-meta-item-text">Valine: </span>
     
-    <a title="valine" href="/en/2020/03/20/000_hexo-github-pages-guide-en/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/en/2020/03/20/000_hexo-github-pages-guide-en/" itemprop="commentCount"></span>
+    <a title="valine" href="/en/2026/08/25/106_oceanbase-dynamic-partition-analysis-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/08/25/106_oceanbase-dynamic-partition-analysis-en/" itemprop="commentCount"></span>
     </a>
   </span>
   
@@ -392,10 +392,982 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <hr>
+          <h2 id="1-Where-the-Problem-Starts"><a href="#1-Where-the-Problem-Starts" class="headerlink" title="1. Where the Problem Starts"></a>1. Where the Problem Starts</h2><p>Anyone who’s used OceanBase has hit this scenario: tables partitioned by time range require partitions to be created manually in advance. Forget to create a new partition, and data writes fail immediately with a “partition not found” error. Create too many partitions upfront, and empty partition metadata becomes a maintenance burden. For tables like logs and order transaction records — data with a clear lifecycle — DBAs also need to periodically clean up expired partitions. One mistake and you risk data loss or production incidents.</p>
+<p>Starting from V4.3.5 BP2, OceanBase introduced dynamic partitioning to completely remove “partition creation and deletion” from the DBA’s daily operations. An important clarification upfront: dynamic partitioning is not an entirely new partition type. It’s an automated management layer on top of RANGE / RANGE COLUMNS partitioning. Understanding its design logic and applicable boundaries is more valuable than just memorizing the syntax.</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/en/2020/03/20/000_hexo-github-pages-guide-en/#more" rel="contents">
+              <a class="btn" href="/en/2026/08/25/106_oceanbase-dynamic-partition-analysis-en/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/08/14/105_deepseek-harness-deep-analysis-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/en/2026/08/14/105_deepseek-harness-deep-analysis-en/" class="post-title-link" itemprop="url">DeepSeek Harness Deep Analysis</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-08-14 00:00:00" itemprop="dateCreated datePublished" datetime="2026-08-14T00:00:00+08:00">2026-08-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 18:16:40" itemprop="dateModified" datetime="2026-09-25T18:16:40+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/08/14/105_deepseek-harness-deep-analysis-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/08/14/105_deepseek-harness-deep-analysis-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="1-Background"><a href="#1-Background" class="headerlink" title="1. Background"></a>1. Background</h2><p>On August 13, 2026, DeepSeek officially open-sourced the Harness developer preview. The project broke 20,000 stars on GitHub within an hour of launch, then surpassed 920,000 stars the following day — a massive impact.<br><img data-src="/img/deepseek-harness-star-changes.png" alt="alt text"><br>From forming the Harness team in May, to opening internal beta testing in July, to fully open-sourcing under the MIT license in August — the entire process took less than 3 months. This pace signals that DeepSeek isn’t just releasing a new tool here — it’s making a directional shift in product strategy.</p>
+<hr>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/en/2026/08/14/105_deepseek-harness-deep-analysis-en/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/07/12/104_chatgpt-5.6-introduction-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/en/2026/07/12/104_chatgpt-5.6-introduction-en/" class="post-title-link" itemprop="url">GPT-5.6 Is Here</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-07-12 00:00:00" itemprop="dateCreated datePublished" datetime="2026-07-12T00:00:00+08:00">2026-07-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 18:16:44" itemprop="dateModified" datetime="2026-09-25T18:16:44+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/07/12/104_chatgpt-5.6-introduction-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/07/12/104_chatgpt-5.6-introduction-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>On July 10, 2026, OpenAI released GPT-5.6.</p>
+<p>The one core takeaway: large language models are transitioning from chatbots to agents that get work done. Previously, you asked questions and got answers. Now, you give it a goal, and it plans the steps, calls tools, coordinates multiple Agents in parallel, and completes the task. On the efficiency front, GPT-5.6 delivered solid numbers across coding, knowledge work, cybersecurity, and science — token usage and costs are dropping while task completion rates are rising.</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/en/2026/07/12/104_chatgpt-5.6-introduction-en/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/06/17/103_JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/en/2026/06/17/103_JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/" class="post-title-link" itemprop="url">JetCache User Guide</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-06-17 00:00:00" itemprop="dateCreated datePublished" datetime="2026-06-17T00:00:00+08:00">2026-06-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:17:58" itemprop="dateModified" datetime="2026-09-25T17:17:58+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Middleware/" itemprop="url" rel="index"><span itemprop="name">Middleware</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/06/17/103_JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/06/17/103_JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="1-Component-Overview"><a href="#1-Component-Overview" class="headerlink" title="1. Component Overview"></a>1. Component Overview</h1><p>JetCache is a general-purpose cache access framework open-sourced by Alibaba (<a href="https://github.com/alibaba/jetcache" target="_blank" rel="noopener">source</a>). It does one thing: with a unified <code>Cache&lt;K, V&gt;</code> interface, it seamlessly combines local in-memory cache with remote Redis cache, then provides standard cache protocol integration through both annotations and API — letting business code use caching in the most concise way possible.</p>
+<p>Compared to Spring Cache, JetCache’s core advantages:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Spring Cache</th>
+<th>JetCache</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TTL (time-to-live)</td>
+<td>Not natively supported, requires customization</td>
+<td><strong>Natively supported</strong> — write <code>expire</code> directly on the annotation</td>
+</tr>
+<tr>
+<td>Two-level cache</td>
+<td>Not supported</td>
+<td><strong>Natively supported</strong> <code>CacheType.BOTH</code> (local + remote)</td>
+</tr>
+<tr>
+<td>Auto cache refresh</td>
+<td>Not supported</td>
+<td><strong>Supported</strong> <code>@CacheRefresh</code> with globally unique distributed refresh</td>
+</tr>
+<tr>
+<td>Penetration protection</td>
+<td>Not supported</td>
+<td><strong>Supported</strong> <code>@CachePenetrationProtect</code></td>
+</tr>
+<tr>
+<td>Distributed lock</td>
+<td>Not supported</td>
+<td><strong>Built-in</strong> <code>tryLock</code> / <code>tryLockAndRun</code></td>
+</tr>
+<tr>
+<td>Async API</td>
+<td>Not supported</td>
+<td><strong>Supported</strong> (truly non-blocking with Lettuce client)</td>
+</tr>
+<tr>
+<td>Stats &amp; monitoring</td>
+<td>Requires third-party</td>
+<td><strong>Built-in</strong> hit rate, load count, and other statistics</td>
+</tr>
+<tr>
+<td>Update/delete cache annotations</td>
+<td>Exists but limited</td>
+<td><code>@CacheUpdate</code> / <code>@CacheInvalidate</code> with SpEL support</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><img data-src="/img/jetcache-final.png" alt="alt text"></p>
+<h1 id="2-Core-Concepts"><a href="#2-Core-Concepts" class="headerlink" title="2. Core Concepts"></a>2. Core Concepts</h1>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/en/2026/06/17/103_JetCache-%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/06/15/102_JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/en/2026/06/15/102_JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/" class="post-title-link" itemprop="url">JD-HotKey User Guide</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-06-15 00:00:00" itemprop="dateCreated datePublished" datetime="2026-06-15T00:00:00+08:00">2026-06-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:15:10" itemprop="dateModified" datetime="2026-09-25T17:15:10+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Middleware/" itemprop="url" rel="index"><span itemprop="name">Middleware</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/06/15/102_JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/06/15/102_JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="1-Component-Overview"><a href="#1-Component-Overview" class="headerlink" title="1. Component Overview"></a>1. Component Overview</h1><p>JD-HotKey is a <strong>real-time hot key detection and caching middleware</strong> open-sourced by JD.com (<a href="https://gitee.com/jd-platform-opensource/hotkey" target="_blank" rel="noopener">source</a>). It does one thing: in high-concurrency scenarios, it <strong>automatically discovers hot keys and pushes them to every application node’s JVM memory within milliseconds</strong>, so hot requests are served directly from local memory instead of hitting Redis or the database.</p>
+<p>Classic scenario: a celebrity suddenly announces something, and a flood of requests hits the related products. You had no way to predict which product ID would go hot. A Redis node gets hammered by these requests and its CPU spikes — this is a textbook <strong>unpredictable burst hot key</strong>.</p>
+<p>That’s where JD-HotKey comes in: it automatically detects these hot spots, mirrors the data into every application server’s local memory, and subsequent requests are served straight from memory — <strong>RT drops from tens of milliseconds to under 1ms</strong>.</p>
+<p>Compared to using a local cache directly (like Caffeine), JD-HotKey’s core advantages:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Caffeine Local Cache</th>
+<th>JD-HotKey</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hot key detection</td>
+<td><strong>Manual configuration</strong> — you need to know which keys to cache upfront</td>
+<td><strong>Automatic detection</strong> — determines hot keys based on real-time access volume</td>
+</tr>
+<tr>
+<td>Dynamism</td>
+<td>Static, stays once configured</td>
+<td><strong>Automatically joins/exits hot status</strong>, releases memory when cold</td>
+</tr>
+<tr>
+<td>Multi-node consistency</td>
+<td>Each node is independent, unaware of others</td>
+<td><strong>Global unified detection</strong>, all nodes synchronize</td>
+</tr>
+<tr>
+<td>Use case</td>
+<td>Known high-frequency data (dictionaries, configs)</td>
+<td><strong>Unpredictable burst hot keys</strong> (flash sales, trending searches)</td>
+</tr>
+<tr>
+<td>Deployment complexity</td>
+<td>Low (pure SDK)</td>
+<td>Medium (requires etcd + worker)</td>
+</tr>
+<tr>
+<td>Hot user / hot endpoint detection</td>
+<td>Not supported</td>
+<td><strong>Supported</strong> (not limited to keys — endpoints and users too)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>In short: <strong>known hot keys are fine with local cache; unpredictable hot keys need JD-HotKey</strong>.</p>
+<h1 id="2-Core-Architecture"><a href="#2-Core-Architecture" class="headerlink" title="2. Core Architecture"></a>2. Core Architecture</h1>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/en/2026/06/15/102_JD-HotKey-%E7%83%AD%E7%82%B9%E6%8E%A2%E6%B5%8B%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C-en/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/05/30/101_multi-agent-communication-deep-dive-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/en/2026/05/30/101_multi-agent-communication-deep-dive-en/" class="post-title-link" itemprop="url">Multi-Agent Communication: A Deep Dive</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-05-30 00:00:00" itemprop="dateCreated datePublished" datetime="2026-05-30T00:00:00+08:00">2026-05-30</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 18:16:47" itemprop="dateModified" datetime="2026-09-25T18:16:47+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/05/30/101_multi-agent-communication-deep-dive-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/05/30/101_multi-agent-communication-deep-dive-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="Background"><a href="#Background" class="headerlink" title="Background"></a>Background</h2><p>When a system evolves from a single Agent to multi-Agent collaboration, communication design becomes the deciding factor between success and failure. Once the system is running, the biggest challenge is no longer individual Agent capability — it’s how efficiently and accurately information flows between Agents. A typical review task passes through an average of 4 Agents in sequence, and any misunderstanding at one stage gets amplified downstream.</p>
+<p>Communication design determines whether a Multi-Agent system collaborates efficiently or works at cross purposes. A single Agent is like a programmer working alone — no matter how skilled, there’s a ceiling. A team of Agents needs a communication protocol: who reports to whom, what format they use, and how failures are handled.</p>
+<p>This article breaks down Multi-Agent communication across three dimensions: topology (who talks to whom), mechanism (how data flows), and protocol (what format they use). Then it analyzes failure modes and cost control strategies from real engineering experience.</p>
+<h2 id=""><a href="#" class="headerlink" title=""></a>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/en/2026/05/30/101_multi-agent-communication-deep-dive-en/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/05/23/100_Flipbook%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90-%E5%BD%93%E6%B5%8F%E8%A7%88%E5%99%A8%E4%B8%8D%E5%86%8D%E9%9C%80%E8%A6%81HTML-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/en/2026/05/23/100_Flipbook%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90-%E5%BD%93%E6%B5%8F%E8%A7%88%E5%99%A8%E4%B8%8D%E5%86%8D%E9%9C%80%E8%A6%81HTML-en/" class="post-title-link" itemprop="url">Flipbook Deep Dive: When Browsers No Longer Need HTML</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-05-23 00:00:00" itemprop="dateCreated datePublished" datetime="2026-05-23T00:00:00+08:00">2026-05-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:17:52" itemprop="dateModified" datetime="2026-09-25T17:17:52+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/05/23/100_Flipbook%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90-%E5%BD%93%E6%B5%8F%E8%A7%88%E5%99%A8%E4%B8%8D%E5%86%8D%E9%9C%80%E8%A6%81HTML-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/05/23/100_Flipbook%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90-%E5%BD%93%E6%B5%8F%E8%A7%88%E5%99%A8%E4%B8%8D%E5%86%8D%E9%9C%80%E8%A6%81HTML-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>Over the past 50 years, human-computer interaction has evolved from CLI to GUI to Web. Shopify CEO Tobi Lütke recently reposted something that drew my attention to an experimental product called <a href="https://flipbook.page/" target="_blank" rel="noopener">flipbook.page</a>. It’s described as “a fully on-demand, real-time-generated infinite visual browser.” The core idea: every page you see is an image generated in real time by AI — no HTML, no CSS, no JavaScript. Everything is pixels.</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/en/2026/05/23/100_Flipbook%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90-%E5%BD%93%E6%B5%8F%E8%A7%88%E5%99%A8%E4%B8%8D%E5%86%8D%E9%9C%80%E8%A6%81HTML-en/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/05/22/099_opencli-deep-analysis-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/en/2026/05/22/099_opencli-deep-analysis-en/" class="post-title-link" itemprop="url">OpenCLI Deep Dive: Letting AI Code Agents Control Any Website</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-05-22 00:00:00" itemprop="dateCreated datePublished" datetime="2026-05-22T00:00:00+08:00">2026-05-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:17:01" itemprop="dateModified" datetime="2026-09-25T17:17:01+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/05/22/099_opencli-deep-analysis-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/05/22/099_opencli-deep-analysis-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="Background"><a href="#Background" class="headerlink" title="Background"></a>Background</h2><p>When I was researching Chrome DevTools MCP previously, the core problem it solved was letting AI control a browser. But that approach had inherent limitations: you had to configure an MCP Server, depend on Chrome’s debug port, and write a separate adapter for each platform.</p>
+<p>OpenCLI reimagines this from scratch, and goes further. It doesn’t just let AI control a browser — it turns any website into a standardized command-line tool. With 22K+ stars on GitHub, it’s clearly hitting a real need.</p>
+<p>This article covers three things: what OpenCLI is, how its architecture is designed, and — the most important part — how to use it within Code Agents like Claude Code.</p>
+<h2 id=""><a href="#" class="headerlink" title=""></a>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/en/2026/05/22/099_opencli-deep-analysis-en/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/05/16/098_trendradar-hot-news-aggregator-guide-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/en/2026/05/16/098_trendradar-hot-news-aggregator-guide-en/" class="post-title-link" itemprop="url">TrendRadar: Stop Doomscrolling, See Only the News You Actually Care About</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-05-16 00:00:00" itemprop="dateCreated datePublished" datetime="2026-05-16T00:00:00+08:00">2026-05-16</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:15:42" itemprop="dateModified" datetime="2026-09-25T17:15:42+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/05/16/098_trendradar-hot-news-aggregator-guide-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/05/16/098_trendradar-hot-news-aggregator-guide-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="Background"><a href="#Background" class="headerlink" title="Background"></a>Background</h2><p>Every day, the routine goes: open your phone, scroll through Weibo trending, Zhihu hot list, Douyin trending, Toutiao — two hours gone, and maybe three to five items were actually useful. The rest is clickbait headlines, marketing fluff, celebrity gossip, and whatever the algorithm decided you might be interested in. Platform algorithms hijack your attention — the content you want to see is buried, and the content you don’t want is inescapable.</p>
+<p>TrendRadar solves exactly this problem: it aggregates trending topics across the entire internet, filters them by keywords you define, pushes updates to your phone on schedule, and can even have AI analyze the trends and sentiment behind the headlines. It shifts you from passively receiving algorithm recommendations to actively consuming what you care about.</p>
+<h2 id=""><a href="#" class="headerlink" title=""></a>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/en/2026/05/16/098_trendradar-hot-news-aggregator-guide-en/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/05/14/097_dram-nand-flash-deep-analysis-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/en/2026/05/14/097_dram-nand-flash-deep-analysis-en/" class="post-title-link" itemprop="url">The Storage Chip Duo: A Complete Analysis of DRAM and NAND Flash</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-05-14 00:00:00" itemprop="dateCreated datePublished" datetime="2026-05-14T00:00:00+08:00">2026-05-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:14:29" itemprop="dateModified" datetime="2026-09-25T17:14:29+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Storage-Chips/" itemprop="url" rel="index"><span itemprop="name">Storage Chips</span></a>
+                </span>
+            </span>
+
+          
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/05/14/097_dram-nand-flash-deep-analysis-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/05/14/097_dram-nand-flash-deep-analysis-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="Background"><a href="#Background" class="headerlink" title="Background"></a>Background</h2><p>Several major events in the storage chip industry in 2026 are worth paying attention to: Samsung’s market cap hit a new high, with HBM orders booked through next year; SK Hynix’s stock price surged as it became NVIDIA’s largest HBM supplier; Micron announced mass production of HBM3e; and CXMT (ChangXin Memory Technologies) closed a successful funding round, marking another breakthrough for China’s DRAM industry. Behind these headlines — memory sticks, SSDs, HBM — all trace back to two fundamental technology families: DRAM and NAND Flash.</p>
+<p>Understanding the difference and relationship between these two makes all of those news stories click into place.</p>
+<h2 id=""><a href="#" class="headerlink" title=""></a>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/en/2026/05/14/097_dram-nand-flash-deep-analysis-en/#more" rel="contents">
                 Read more &raquo;
               </a>
             </div>
@@ -418,6 +1390,9 @@
   </div>
 
   
+  <nav class="pagination">
+    <span class="page-number current">1</span><a class="page-number" href="/en/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/en/page/11/">11</a><a class="extend next" rel="next" href="/en/page/2/"><i class="fa fa-angle-right" aria-label="Next page"></i></a>
+  </nav>
 
 
 
@@ -484,20 +1459,20 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">109</span>
+          <span class="site-state-item-count">209</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-count">27</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">69</span>
+        <span class="site-state-item-count">88</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="“I’m 50th in line, but someone 200th got their ticket first — how?” This question has puzzled countless ticket buyers. The answer lies in the underlying design of the 12306 backup system: seat reuse,">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Deep Dive into 12306&#39;s Backup Ticket Queue System Design">
+<meta property="og:url" content="https://donehub.github.io/en/2024/05/03/044_12306-backup-queue-system-design-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="“I’m 50th in line, but someone 200th got their ticket first — how?” This question has puzzled countless ticket buyers. The answer lies in the underlying design of the 12306 backup system: seat reuse,">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2024-05-02T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T10:18:11.823Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="高并发系统设计">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2024/05/03/044_12306-backup-queue-system-design-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>Deep Dive into 12306's Backup Ticket Queue System Design | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2024/05/03/044_12306-backup-queue-system-design-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Deep Dive into 12306's Backup Ticket Queue System Design
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2024-05-03 00:00:00" itemprop="dateCreated datePublished" datetime="2024-05-03T00:00:00+08:00">2024-05-03</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 18:18:11" itemprop="dateModified" datetime="2026-09-25T18:18:11+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">系统架构</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2024/05/03/044_12306-backup-queue-system-design-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2024/05/03/044_12306-backup-queue-system-design-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>“I’m 50th in line, but someone 200th got their ticket first — how?” This question has puzzled countless ticket buyers. The answer lies in the underlying design of the 12306 backup system: seat reuse, per-interval independent queuing, and event-driven matching. This article breaks down this world-class high-concurrency system across five dimensions — not just what it does, but why it works this way.</p>
+</blockquote>
+<hr>
+<a id="more"></a>
+<h2 id="1-Why-is-12306-So-Hard-to-Build"><a href="#1-Why-is-12306-So-Hard-to-Build" class="headerlink" title="1. Why is 12306 So Hard to Build?"></a>1. Why is 12306 So Hard to Build?</h2><p>Before diving into the design, let’s understand the scale of the problem.</p>
+<h3 id="1-1-Business-Complexity"><a href="#1-1-Business-Complexity" class="headerlink" title="1.1 Business Complexity"></a>1.1 Business Complexity</h3><p>Railway ticketing differs fundamentally from typical e-commerce flash sales:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>E-Commerce Flash Sale</th>
+<th>12306 Ticketing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Product granularity</td>
+<td>SKU level (one phone)</td>
+<td>Interval level (Beijing→Jinan, same seat, different intervals)</td>
+</tr>
+<tr>
+<td>Inventory management</td>
+<td>Just deduct stock</td>
+<td>Overlapping intervals, seat reuse</td>
+</tr>
+<tr>
+<td>Concurrency contention</td>
+<td>Multiple buyers for one SKU</td>
+<td>Multiple overlapping intervals for the same seat</td>
+</tr>
+<tr>
+<td>Order association</td>
+<td>Independent orders</td>
+<td>Linked orders (connecting trips, round trips)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>The core difference</strong>: A single high-speed train from Beijing to Shanghai passes through 10 stations. The same seat can be split into 9 interval segments sold separately. This creates exponential complexity.</p>
+<h3 id="1-2-Scale-Numbers"><a href="#1-2-Scale-Numbers" class="headerlink" title="1.2 Scale Numbers"></a>1.2 Scale Numbers</h3><p>Take the 2024 Spring Festival travel rush as an example:</p>
+<ul>
+<li>Daily page views: <strong>10 billion+</strong></li>
+<li>Peak QPS: <strong>1 million+ per second</strong></li>
+<li>Backup orders: daily peak of <strong>20 million+</strong></li>
+<li>Train data: <strong>5,000+ trains</strong>, each with <strong>500–2,000 seats</strong></li>
+</ul>
+<p>At this scale, any design flaw gets amplified instantly into a system-wide failure.</p>
+<hr>
+<h2 id="2-Core-Foundation-Seat-Reuse"><a href="#2-Core-Foundation-Seat-Reuse" class="headerlink" title="2. Core Foundation: Seat Reuse"></a>2. Core Foundation: Seat Reuse</h2><h3 id="2-1-What-is-Seat-Reuse"><a href="#2-1-What-is-Seat-Reuse" class="headerlink" title="2.1 What is Seat Reuse?"></a>2.1 What is Seat Reuse?</h3><p><strong>Seat reuse</strong> means the same seat can be sold to different passengers in segments, as long as their travel intervals don’t overlap.</p>
+<p>Example:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">Train: G1 Beijing → Qingdao</span><br><span class="line">Stations: Beijing → Tianjin → Jinan → Zibo → Qingdao</span><br><span class="line"></span><br><span class="line">Seat 12A sales:</span><br><span class="line">- Zhang: Beijing → Jinan (occupies Beijing→Tianjin, Tianjin→Jinan)</span><br><span class="line">- Li: Jinan → Qingdao (occupies Jinan→Zibo, Zibo→Qingdao)</span><br><span class="line">- Wang: Tianjin → Zibo (occupies Tianjin→Jinan, Jinan→Zibo)</span><br><span class="line"></span><br><span class="line">Result: Seat 12A is sold to 3 people simultaneously, no conflicts</span><br></pre></td></tr></table></figure>
+<p>This design dramatically improves seat utilization, but the technical implementation gets significantly harder.</p>
+<h3 id="2-2-Implementation-Redis-Bitmap"><a href="#2-2-Implementation-Redis-Bitmap" class="headerlink" title="2.2 Implementation: Redis Bitmap"></a>2.2 Implementation: Redis Bitmap</h3><p>12306 uses <strong>Redis Bitmap</strong> to store the interval occupancy status of each seat.</p>
+<p><strong>Data structure design:</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">Key:   train:&#123;train_id&#125;:&#123;date&#125;:&#123;seat_no&#125;</span><br><span class="line">Value: Bitmap, each bit represents the occupancy of one station interval</span><br><span class="line"></span><br><span class="line">Example:</span><br><span class="line">Train G1, date 2024-01-20, seat 12A</span><br><span class="line">Stations: Beijing(0) → Tianjin(1) → Jinan(2) → Zibo(3) → Qingdao(4)</span><br><span class="line"></span><br><span class="line">Bitmap: 1 1 0 0</span><br><span class="line">         ↑ ↑ ↑ ↑</span><br><span class="line">         │ │ │ └─ Zibo→Qingdao (0&#x3D;available)</span><br><span class="line">         │ │ └─── Jinan→Zibo (0&#x3D;available)  </span><br><span class="line">         │ └───── Tianjin→Jinan (1&#x3D;occupied)</span><br><span class="line">         └─────── Beijing→Tianjin (1&#x3D;occupied)</span><br><span class="line"></span><br><span class="line">Meaning: Beijing→Jinan sold, Jinan→Qingdao available</span><br></pre></td></tr></table></figure>
+<p><strong>Why Bitmap?</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Bitmap</th>
+<th>Traditional (e.g., Hash)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Space</td>
+<td>N stations need only N bits (a few bytes)</td>
+<td>One field per interval (hundreds of bytes)</td>
+</tr>
+<tr>
+<td>Query complexity</td>
+<td>O(1)</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>Interval check</td>
+<td>Bitwise <code>OR</code>, one operation</td>
+<td>Must iterate all intervals</td>
+</tr>
+<tr>
+<td>Use case</td>
+<td>Fixed-length, high-frequency queries</td>
+<td>Flexible but inefficient</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Interval availability check (pseudocode):</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">check_interval_available</span><span class="params">(redis, train_id, date, seat_no, from_station, to_station)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Check if a specific interval is available</span></span><br><span class="line"><span class="string">    from_station: starting station index (e.g., Beijing=0)</span></span><br><span class="line"><span class="string">    to_station: ending station index (e.g., Jinan=2)</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"train:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;seat_no&#125;</span>"</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Check all bits from from_station to to_station-1</span></span><br><span class="line">    <span class="comment"># i.e., interval [from_station, to_station)</span></span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> range(from_station, to_station):</span><br><span class="line">        bit = redis.getbit(key, i)</span><br><span class="line">        <span class="keyword">if</span> bit == <span class="number">1</span>:  <span class="comment"># This interval is already occupied</span></span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">allocate_interval</span><span class="params">(redis, train_id, date, seat_no, from_station, to_station)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Allocate interval: set corresponding bits to 1</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"train:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;seat_no&#125;</span>"</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> range(from_station, to_station):</span><br><span class="line">        redis.setbit(key, i, <span class="number">1</span>)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> <span class="literal">True</span></span><br></pre></td></tr></table></figure>
+<p><strong>A more efficient approach using bitwise operations:</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">check_and_allocate</span><span class="params">(redis, train_id, date, seat_no, from_station, to_station)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Check and allocate interval in one bitwise operation</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"train:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;seat_no&#125;</span>"</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 1. Get current bitmap value (represented as integer)</span></span><br><span class="line">    current = redis.get(key)</span><br><span class="line">    <span class="keyword">if</span> current <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        current = <span class="number">0</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 2. Build interval mask</span></span><br><span class="line">    <span class="comment"># e.g., from=0, to=2, mask is 0b0011 (lower bits = earlier intervals)</span></span><br><span class="line">    mask = (<span class="number">1</span> &lt;&lt; to_station) - (<span class="number">1</span> &lt;&lt; from_station)  <span class="comment"># 0b0011</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 3. Check if interval is already occupied</span></span><br><span class="line">    <span class="keyword">if</span> current &amp; mask != <span class="number">0</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">False</span>  <span class="comment"># Interval is occupied</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 4. Allocate interval (atomic operation, requires Lua script)</span></span><br><span class="line">    <span class="comment"># Lua script ensures atomicity of check + set</span></span><br><span class="line">    lua_script = <span class="string">"""</span></span><br><span class="line"><span class="string">        local current = tonumber(redis.call('GET', KEYS[1])) or 0</span></span><br><span class="line"><span class="string">        local mask = tonumber(ARGV[1])</span></span><br><span class="line"><span class="string">        if (current &amp; mask) == 0 then</span></span><br><span class="line"><span class="string">            redis.call('SET', KEYS[1], current | mask)</span></span><br><span class="line"><span class="string">            return 1</span></span><br><span class="line"><span class="string">        else</span></span><br><span class="line"><span class="string">            return 0</span></span><br><span class="line"><span class="string">        end</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    result = redis.eval(lua_script, <span class="number">1</span>, key, mask)</span><br><span class="line">    <span class="keyword">return</span> result == <span class="number">1</span></span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="3-Distributed-Queuing-Mechanism"><a href="#3-Distributed-Queuing-Mechanism" class="headerlink" title="3. Distributed Queuing Mechanism"></a>3. Distributed Queuing Mechanism</h2><h3 id="3-1-Core-Design-Per-Interval-Independent-Queuing"><a href="#3-1-Core-Design-Per-Interval-Independent-Queuing" class="headerlink" title="3.1 Core Design: Per-Interval Independent Queuing"></a>3.1 Core Design: Per-Interval Independent Queuing</h3><p>Many people assume the backup queue is one big line for the entire train. It’s not.</p>
+<p><strong>12306’s design: each travel interval has its own independent queue.</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">Backup queues for Train G1 (Beijing → Qingdao):</span><br><span class="line"></span><br><span class="line">Queue 1: Beijing → Tianjin (85 people in line)</span><br><span class="line">Queue 2: Beijing → Jinan (320 people in line)</span><br><span class="line">Queue 3: Tianjin → Jinan (56 people in line)</span><br><span class="line">Queue 4: Jinan → Qingdao (198 people in line)</span><br><span class="line">Queue 5: Beijing → Qingdao (1,275 people in line)</span><br><span class="line">...</span><br><span class="line"></span><br><span class="line">Each interval has its own Sorted Set</span><br></pre></td></tr></table></figure>
+<p><strong>Why queue by interval?</strong></p>
+<ol>
+<li><strong>Fairness</strong>: Beijing→Tianjin and Beijing→Qingdao aren’t the same tickets at all — mixing them in one queue makes no sense</li>
+<li><strong>Parallel processing</strong>: Different interval queues can be processed concurrently, increasing throughput</li>
+<li><strong>Precise matching</strong>: When a seat is released, the system locates the exact queue directly — no iteration needed</li>
+</ol>
+<p><strong>This answers a common question</strong>:</p>
+<blockquote>
+<p>Why am I 50th in line but someone 200th got their ticket first?</p>
+</blockquote>
+<p>Because you’re not in the same queue. They queued for Tianjin→Jinan; you queued for Beijing→Jinan.</p>
+<h3 id="3-2-Implementation-Redis-Sorted-Set"><a href="#3-2-Implementation-Redis-Sorted-Set" class="headerlink" title="3.2 Implementation: Redis Sorted Set"></a>3.2 Implementation: Redis Sorted Set</h3><p><strong>Data structure design:</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">Key:   backup:&#123;train_id&#125;:&#123;date&#125;:&#123;from_station&#125;:&#123;to_station&#125;</span><br><span class="line">Value: Sorted set storing backup order IDs</span><br><span class="line">Score: Timestamp when user submitted the backup request (lower &#x3D; earlier)</span><br><span class="line"></span><br><span class="line">Example:</span><br><span class="line">backup:G1:20240120:beijing:jinan</span><br><span class="line">  ├─ order_001 (score: 1705678901) ← 1st</span><br><span class="line">  ├─ order_002 (score: 1705678905) ← 2nd</span><br><span class="line">  ├─ order_003 (score: 1705678912) ← 3rd</span><br><span class="line">  └─ ...</span><br></pre></td></tr></table></figure>
+<p><strong>Core operations:</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> time</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add_to_backup_queue</span><span class="params">(redis, train_id, date, from_station, to_station, order_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Join backup queue (ZADD)</span></span><br><span class="line"><span class="string">    Timestamp as Score naturally implements first-come-first-served</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span></span><br><span class="line">    score = int(time.time() * <span class="number">1000</span>)  <span class="comment"># Millisecond timestamp for precise ordering</span></span><br><span class="line">    </span><br><span class="line">    redis.zadd(key, &#123;order_id: score&#125;)</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_queue_position</span><span class="params">(redis, train_id, date, from_station, to_station, order_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Query queue position (ZRANK)</span></span><br><span class="line"><span class="string">    Returns current position (0-based, +1 for actual rank)</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span></span><br><span class="line">    rank = redis.zrank(key, order_id)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> rank <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>  <span class="comment"># Not in queue</span></span><br><span class="line">    <span class="keyword">return</span> rank + <span class="number">1</span>  <span class="comment"># Actual rank (1-based)</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_top_n_from_queue</span><span class="params">(redis, train_id, date, from_station, to_station, n=<span class="number">10</span>)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Get top N from queue (ZRANGE)</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span></span><br><span class="line">    <span class="keyword">return</span> redis.zrange(key, <span class="number">0</span>, n - <span class="number">1</span>)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">remove_from_queue</span><span class="params">(redis, train_id, date, from_station, to_station, order_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Remove from queue on success or cancellation (ZREM)</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    key = <span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span></span><br><span class="line">    redis.zrem(key, order_id)</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">True</span></span><br></pre></td></tr></table></figure>
+<p><strong>Performance analysis:</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Complexity</th>
+<th>Time for million-level queue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ZADD (join queue)</td>
+<td>O(log N)</td>
+<td>~21 comparisons, microsecond-level</td>
+</tr>
+<tr>
+<td>ZRANK (query rank)</td>
+<td>O(log N)</td>
+<td>Microsecond-level</td>
+</tr>
+<tr>
+<td>ZRANGE (get top N)</td>
+<td>O(log N + M)</td>
+<td>M = number retrieved, millisecond-level</td>
+</tr>
+<tr>
+<td>ZREM (leave queue)</td>
+<td>O(log N)</td>
+<td>Microsecond-level</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Sorted Set is a natural fit for queuing — it stays efficient even with millions of entries.</p>
+<h3 id="3-3-Data-Persistence-MySQL-Sharding"><a href="#3-3-Data-Persistence-MySQL-Sharding" class="headerlink" title="3.3 Data Persistence: MySQL Sharding"></a>3.3 Data Persistence: MySQL Sharding</h3><p>Redis is an in-memory database; a crash could lose data. Backup orders must be persisted to MySQL.</p>
+<p><strong>Sharding strategy:</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">Database shard key: user_id % 16 (16 databases by user)</span><br><span class="line">Table shard key: order_id % 128 (128 tables per database)</span><br><span class="line"></span><br><span class="line">Table structure:</span><br><span class="line">CREATE TABLE backup_order_00 (</span><br><span class="line">    order_id BIGINT PRIMARY KEY,</span><br><span class="line">    user_id BIGINT NOT NULL,</span><br><span class="line">    train_id VARCHAR(20) NOT NULL,</span><br><span class="line">    travel_date DATE NOT NULL,</span><br><span class="line">    from_station VARCHAR(20) NOT NULL,</span><br><span class="line">    to_station VARCHAR(20) NOT NULL,</span><br><span class="line">    seat_type TINYINT NOT NULL,      -- Seat type: business&#x2F;first&#x2F;second</span><br><span class="line">    status TINYINT DEFAULT 0,         -- Status: queuing&#x2F;fulfilled&#x2F;cancelled</span><br><span class="line">    queue_position INT,              -- Redundant storage of queue position</span><br><span class="line">    create_time DATETIME,</span><br><span class="line">    update_time DATETIME,</span><br><span class="line">    </span><br><span class="line">    INDEX idx_train_date (train_id, travel_date, from_station, to_station)</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+<p><strong>How do Redis and MySQL stay consistent?</strong></p>
+<p>This is a classic distributed consistency problem, covered in detail later.</p>
+<hr>
+<h2 id="4-Event-Driven-Where-Do-Backup-Tickets-Come-From"><a href="#4-Event-Driven-Where-Do-Backup-Tickets-Come-From" class="headerlink" title="4. Event-Driven: Where Do Backup Tickets Come From?"></a>4. Event-Driven: Where Do Backup Tickets Come From?</h2><p>Backup tickets don’t appear from nowhere — they all come from system events.</p>
+<h3 id="4-1-Four-Ticket-Sources"><a href="#4-1-Four-Ticket-Sources" class="headerlink" title="4.1 Four Ticket Sources"></a>4.1 Four Ticket Sources</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Trigger event</th>
+<th>Latency</th>
+<th>Share (estimated)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>User refunds</td>
+<td>User voluntarily cancels</td>
+<td>Seconds</td>
+<td>40%</td>
+</tr>
+<tr>
+<td>Order timeout</td>
+<td>30 minutes without payment after purchase</td>
+<td>Seconds</td>
+<td>35%</td>
+</tr>
+<tr>
+<td>Reschedule release</td>
+<td>User switches to another train</td>
+<td>Seconds</td>
+<td>15%</td>
+</tr>
+<tr>
+<td>Dynamic addition</td>
+<td>12306 officially adds carriages</td>
+<td>Minutes</td>
+<td>10%</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="4-2-Event-Driven-Architecture"><a href="#4-2-Event-Driven-Architecture" class="headerlink" title="4.2 Event-Driven Architecture"></a>4.2 Event-Driven Architecture</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">┌──────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                         Event Sources                            │</span><br><span class="line">├──────────┬──────────┬──────────┬─────────────────────────────────┤</span><br><span class="line">│ Refund   │ Timeout  │ Resched. │ Extra seats (scheduled task)    │</span><br><span class="line">└────┬─────┴────┬─────┴────┬─────┴─────────────┬───────────────────┘</span><br><span class="line">     │          │          │                   │</span><br><span class="line">     ▼          ▼          ▼                   ▼</span><br><span class="line">┌──────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    Message Queue (Kafka&#x2F;RocketMQ)                │</span><br><span class="line">│                                                                  │</span><br><span class="line">│  Topic: ticket-released                                         │</span><br><span class="line">│  Partition: by train_id, ensuring sequential processing per train│</span><br><span class="line">└───────────────────────────┬──────────────────────────────────────┘</span><br><span class="line">                            │</span><br><span class="line">                            ▼</span><br><span class="line">┌──────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                    Backup Matching Service                       │</span><br><span class="line">│                                                                  │</span><br><span class="line">│  1. Consume released seat event                                 │</span><br><span class="line">│  2. Query backup queue for the interval (Redis Sorted Set)      │</span><br><span class="line">│  3. Take the first person in queue                              │</span><br><span class="line">│  4. Execute fulfillment process                                 │</span><br><span class="line">└──────────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p><strong>Event message structure:</strong></p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"event_id"</span>: <span class="string">"evt_20240120_123456"</span>,</span><br><span class="line">  <span class="attr">"event_type"</span>: <span class="string">"REFUND"</span>,  <span class="comment">// REFUND / TIMEOUT / RESCHEDULE / EXTRA_SEAT</span></span><br><span class="line">  <span class="attr">"train_id"</span>: <span class="string">"G1"</span>,</span><br><span class="line">  <span class="attr">"travel_date"</span>: <span class="string">"2024-01-20"</span>,</span><br><span class="line">  <span class="attr">"seat_no"</span>: <span class="string">"12A"</span>,</span><br><span class="line">  <span class="attr">"from_station"</span>: <span class="string">"beijing"</span>,</span><br><span class="line">  <span class="attr">"to_station"</span>: <span class="string">"jinan"</span>,</span><br><span class="line">  <span class="attr">"seat_type"</span>: <span class="number">2</span>,  <span class="comment">// Second class</span></span><br><span class="line">  <span class="attr">"release_time"</span>: <span class="number">1705678901234</span>,</span><br><span class="line">  <span class="attr">"trace_id"</span>: <span class="string">"trace_abc123"</span>  <span class="comment">// Distributed tracing</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="4-3-Backup-Matching-Flow"><a href="#4-3-Backup-Matching-Flow" class="headerlink" title="4.3 Backup Matching Flow"></a>4.3 Backup Matching Flow</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">Seat release event triggered:</span><br><span class="line"></span><br><span class="line">Step 1: Parse event, determine released interval</span><br><span class="line">        train_id&#x3D;G1, date&#x3D;20240120, seat&#x3D;12A, from&#x3D;beijing, to&#x3D;jinan</span><br><span class="line"></span><br><span class="line">Step 2: Compute all atomic intervals covered</span><br><span class="line">        Beijing→Jinan &#x3D; [Beijing→Tianjin, Tianjin→Jinan]</span><br><span class="line"></span><br><span class="line">Step 3: Query backup queues for these intervals</span><br><span class="line">        - Queue A: Beijing→Tianjin (85 people)</span><br><span class="line">        - Queue B: Tianjin→Jinan (56 people)</span><br><span class="line">        - Queue C: Beijing→Jinan (320 people) ← Exact match, process first</span><br><span class="line"></span><br><span class="line">Step 4: Try to match Queue C&#39;s first person</span><br><span class="line">        - Check if seat 12A meets the user&#39;s needs (seat type, availability)</span><br><span class="line">        - Meets → execute fulfillment</span><br><span class="line">        - Doesn&#39;t meet → try Queue C&#39;s second person</span><br><span class="line"></span><br><span class="line">Step 5: If Queue C has no match, try other queues</span><br><span class="line">        - Does Queue A + Queue B have the same seat?</span><br><span class="line">        - This involves cross-interval matching, detailed later</span><br></pre></td></tr></table></figure>
+<h3 id="4-4-Complete-Fulfillment-Flow"><a href="#4-4-Complete-Fulfillment-Flow" class="headerlink" title="4.4 Complete Fulfillment Flow"></a>4.4 Complete Fulfillment Flow</h3><p>After a seat is released, the system must execute an atomic process to complete fulfillment:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br></pre></td><td class="code"><pre><span class="line">┌──────────────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                        Complete Fulfillment Flow                         │</span><br><span class="line">├──────────────────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                                          │</span><br><span class="line">│  ┌─────────────┐                                                        │</span><br><span class="line">│  │ Seat release │                                                        │</span><br><span class="line">│  │   event      │                                                        │</span><br><span class="line">│  └──────┬──────┘                                                        │</span><br><span class="line">│         │                                                                │</span><br><span class="line">│         ▼                                                                │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐│</span><br><span class="line">│  │ Step 1: Query backup queue                                          ││</span><br><span class="line">│  │                                                                     ││</span><br><span class="line">│  │  redis.zrange(&quot;backup:G1:20240120:beijing:jinan&quot;, 0, 0)           ││</span><br><span class="line">│  │  → Get first user_id in queue                                       ││</span><br><span class="line">│  └──────────────────────────────┬──────────────────────────────────────┘│</span><br><span class="line">│                                 │                                        │</span><br><span class="line">│                                 ▼                                        │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐│</span><br><span class="line">│  │ Step 2: Acquire distributed lock                                    ││</span><br><span class="line">│  │                                                                     ││</span><br><span class="line">│  │  lock_keys &#x3D; [&quot;lock:G1:20240120:12A:beijing:tianjin&quot;,              ││</span><br><span class="line">│  │               &quot;lock:G1:20240120:12A:tianjin:jinan&quot;]                 ││</span><br><span class="line">│  │  redis.set(lock_key, user_id, nx&#x3D;True, px&#x3D;5000)                    ││</span><br><span class="line">│  │  → Lock all atomic intervals to prevent overselling                 ││</span><br><span class="line">│  └──────────────────────────────┬──────────────────────────────────────┘│</span><br><span class="line">│                                 │                                        │</span><br><span class="line">│                                 ▼                                        │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐│</span><br><span class="line">│  │ Step 3: Check seat availability (double-check)                      ││</span><br><span class="line">│  │                                                                     ││</span><br><span class="line">│  │  bitmap_key &#x3D; &quot;train:G1:20240120:12A&quot;                              ││</span><br><span class="line">│  │  check_interval_available(bitmap_key, beijing, jinan)              ││</span><br><span class="line">│  │  → Confirm seat is truly available                                  ││</span><br><span class="line">│  └──────────────────────────────┬──────────────────────────────────────┘│</span><br><span class="line">│                                 │                                        │</span><br><span class="line">│                                 ▼                                        │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐│</span><br><span class="line">│  │ Step 4: MySQL local transaction (atomic)                            ││</span><br><span class="line">│  │                                                                     ││</span><br><span class="line">│  │  BEGIN TRANSACTION;                                                ││</span><br><span class="line">│  │    -- 4.1 Mark seat as occupied                                    ││</span><br><span class="line">│  │    UPDATE seat SET status&#x3D;&#39;OCCUPIED&#39; WHERE ...;                    ││</span><br><span class="line">│  │    -- 4.2 Create order                                             ││</span><br><span class="line">│  │    INSERT INTO ticket_order (...) VALUES (...);                    ││</span><br><span class="line">│  │    -- 4.3 Update backup status                                     ││</span><br><span class="line">│  │    UPDATE backup_order SET status&#x3D;&#39;FULFILLED&#39; WHERE ...;           ││</span><br><span class="line">│  │    -- 4.4 Write operation log (for async Redis sync)               ││</span><br><span class="line">│  │    INSERT INTO backup_operation_log (...) VALUES (...);            ││</span><br><span class="line">│  │  COMMIT;                                                            ││</span><br><span class="line">│  └──────────────────────────────┬──────────────────────────────────────┘│</span><br><span class="line">│                                 │                                        │</span><br><span class="line">│                                 ▼                                        │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐│</span><br><span class="line">│  │ Step 5: Async update Redis                                          ││</span><br><span class="line">│  │                                                                     ││</span><br><span class="line">│  │  -- 5.1 Update seat Bitmap                                          ││</span><br><span class="line">│  │  redis.setbit(&quot;train:G1:20240120:12A&quot;, beijing_idx, 1)            ││</span><br><span class="line">│  │  redis.setbit(&quot;train:G1:20240120:12A&quot;, tianjin_idx, 1)            ││</span><br><span class="line">│  │  -- 5.2 Remove from backup queue                                    ││</span><br><span class="line">│  │  redis.zrem(&quot;backup:G1:20240120:beijing:jinan&quot;, user_id)          ││</span><br><span class="line">│  │  -- 5.3 Release distributed lock                                    ││</span><br><span class="line">│  │  redis.del(lock_keys)                                              ││</span><br><span class="line">│  └──────────────────────────────┬──────────────────────────────────────┘│</span><br><span class="line">│                                 │                                        │</span><br><span class="line">│                                 ▼                                        │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐│</span><br><span class="line">│  │ Step 6: Post-processing                                             ││</span><br><span class="line">│  │                                                                     ││</span><br><span class="line">│  │  -- 6.1 Freeze prepayment (call payment service)                    ││</span><br><span class="line">│  │  -- 6.2 Send SMS notification (call notification service)           ││</span><br><span class="line">│  │  -- 6.3 Update operation log status                                 ││</span><br><span class="line">│  └─────────────────────────────────────────────────────────────────────┘│</span><br><span class="line">│                                                                          │</span><br><span class="line">└──────────────────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p><strong>Key points at each step:</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Key point</th>
+<th>Failure handling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Acquire lock</td>
+<td>Acquire in lexicographic order to prevent deadlock</td>
+<td>Failed → seat taken, skip</td>
+</tr>
+<tr>
+<td>Double-check</td>
+<td>Re-check after locking to prevent concurrent bypass</td>
+<td>Unavailable → release lock, try next user</td>
+</tr>
+<tr>
+<td>MySQL transaction</td>
+<td>Local transaction ensures atomicity</td>
+<td>Failed → release lock, rollback, try next</td>
+</tr>
+<tr>
+<td>Async Redis update</td>
+<td>Operation log ensures eventual consistency</td>
+<td>Failed → scheduled task compensates</td>
+</tr>
+<tr>
+<td>Post-processing</td>
+<td>Async, doesn’t block main flow</td>
+<td>Failed → retry or alert for manual handling</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="5-High-Concurrency-Architecture-Design"><a href="#5-High-Concurrency-Architecture-Design" class="headerlink" title="5. High-Concurrency Architecture Design"></a>5. High-Concurrency Architecture Design</h2><h3 id="5-1-Four-Layer-Defense-Architecture"><a href="#5-1-Four-Layer-Defense-Architecture" class="headerlink" title="5.1 Four-Layer Defense Architecture"></a>5.1 Four-Layer Defense Architecture</h3><p>From user request to data persistence, 12306 builds a four-layer defense system, reducing pressure at each level:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                        User Request                             │</span><br><span class="line">└─────────────────────────────┬───────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">                              ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                 Layer 1: Gateway Rate Limiting                  │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  Token bucket: limits per-IP, per-user request frequency       │</span><br><span class="line">│  Anti-abuse: detects abnormal request patterns                 │</span><br><span class="line">│  Purpose: block malicious traffic, protect backend services    │</span><br><span class="line">└─────────────────────────────┬───────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">                              ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                 Layer 2: Application Local Cache                │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  Tech: Caffeine &#x2F; Guava Cache                                  │</span><br><span class="line">│  Cached content:                                                │</span><br><span class="line">│    - Queue length for popular routes (&quot;what&#39;s my position?&quot;)   │</span><br><span class="line">│    - Seat overview for popular trains                          │</span><br><span class="line">│    - TTL: 5-10 seconds (tolerate brief inconsistency)          │</span><br><span class="line">│  Effect: intercepts 60%+ of queries, reduces Redis pressure   │</span><br><span class="line">└─────────────────────────────┬───────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">                              ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                 Layer 3: Redis Cluster Cache                    │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  Deployment: master-replica + sentinel for HA                   │</span><br><span class="line">│  Stores:                                                        │</span><br><span class="line">│    - Seat Bitmap (real-time status)                             │</span><br><span class="line">│    - Backup Sorted Set (queue data)                             │</span><br><span class="line">│    - Distributed locks (concurrency control)                    │</span><br><span class="line">│  Performance: 100K+ QPS per node, all in-memory               │</span><br><span class="line">└─────────────────────────────┬───────────────────────────────────┘</span><br><span class="line">                              │</span><br><span class="line">                              ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                 Layer 4: MySQL Sharding                         │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  Stores: order persistence, user data, backup records          │</span><br><span class="line">│  Sharding: by user_id for databases, by order_id for tables    │</span><br><span class="line">│  Purpose: data safety net, fallback when Redis is down         │</span><br><span class="line">└─────────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p><strong>Why four layers?</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Core role</th>
+<th>If missing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Gateway rate limiting</td>
+<td>Block malicious traffic</td>
+<td>Backend gets overwhelmed, legitimate users can’t access</td>
+</tr>
+<tr>
+<td>Local cache</td>
+<td>Intercept high-frequency queries</td>
+<td>Redis gets crushed by read requests</td>
+</tr>
+<tr>
+<td>Redis cache</td>
+<td>Handle core reads/writes</td>
+<td>MySQL gets hammered by high-frequency queries</td>
+</tr>
+<tr>
+<td>MySQL persistence</td>
+<td>Data safety net</td>
+<td>Data loss when Redis fails</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="5-2-Rate-Limiting-and-Degradation"><a href="#5-2-Rate-Limiting-and-Degradation" class="headerlink" title="5.2 Rate Limiting and Degradation"></a>5.2 Rate Limiting and Degradation</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Rate limiting</th>
+<th>Degradation</th>
+<th>User experience</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Normal peak</td>
+<td>Token bucket at 100K QPS</td>
+<td>None</td>
+<td>Normal service</td>
+</tr>
+<tr>
+<td>Extreme peak</td>
+<td>Sliding window</td>
+<td>Queue wait</td>
+<td>“System busy, please retry”</td>
+</tr>
+<tr>
+<td>Redis failure</td>
+<td>Circuit break</td>
+<td>Reads go to MySQL, writes go to MQ</td>
+<td>Backup delayed, position unqueryable</td>
+</tr>
+<tr>
+<td>MySQL failure</td>
+<td>Circuit break</td>
+<td>Pause orders, read-only</td>
+<td>“System under maintenance”</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="6-Technical-Deep-Dives"><a href="#6-Technical-Deep-Dives" class="headerlink" title="6. Technical Deep Dives"></a>6. Technical Deep Dives</h2><p>The core design was covered above. What keeps the system rock-solid, though, is the meticulous handling of details.</p>
+<h3 id="6-1-Challenge-1-Distributed-Consistency"><a href="#6-1-Challenge-1-Distributed-Consistency" class="headerlink" title="6.1 Challenge 1: Distributed Consistency"></a>6.1 Challenge 1: Distributed Consistency</h3><p><strong>Problem</strong>: How do you keep the Redis queue and MySQL orders in sync?</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">Scenario: User cancels backup</span><br><span class="line"></span><br><span class="line">Approach 1: Update MySQL first, then delete Redis</span><br><span class="line">  1. MySQL DELETE succeeds</span><br><span class="line">  2. Redis ZREM fails (network blip)</span><br><span class="line">  → Result: No order in MySQL, still queuing in Redis — &quot;ghost queue&quot;</span><br><span class="line"></span><br><span class="line">Approach 2: Delete Redis first, then update MySQL</span><br><span class="line">  1. Redis ZREM succeeds</span><br><span class="line">  2. MySQL DELETE fails</span><br><span class="line">  → Result: Redis deleted, MySQL still has it — user can&#39;t recover their spot</span><br></pre></td></tr></table></figure>
+<p><strong>Solution</strong>: Local message table + eventual consistency</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- Backup operation log table (same database as business tables, uses local transaction)</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> backup_operation_log (</span><br><span class="line">    log_id <span class="built_in">BIGINT</span> PRIMARY <span class="keyword">KEY</span> AUTO_INCREMENT,</span><br><span class="line">    order_id <span class="built_in">BIGINT</span> <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    operation_type <span class="built_in">VARCHAR</span>(<span class="number">20</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,  <span class="comment">-- ADD / CANCEL / FULFILL</span></span><br><span class="line">    redis_status <span class="built_in">TINYINT</span> <span class="keyword">DEFAULT</span> <span class="number">0</span>,        <span class="comment">-- 0=pending 1=success 2=failed</span></span><br><span class="line">    mysql_status <span class="built_in">TINYINT</span> <span class="keyword">DEFAULT</span> <span class="number">0</span>,       <span class="comment">-- 0=pending 1=success 2=failed</span></span><br><span class="line">    retry_count <span class="built_in">INT</span> <span class="keyword">DEFAULT</span> <span class="number">0</span>,</span><br><span class="line">    create_time DATETIME,</span><br><span class="line">    update_time DATETIME,</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">INDEX</span> idx_status (redis_status, mysql_status)</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+<p><strong>Operation flow:</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">cancel_backup_order</span><span class="params">(order_id)</span>:</span></span><br><span class="line">    <span class="string">"""Cancel backup order (ensures eventual consistency)"""</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 1: Local transaction — write operation log + update order status</span></span><br><span class="line">    <span class="keyword">with</span> db.transaction():</span><br><span class="line">        <span class="comment"># Mark order as "cancelling"</span></span><br><span class="line">        db.execute(<span class="string">"UPDATE backup_order SET status = 'CANCELING' WHERE order_id = ?"</span>, order_id)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># Write operation log</span></span><br><span class="line">        log_id = db.execute(<span class="string">"""</span></span><br><span class="line"><span class="string">            INSERT INTO backup_operation_log </span></span><br><span class="line"><span class="string">            (order_id, operation_type, redis_status, mysql_status) </span></span><br><span class="line"><span class="string">            VALUES (?, 'CANCEL', 0, 0)</span></span><br><span class="line"><span class="string">        """</span>, order_id)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 2: Async process Redis operation</span></span><br><span class="line">    mq.send(<span class="string">'backup_operation'</span>, &#123;<span class="string">'log_id'</span>: log_id, <span class="string">'order_id'</span>: order_id, <span class="string">'type'</span>: <span class="string">'CANCEL'</span>&#125;)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">process_cancel_message</span><span class="params">(message)</span>:</span></span><br><span class="line">    <span class="string">"""Process cancellation message"""</span></span><br><span class="line">    log_id = message[<span class="string">'log_id'</span>]</span><br><span class="line">    order_id = message[<span class="string">'order_id'</span>]</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        <span class="comment"># Step 3: Remove from Redis queue</span></span><br><span class="line">        redis.zrem(<span class="string">f"backup:<span class="subst">&#123;train&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;<span class="keyword">from</span>&#125;</span>:<span class="subst">&#123;to&#125;</span>"</span>, order_id)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># Step 4: Update MySQL order status</span></span><br><span class="line">        db.execute(<span class="string">"UPDATE backup_order SET status = 'CANCELED' WHERE order_id = ?"</span>, order_id)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># Step 5: Update operation log</span></span><br><span class="line">        db.execute(<span class="string">"UPDATE backup_operation_log SET redis_status=1, mysql_status=1 WHERE log_id=?"</span>, log_id)</span><br><span class="line">        </span><br><span class="line">    <span class="keyword">except</span> Exception <span class="keyword">as</span> e:</span><br><span class="line">        <span class="comment"># Retry on failure, alert after 3 attempts</span></span><br><span class="line">        retry_count = db.query(<span class="string">"SELECT retry_count FROM backup_operation_log WHERE log_id=?"</span>, log_id)</span><br><span class="line">        <span class="keyword">if</span> retry_count &lt; <span class="number">3</span>:</span><br><span class="line">            db.execute(<span class="string">"UPDATE backup_operation_log SET retry_count = retry_count + 1 WHERE log_id=?"</span>, log_id)</span><br><span class="line">            mq.send(<span class="string">'backup_operation'</span>, message, delay=<span class="number">60</span>)  <span class="comment"># Retry after 60 seconds</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            alert(<span class="string">f"Backup cancellation failed, log_id=<span class="subst">&#123;log_id&#125;</span>, error=<span class="subst">&#123;e&#125;</span>"</span>)</span><br></pre></td></tr></table></figure>
+<p><strong>Scheduled reconciliation task:</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">reconcile_backup_data</span><span class="params">()</span>:</span></span><br><span class="line">    <span class="string">"""Reconcile every hour to ensure Redis and MySQL are consistent"""</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 1: Scan all backup queues</span></span><br><span class="line">    all_queues = redis.keys(<span class="string">"backup:*"</span>)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> queue_key <span class="keyword">in</span> all_queues:</span><br><span class="line">        order_ids = redis.zrange(queue_key, <span class="number">0</span>, <span class="number">-1</span>)</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">for</span> order_id <span class="keyword">in</span> order_ids:</span><br><span class="line">            <span class="comment"># Step 2: Check if order exists in MySQL</span></span><br><span class="line">            order = db.query(<span class="string">"SELECT * FROM backup_order WHERE order_id = ?"</span>, order_id)</span><br><span class="line">            </span><br><span class="line">            <span class="keyword">if</span> <span class="keyword">not</span> order <span class="keyword">or</span> order.status == <span class="string">'CANCELED'</span>:</span><br><span class="line">                <span class="comment"># Step 3: Exists in Redis but not in MySQL (or cancelled) — clean up Redis</span></span><br><span class="line">                redis.zrem(queue_key, order_id)</span><br><span class="line">                log.info(<span class="string">f"Cleaned ghost queue entry: <span class="subst">&#123;order_id&#125;</span>"</span>)</span><br></pre></td></tr></table></figure>
+<hr>
+<h3 id="6-2-Challenge-2-Concurrent-Contention-and-Overselling"><a href="#6-2-Challenge-2-Concurrent-Contention-and-Overselling" class="headerlink" title="6.2 Challenge 2: Concurrent Contention and Overselling"></a>6.2 Challenge 2: Concurrent Contention and Overselling</h3><p><strong>Problem</strong>: When the same seat is released, how do multiple interval queues compete for it?</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">Scenario:</span><br><span class="line">Train G1, seat 12A</span><br><span class="line">Zhang cancels: Beijing → Jinan</span><br><span class="line"></span><br><span class="line">Released intervals: Beijing→Tianjin, Tianjin→Jinan</span><br><span class="line"></span><br><span class="line">Existing backup queues:</span><br><span class="line">- Queue A: Beijing→Tianjin (100 people)</span><br><span class="line">- Queue B: Tianjin→Jinan (80 people)</span><br><span class="line">- Queue C: Beijing→Jinan (200 people)</span><br><span class="line"></span><br><span class="line">Without concurrency control:</span><br><span class="line">1. Queue A assigns 12A to user X (Beijing→Tianjin)</span><br><span class="line">2. Queue C assigns 12A to user Y (Beijing→Jinan)</span><br><span class="line">→ X and Y&#39;s intervals overlap — oversold!</span><br></pre></td></tr></table></figure>
+<p><strong>Solution</strong>: Distributed locks + interval locking</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">allocate_seat_to_backup</span><span class="params">(train_id, date, seat_no, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Allocate seat to backup user</span></span><br><span class="line"><span class="string">    Core idea: lock all involved atomic intervals to prevent concurrent overselling</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 1: Get all atomic intervals for this range (adjacent station pairs)</span></span><br><span class="line">    atomic_intervals = get_atomic_intervals(train_id, from_station, to_station)</span><br><span class="line">    <span class="comment"># e.g., Beijing→Jinan = [(Beijing, Tianjin), (Tianjin, Jinan)]</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 2: Generate lock keys (sorted lexicographically to prevent deadlock)</span></span><br><span class="line">    lock_keys = sorted([</span><br><span class="line">        <span class="string">f"lock:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;seat_no&#125;</span>:<span class="subst">&#123;f&#125;</span>:<span class="subst">&#123;t&#125;</span>"</span></span><br><span class="line">        <span class="keyword">for</span> f, t <span class="keyword">in</span> atomic_intervals</span><br><span class="line">    ])</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 3: Try to acquire all locks (SET NX PX with timeout)</span></span><br><span class="line">    lock_acquired = []</span><br><span class="line">    <span class="keyword">for</span> key <span class="keyword">in</span> lock_keys:</span><br><span class="line">        success = redis.set(key, user_id, nx=<span class="literal">True</span>, px=<span class="number">5000</span>)  <span class="comment"># 5 second timeout</span></span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> success:</span><br><span class="line">            <span class="comment"># Failed to acquire — release already acquired locks</span></span><br><span class="line">            <span class="keyword">for</span> acquired_key <span class="keyword">in</span> lock_acquired:</span><br><span class="line">                redis.delete(acquired_key)</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span>, <span class="string">"Seat is occupied"</span></span><br><span class="line">        lock_acquired.append(key)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        <span class="comment"># Step 4: Double-check seat availability</span></span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> check_seat_available(train_id, date, seat_no, from_station, to_station):</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span>, <span class="string">"Seat unavailable"</span></span><br><span class="line">        </span><br><span class="line">        <span class="comment"># Step 5: Execute fulfillment</span></span><br><span class="line">        <span class="comment"># 5.1 Mark seat as occupied</span></span><br><span class="line">        mark_seat_occupied(train_id, date, seat_no, from_station, to_station, user_id)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 5.2 Create order (MySQL local transaction)</span></span><br><span class="line">        order_id = create_ticket_order(user_id, train_id, date, seat_no, from_station, to_station)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 5.3 Freeze prepayment</span></span><br><span class="line">        freeze_payment(user_id, order_id)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 5.4 Remove from backup queue</span></span><br><span class="line">        redis.zrem(<span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span>, user_id)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 5.5 Send notification</span></span><br><span class="line">        send_notification(user_id, <span class="string">f"Backup successful! Order: <span class="subst">&#123;order_id&#125;</span>"</span>)</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">return</span> <span class="literal">True</span>, order_id</span><br><span class="line">        </span><br><span class="line">    <span class="keyword">finally</span>:</span><br><span class="line">        <span class="comment"># Step 6: Release locks</span></span><br><span class="line">        <span class="keyword">for</span> key <span class="keyword">in</span> lock_acquired:</span><br><span class="line">            <span class="comment"># Use Lua script to ensure only releasing locks you own</span></span><br><span class="line">            redis.eval(<span class="string">"""</span></span><br><span class="line"><span class="string">                if redis.call("GET", KEYS[1]) == ARGV[1] then</span></span><br><span class="line"><span class="string">                    return redis.call("DEL", KEYS[1])</span></span><br><span class="line"><span class="string">                else</span></span><br><span class="line"><span class="string">                    return 0</span></span><br><span class="line"><span class="string">                end</span></span><br><span class="line"><span class="string">            """</span>, <span class="number">1</span>, key, user_id)</span><br></pre></td></tr></table></figure>
+<p><strong>Key points:</strong></p>
+<ol>
+<li><strong>Lock granularity</strong>: Lock at the “atomic interval” level (between adjacent stations), not the entire seat</li>
+<li><strong>Lock ordering</strong>: Acquire locks in lexicographic order to prevent deadlock (A waits for B, B waits for A)</li>
+<li><strong>Double-check</strong>: Re-check availability after acquiring the lock to prevent concurrent bypass</li>
+<li><strong>Atomic release</strong>: Use Lua scripts to ensure you only release locks you own</li>
+</ol>
+<hr>
+<h3 id="6-3-Challenge-3-Cross-Interval-Matching"><a href="#6-3-Challenge-3-Cross-Interval-Matching" class="headerlink" title="6.3 Challenge 3: Cross-Interval Matching"></a>6.3 Challenge 3: Cross-Interval Matching</h3><p><strong>Problem</strong>: User backs up a “long interval,” but only “short intervals” are released — how to match?</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">Scenario:</span><br><span class="line">User backup: Beijing → Qingdao (full route)</span><br><span class="line"></span><br><span class="line">Current releases:</span><br><span class="line">- Zhang cancels: Beijing → Tianjin (first segment only)</span><br><span class="line">- Li cancels: Tianjin → Jinan (second segment only)</span><br><span class="line">- Wang cancels: Jinan → Qingdao (last two segments)</span><br><span class="line"></span><br><span class="line">Can these match?</span><br><span class="line">- If all three release simultaneously, they could be combined for the user</span><br><span class="line">- In reality, cancellations are discrete events — hard to assemble all intervals</span><br></pre></td></tr></table></figure>
+<p><strong>Approach 1</strong>: No cross-interval matching (simple, 12306’s current approach)</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">Rules:</span><br><span class="line">- User backing up Beijing→Qingdao needs a complete Beijing→Qingdao interval to be free</span><br><span class="line">- Cannot be assembled from Beijing→Tianjin + Tianjin→Qingdao</span><br><span class="line"></span><br><span class="line">Pros:</span><br><span class="line">- Simple implementation, clear logic</span><br><span class="line">- Avoids complex cross-interval lock contention</span><br><span class="line"></span><br><span class="line">Cons:</span><br><span class="line">- Slightly worse user experience — users need to back up in segments</span><br><span class="line">- Lower ticket utilization</span><br></pre></td></tr></table></figure>
+<p><strong>Approach 2</strong>: Smart cross-interval matching (complex, better experience)</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">smart_match_backup</span><span class="params">(train_id, date, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Smart matching: try to combine multiple short intervals to satisfy a long interval</span></span><br><span class="line"><span class="string">    Core logic: iterate all seats, find one that's free across all intervals</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 1: Get all atomic intervals</span></span><br><span class="line">    atomic_intervals = get_atomic_intervals(train_id, from_station, to_station)</span><br><span class="line">    <span class="comment"># e.g., Beijing→Qingdao = [Beijing→Tianjin, Tianjin→Jinan, Jinan→Zibo, Zibo→Qingdao]</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 2: Get all seats for this train</span></span><br><span class="line">    all_seats = get_all_seats(train_id, date, seat_type)</span><br><span class="line">    <span class="comment"># e.g., ['12A', '12B', '12C', '13A', '13B', ...]</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 3: Check each seat for availability across all intervals</span></span><br><span class="line">    <span class="keyword">for</span> seat_no <span class="keyword">in</span> all_seats:</span><br><span class="line">        bitmap_key = <span class="string">f"train:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;seat_no&#125;</span>"</span></span><br><span class="line">        </span><br><span class="line">        <span class="comment"># Check if this seat is free in all atomic intervals</span></span><br><span class="line">        all_available = <span class="literal">True</span></span><br><span class="line">        <span class="keyword">for</span> i, (f, t) <span class="keyword">in</span> enumerate(atomic_intervals):</span><br><span class="line">            station_idx = get_station_index(f)</span><br><span class="line">            bit = redis.getbit(bitmap_key, station_idx)</span><br><span class="line">            <span class="keyword">if</span> bit == <span class="number">1</span>:  <span class="comment"># This interval is occupied</span></span><br><span class="line">                all_available = <span class="literal">False</span></span><br><span class="line">                <span class="keyword">break</span></span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span> all_available:</span><br><span class="line">            <span class="comment"># Found a seat free across all intervals</span></span><br><span class="line">            <span class="keyword">return</span> seat_no</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Step 4: No complete match found</span></span><br><span class="line">    <span class="comment"># Optional: record missing intervals, wait for future releases</span></span><br><span class="line">    <span class="keyword">return</span> <span class="literal">None</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">on_seat_released</span><span class="params">(train_id, date, seat_no, from_station, to_station)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Triggered by seat release event</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Query all potentially matching backup queues</span></span><br><span class="line">    <span class="comment"># Includes: exact match + users waiting for cross-interval match</span></span><br><span class="line">    related_queues = find_related_backup_queues(train_id, date, from_station, to_station)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> queue_key <span class="keyword">in</span> related_queues:</span><br><span class="line">        <span class="comment"># Get top 10 from queue, try to match</span></span><br><span class="line">        candidates = redis.zrange(queue_key, <span class="number">0</span>, <span class="number">9</span>)</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">for</span> user_id <span class="keyword">in</span> candidates:</span><br><span class="line">            <span class="comment"># Get this user's backup request</span></span><br><span class="line">            request = get_backup_request(user_id)</span><br><span class="line">            </span><br><span class="line">            <span class="comment"># Try to match a seat for this user</span></span><br><span class="line">            seat = smart_match_backup(</span><br><span class="line">                train_id, date, </span><br><span class="line">                request.from_station, request.to_station, </span><br><span class="line">                user_id</span><br><span class="line">            )</span><br><span class="line">            </span><br><span class="line">            <span class="keyword">if</span> seat:</span><br><span class="line">                allocate_seat(seat, request.from_station, request.to_station, user_id)</span><br><span class="line">                <span class="keyword">break</span>  <span class="comment"># Seat assigned, exit this queue</span></span><br></pre></td></tr></table></figure>
+<p><strong>Challenges of cross-interval matching:</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Challenge</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Complexity spike</td>
+<td>Need to maintain a “missing interval index,” query efficiency drops</td>
+</tr>
+<tr>
+<td>More complex concurrency</td>
+<td>Multiple partially-matching users compete for the same interval</td>
+</tr>
+<tr>
+<td>Unpredictable UX</td>
+<td>With partial matching, users don’t know which queue they’re in</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Practical trade-off</strong>: 12306 currently uses the “no cross-interval matching” strategy, sacrificing some user experience for system simplicity.</p>
+<hr>
+<h3 id="6-4-Challenge-4-Hotspot-Skew"><a href="#6-4-Challenge-4-Hotspot-Skew" class="headerlink" title="6.4 Challenge 4: Hotspot Skew"></a>6.4 Challenge 4: Hotspot Skew</h3><p><strong>Problem</strong>: During Spring Festival rush, a single interval queue can hit millions.</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">Scenario:</span><br><span class="line">Week before Spring Festival, Beijing→Harbin, backup queue has 2 million people</span><br><span class="line"></span><br><span class="line">Sorted Set performance:</span><br><span class="line">- ZADD: O(log N) &#x3D; log(2,000,000) ≈ 21 operations</span><br><span class="line">- ZRANK: O(log N) ≈ 21 operations</span><br><span class="line">- Single operations are microsecond-level — not the problem</span><br><span class="line"></span><br><span class="line">The issue:</span><br><span class="line">1. Frequent ZRANK queries for queue position — hot key</span><br><span class="line">2. Frequent ZRANGE to get queue head — hot key</span><br><span class="line">3. Redis is single-threaded — single key becomes the bottleneck</span><br></pre></td></tr></table></figure>
+<p><strong>Solution</strong>: Sharded queues + virtual queuing</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Approach 1: Queue sharding</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_shard_key</span><span class="params">(train_id, date, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Split one large queue into multiple smaller queues</span></span><br><span class="line"><span class="string">    Shard by user_id, ensuring same user always lands in same shard</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    shard_count = <span class="number">32</span></span><br><span class="line">    shard_id = hash(user_id) % shard_count</span><br><span class="line">    <span class="keyword">return</span> <span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>:shard:<span class="subst">&#123;shard_id&#125;</span>"</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add_to_sharded_queue</span><span class="params">(train_id, date, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""Join sharded queue"""</span></span><br><span class="line">    shard_key = get_shard_key(train_id, date, from_station, to_station, user_id)</span><br><span class="line">    score = int(time.time() * <span class="number">1000</span>)</span><br><span class="line">    redis.zadd(shard_key, &#123;user_id: score&#125;)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_queue_position_sharded</span><span class="params">(train_id, date, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""Query position in sharded queue"""</span></span><br><span class="line">    shard_key = get_shard_key(train_id, date, from_station, to_station, user_id)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Rank within this shard</span></span><br><span class="line">    local_rank = redis.zrank(shard_key, user_id)</span><br><span class="line">    <span class="keyword">if</span> local_rank <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Add completed counts from other shards</span></span><br><span class="line">    total_finished = sum([</span><br><span class="line">        redis.get(<span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>:shard:<span class="subst">&#123;i&#125;</span>:finished"</span>)</span><br><span class="line">        <span class="keyword">for</span> i <span class="keyword">in</span> range(<span class="number">32</span>)</span><br><span class="line">    ])</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Virtual rank (more accurate estimate)</span></span><br><span class="line">    <span class="keyword">return</span> local_rank + total_finished + <span class="number">1</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment"># Approach 2: Virtual queue position</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_virtual_position</span><span class="params">(redis, train_id, date, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Don't return exact rank — return a "virtual position"</span></span><br><span class="line"><span class="string">    Prevents users from seeing "1.5 million in line" and giving up</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    real_rank = get_real_position(redis, train_id, date, from_station, to_station, user_id)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> real_rank &lt;= <span class="number">100</span>:</span><br><span class="line">        <span class="comment"># Top 100: return exact rank</span></span><br><span class="line">        <span class="keyword">return</span> real_rank</span><br><span class="line">    <span class="keyword">elif</span> real_rank &lt;= <span class="number">1000</span>:</span><br><span class="line">        <span class="comment"># 100-1000: show "top 1000"</span></span><br><span class="line">        <span class="keyword">return</span> <span class="string">f"Top 1000"</span></span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="comment"># 1000+: show estimated wait time</span></span><br><span class="line">        avg_fulfill_rate = get_historical_fulfill_rate(train_id, from_station, to_station)</span><br><span class="line">        wait_hours = real_rank / avg_fulfill_rate</span><br><span class="line">        <span class="keyword">return</span> <span class="string">f"Estimated wait: <span class="subst">&#123;wait_hours:<span class="number">.1</span>f&#125;</span> hours"</span></span><br></pre></td></tr></table></figure>
+<p><strong>Local cache optimization:</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Approach 3: Local cache for hot data</span></span><br><span class="line"><span class="keyword">from</span> cachetools <span class="keyword">import</span> TTLCache</span><br><span class="line"></span><br><span class="line"><span class="comment"># Local cache: queue lengths for popular trains</span></span><br><span class="line">queue_length_cache = TTLCache(maxsize=<span class="number">10000</span>, ttl=<span class="number">10</span>)  <span class="comment"># 10 second expiry</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_queue_length</span><span class="params">(train_id, date, from_station, to_station)</span>:</span></span><br><span class="line">    <span class="string">"""Get queue length (prefer local cache)"""</span></span><br><span class="line">    cache_key = <span class="string">f"<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> cache_key <span class="keyword">in</span> queue_length_cache:</span><br><span class="line">        <span class="keyword">return</span> queue_length_cache[cache_key]</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Cache miss — query Redis</span></span><br><span class="line">    length = redis.zcard(<span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span>)</span><br><span class="line">    queue_length_cache[cache_key] = length</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> length</span><br></pre></td></tr></table></figure>
+<hr>
+<h3 id="6-5-Challenge-5-Disaster-Recovery-and-Degradation"><a href="#6-5-Challenge-5-Disaster-Recovery-and-Degradation" class="headerlink" title="6.5 Challenge 5: Disaster Recovery and Degradation"></a>6.5 Challenge 5: Disaster Recovery and Degradation</h3><p><strong>Problem</strong>: How do you keep backup available when Redis fails?</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Failure scenarios:</span><br><span class="line">1. Redis master goes down, sentinel is switching (30 seconds unavailable)</span><br><span class="line">2. Redis cluster network partition — some data unreachable</span><br><span class="line">3. Redis OOM — killed by system OOM Killer</span><br></pre></td></tr></table></figure>
+<p><strong>Multi-level disaster recovery design:</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                        Normal Flow                              │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  User request → Redis Sorted Set queue → Match → Create order  │</span><br><span class="line">│                                                                 │</span><br><span class="line">└───────────────────────────┬─────────────────────────────────────┘</span><br><span class="line">                            │ Redis failure detected</span><br><span class="line">                            ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                       Degraded Flow                             │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  User request → MQ buffer → MySQL records queue → Background   │</span><br><span class="line">│                               task restores when Redis returns  │</span><br><span class="line">│                                                                 │</span><br><span class="line">│  Specific measures:                                             │</span><br><span class="line">│  1. New backup requests write to MQ (Kafka), not Redis         │</span><br><span class="line">│  2. MySQL records backup order (status&#x3D;PENDING)                │</span><br><span class="line">│  3. Background task monitors Redis recovery, syncs MQ → Redis  │</span><br><span class="line">│  4. Queue position query returns &quot;System busy, retry later&quot;    │</span><br><span class="line">│                                                                 │</span><br><span class="line">└─────────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+<p><strong>Degradation code example:</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">add_backup_order_with_fallback</span><span class="params">(train_id, date, from_station, to_station, user_id)</span>:</span></span><br><span class="line">    <span class="string">"""Join backup queue (with fallback)"""</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        <span class="comment"># Try writing to Redis</span></span><br><span class="line">        redis.zadd(<span class="string">f"backup:<span class="subst">&#123;train_id&#125;</span>:<span class="subst">&#123;date&#125;</span>:<span class="subst">&#123;from_station&#125;</span>:<span class="subst">&#123;to_station&#125;</span>"</span>, </span><br><span class="line">                   &#123;user_id: time.time()&#125;)</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">True</span>, <span class="string">"Queued successfully"</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">except</span> RedisError <span class="keyword">as</span> e:</span><br><span class="line">        <span class="comment"># Redis failure — fall back to MQ</span></span><br><span class="line">        log.error(<span class="string">f"Redis failure, falling back to MQ: <span class="subst">&#123;e&#125;</span>"</span>)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># Write to MQ</span></span><br><span class="line">        mq.send(<span class="string">'backup_queue_pending'</span>, &#123;</span><br><span class="line">            <span class="string">'train_id'</span>: train_id,</span><br><span class="line">            <span class="string">'date'</span>: date,</span><br><span class="line">            <span class="string">'from'</span>: from_station,</span><br><span class="line">            <span class="string">'to'</span>: to_station,</span><br><span class="line">            <span class="string">'user_id'</span>: user_id,</span><br><span class="line">            <span class="string">'timestamp'</span>: time.time()</span><br><span class="line">        &#125;)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># Write to MySQL (status=PENDING, awaiting recovery)</span></span><br><span class="line">        db.execute(<span class="string">"""</span></span><br><span class="line"><span class="string">            INSERT INTO backup_order </span></span><br><span class="line"><span class="string">            (user_id, train_id, travel_date, from_station, to_station, status)</span></span><br><span class="line"><span class="string">            VALUES (?, ?, ?, ?, ?, 'PENDING')</span></span><br><span class="line"><span class="string">        """</span>, user_id, train_id, date, from_station, to_station)</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">return</span> <span class="literal">True</span>, <span class="string">"Queued successfully. System busy — position available later"</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">recover_redis_from_mq</span><span class="params">()</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Background task: restore queue data from MQ after Redis recovers</span></span><br><span class="line"><span class="string">    Key: use idempotent operations to prevent duplicate additions</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    messages = mq.consume(<span class="string">'backup_queue_pending'</span>, batch_size=<span class="number">100</span>)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> msg <span class="keyword">in</span> messages:</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            queue_key = <span class="string">f"backup:<span class="subst">&#123;msg[<span class="string">'train_id'</span>]&#125;</span>:<span class="subst">&#123;msg[<span class="string">'date'</span>]&#125;</span>:<span class="subst">&#123;msg[<span class="string">'from'</span>]&#125;</span>:<span class="subst">&#123;msg[<span class="string">'to'</span>]&#125;</span>"</span></span><br><span class="line">            </span><br><span class="line">            <span class="comment"># Idempotency check: verify user isn't already in queue</span></span><br><span class="line">            existing_score = redis.zscore(queue_key, msg[<span class="string">'user_id'</span>])</span><br><span class="line">            <span class="keyword">if</span> existing_score <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span>:</span><br><span class="line">                <span class="comment"># User already in queue — skip (preserve original Score, don't update)</span></span><br><span class="line">                log.info(<span class="string">f"User <span class="subst">&#123;msg[<span class="string">'user_id'</span>]&#125;</span> already in queue, skipping recovery"</span>)</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                <span class="comment"># User not in queue — add them</span></span><br><span class="line">                redis.zadd(queue_key, &#123;msg[<span class="string">'user_id'</span>]: msg[<span class="string">'timestamp'</span>]&#125;)</span><br><span class="line">            </span><br><span class="line">            <span class="comment"># Update MySQL status to QUEUED</span></span><br><span class="line">            db.execute(<span class="string">"""</span></span><br><span class="line"><span class="string">                UPDATE backup_order SET status = 'QUEUED' </span></span><br><span class="line"><span class="string">                WHERE user_id = ? AND train_id = ? AND travel_date = ?</span></span><br><span class="line"><span class="string">            """</span>, msg[<span class="string">'user_id'</span>], msg[<span class="string">'train_id'</span>], msg[<span class="string">'date'</span>])</span><br><span class="line">            </span><br><span class="line">        <span class="keyword">except</span> RedisError <span class="keyword">as</span> e:</span><br><span class="line">            log.error(<span class="string">f"Redis still not recovered, will retry: <span class="subst">&#123;e&#125;</span>"</span>)</span><br><span class="line">            <span class="keyword">break</span>  <span class="comment"># Redis still unavailable — stop and wait for next recovery</span></span><br></pre></td></tr></table></figure>
+<p><strong>Key points in the degradation flow:</strong></p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Key point</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Idempotent recovery</td>
+<td>Check if user is already in queue before adding — avoids duplicates or Score overwrites</td>
+</tr>
+<tr>
+<td>State tracking</td>
+<td>MySQL tracks PENDING→QUEUED status transitions for monitoring</td>
+</tr>
+<tr>
+<td>Batch consumption</td>
+<td>Consume 100 at a time — one failure doesn’t block the entire batch</td>
+</tr>
+<tr>
+<td>Graceful exit</td>
+<td>Break when Redis is still down — unprocessed messages stay in MQ for next recovery</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="7-Summary-and-Reflections"><a href="#7-Summary-and-Reflections" class="headerlink" title="7. Summary and Reflections"></a>7. Summary and Reflections</h2><h3 id="7-1-Design-Essentials-of-the-12306-Backup-System"><a href="#7-1-Design-Essentials-of-the-12306-Backup-System" class="headerlink" title="7.1 Design Essentials of the 12306 Backup System"></a>7.1 Design Essentials of the 12306 Backup System</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Design point</th>
+<th>Core idea</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Seat reuse</td>
+<td>Sell same seat in segments to maximize utilization</td>
+<td>Redis Bitmap</td>
+</tr>
+<tr>
+<td>Distributed queuing</td>
+<td>Per-interval independent queues — fair and precise</td>
+<td>Redis Sorted Set</td>
+</tr>
+<tr>
+<td>Event-driven</td>
+<td>Four ticket sources trigger automatic fulfillment</td>
+<td>Kafka + consumer pattern</td>
+</tr>
+<tr>
+<td>High-concurrency architecture</td>
+<td>Four-layer defense + rate limiting + degradation</td>
+<td>Gateway + Caffeine + Redis + MySQL</td>
+</tr>
+<tr>
+<td>Consistency guarantee</td>
+<td>Local message table + eventual consistency</td>
+<td>MySQL transaction + MQ</td>
+</tr>
+<tr>
+<td>Concurrency control</td>
+<td>Distributed lock + double-check</td>
+<td>Redis SET NX + Lua</td>
+</tr>
+<tr>
+<td>Disaster recovery</td>
+<td>MQ buffering + idempotent recovery</td>
+<td>Kafka + scheduled reconciliation</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="7-2-Why-Official-Backup-Beats-Third-Party-Tools"><a href="#7-2-Why-Official-Backup-Beats-Third-Party-Tools" class="headerlink" title="7.2 Why Official Backup Beats Third-Party Tools"></a>7.2 Why Official Backup Beats Third-Party Tools</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Official backup</th>
+<th>Third-party ticket scalpers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Data source</td>
+<td>Direct access to seat data, no delay</td>
+<td>Polls 12306 API, has latency</td>
+</tr>
+<tr>
+<td>Queue fairness</td>
+<td>Timestamp-sorted, first-come-first-served</td>
+<td>Cannot access real queue data</td>
+</tr>
+<tr>
+<td>Ticket coverage</td>
+<td>All four sources including dynamic additions</td>
+<td>Can only monitor some sources</td>
+</tr>
+<tr>
+<td>System stability</td>
+<td>HA architecture + degradation</td>
+<td>Gets rate-limited and blocked by 12306</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="7-3-Architecture-Principles-Worth-Borrowing"><a href="#7-3-Architecture-Principles-Worth-Borrowing" class="headerlink" title="7.3 Architecture Principles Worth Borrowing"></a>7.3 Architecture Principles Worth Borrowing</h3><ol>
+<li><p><strong>Data structure choice sets the system ceiling</strong>: Bitmap and Sorted Set keep million-level data efficient</p>
+</li>
+<li><p><strong>Divide and conquer solves scale problems</strong>: Independent per-interval queuing breaks the global problem into local ones</p>
+</li>
+<li><p><strong>Event-driven decouples complex logic</strong>: Refunds, timeouts, reschedules, additions — all unified as events</p>
+</li>
+<li><p><strong>Four-layer defense absorbs high concurrency</strong>: Gateway rate limiting → local cache → Redis → MySQL, pressure drops at each level</p>
+</li>
+<li><p><strong>Eventual consistency beats strong consistency</strong>: In distributed systems, eventual consistency is easier to implement and provides better user experience</p>
+</li>
+<li><p><strong>Idempotent design prevents duplicate operations</strong>: Check before adding during degraded recovery to avoid data corruption</p>
+</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/%E9%AB%98%E5%B9%B6%E5%8F%91%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1/" rel="tag"><i class="fa fa-tag"></i> 高并发系统设计</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2023/09/09/043_oracle_sqlloader-en/" rel="prev" title="Introduction to Oracle SQL*Loader and Its Applications">
+      <i class="fa fa-chevron-left"></i> Introduction to Oracle SQL*Loader and Its Applications
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2024/05/28/045_kong-api-gateway-deep-analysis-en/" rel="next" title="Deep Dive into Kong API Gateway">
+      Deep Dive into Kong API Gateway <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-Why-is-12306-So-Hard-to-Build"><span class="nav-number">1.</span> <span class="nav-text">1. Why is 12306 So Hard to Build?</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-Business-Complexity"><span class="nav-number">1.1.</span> <span class="nav-text">1.1 Business Complexity</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-Scale-Numbers"><span class="nav-number">1.2.</span> <span class="nav-text">1.2 Scale Numbers</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-Core-Foundation-Seat-Reuse"><span class="nav-number">2.</span> <span class="nav-text">2. Core Foundation: Seat Reuse</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-What-is-Seat-Reuse"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 What is Seat Reuse?</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-Implementation-Redis-Bitmap"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 Implementation: Redis Bitmap</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-Distributed-Queuing-Mechanism"><span class="nav-number">3.</span> <span class="nav-text">3. Distributed Queuing Mechanism</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-Core-Design-Per-Interval-Independent-Queuing"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 Core Design: Per-Interval Independent Queuing</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-Implementation-Redis-Sorted-Set"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 Implementation: Redis Sorted Set</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-Data-Persistence-MySQL-Sharding"><span class="nav-number">3.3.</span> <span class="nav-text">3.3 Data Persistence: MySQL Sharding</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-Event-Driven-Where-Do-Backup-Tickets-Come-From"><span class="nav-number">4.</span> <span class="nav-text">4. Event-Driven: Where Do Backup Tickets Come From?</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-Four-Ticket-Sources"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 Four Ticket Sources</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-Event-Driven-Architecture"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 Event-Driven Architecture</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-Backup-Matching-Flow"><span class="nav-number">4.3.</span> <span class="nav-text">4.3 Backup Matching Flow</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-Complete-Fulfillment-Flow"><span class="nav-number">4.4.</span> <span class="nav-text">4.4 Complete Fulfillment Flow</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-High-Concurrency-Architecture-Design"><span class="nav-number">5.</span> <span class="nav-text">5. High-Concurrency Architecture Design</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-Four-Layer-Defense-Architecture"><span class="nav-number">5.1.</span> <span class="nav-text">5.1 Four-Layer Defense Architecture</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-Rate-Limiting-and-Degradation"><span class="nav-number">5.2.</span> <span class="nav-text">5.2 Rate Limiting and Degradation</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-Technical-Deep-Dives"><span class="nav-number">6.</span> <span class="nav-text">6. Technical Deep Dives</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-Challenge-1-Distributed-Consistency"><span class="nav-number">6.1.</span> <span class="nav-text">6.1 Challenge 1: Distributed Consistency</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-Challenge-2-Concurrent-Contention-and-Overselling"><span class="nav-number">6.2.</span> <span class="nav-text">6.2 Challenge 2: Concurrent Contention and Overselling</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-Challenge-3-Cross-Interval-Matching"><span class="nav-number">6.3.</span> <span class="nav-text">6.3 Challenge 3: Cross-Interval Matching</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-4-Challenge-4-Hotspot-Skew"><span class="nav-number">6.4.</span> <span class="nav-text">6.4 Challenge 4: Hotspot Skew</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-5-Challenge-5-Disaster-Recovery-and-Degradation"><span class="nav-number">6.5.</span> <span class="nav-text">6.5 Challenge 5: Disaster Recovery and Degradation</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-Summary-and-Reflections"><span class="nav-number">7.</span> <span class="nav-text">7. Summary and Reflections</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-Design-Essentials-of-the-12306-Backup-System"><span class="nav-number">7.1.</span> <span class="nav-text">7.1 Design Essentials of the 12306 Backup System</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-2-Why-Official-Backup-Beats-Third-Party-Tools"><span class="nav-number">7.2.</span> <span class="nav-text">7.2 Why Official Backup Beats Third-Party Tools</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-3-Architecture-Principles-Worth-Borrowing"><span class="nav-number">7.3.</span> <span class="nav-text">7.3 Architecture Principles Worth Borrowing</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2024/05/03/044_12306-backup-queue-system-design-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2024/05/03/044_12306-backup-queue-system-design-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

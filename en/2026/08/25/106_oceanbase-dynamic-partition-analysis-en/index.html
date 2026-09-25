@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="1. Where the Problem StartsAnyone who’s used OceanBase has hit this scenario: tables partitioned by time range require partitions to be created manually in advance. Forget to create a new partition, a">
+<meta property="og:type" content="article">
+<meta property="og:title" content="OceanBase Dynamic Partition Design">
+<meta property="og:url" content="https://donehub.github.io/en/2026/08/25/106_oceanbase-dynamic-partition-analysis-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="1. Where the Problem StartsAnyone who’s used OceanBase has hit this scenario: tables partitioned by time range require partitions to be created manually in advance. Forget to create a new partition, a">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://donehub.github.io/img/oceanbase-dynamic-partition.png">
+<meta property="og:image" content="https://donehub.github.io/img/oceanbase-scheduler.png">
+<meta property="article:published_time" content="2026-08-24T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T10:15:30.322Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="OceanBase">
+<meta property="article:tag" content="Partitioned Tables">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://donehub.github.io/img/oceanbase-dynamic-partition.png">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/08/25/106_oceanbase-dynamic-partition-analysis-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>OceanBase Dynamic Partition Design | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/08/25/106_oceanbase-dynamic-partition-analysis-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          OceanBase Dynamic Partition Design
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-08-25 00:00:00" itemprop="dateCreated datePublished" datetime="2026-08-25T00:00:00+08:00">2026-08-25</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 18:15:30" itemprop="dateModified" datetime="2026-09-25T18:15:30+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Database/" itemprop="url" rel="index"><span itemprop="name">Database</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/08/25/106_oceanbase-dynamic-partition-analysis-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/08/25/106_oceanbase-dynamic-partition-analysis-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="1-Where-the-Problem-Starts"><a href="#1-Where-the-Problem-Starts" class="headerlink" title="1. Where the Problem Starts"></a>1. Where the Problem Starts</h2><p>Anyone who’s used OceanBase has hit this scenario: tables partitioned by time range require partitions to be created manually in advance. Forget to create a new partition, and data writes fail immediately with a “partition not found” error. Create too many partitions upfront, and empty partition metadata becomes a maintenance burden. For tables like logs and order transaction records — data with a clear lifecycle — DBAs also need to periodically clean up expired partitions. One mistake and you risk data loss or production incidents.</p>
+<p>Starting from V4.3.5 BP2, OceanBase introduced dynamic partitioning to completely remove “partition creation and deletion” from the DBA’s daily operations. An important clarification upfront: dynamic partitioning is not an entirely new partition type. It’s an automated management layer on top of RANGE / RANGE COLUMNS partitioning. Understanding its design logic and applicable boundaries is more valuable than just memorizing the syntax.</p>
+<a id="more"></a>
+<h2 id="2-The-Design-Logic-Behind-DYNAMIC-PARTITION-POLICY"><a href="#2-The-Design-Logic-Behind-DYNAMIC-PARTITION-POLICY" class="headerlink" title="2. The Design Logic Behind DYNAMIC_PARTITION_POLICY"></a>2. The Design Logic Behind DYNAMIC_PARTITION_POLICY</h2><p><img data-src="/img/oceanbase-dynamic-partition.png" alt="alt text"></p>
+<p>You declare the partition management strategy via the <code>DYNAMIC_PARTITION_POLICY</code> clause at table creation. Here’s a real passport log table example:</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> api_passport_logs (</span><br><span class="line">    <span class="keyword">id</span> <span class="built_in">BIGINT</span>(<span class="number">20</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</span><br><span class="line">    ltime DATETIME <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">COMMENT</span> <span class="string">'Log time'</span>,</span><br><span class="line">    <span class="comment">-- ... other business fields omitted</span></span><br><span class="line">    create_time DATETIME <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    update_time DATETIME <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">    PRIMARY <span class="keyword">KEY</span> (<span class="keyword">id</span>, ltime)</span><br><span class="line">) <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span> = utf8mb4</span><br><span class="line">DYNAMIC_PARTITION_POLICY (</span><br><span class="line">    <span class="keyword">ENABLE</span> = <span class="literal">true</span>,</span><br><span class="line">    TIME_UNIT = <span class="string">'month'</span>,</span><br><span class="line">    PRECREATE_TIME = <span class="string">'1 month'</span>,</span><br><span class="line">    EXPIRE_TIME = <span class="string">'6 month'</span>,</span><br><span class="line">    <span class="keyword">TIME_ZONE</span> = <span class="string">'+8:00'</span>,</span><br><span class="line">    BIGINT_PRECISION = <span class="string">'none'</span></span><br><span class="line">)</span><br><span class="line"><span class="keyword">PARTITION</span> <span class="keyword">BY</span> <span class="keyword">RANGE</span> <span class="keyword">COLUMNS</span> (ltime) (</span><br><span class="line">    <span class="keyword">PARTITION</span> P202602 <span class="keyword">VALUES</span> <span class="keyword">LESS</span> <span class="keyword">THAN</span> (<span class="string">'2026-03-01 00:00:00'</span>),</span><br><span class="line">    <span class="keyword">PARTITION</span> P202603 <span class="keyword">VALUES</span> <span class="keyword">LESS</span> <span class="keyword">THAN</span> (<span class="string">'2026-04-01 00:00:00'</span>)</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+<p>This CREATE TABLE statement covers all six dynamic partitioning parameters. You only need to manually define the first few partitions — subsequent partitions are created automatically by a background scheduler task, and expired partitions are cleaned up automatically. Note that dynamic partition management doesn’t kick in immediately after table creation. You need to wait for the next scheduled task trigger, or manually call <code>DBMS_PARTITION.MANAGE_DYNAMIC_PARTITION()</code>.</p>
+<h3 id="TIME-UNIT-Choosing-Partition-Granularity"><a href="#TIME-UNIT-Choosing-Partition-Granularity" class="headerlink" title="TIME_UNIT: Choosing Partition Granularity"></a>TIME_UNIT: Choosing Partition Granularity</h3><p>TIME_UNIT determines the time granularity of partitions. Supported values: <code>hour</code>, <code>day</code>, <code>week</code>, <code>month</code>, <code>year</code>. The choice should be based on data growth rate, per-partition data volume, query time ranges, and data retention requirements.</p>
+<p>Taking day granularity as an example: if you write 100 million rows per day and retain 7 days, day partitioning works well — per-partition volume stays manageable, and queries are precise. But if you only write 10 million rows per day and need to retain 10 years, day granularity would generate 3,650 partitions. In that case, month granularity is more appropriate. In OceanBase’s distributed architecture, partitions are the fundamental unit for data distribution, replica replication, and load balancing. Increasing partition count brings overhead in metadata management, scheduling, and load balancing — so avoid finer granularity than you actually need.</p>
+<p>Note that partition key type also constrains TIME_UNIT values. For example, DATE-type partition keys don’t support <code>hour</code> granularity, and YEAR type can only use <code>year</code> granularity. TIME_UNIT doesn’t freely combine with any partition key type.</p>
+<h3 id="PRECREATE-TIME-Coverage-Window-for-Future-Partitions"><a href="#PRECREATE-TIME-Coverage-Window-for-Future-Partitions" class="headerlink" title="PRECREATE_TIME: Coverage Window for Future Partitions"></a>PRECREATE_TIME: Coverage Window for Future Partitions</h3><p>PRECREATE_TIME controls the time coverage range for pre-created partitions. It takes a string with time units (e.g., <code>&#39;1 month&#39;</code>, <code>&#39;7 day&#39;</code>, <code>&#39;2 hour&#39;</code>). Its precise meaning: each time the scheduler runs, it ensures the upper bound of the largest partition exceeds <code>now() + PRECREATE_TIME</code>.</p>
+<p>Taking <code>TIME_UNIT = month</code> and <code>PRECREATE_TIME = &#39;1 month&#39;</code> as an example: the scheduler ensures partitions covering at least one month from now are already created. This isn’t “run ADD PARTITION one month early” — it’s ensuring the future partition coverage window always meets business write requirements. PRECREATE_TIME essentially provides a future partition coverage window for the dynamic partition scheduler. A larger pre-creation window improves tolerance for scheduling delays or consecutive scheduling failures. If future partitions aren’t created in time and business write times exceed the current maximum partition bound, writes will still fail.</p>
+<p>PRECREATE_TIME should be determined based on scheduling cycle, business write patterns, and acceptable pre-created partition count. A single dynamic partition management task creates at most 2,048 partitions. If a long scheduling gap requires creating a large backlog of partitions, multiple task executions may be needed.</p>
+<h3 id="EXPIRE-TIME-Partition-Level-Lifecycle-Management"><a href="#EXPIRE-TIME-Partition-Level-Lifecycle-Management" class="headerlink" title="EXPIRE_TIME: Partition-Level Lifecycle Management"></a>EXPIRE_TIME: Partition-Level Lifecycle Management</h3><p>EXPIRE_TIME defines data retention duration, also taking a string with time units (e.g., <code>&#39;6 month&#39;</code>, <code>&#39;90 day&#39;</code>, <code>&#39;1 year&#39;</code>). Each time the scheduler runs, it drops partitions that satisfy:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Partition upper bound &lt; now() - EXPIRE_TIME</span><br></pre></td></tr></table></figure>
+<p>One critical point: EXPIRE_TIME evaluates whether the entire partition is expired. When expired, the entire partition is DROPped — it doesn’t delete rows individually by time.</p>
+<p>Taking the log table with <code>&#39;6 month&#39;</code> as an example: if the current time is 2026-08-25, the deletion condition is partition upper bound &lt; 2026-02-25. This means partitions with upper bounds before February 25th are dropped entirely. Since we’re partitioning by month, the actual retained data range isn’t precisely 180 days — it’s granular to partition boundaries. Compared to row-by-row DELETE, partition-level DROP avoids scanning and deleting large volumes of historical rows, typically making it more suitable for lifecycle management of large-scale time-series data. However, partition drops can still consume resources (involving data lifecycle processing for corresponding Tablets/replicas) and shouldn’t be treated as a zero-cost operation.</p>
+<p>For tables with audit requirements or data retrieval needs, plan data archiving before EXPIRE_TIME takes effect. If your organization has an approval process for data deletion, you can set EXPIRE_TIME to <code>-1</code> to disable auto-expiry deletion, keeping only the auto-creation capability. But disabling auto-deletion doesn’t mean data is automatically archived — managing expired data still requires DBA planning.</p>
+<h3 id="TIME-ZONE-and-BIGINT-PRECISION"><a href="#TIME-ZONE-and-BIGINT-PRECISION" class="headerlink" title="TIME_ZONE and BIGINT_PRECISION"></a>TIME_ZONE and BIGINT_PRECISION</h3><p>TIME_ZONE specifies the time zone used for dynamic partition current-time calculations and time-type partition key boundary computations. Setting it to <code>&#39;default&#39;</code> uses the tenant time zone; explicitly setting <code>&#39;+8:00&#39;</code> etc. uses the specified offset. For DATETIME/DATE/TIMESTAMP partition keys, it’s recommended to explicitly specify the business-unified time zone to avoid mismatches between business time semantics and partition boundary calculations. Geographic time zone formats like <code>&#39;Asia/Shanghai&#39;</code> are also supported.</p>
+<p>BIGINT_PRECISION applies only to BIGINT-type timestamp partition keys, specifying timestamp precision (supports <code>&#39;none&#39;</code>, <code>&#39;us&#39;</code>, <code>&#39;ms&#39;</code>, <code>&#39;s&#39;</code>). For non-BIGINT partition key types (DATETIME, DATE, TIMESTAMP, YEAR), use <code>&#39;none&#39;</code> or omit the parameter.</p>
+<h2 id="3-Partition-Key-Type-Support"><a href="#3-Partition-Key-Type-Support" class="headerlink" title="3. Partition Key Type Support"></a>3. Partition Key Type Support</h2><p>Dynamic partitioning supports Range and Range Columns partitioning, but with clear restrictions on partition key types:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Partition Method</th>
+<th>Supported Key Types</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Range Columns</td>
+<td>DATE, DATETIME, TIMESTAMP, YEAR, BIGINT (requires BIGINT_PRECISION)</td>
+</tr>
+<tr>
+<td>Range</td>
+<td>YEAR, BIGINT (requires BIGINT_PRECISION)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The most common pattern is Range Columns with DATETIME partition keys — the log table above uses this. If your business uses integer timestamps (e.g., Unix millisecond timestamps), you can use Range with BIGINT_PRECISION for dynamic partitioning.</p>
+<p>Dynamic partitioning operates on first-level partitions. For subpartitioned tables, you can only enable dynamic partition management on first-level partitions — subpartitions cannot be independently managed with dynamic partition lifecycle.</p>
+<h2 id="4-Dynamic-Partitioning-vs-Interval-Partitioning"><a href="#4-Dynamic-Partitioning-vs-Interval-Partitioning" class="headerlink" title="4. Dynamic Partitioning vs. Interval Partitioning"></a>4. Dynamic Partitioning vs. Interval Partitioning</h2><p>OceanBase V4.4.2 introduced INTERVAL partitioning in Oracle compatibility mode. The core mechanism differences:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Dynamic Partitioning</th>
+<th>Interval Partitioning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Creation trigger</td>
+<td>Scheduled task pre-creation</td>
+<td>Data write trigger</td>
+</tr>
+<tr>
+<td>Drop expired partitions</td>
+<td>Supported</td>
+<td>Not supported</td>
+</tr>
+<tr>
+<td>Primary purpose</td>
+<td>Automated lifecycle management</td>
+<td>Auto extension</td>
+</tr>
+<tr>
+<td>Version</td>
+<td>V4.3.5 BP2</td>
+<td>V4.4.2+, Oracle compatibility mode</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The biggest mechanism difference: Interval is triggered by DML, while dynamic partitioning uses proactive background scheduled tasks. They’re different automated partition management mechanisms with different version support, compatibility modes, and partition levels. Choose based on your specific OceanBase version and business requirements.</p>
+<h2 id="5-How-Dynamic-Partitioning-Actually-Runs"><a href="#5-How-Dynamic-Partitioning-Actually-Runs" class="headerlink" title="5. How Dynamic Partitioning Actually Runs"></a>5. How Dynamic Partitioning Actually Runs</h2><p>Dynamic partitioning is a schedule-driven automation mechanism, not a real-time trigger that fires at exact time boundaries. Its operation flow:<br><img data-src="/img/oceanbase-scheduler.png" alt="alt text"></p>
+<p>In V4.3.5, scheduling frequency is determined by TIME_UNIT:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>TIME_UNIT</th>
+<th>Schedule Frequency</th>
+<th>Can Execution Time Be Adjusted</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>hour</td>
+<td>Every hour on the hour</td>
+<td>Cannot be modified</td>
+</tr>
+<tr>
+<td>day / week / month / year</td>
+<td>Once daily, default midnight</td>
+<td>Adjustable via DBMS_SCHEDULER</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Hourly task scheduling times are fixed and cannot be modified. Daily tasks default to midnight execution. For businesses sensitive to DDL/metadata operation timing, you can use <code>DBMS_SCHEDULER</code> to shift daily tasks to off-peak hours.</p>
+<p>OceanBase provides the system package <code>DBMS_PARTITION</code>, where <code>MANAGE_DYNAMIC_PARTITION()</code> can manually trigger a one-time partition management task. This is useful in several scenarios: you’ve modified dynamic partition parameters and need them to take effect immediately; you need to urgently pre-create partitions for a traffic spike; or you want to verify your configuration is correct. After modifying dynamic partition parameters, pre-creation and deletion operations don’t take effect immediately — you must wait for the next schedule or trigger manually. This behavior differs from many DBAs’ expectations — in MySQL, <code>ALTER TABLE ADD PARTITION</code> executes immediately, whereas OceanBase’s dynamic partitioning uses an asynchronous scheduling model.</p>
+<h2 id="6-Parameter-Modification-Boundaries"><a href="#6-Parameter-Modification-Boundaries" class="headerlink" title="6. Parameter Modification Boundaries"></a>6. Parameter Modification Boundaries</h2><p>V4.3.5 BP2 supports online modification of dynamic partition policy parameters via <code>ALTER TABLE ... SET DYNAMIC_PARTITION_POLICY</code>, but not all parameters are modifiable:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Modifiable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ENABLE</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>PRECREATE_TIME</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>EXPIRE_TIME</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>TIME_UNIT</td>
+<td>No</td>
+</tr>
+<tr>
+<td>TIME_ZONE</td>
+<td>No</td>
+</tr>
+<tr>
+<td>BIGINT_PRECISION</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>TIME_UNIT, TIME_ZONE, and BIGINT_PRECISION cannot be changed after table creation. If these are misconfigured, the only fix is to rebuild the table. This means you need to carefully determine partition granularity, time zone, and precision settings at initial table creation.</p>
+<h2 id="7-Dynamic-Partitioning-and-Partition-Splitting"><a href="#7-Dynamic-Partitioning-and-Partition-Splitting" class="headerlink" title="7. Dynamic Partitioning and Partition Splitting"></a>7. Dynamic Partitioning and Partition Splitting</h2><p>OceanBase V4.3.4 introduced automatic partition splitting (experimental in V4.3.4, GA in V4.3.5). It solves the problem of individual partitions growing too large. Auto-splitting uses <code>SIZE</code> to specify the split threshold; if <code>SIZE</code> isn’t specified, it uses the tenant-level <code>auto_split_tablet_size</code>. Currently, auto-splitting primarily targets qualifying Range/Range Columns first-level partitioned primary key tables, with restrictions on primary keys and partition key prefixes.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Problem Solved</th>
+<th>Trigger</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dynamic Partitioning</td>
+<td>Auto scale partition count up/down over time</td>
+<td>Scheduled task</td>
+</tr>
+<tr>
+<td>Partition Splitting</td>
+<td>Individual partition data volume too large</td>
+<td>Data volume reaches SIZE threshold</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The two are complementary: dynamic partitioning manages partition lifecycle (creation and expiry deletion), while partition splitting controls per-partition data scale. But they’re not the same level of capability — confirm each one’s constraints before combining them.</p>
+<h2 id="8-How-to-Verify-Dynamic-Partitioning-in-Production"><a href="#8-How-to-Verify-Dynamic-Partitioning-in-Production" class="headerlink" title="8. How to Verify Dynamic Partitioning in Production"></a>8. How to Verify Dynamic Partitioning in Production</h2><p>After configuring dynamic partitioning, the DBA’s main question: is the scheduler running properly? OceanBase V4.3.5 BP2 provides system views for monitoring:</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span></span><br><span class="line">    TABLE_NAME,</span><br><span class="line">    MAX_HIGH_BOUND_VAL,</span><br><span class="line">    <span class="keyword">ENABLE</span>,</span><br><span class="line">    TIME_UNIT,</span><br><span class="line">    PRECREATE_TIME,</span><br><span class="line">    EXPIRE_TIME,</span><br><span class="line">    <span class="keyword">TIME_ZONE</span></span><br><span class="line"><span class="keyword">FROM</span> oceanbase.DBA_OB_DYNAMIC_PARTITION_TABLES</span><br><span class="line"><span class="keyword">WHERE</span> TABLE_NAME = <span class="string">'api_passport_logs'</span>;</span><br></pre></td></tr></table></figure>
+<p><code>MAX_HIGH_BOUND_VAL</code> is the upper bound of the current maximum partition. The core logic for determining if dynamic partitioning is running correctly:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">MAX_HIGH_BOUND_VAL should be &gt; now() + PRECREATE_TIME</span><br></pre></td></tr></table></figure>
+<p>If this condition isn’t met, the scheduler may not be executing properly, or partition creation encountered errors. First try manually calling <code>DBMS_PARTITION.MANAGE_DYNAMIC_PARTITION()</code> to trigger a scheduling cycle, then observe whether missing partitions get created. If nothing changes after manual trigger, check the cluster’s scheduler task status and logs.</p>
+<h2 id="9-Practical-Selection-Guidance"><a href="#9-Practical-Selection-Guidance" class="headerlink" title="9. Practical Selection Guidance"></a>9. Practical Selection Guidance</h2><p>Dynamic partitioning is best suited for time-series scenarios where data has a clear lifecycle. Here are configuration approaches for typical scenarios — specific parameters need adjustment based on actual business:</p>
+<p>Application log tables. High write volume, data retained 7-30 days, queries primarily time-range based. TIME_UNIT is typically <code>day</code>, PRECREATE_TIME based on scheduling fault tolerance needs (e.g., <code>&#39;7 day&#39;</code>), EXPIRE_TIME based on data retention requirements (e.g., <code>&#39;30 day&#39;</code>).</p>
+<p>Transaction record tables. Large data volume, long retention periods, possible audit requirements. TIME_UNIT is typically <code>month</code> to control partition count. PRECREATE_TIME and EXPIRE_TIME should be determined by business data retention policy and compliance requirements — avoid blindly applying fixed rules of thumb. If the audit department requires approval for data deletion, set EXPIRE_TIME to <code>-1</code> to disable auto-deletion.</p>
+<p>Multi-tenant SaaS platforms. As the number of dynamic partition tables increases, the background partition management tasks face more tables to handle and more DDL management pressure. With many tables, evaluate the scheduler’s capacity and control concurrency through scheduling frequency adjustments or batch management when necessary.</p>
+<h2 id="10-Limitations-to-Be-Aware-Of"><a href="#10-Limitations-to-Be-Aware-Of" class="headerlink" title="10. Limitations to Be Aware Of"></a>10. Limitations to Be Aware Of</h2><p>Automatic partition deletion has no “recycle bin” mechanism — expired partitions are DROPped immediately. In environments with strict data compliance requirements, this behavior needs to be confirmed with business and compliance teams before going live. At minimum, establish a data archiving process to sync data that needs retention to offline storage before partitions are dropped.</p>
+<p>From a version evolution perspective, V4.3.5 BP2 is the first version to support dynamic partitioning, and already supports modifying ENABLE, PRECREATE_TIME, and EXPIRE_TIME via ALTER TABLE. Confirm your target version’s specific capabilities before production deployment.</p>
+<p>Dynamic partitioning essentially automates partition operations and maintenance, but it doesn’t replace partition design itself. Choosing appropriate granularity, setting correct retention periods, and planning archiving workflows — these decisions still require DBAs to make judgment calls based on business characteristics. Tools solve execution problems; decision-making remains a human responsibility.</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/OceanBase/" rel="tag"><i class="fa fa-tag"></i> OceanBase</a>
+              <a href="/tags/Partitioned-Tables/" rel="tag"><i class="fa fa-tag"></i> Partitioned Tables</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/08/14/105_deepseek-harness-deep-analysis-en/" rel="prev" title="DeepSeek Harness Deep Analysis">
+      <i class="fa fa-chevron-left"></i> DeepSeek Harness Deep Analysis
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-Where-the-Problem-Starts"><span class="nav-number">1.</span> <span class="nav-text">1. Where the Problem Starts</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-The-Design-Logic-Behind-DYNAMIC-PARTITION-POLICY"><span class="nav-number">2.</span> <span class="nav-text">2. The Design Logic Behind DYNAMIC_PARTITION_POLICY</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#TIME-UNIT-Choosing-Partition-Granularity"><span class="nav-number">2.1.</span> <span class="nav-text">TIME_UNIT: Choosing Partition Granularity</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#PRECREATE-TIME-Coverage-Window-for-Future-Partitions"><span class="nav-number">2.2.</span> <span class="nav-text">PRECREATE_TIME: Coverage Window for Future Partitions</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#EXPIRE-TIME-Partition-Level-Lifecycle-Management"><span class="nav-number">2.3.</span> <span class="nav-text">EXPIRE_TIME: Partition-Level Lifecycle Management</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#TIME-ZONE-and-BIGINT-PRECISION"><span class="nav-number">2.4.</span> <span class="nav-text">TIME_ZONE and BIGINT_PRECISION</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-Partition-Key-Type-Support"><span class="nav-number">3.</span> <span class="nav-text">3. Partition Key Type Support</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-Dynamic-Partitioning-vs-Interval-Partitioning"><span class="nav-number">4.</span> <span class="nav-text">4. Dynamic Partitioning vs. Interval Partitioning</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-How-Dynamic-Partitioning-Actually-Runs"><span class="nav-number">5.</span> <span class="nav-text">5. How Dynamic Partitioning Actually Runs</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-Parameter-Modification-Boundaries"><span class="nav-number">6.</span> <span class="nav-text">6. Parameter Modification Boundaries</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-Dynamic-Partitioning-and-Partition-Splitting"><span class="nav-number">7.</span> <span class="nav-text">7. Dynamic Partitioning and Partition Splitting</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-How-to-Verify-Dynamic-Partitioning-in-Production"><span class="nav-number">8.</span> <span class="nav-text">8. How to Verify Dynamic Partitioning in Production</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#9-Practical-Selection-Guidance"><span class="nav-number">9.</span> <span class="nav-text">9. Practical Selection Guidance</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#10-Limitations-to-Be-Aware-Of"><span class="nav-number">10.</span> <span class="nav-text">10. Limitations to Be Aware Of</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/08/25/106_oceanbase-dynamic-partition-analysis-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/08/25/106_oceanbase-dynamic-partition-analysis-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="Building a knowledge base Q&amp;A system in an enterprise usually comes with a choice: use standard vector-retrieval RAG, or use Microsoft’s GraphRAG? The two differ significantly in technical approac">
+<meta property="og:type" content="article">
+<meta property="og:title" content="GraphRAG vs Standard RAG — When to Use Each">
+<meta property="og:url" content="https://donehub.github.io/en/2026/03/10/068_graphrag-vs-rag-scenarios-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="Building a knowledge base Q&amp;A system in an enterprise usually comes with a choice: use standard vector-retrieval RAG, or use Microsoft’s GraphRAG? The two differ significantly in technical approac">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-03-09T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T09:25:30.579Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="GraphRAG">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/03/10/068_graphrag-vs-rag-scenarios-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>GraphRAG vs Standard RAG — When to Use Each | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/03/10/068_graphrag-vs-rag-scenarios-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          GraphRAG vs Standard RAG — When to Use Each
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-03-10 00:00:00" itemprop="dateCreated datePublished" datetime="2026-03-10T00:00:00+08:00">2026-03-10</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:25:30" itemprop="dateModified" datetime="2026-09-25T17:25:30+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/03/10/068_graphrag-vs-rag-scenarios-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/03/10/068_graphrag-vs-rag-scenarios-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Building a knowledge base Q&amp;A system in an enterprise usually comes with a choice: use standard vector-retrieval RAG, or use Microsoft’s GraphRAG? The two differ significantly in technical approach and suitable scenarios. Picking the wrong one means either insufficient retrieval accuracy or excessive engineering complexity. This article analyzes the capability boundaries and best-use timing of both approaches from a practical scenario perspective.</p>
+<a id="more"></a>
+<h2 id="What-Standard-RAG-Can-Actually-Do"><a href="#What-Standard-RAG-Can-Actually-Do" class="headerlink" title="What Standard RAG Can Actually Do"></a>What Standard RAG Can Actually Do</h2><p>RAG (Retrieval-Augmented Generation) works like this: split documents into chunks, vector-embed them, store in a vector database; when a user queries, vectorize the query, retrieve the TopK most semantically similar chunks, and feed them to the LLM for answer generation. The mechanism is essentially text-segment similarity matching, and what it does well versus what it can’t do has a very clear boundary.</p>
+<p>Standard RAG excels at single-point factual queries — questions where the complete answer lives inside a single chunk. Things like “what’s the API timeout?”, “what features does the product support?”, “when was GPT-4 released?” — straightforward factual questions. As long as the answer is clearly stated in some chunk, standard RAG can retrieve it accurately. These questions account for over 70% of enterprise knowledge base queries, forming RAG’s most solid base.</p>
+<h2 id="What-It-Genuinely-Cannot-Do"><a href="#What-It-Genuinely-Cannot-Do" class="headerlink" title="What It Genuinely Cannot Do"></a>What It Genuinely Cannot Do</h2><p>Standard RAG’s weakness is that it finds segments but can’t always connect the relationships between them. Consider a real scenario: a user enters a multi-condition query looking for a phone good for video, with decent battery life, and stable user reviews. Standard RAG might retrieve Chunk A “XX phone has a powerful imaging system, outstanding video capability,” Chunk B “XX phone has a 5500mAh battery, excellent battery life,” Chunk C “User review: used for six months, system is stable.” The problem is A, B, and C might come from three different documents describing three different phones. Standard RAG throws all three chunks at the LLM, which then has no idea which phone actually satisfies all three conditions.</p>
+<p>This is standard RAG’s fundamental limitation: its retrieval unit is the text segment, not the entity, and certainly not the relationship. It’s good at “finding similar text,” bad at “finding answers satisfying multiple relational constraints.” This limitation becomes inescapable in four types of scenarios.</p>
+<h2 id="Multi-Dimensional-Correlated-Queries"><a href="#Multi-Dimensional-Correlated-Queries" class="headerlink" title="Multi-Dimensional Correlated Queries"></a>Multi-Dimensional Correlated Queries</h2><p>Multi-dimensional correlated queries aren’t simple multi-condition filtering. Multi-condition filtering is <code>price &lt; 5000 AND brand = Huawei</code> — SQL can handle that. Multi-dimensional correlated queries mean: multiple dimensions have structured relationships between them, requiring navigation and intersection along those relationships.</p>
+<p>Product recommendation systems are a typical scenario. Product knowledge isn’t a flat table — it’s a relationship network: each product connects to brand, price segment, core selling points, target audience, user reputation, and other attribute nodes. When a user asks “any flagship good for video, strong performance, stable reputation?”, standard RAG’s approach is fuzzy matching in text, separately retrieving “strong imaging,” “strong performance,” “good reputation” segments, then letting the LLM guess. GraphRAG builds knowledge into a graph and navigates along relationship edges: find the “imaging flagship” node, “performance flagship” node, “stable user reputation” node, then take the intersection of their connected product entities. This isn’t a semantic similarity problem — it’s a graph traversal problem.</p>
+<p>The root cause is retrieval space mismatch. Standard RAG’s retrieval space is vector space, measuring how similar two text segments are; multi-dimensional correlated queries need relationship space, requiring path-finding along entity relationships. Two completely different spaces — using the wrong tool produces wildly different results.</p>
+<h2 id="Global-Summarization-and-Hidden-Relationship-Discovery"><a href="#Global-Summarization-and-Hidden-Relationship-Discovery" class="headerlink" title="Global Summarization and Hidden Relationship Discovery"></a>Global Summarization and Hidden Relationship Discovery</h2><p>Global summarization questions ask about the whole picture, not a single point. Things like “what are the trends in high-end phones in recent years?”, “what’s the current tech landscape of the AI Agent industry?”, “how are the company’s departments’ businesses connected?” The answers to these questions are scattered across the entire corpus, not in any single chunk. Standard RAG’s TopK most similar chunks tend to be fragmented: Chunk 1 covers imaging, Chunk 2 covers chips, Chunk 3 covers pricing, Chunk 4 covers AI features. The LLM gets these fragments and can only stitch them together, producing an answer that covers everything but offers no insight — reads like a table of contents, not an analysis.</p>
+<p>GraphRAG solves this through community detection and hierarchical summarization. The approach has three steps: first, use a community detection algorithm (like Leiden) to partition the knowledge graph into semantic communities — entities within each community are tightly related, communities are relatively loose from each other; second, generate a local summary for each community; third, aggregate all local summaries into a global view. This hierarchical summarization mechanism is naturally suited for “overall trends” and “industry landscape” questions, because it doesn’t piece together fragments — it starts from structured communities, each with its own theme and insights, and merging them yields the global view.</p>
+<p>Another class of problems standard RAG can’t handle is hidden relationship discovery. Two entities might never be directly stated as related in any text, but their connection can be inferred through intermediate nodes. Product A and Product B might never have been directly compared in any document, but their attributes heavily overlap: both are in the high-end price segment, both target business users, both excel at imaging. In graph structure, Product A and Product B aren’t directly connected, but they share many of the same neighbor nodes — this structural proximity is the hidden relationship. Standard RAG retrieves based on semantic similarity between query and chunks; if no document puts Product A and Product B in the same text passage, there’s no way to discover their connection.</p>
+<p>Business scenarios relying on hidden relationship discovery are actually quite broad. Competitive analysis needs to find products not directly compared but substantially overlapping; risk investigation needs to trace from multiple seemingly unrelated accounts through intermediate nodes to find they share the same controller; drug discovery needs to find two target proteins never mentioned in the same paper but discovered through pathway networks to be in the same signaling pathway. Standard RAG can’t do any of this, because its information unit is the text segment, not the entity relationship graph.</p>
+<h2 id="Cross-Document-Causal-Chain-Tracing"><a href="#Cross-Document-Causal-Chain-Tracing" class="headerlink" title="Cross-Document Causal Chain Tracing"></a>Cross-Document Causal Chain Tracing</h2><p>Some answers require linking multiple pieces of information across documents to derive a root cause. A typical example is “root cause analysis of XX project delay.” The real answer might be scattered across: the requirements document records a major mid-project requirement change, the schedule shows key developers were reassigned to other projects, the dev weekly mentions unexpected issues in API integration testing, QA feedback flags a third-party SDK bug blocking test progress, client communication records show the client added features during acceptance.</p>
+<p>Standard RAG is most likely to retrieve a single segment from some document, like a meeting note: “This meeting confirmed a two-week project delay, mainly due to requirement changes.” Not wrong, but incomplete. The real root cause is the result of multiple compounding factors; looking at only one of them misleads decision-making.</p>
+<p>GraphRAG models people, requirements, tasks, timelines, risks, and dependencies all as graph nodes and edges. Starting from the “project delay” symptom, following relationship edges traces multiple causal paths: requirement changes affected Task A which blocked Task B ultimately causing delay; developer reassignment left Task A understaffed causing delay; SDK bug blocked integration causing delay; client’s new requirements caused rework in acceptance causing delay. This is a multi-path convergence problem on a graph, not something text similarity can solve.</p>
+<h2 id="Why-You-Can’t-Just-Go-All-In-on-GraphRAG"><a href="#Why-You-Can’t-Just-Go-All-In-on-GraphRAG" class="headerlink" title="Why You Can’t Just Go All-In on GraphRAG"></a>Why You Can’t Just Go All-In on GraphRAG</h2><p>After covering what GraphRAG does well, we have to face its engineering cost head-on. GraphRAG’s indexing phase isn’t even in the same order of magnitude as standard RAG.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Standard RAG</th>
+<th>GraphRAG</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Document processing</td>
+<td>Chunk splitting</td>
+<td>Entity extraction + relationship extraction</td>
+</tr>
+<tr>
+<td>Index construction</td>
+<td>Vector embedding</td>
+<td>Graph build + community detection + per-community summarization</td>
+</tr>
+<tr>
+<td>LLM calls</td>
+<td>Low (embedding only)</td>
+<td>Extremely high (extraction and summarization both call LLM)</td>
+</tr>
+<tr>
+<td>Index time</td>
+<td>Minutes</td>
+<td>Hours or even days (depending on corpus size)</td>
+</tr>
+<tr>
+<td>Query latency</td>
+<td>Milliseconds to seconds</td>
+<td>Seconds to tens of seconds (traversal + synthesis)</td>
+</tr>
+<tr>
+<td>Storage cost</td>
+<td>Vector database</td>
+<td>Graph DB + vector DB + summary storage</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>A quantitative example: for a 1-million-token enterprise knowledge base, standard RAG’s indexing cost might be just a few dollars in embedding fees. GraphRAG’s indexing phase (entity extraction, relationship extraction, community summarization) could cost tens or even hundreds of dollars in LLM calls. That’s before counting query-phase costs — each GraphRAG query traverses more nodes, reads more relationships, and synthesizes longer contexts, all token costs.</p>
+<p>If 80%+ of your scenarios are simple factual questions, going with GraphRAG is over-engineering. More expensive, higher latency, and simple question quality might actually be worse.</p>
+<h2 id="Hybrid-Routing-Architecture"><a href="#Hybrid-Routing-Architecture" class="headerlink" title="Hybrid Routing Architecture"></a>Hybrid Routing Architecture</h2><p>People who’ve actually built production systems don’t choose between standard RAG and GraphRAG. The right approach is hybrid routing: route queries to different processing engines based on query type — simple facts go to standard RAG, structured queries go to SQL, relational reasoning and global summarization go to GraphRAG, then unify answer synthesis.</p>
+<p>The Query Router is the heart of hybrid routing, responsible for classifying user questions and routing to the appropriate retrieval engine. There are three implementation approaches, from light to heavy. First is rule-based routing, using keyword and sentence pattern matching — fast and cheap:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">route_query</span><span class="params">(query: str)</span> -&gt; str:</span></span><br><span class="line">    <span class="comment"># Global summarization keywords</span></span><br><span class="line">    summary_keywords = [<span class="string">"trend"</span>, <span class="string">"landscape"</span>, <span class="string">"overall"</span>, <span class="string">"summary"</span>, <span class="string">"overview"</span>, <span class="string">"development"</span>]</span><br><span class="line">    <span class="keyword">if</span> any(kw <span class="keyword">in</span> query <span class="keyword">for</span> kw <span class="keyword">in</span> summary_keywords):</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"graphrag_summary"</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># Structured query keywords</span></span><br><span class="line">    <span class="keyword">if</span> <span class="string">"how many"</span> <span class="keyword">in</span> query <span class="keyword">or</span> <span class="string">"when"</span> <span class="keyword">in</span> query <span class="keyword">or</span> <span class="string">"what is"</span> <span class="keyword">in</span> query:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"normal_rag"</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># Relational reasoning keywords</span></span><br><span class="line">    relation_keywords = [<span class="string">"related"</span>, <span class="string">"impact"</span>, <span class="string">"cause"</span>, <span class="string">"depend"</span>, <span class="string">"shared"</span>]</span><br><span class="line">    <span class="keyword">if</span> any(kw <span class="keyword">in</span> query <span class="keyword">for</span> kw <span class="keyword">in</span> relation_keywords):</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"graphrag_relation"</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="string">"normal_rag"</span>  <span class="comment"># Default to standard RAG</span></span><br></pre></td></tr></table></figure>
+<p>Second is LLM classification routing, using a small model (like GPT-4o-mini) to classify the query — more accurate but with additional latency and cost:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">ROUTER_PROMPT = <span class="string">"""</span></span><br><span class="line"><span class="string">Classify the following user question into one of these types:</span></span><br><span class="line"><span class="string">- factual: simple factual query, answer is in some text passage</span></span><br><span class="line"><span class="string">- sql: can be converted to a structured query</span></span><br><span class="line"><span class="string">- relation: requires cross-entity relationship reasoning</span></span><br><span class="line"><span class="string">- summary: requires global summarization or trend analysis</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">User question: &#123;query&#125;</span></span><br><span class="line"><span class="string">Type:</span></span><br><span class="line"><span class="string">"""</span></span><br></pre></td></tr></table></figure>
+<p>Third is hybrid routing: rules first, fall back to LLM when rules can’t decide, balancing cost and latency.</p>
+<p>The routing strategy’s core principle: default to standard RAG, only route to GraphRAG when clearly needed. Most queries are simple factual questions — GraphRAG should be the special forces, not the regular army. If you reverse this and run everything through GraphRAG, costs go up, latency goes up, and simple question accuracy actually drops because GraphRAG’s longer context and more noise make the LLM more prone to distraction.</p>
+<h2 id="Scenario-to-Tool-Mapping"><a href="#Scenario-to-Tool-Mapping" class="headerlink" title="Scenario-to-Tool Mapping"></a>Scenario-to-Tool Mapping</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Question Type</th>
+<th>Example</th>
+<th>Recommended Tool</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Single-point fact</td>
+<td>“What’s the API timeout?”</td>
+<td>Standard RAG / SQL</td>
+<td>Answer is in a chunk — don’t use a sledgehammer on a nail</td>
+</tr>
+<tr>
+<td>Multi-condition filter</td>
+<td>“Huawei phones under 5000”</td>
+<td>SQL / structured query</td>
+<td>This is a database job</td>
+</tr>
+<tr>
+<td>Multi-entity relationship</td>
+<td>“Flagship good for video with solid reputation”</td>
+<td>GraphRAG</td>
+<td>Needs intersection along relationship edges</td>
+</tr>
+<tr>
+<td>Global trends</td>
+<td>“AI Agent industry landscape”</td>
+<td>GraphRAG</td>
+<td>Needs community summarization</td>
+</tr>
+<tr>
+<td>Hidden relationship discovery</td>
+<td>“Association analysis of two accounts”</td>
+<td>GraphRAG</td>
+<td>Needs graph structure inference</td>
+</tr>
+<tr>
+<td>Cross-document causal tracing</td>
+<td>“Root cause of project delay”</td>
+<td>GraphRAG</td>
+<td>Needs multi-path convergence</td>
+</tr>
+<tr>
+<td>Simple comparison</td>
+<td>“Difference between A and B”</td>
+<td>Standard RAG</td>
+<td>Just concatenate two text segments</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The right approach to technology selection isn’t listing a technology’s advantages. It’s first clearly stating the existing solution’s capability boundaries, then what the new solution fills in, and finally engineering the two together. If you can articulate that selection logic clearly, you’re not chasing hype — you’ve actually built systems, hit the walls, and thought it through.</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/GraphRAG/" rel="tag"><i class="fa fa-tag"></i> GraphRAG</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/02/15/067_superpowers-vs-speckit-guide-en/" rel="prev" title="Superpowers vs SpecKit — A Practical Guide">
+      <i class="fa fa-chevron-left"></i> Superpowers vs SpecKit — A Practical Guide
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2026/03/21/070_llm-function-calling-deep-analysis-en/" rel="next" title="LLM Function Calling — Under the Hood">
+      LLM Function Calling — Under the Hood <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#What-Standard-RAG-Can-Actually-Do"><span class="nav-number">1.</span> <span class="nav-text">What Standard RAG Can Actually Do</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#What-It-Genuinely-Cannot-Do"><span class="nav-number">2.</span> <span class="nav-text">What It Genuinely Cannot Do</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Multi-Dimensional-Correlated-Queries"><span class="nav-number">3.</span> <span class="nav-text">Multi-Dimensional Correlated Queries</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Global-Summarization-and-Hidden-Relationship-Discovery"><span class="nav-number">4.</span> <span class="nav-text">Global Summarization and Hidden Relationship Discovery</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Cross-Document-Causal-Chain-Tracing"><span class="nav-number">5.</span> <span class="nav-text">Cross-Document Causal Chain Tracing</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Why-You-Can’t-Just-Go-All-In-on-GraphRAG"><span class="nav-number">6.</span> <span class="nav-text">Why You Can’t Just Go All-In on GraphRAG</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Hybrid-Routing-Architecture"><span class="nav-number">7.</span> <span class="nav-text">Hybrid Routing Architecture</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Scenario-to-Tool-Mapping"><span class="nav-number">8.</span> <span class="nav-text">Scenario-to-Tool Mapping</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/03/10/068_graphrag-vs-rag-scenarios-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/03/10/068_graphrag-vs-rag-scenarios-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="When building RAG (Retrieval-Augmented Generation) applications, a vector database is the core component you can’t avoid. There are plenty of products on the market (Milvus, Qdrant, Weaviate, Chroma,">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Deep Dive into Vector Databases">
+<meta property="og:url" content="https://donehub.github.io/en/2025/05/19/050_vector-database-deep-analysis-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="When building RAG (Retrieval-Augmented Generation) applications, a vector database is the core component you can’t avoid. There are plenty of products on the market (Milvus, Qdrant, Weaviate, Chroma,">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2025-05-18T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T10:14:56.009Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Vector Database">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2025/05/19/050_vector-database-deep-analysis-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>Deep Dive into Vector Databases | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2025/05/19/050_vector-database-deep-analysis-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Deep Dive into Vector Databases
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2025-05-19 00:00:00" itemprop="dateCreated datePublished" datetime="2025-05-19T00:00:00+08:00">2025-05-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 18:14:56" itemprop="dateModified" datetime="2026-09-25T18:14:56+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2025/05/19/050_vector-database-deep-analysis-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2025/05/19/050_vector-database-deep-analysis-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>When building RAG (Retrieval-Augmented Generation) applications, a vector database is the core component you can’t avoid. There are plenty of products on the market (Milvus, Qdrant, Weaviate, Chroma, Pinecone), and each one claims to be the best. This article goes from底层 principles to practical selection, with a重点 analysis of Chroma and Milvus as representative products, to help you make the right choice for your specific scenario.</p>
+<h2 id=""><a href="#" class="headerlink" title=""></a><a id="more"></a></h2><h2 id="What-Problem-Do-Vector-Databases-Solve"><a href="#What-Problem-Do-Vector-Databases-Solve" class="headerlink" title="What Problem Do Vector Databases Solve?"></a>What Problem Do Vector Databases Solve?</h2><p>Traditional databases excel at exact matching: <code>WHERE name = &#39;Zhang San&#39;</code>. Semantic search is a completely different requirement. A user asks “how to improve team collaboration efficiency” and the system needs to find documents with similar meaning, even if none of those exact keywords appear anywhere in the document. This is where vector databases deliver value: they convert unstructured data like text, images, and audio into vectors in high-dimensional space (strings of floating-point numbers), measure semantic similarity by computing distances between vectors, and retrieve the most semantically close content.</p>
+<p>The process has three steps: raw text is encoded into vectors by an Embedding model and stored in the vector database. At query time, user input is encoded the same way, then the database computes similarity and returns the Top-K closest results.</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Text → Embedding model → Vector [0.12, -0.34, 0.56, ...] → Vector database</span><br><span class="line">Query → Embedding model → Vector [0.15, -0.30, 0.52, ...] → Similarity computation → Top-K results</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="Core-Technical-Metrics"><a href="#Core-Technical-Metrics" class="headerlink" title="Core Technical Metrics"></a>Core Technical Metrics</h2><h3 id="Index-Algorithms-Determine-the-Performance-Ceiling"><a href="#Index-Algorithms-Determine-the-Performance-Ceiling" class="headerlink" title="Index Algorithms Determine the Performance Ceiling"></a>Index Algorithms Determine the Performance Ceiling</h3><p>The index algorithm of a vector database directly determines query speed and recall rate. Here are the characteristics and suitable scenarios for mainstream index types:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Index Type</th>
+<th>Principle</th>
+<th>Query Speed</th>
+<th>Memory Usage</th>
+<th>Suitable Scenario</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FLAT</td>
+<td>Brute-force traversal, exact computation</td>
+<td>Slowest</td>
+<td>Highest</td>
+<td>Small datasets, requires 100% recall</td>
+</tr>
+<tr>
+<td>IVF-FLAT</td>
+<td>Clustering + inverted index</td>
+<td>Medium</td>
+<td>Medium</td>
+<td>Millions-scale, balanced approach</td>
+</tr>
+<tr>
+<td>IVF-PQ</td>
+<td>Clustering + product quantization compression</td>
+<td>Fast</td>
+<td>Low</td>
+<td>Memory-constrained, trades accuracy</td>
+</tr>
+<tr>
+<td>HNSW</td>
+<td>Hierarchical Navigable Small World graph</td>
+<td>Fastest</td>
+<td>Relatively high</td>
+<td>High-performance real-time queries</td>
+</tr>
+<tr>
+<td>DISKANN</td>
+<td>Disk index + SSD optimization</td>
+<td>Slower</td>
+<td>Very low</td>
+<td>Ultra-large scale, cost-sensitive</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>HNSW is the current mainstream choice. It builds a multi-layer graph structure. During search, it quickly jumps to the target area through the sparse top-layer graph, then progressively descends through denser lower layers for precise search — similar in concept to the layered lookup mechanism of a skip list. Building HNSW involves three key parameters: M controls the maximum number of connections per node (default 16) — higher values improve recall but increase memory usage; efConstruction determines the search range during index building (default 200); efSearch dynamically adjusts search width at query time and is the primary knob for balancing recall and latency at runtime.</p>
+<h3 id="Distributed-Architecture-Determines-Scalability"><a href="#Distributed-Architecture-Determines-Scalability" class="headerlink" title="Distributed Architecture Determines Scalability"></a>Distributed Architecture Determines Scalability</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Architecture Type</th>
+<th>Representative Products</th>
+<th>Characteristics</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Single-machine embedded</td>
+<td>Chroma, Faiss</td>
+<td>No deployment cost, limited by data volume</td>
+</tr>
+<tr>
+<td>Single-machine service</td>
+<td>Qdrant standalone</td>
+<td>Independent process, supports persistence</td>
+</tr>
+<tr>
+<td>Distributed cluster</td>
+<td>Milvus, Qdrant cluster</td>
+<td>Horizontal scaling, high availability</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="Metadata-Filtering-Capability"><a href="#Metadata-Filtering-Capability" class="headerlink" title="Metadata Filtering Capability"></a>Metadata Filtering Capability</h3><p>In real business scenarios, vector search often needs to combine conditional filtering — for example, finding similar products where “price is between 100-500 and category is electronics.” The capability differences across databases here are significant:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Database</th>
+<th>Filtering Capability</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qdrant</td>
+<td>Strongest</td>
+<td>Native complex filter support, best performance</td>
+</tr>
+<tr>
+<td>Milvus</td>
+<td>Strong</td>
+<td>Scalar field filtering supported</td>
+</tr>
+<tr>
+<td>Chroma</td>
+<td>Basic</td>
+<td>Simple where conditions</td>
+</tr>
+<tr>
+<td>Pinecone</td>
+<td>Strong</td>
+<td>Metadata namespaces</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="Horizontal-Comparison-of-Mainstream-Vector-Databases"><a href="#Horizontal-Comparison-of-Mainstream-Vector-Databases" class="headerlink" title="Horizontal Comparison of Mainstream Vector Databases"></a>Horizontal Comparison of Mainstream Vector Databases</h2><h3 id="Open-Source-Product-Comparison"><a href="#Open-Source-Product-Comparison" class="headerlink" title="Open-Source Product Comparison"></a>Open-Source Product Comparison</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Database</th>
+<th>Language</th>
+<th>Architecture</th>
+<th>Index Support</th>
+<th>Filtering</th>
+<th>Community Activity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Milvus</td>
+<td>Go</td>
+<td>Distributed</td>
+<td>HNSW/IVF/DISKANN</td>
+<td>Strong</td>
+<td>Active (CNCF project)</td>
+</tr>
+<tr>
+<td>Qdrant</td>
+<td>Rust</td>
+<td>Single/Distributed</td>
+<td>HNSW</td>
+<td>Strongest</td>
+<td>Active</td>
+</tr>
+<tr>
+<td>Weaviate</td>
+<td>Go</td>
+<td>Single/Distributed</td>
+<td>HNSW</td>
+<td>Strong</td>
+<td>Active</td>
+</tr>
+<tr>
+<td>Chroma</td>
+<td>Python</td>
+<td>Embedded</td>
+<td>HNSW</td>
+<td>Basic</td>
+<td>Active</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="Cloud-Service-Comparison"><a href="#Cloud-Service-Comparison" class="headerlink" title="Cloud Service Comparison"></a>Cloud Service Comparison</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Product</th>
+<th>Positioning</th>
+<th>Advantages</th>
+<th>Disadvantages</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pinecone</td>
+<td>Fully managed serverless</td>
+<td>Zero ops, auto-scaling</td>
+<td>Vendor lock-in, uncontrollable costs</td>
+</tr>
+<tr>
+<td>Zilliz Cloud</td>
+<td>Milvus managed edition</td>
+<td>Enterprise support, Milvus API compatible</td>
+<td>Higher price</td>
+</tr>
+<tr>
+<td>MongoDB Atlas Vector</td>
+<td>MongoDB ecosystem</td>
+<td>Reuse existing infrastructure</td>
+<td>Limited vector capabilities</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="Performance-Benchmarks-Million-scale-Vectors-HNSW-Index"><a href="#Performance-Benchmarks-Million-scale-Vectors-HNSW-Index" class="headerlink" title="Performance Benchmarks (Million-scale Vectors, HNSW Index)"></a>Performance Benchmarks (Million-scale Vectors, HNSW Index)</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Database</th>
+<th>QPS</th>
+<th>P99 Latency</th>
+<th>Memory Usage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Milvus</td>
+<td>~15000</td>
+<td>~10ms</td>
+<td>High</td>
+</tr>
+<tr>
+<td>Qdrant</td>
+<td>~12000</td>
+<td>~8ms</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Weaviate</td>
+<td>~8000</td>
+<td>~15ms</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Chroma</td>
+<td>~3000</td>
+<td>~30ms</td>
+<td>Low</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="Chroma-The-Go-To-for-Lightweight-Entry"><a href="#Chroma-The-Go-To-for-Lightweight-Entry" class="headerlink" title="Chroma: The Go-To for Lightweight Entry"></a>Chroma: The Go-To for Lightweight Entry</h2><h3 id="Suitable-Scenarios"><a href="#Suitable-Scenarios" class="headerlink" title="Suitable Scenarios"></a>Suitable Scenarios</h3><p>Chroma’s design philosophy is minimalism: Python-native, embedded execution, and a friendly API. It excels in four scenarios: rapid RAG demo prototyping (runs in a few lines of code), small-scale applications with under 100K documents, local development where data should not leave the machine, and research scenarios for learning vector database fundamentals.</p>
+<h3 id="Core-API"><a href="#Core-API" class="headerlink" title="Core API"></a>Core API</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Chroma's minimalist API design</span></span><br><span class="line"><span class="keyword">import</span> chromadb</span><br><span class="line"></span><br><span class="line"><span class="comment"># Initialize: embedded, no server needed</span></span><br><span class="line">client = chromadb.PersistentClient(path=<span class="string">"./chroma_db"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Create a collection</span></span><br><span class="line">collection = client.create_collection(</span><br><span class="line">    name=<span class="string">"documents"</span>,</span><br><span class="line">    metadata=&#123;<span class="string">"hnsw:space"</span>: <span class="string">"cosine"</span>&#125;  <span class="comment"># Supports l2, ip, cosine</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Add documents: auto-embedding (uses built-in default model)</span></span><br><span class="line">collection.add(</span><br><span class="line">    documents=[<span class="string">"Document content 1"</span>, <span class="string">"Document content 2"</span>],</span><br><span class="line">    ids=[<span class="string">"doc1"</span>, <span class="string">"doc2"</span>]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Query: all in one step</span></span><br><span class="line">results = collection.query(</span><br><span class="line">    query_texts=[<span class="string">"Query content"</span>],</span><br><span class="line">    n_results=<span class="number">5</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>Chroma uses <code>all-MiniLM-L6-v2</code> as the default Embedding model built in, but you can swap it for third-party models like OpenAI or Cohere:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> chromadb.utils <span class="keyword">import</span> embedding_functions</span><br><span class="line"></span><br><span class="line"><span class="comment"># Use OpenAI Embedding</span></span><br><span class="line">openai_ef = embedding_functions.OpenAIEmbeddingFunction(</span><br><span class="line">    api_key=<span class="string">"your-key"</span>,</span><br><span class="line">    model_name=<span class="string">"text-embedding-3-small"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">collection = client.create_collection(</span><br><span class="line">    name=<span class="string">"docs"</span>,</span><br><span class="line">    embedding_function=openai_ef</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<h3 id="Metadata-Filtering"><a href="#Metadata-Filtering" class="headerlink" title="Metadata Filtering"></a>Metadata Filtering</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Add documents with metadata</span></span><br><span class="line">collection.add(</span><br><span class="line">    documents=[<span class="string">"Technical doc"</span>, <span class="string">"Product doc"</span>],</span><br><span class="line">    ids=[<span class="string">"d1"</span>, <span class="string">"d2"</span>],</span><br><span class="line">    metadatas=[</span><br><span class="line">        &#123;<span class="string">"category"</span>: <span class="string">"tech"</span>, <span class="string">"author"</span>: <span class="string">"Zhang San"</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"category"</span>: <span class="string">"product"</span>, <span class="string">"author"</span>: <span class="string">"Li Si"</span>&#125;</span><br><span class="line">    ]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Filter at query time</span></span><br><span class="line">results = collection.query(</span><br><span class="line">    query_texts=[<span class="string">"How to deploy"</span>],</span><br><span class="line">    n_results=<span class="number">5</span>,</span><br><span class="line">    where=&#123;<span class="string">"category"</span>: <span class="string">"tech"</span>&#125;  <span class="comment"># Only search in technical documents</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<h3 id="Limitations"><a href="#Limitations" class="headerlink" title="Limitations"></a>Limitations</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Limitation</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Single-machine architecture</td>
+<td>Cannot scale horizontally, data volume caps around millions</td>
+</tr>
+<tr>
+<td>Single index type</td>
+<td>Only supports HNSW, no switching based on scenario</td>
+</tr>
+<tr>
+<td>Simple filtering</td>
+<td>No complex boolean combinations, mediocre performance</td>
+</tr>
+<tr>
+<td>No distribution</td>
+<td>No replication or sharding, single point of failure risk</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Chroma is the SQLite of vector databases — simple, pleasant to use, ideal for rapid prototyping and small-to-medium applications. Just do not expect it to handle production-grade traffic.</p>
+<hr>
+<h2 id="Milvus-Production-Grade-Large-Scale-First-Choice"><a href="#Milvus-Production-Grade-Large-Scale-First-Choice" class="headerlink" title="Milvus: Production-Grade, Large-Scale First Choice"></a>Milvus: Production-Grade, Large-Scale First Choice</h2><h3 id="Suitable-Scenarios-1"><a href="#Suitable-Scenarios-1" class="headerlink" title="Suitable Scenarios"></a>Suitable Scenarios</h3><p>Milvus is positioned as a cloud-native distributed vector database and is currently a CNCF sandbox project. It fits large-scale production applications (millions to hundreds of millions of vectors), high-concurrency real-time retrieval (low latency, high throughput requirements), complex filtering needs combining scalar fields, and infrastructure environments supporting Kubernetes and multi-cloud deployment.</p>
+<h3 id="Architecture-Breakdown"><a href="#Architecture-Breakdown" class="headerlink" title="Architecture Breakdown"></a>Architecture Breakdown</h3><p>Milvus uses a layered architecture design, from top to bottom: SDK layer, Proxy access layer, Coordination layer, Worker node layer, and underlying Storage.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Component</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SDK Layer</td>
+<td>Python / Go / Java / Node.js / REST</td>
+<td>Client access</td>
+</tr>
+<tr>
+<td>Access Layer</td>
+<td>Proxy</td>
+<td>Request parsing, routing, load balancing</td>
+</tr>
+<tr>
+<td>Coordination Layer</td>
+<td>Root Coord</td>
+<td>Global coordination, handles DDL (create collections, indexes, etc.)</td>
+</tr>
+<tr>
+<td>Coordination Layer</td>
+<td>Query Coord</td>
+<td>Query node scheduling, load balancing</td>
+</tr>
+<tr>
+<td>Coordination Layer</td>
+<td>Data Coord</td>
+<td>Data node scheduling, segment management</td>
+</tr>
+<tr>
+<td>Coordination Layer</td>
+<td>Index Coord</td>
+<td>Index build task scheduling</td>
+</tr>
+<tr>
+<td>Worker Layer</td>
+<td>Query / Data / Index Node</td>
+<td>Execute queries, data writes, index building</td>
+</tr>
+<tr>
+<td>Storage Layer</td>
+<td>etcd + MinIO</td>
+<td>Metadata storage + object storage</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The advantage of this architecture is that components can scale independently. If you need more query capacity, add Query Nodes without expanding Data Nodes or Index Nodes.</p>
+<h3 id="Index-Selection-in-Practice"><a href="#Index-Selection-in-Practice" class="headerlink" title="Index Selection in Practice"></a>Index Selection in Practice</h3><p>Different scales and scenarios call for different index strategies:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Data Scale</th>
+<th>Memory Budget</th>
+<th>Recommended Index</th>
+<th>Parameter Guidance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&lt; 1M</td>
+<td>Ample</td>
+<td>FLAT</td>
+<td>Exact search, 100% recall</td>
+</tr>
+<tr>
+<td>1M-10M</td>
+<td>Ample</td>
+<td>HNSW</td>
+<td>M=16, efConstruction=256</td>
+</tr>
+<tr>
+<td>1M-10M</td>
+<td>Tight</td>
+<td>IVF-FLAT</td>
+<td>nlist=1024</td>
+</tr>
+<tr>
+<td>&gt; 10M</td>
+<td>Tight</td>
+<td>IVF-PQ</td>
+<td>nlist=1024, m=8, nbits=8</td>
+</tr>
+<tr>
+<td>&gt; 100M</td>
+<td>Very tight</td>
+<td>DISKANN</td>
+<td>Disk index, SSD required</td>
+</tr>
+</tbody>
+</table>
+</div>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pymilvus <span class="keyword">import</span> MilvusClient, IndexType, MetricType</span><br><span class="line"></span><br><span class="line"><span class="comment"># Create HNSW index</span></span><br><span class="line">index_params = MilvusClient.prepare_index_params()</span><br><span class="line">index_params.add_index(</span><br><span class="line">    field_name=<span class="string">"vector"</span>,</span><br><span class="line">    index_type=IndexType.HNSW,</span><br><span class="line">    metric_type=MetricType.COSINE,</span><br><span class="line">    params=&#123;<span class="string">"M"</span>: <span class="number">16</span>, <span class="string">"efConstruction"</span>: <span class="number">256</span>&#125;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Search parameters: dynamically adjust ef to improve recall</span></span><br><span class="line">search_params = &#123;<span class="string">"params"</span>: &#123;<span class="string">"ef"</span>: <span class="number">64</span>&#125;&#125;  <span class="comment"># Higher ef = better recall, higher latency</span></span><br></pre></td></tr></table></figure>
+<h3 id="Collection-Design-and-Filtered-Queries"><a href="#Collection-Design-and-Filtered-Queries" class="headerlink" title="Collection Design and Filtered Queries"></a>Collection Design and Filtered Queries</h3><p>When creating a collection, you define the schema for both vector fields and scalar fields. Scalar fields are used for subsequent filtered queries. It is recommended to create separate indexes on frequently filtered scalar fields to speed up queries.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pymilvus <span class="keyword">import</span> MilvusClient</span><br><span class="line"></span><br><span class="line">client = MilvusClient(<span class="string">"http://localhost:19530"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Create collection: vector fields + scalar fields</span></span><br><span class="line">client.create_collection(</span><br><span class="line">    collection_name=<span class="string">"products"</span>,</span><br><span class="line">    dimension=<span class="number">1536</span>,  <span class="comment"># OpenAI text-embedding-3-small dimension</span></span><br><span class="line">    metric_type=<span class="string">"COSINE"</span>,</span><br><span class="line">    auto_id=<span class="literal">False</span>,</span><br><span class="line">    fields=[</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"id"</span>, <span class="string">"dtype"</span>: <span class="string">"VARCHAR"</span>, <span class="string">"max_length"</span>: <span class="number">64</span>, <span class="string">"is_primary"</span>: <span class="literal">True</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"vector"</span>, <span class="string">"dtype"</span>: <span class="string">"FLOAT_VECTOR"</span>, <span class="string">"dim"</span>: <span class="number">1536</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"title"</span>, <span class="string">"dtype"</span>: <span class="string">"VARCHAR"</span>, <span class="string">"max_length"</span>: <span class="number">256</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"category"</span>, <span class="string">"dtype"</span>: <span class="string">"VARCHAR"</span>, <span class="string">"max_length"</span>: <span class="number">64</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"price"</span>, <span class="string">"dtype"</span>: <span class="string">"FLOAT"</span>&#125;,</span><br><span class="line">        &#123;<span class="string">"name"</span>: <span class="string">"created_at"</span>, <span class="string">"dtype"</span>: <span class="string">"INT64"</span>&#125;  <span class="comment"># Timestamp</span></span><br><span class="line">    ]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Create scalar field index (accelerates filtering)</span></span><br><span class="line">client.create_index(</span><br><span class="line">    collection_name=<span class="string">"products"</span>,</span><br><span class="line">    field_name=<span class="string">"category"</span>,</span><br><span class="line">    index_type=<span class="string">"Trie"</span>  <span class="comment"># Trie for strings, STL_SORT for numerics</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>Milvus filter expressions support AND, OR, NOT, IN, LIKE and other operators, allowing scalar conditions to be applied alongside vector similarity search:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Basic filtered query</span></span><br><span class="line">results = client.search(</span><br><span class="line">    collection_name=<span class="string">"products"</span>,</span><br><span class="line">    data=[[<span class="number">0.1</span>, <span class="number">0.2</span>, ...]],  <span class="comment"># Query vector</span></span><br><span class="line">    filter=<span class="string">'category == "electronics" and price &gt;= 100 and price &lt;= 500'</span>,</span><br><span class="line">    limit=<span class="number">10</span>,</span><br><span class="line">    output_fields=[<span class="string">"title"</span>, <span class="string">"category"</span>, <span class="string">"price"</span>]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Complex filtering: supports AND, OR, NOT, IN, LIKE</span></span><br><span class="line">filter_expr = <span class="string">'''</span></span><br><span class="line"><span class="string">    (category in ["electronics", "books"])</span></span><br><span class="line"><span class="string">    and price &gt; 50</span></span><br><span class="line"><span class="string">    and created_at &gt; 1700000000</span></span><br><span class="line"><span class="string">'''</span></span><br></pre></td></tr></table></figure>
+<h3 id="Deployment-Options"><a href="#Deployment-Options" class="headerlink" title="Deployment Options"></a>Deployment Options</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Deployment Method</th>
+<th>Suitable Scenario</th>
+<th>Complexity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Milvus Lite</td>
+<td>Development/testing, pip install</td>
+<td>Lowest</td>
+</tr>
+<tr>
+<td>Docker Compose</td>
+<td>Single-machine production, quick deploy</td>
+<td>Low</td>
+</tr>
+<tr>
+<td>Docker + Kubernetes</td>
+<td>Cluster deployment, high availability</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Zilliz Cloud</td>
+<td>Fully managed, zero ops</td>
+<td>None</td>
+</tr>
+</tbody>
+</table>
+</div>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Docker Compose quick deploy (suitable for single-machine production)</span></span><br><span class="line">wget https://github.com/milvus-io/milvus/releases/download/v2.4.0/milvus-compose.yml</span><br><span class="line">docker-compose -f milvus-compose.yml up -d</span><br><span class="line"></span><br><span class="line"><span class="comment"># Milvus Lite for development/testing (use directly from Python)</span></span><br><span class="line">pip install milvus</span><br><span class="line"><span class="comment"># Automatically starts embedded Milvus, no additional deployment needed</span></span><br></pre></td></tr></table></figure>
+<p>For production environments, Docker Compose (single machine) or Kubernetes cluster (multi-node HA) is recommended. During development, Milvus Lite runs with zero deployment overhead.</p>
+<hr>
+<h2 id="Selection-Decision"><a href="#Selection-Decision" class="headerlink" title="Selection Decision"></a>Selection Decision</h2><p>The key dimensions for selection are data scale, filtering needs, ops capability, and team tech stack. Here are recommendations based on different decision factors:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Decision Dimension</th>
+<th>Condition</th>
+<th>Recommended Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Data scale</td>
+<td>&lt; 100K vectors</td>
+<td>Chroma</td>
+</tr>
+<tr>
+<td>Data scale</td>
+<td>100K-1M</td>
+<td>Chroma standalone / Milvus Lite</td>
+</tr>
+<tr>
+<td>Data scale</td>
+<td>1M-10M</td>
+<td>Milvus standalone / Qdrant</td>
+</tr>
+<tr>
+<td>Data scale</td>
+<td>&gt; 10M</td>
+<td>Milvus cluster / Pinecone Serverless</td>
+</tr>
+<tr>
+<td>Filtering needs</td>
+<td>Simple filtering</td>
+<td>Chroma / Milvus</td>
+</tr>
+<tr>
+<td>Filtering needs</td>
+<td>Complex boolean combinations</td>
+<td>Qdrant (best performance)</td>
+</tr>
+<tr>
+<td>Deployment</td>
+<td>Must be local</td>
+<td>Milvus / Qdrant / Chroma</td>
+</tr>
+<tr>
+<td>Deployment</td>
+<td>Cloud is acceptable</td>
+<td>Pinecone / Zilliz Cloud</td>
+</tr>
+<tr>
+<td>Tech stack</td>
+<td>Python-dominant</td>
+<td>Chroma (most developer-friendly)</td>
+</tr>
+<tr>
+<td>Tech stack</td>
+<td>Go / Rust-dominant</td>
+<td>Milvus / Qdrant</td>
+</tr>
+<tr>
+<td>Tech stack</td>
+<td>Already on MongoDB</td>
+<td>Atlas Vector Search</td>
+</tr>
+<tr>
+<td>Ops capability</td>
+<td>No ops team</td>
+<td>Chroma / Pinecone</td>
+</tr>
+<tr>
+<td>Ops capability</td>
+<td>Has ops team</td>
+<td>Milvus / Qdrant</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="Practical-Advice"><a href="#Practical-Advice" class="headerlink" title="Practical Advice"></a>Practical Advice</h2><h3 id="RAG-Application-Architecture"><a href="#RAG-Application-Architecture" class="headerlink" title="RAG Application Architecture"></a>RAG Application Architecture</h3><p>In a typical RAG application, the vector database serves as the knowledge base retrieval layer. User queries are first encoded into vectors by the Embedding model, then the vector database retrieves the Top-K most relevant text segments, and finally those segments are fed as context to the LLM for answer generation. Collection design typically includes four fields: the vector field (dimension depends on the Embedding model), raw text content, metadata (source, page number, timestamp, etc.), and an HNSW index (M=16 is a good universal starting point).</p>
+<h3 id="Vector-Dimension-Selection"><a href="#Vector-Dimension-Selection" class="headerlink" title="Vector Dimension Selection"></a>Vector Dimension Selection</h3><p>Vector dimension depends on the Embedding model choice. Different models vary significantly in dimension, accuracy, and cost:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Embedding Model</th>
+<th>Dimension</th>
+<th>Characteristics</th>
+<th>Recommended Scenario</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>text-embedding-3-small</td>
+<td>1536</td>
+<td>OpenAI, general-purpose</td>
+<td>Primarily English</td>
+</tr>
+<tr>
+<td>text-embedding-3-large</td>
+<td>3072</td>
+<td>OpenAI, more precise</td>
+<td>High-accuracy needs</td>
+</tr>
+<tr>
+<td>bge-large-zh</td>
+<td>1024</td>
+<td>Chinese-optimized</td>
+<td>Chinese scenarios</td>
+</tr>
+<tr>
+<td>bge-m3</td>
+<td>1024</td>
+<td>Multilingual</td>
+<td>Cross-language scenarios</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Higher dimensions give better accuracy, but storage and computation costs grow proportionally. 1536 dimensions is the current sweet spot for cost-effectiveness. Chinese-language scenarios can drop to 1024 dimensions.</p>
+<h3 id="Memory-Estimation"><a href="#Memory-Estimation" class="headerlink" title="Memory Estimation"></a>Memory Estimation</h3><p>Pre-deployment memory estimation is a step that often gets overlooked. Per-vector storage cost equals dimension count times 4 bytes (float32), plus additional overhead for metadata. HNSW index overhead is approximately 1.5x the base storage. For 1 million vectors at 1536 dimensions: base storage is roughly 6.14 GB (1,000,000 x 1536 x 4), plus HNSW index overhead brings it to about 9.2 GB, with total memory requirement around 10 GB. If vector scale grows to tens of millions, the memory budget needs upfront planning — or consider using compression indexes like IVF-PQ or DISKANN to control costs.</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Vector-Database/" rel="tag"><i class="fa fa-tag"></i> Vector Database</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2025/04/05/049_pdf-rag-production-guide-en/" rel="prev" title="Production-Grade PDF Processing for RAG Systems">
+      <i class="fa fa-chevron-left"></i> Production-Grade PDF Processing for RAG Systems
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2025/06/30/051_vector-similarity-algorithm-en/" rel="next" title="Vector Similarity Search: From Math to Algorithms">
+      Vector Similarity Search: From Math to Algorithms <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#"><span class="nav-number">1.</span> <span class="nav-text"></span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#What-Problem-Do-Vector-Databases-Solve"><span class="nav-number">2.</span> <span class="nav-text">What Problem Do Vector Databases Solve?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Core-Technical-Metrics"><span class="nav-number">3.</span> <span class="nav-text">Core Technical Metrics</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Index-Algorithms-Determine-the-Performance-Ceiling"><span class="nav-number">3.1.</span> <span class="nav-text">Index Algorithms Determine the Performance Ceiling</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Distributed-Architecture-Determines-Scalability"><span class="nav-number">3.2.</span> <span class="nav-text">Distributed Architecture Determines Scalability</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Metadata-Filtering-Capability"><span class="nav-number">3.3.</span> <span class="nav-text">Metadata Filtering Capability</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Horizontal-Comparison-of-Mainstream-Vector-Databases"><span class="nav-number">4.</span> <span class="nav-text">Horizontal Comparison of Mainstream Vector Databases</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Open-Source-Product-Comparison"><span class="nav-number">4.1.</span> <span class="nav-text">Open-Source Product Comparison</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Cloud-Service-Comparison"><span class="nav-number">4.2.</span> <span class="nav-text">Cloud Service Comparison</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Performance-Benchmarks-Million-scale-Vectors-HNSW-Index"><span class="nav-number">4.3.</span> <span class="nav-text">Performance Benchmarks (Million-scale Vectors, HNSW Index)</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Chroma-The-Go-To-for-Lightweight-Entry"><span class="nav-number">5.</span> <span class="nav-text">Chroma: The Go-To for Lightweight Entry</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Suitable-Scenarios"><span class="nav-number">5.1.</span> <span class="nav-text">Suitable Scenarios</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Core-API"><span class="nav-number">5.2.</span> <span class="nav-text">Core API</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Metadata-Filtering"><span class="nav-number">5.3.</span> <span class="nav-text">Metadata Filtering</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Limitations"><span class="nav-number">5.4.</span> <span class="nav-text">Limitations</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Milvus-Production-Grade-Large-Scale-First-Choice"><span class="nav-number">6.</span> <span class="nav-text">Milvus: Production-Grade, Large-Scale First Choice</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Suitable-Scenarios-1"><span class="nav-number">6.1.</span> <span class="nav-text">Suitable Scenarios</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Architecture-Breakdown"><span class="nav-number">6.2.</span> <span class="nav-text">Architecture Breakdown</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Index-Selection-in-Practice"><span class="nav-number">6.3.</span> <span class="nav-text">Index Selection in Practice</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Collection-Design-and-Filtered-Queries"><span class="nav-number">6.4.</span> <span class="nav-text">Collection Design and Filtered Queries</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Deployment-Options"><span class="nav-number">6.5.</span> <span class="nav-text">Deployment Options</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Selection-Decision"><span class="nav-number">7.</span> <span class="nav-text">Selection Decision</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Practical-Advice"><span class="nav-number">8.</span> <span class="nav-text">Practical Advice</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#RAG-Application-Architecture"><span class="nav-number">8.1.</span> <span class="nav-text">RAG Application Architecture</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Vector-Dimension-Selection"><span class="nav-number">8.2.</span> <span class="nav-text">Vector Dimension Selection</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Memory-Estimation"><span class="nav-number">8.3.</span> <span class="nav-text">Memory Estimation</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2025/05/19/050_vector-database-deep-analysis-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2025/05/19/050_vector-database-deep-analysis-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

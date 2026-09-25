@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="The core problem a vector database solves is this: given a query vector, find the K most similar vectors in the database fast. This breaks down into three layers — the mathematical definition of simil">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Vector Similarity Search: From Math to Algorithms">
+<meta property="og:url" content="https://donehub.github.io/en/2025/06/30/051_vector-similarity-algorithm-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="The core problem a vector database solves is this: given a query vector, find the K most similar vectors in the database fast. This breaks down into three layers — the mathematical definition of simil">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2025-06-29T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T09:24:54.236Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Vector Search">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2025/06/30/051_vector-similarity-algorithm-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>Vector Similarity Search: From Math to Algorithms | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2025/06/30/051_vector-similarity-algorithm-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Vector Similarity Search: From Math to Algorithms
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2025-06-30 00:00:00" itemprop="dateCreated datePublished" datetime="2025-06-30T00:00:00+08:00">2025-06-30</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:24:54" itemprop="dateModified" datetime="2026-09-25T17:24:54+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2025/06/30/051_vector-similarity-algorithm-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2025/06/30/051_vector-similarity-algorithm-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>The core problem a vector database solves is this: given a query vector, find the K most similar vectors in the database fast. This breaks down into three layers — the mathematical definition of similarity, the algorithm design for approximate nearest neighbor search, and the engineering optimizations around index structures and storage. This article covers the first two layers in depth: the math behind similarity measurement and the mechanics of the core search algorithms.</p>
+<h2 id=""><a href="#" class="headerlink" title=""></a><a id="more"></a></h2><h2 id="Similarity-Metrics"><a href="#Similarity-Metrics" class="headerlink" title="Similarity Metrics"></a>Similarity Metrics</h2><p>Before discussing retrieval algorithms, we need to settle a foundational question: how do you define “how similar” two vectors are in a high-dimensional space? The choice of metric directly affects both the semantic quality of search results and computational efficiency. The three mainstream options are cosine similarity, Euclidean distance, and inner product.</p>
+<h3 id="Cosine-Similarity"><a href="#Cosine-Similarity" class="headerlink" title="Cosine Similarity"></a>Cosine Similarity</h3><p>Cosine similarity measures the cosine of the angle between two vectors:</p>
+<script type="math/tex; mode=display">
+\cos(\theta) = \frac{\vec{A} \cdot \vec{B}}{|\vec{A}| \times |\vec{B}|} = \frac{\sum_{i=1}^{n} A_i B_i}{\sqrt{\sum_{i=1}^{n} A_i^2} \times \sqrt{\sum_{i=1}^{n} B_i^2}}</script><p>The output range is [-1, 1], where 1 means identical direction and -1 means opposite directions. Cosine similarity only cares about direction, ignoring vector magnitude. This makes it the default choice for text semantics. Embedding model outputs carry information in their magnitudes, but semantic similarity depends primarily on direction: two articles on the same topic, even if vastly different in length (different magnitudes), should point in roughly the same direction in semantic space.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">cosine_similarity</span><span class="params">(a, b)</span>:</span></span><br><span class="line">    <span class="string">"""Cosine similarity computation"""</span></span><br><span class="line">    dot_product = np.dot(a, b)</span><br><span class="line">    norm_a = np.linalg.norm(a)</span><br><span class="line">    norm_b = np.linalg.norm(b)</span><br><span class="line">    <span class="keyword">return</span> dot_product / (norm_a * norm_b)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Example</span></span><br><span class="line">a = np.array([<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>])</span><br><span class="line">b = np.array([<span class="number">2</span>, <span class="number">4</span>, <span class="number">6</span>])  <span class="comment"># b = 2a, same direction</span></span><br><span class="line"></span><br><span class="line">print(cosine_similarity(a, b))  <span class="comment"># Output: 1.0</span></span><br></pre></td></tr></table></figure>
+<p>Computational complexity is O(d), where d is the vector dimension.</p>
+<h3 id="Euclidean-Distance"><a href="#Euclidean-Distance" class="headerlink" title="Euclidean Distance"></a>Euclidean Distance</h3><p>Euclidean distance (L2 distance) measures the straight-line distance between two vectors in Euclidean space:</p>
+<script type="math/tex; mode=display">
+d_{L2}(\vec{A}, \vec{B}) = \sqrt{\sum_{i=1}^{n} (A_i - B_i)^2}</script><p>The range is [0, ∞), with smaller values meaning more similar. Unlike cosine similarity, Euclidean distance accounts for both direction and magnitude, making it suitable for scenarios where absolute distance carries meaning, such as image features and physical coordinates.</p>
+<p>For normalized vectors, there’s a monotonic relationship between Euclidean distance and cosine similarity:</p>
+<script type="math/tex; mode=display">
+d_{L2} = \sqrt{2(1 - \cos(\theta))}</script><p>The proof is straightforward. Given $\vec{A}$ and $\vec{B}$ both normalized ($|\vec{A}| = |\vec{B}| = 1$):</p>
+<script type="math/tex; mode=display">
+|\vec{A} - \vec{B}|^2 = |\vec{A}|^2 + |\vec{B}|^2 - 2\vec{A}\cdot\vec{B} = 2 - 2\cos(\theta)</script><p>The engineering implication is direct: if your vectors are already normalized, L2 and cosine produce identical rankings. Most embedding models today output normalized vectors by default, so choosing between L2 and cosine won’t affect retrieval results in that case.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">euclidean_distance</span><span class="params">(a, b)</span>:</span></span><br><span class="line">    <span class="string">"""Euclidean distance computation"""</span></span><br><span class="line">    <span class="keyword">return</span> np.sqrt(np.sum((a - b) ** <span class="number">2</span>))</span><br><span class="line"></span><br><span class="line"><span class="comment"># Relationship with cosine after normalization</span></span><br><span class="line">a_norm = a / np.linalg.norm(a)</span><br><span class="line">b_norm = b / np.linalg.norm(b)</span><br><span class="line"></span><br><span class="line">d = euclidean_distance(a_norm, b_norm)</span><br><span class="line">cos = cosine_similarity(a_norm, b_norm)</span><br><span class="line"></span><br><span class="line">print(np.sqrt(<span class="number">2</span> * (<span class="number">1</span> - cos)))  <span class="comment"># Equals d</span></span><br></pre></td></tr></table></figure>
+<h3 id="Inner-Product"><a href="#Inner-Product" class="headerlink" title="Inner Product"></a>Inner Product</h3><p>The inner product (dot product) is defined as the sum of component-wise products:</p>
+<script type="math/tex; mode=display">
+\vec{A} \cdot \vec{B} = \sum_{i=1}^{n} A_i B_i</script><p>The output range is unbounded, depending on vector magnitudes. Inner product is the fastest of the three because it skips the norm computation (which requires two passes over the vector), needing only a single pass. At scale, this difference shows up directly in throughput. The trade-off is that inner product requires pre-normalized vectors; without normalization, vectors of different magnitudes produce incomparable scores. After normalization, inner product becomes equivalent to cosine similarity.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">dot_product</span><span class="params">(a, b)</span>:</span></span><br><span class="line">    <span class="string">"""Inner product computation"""</span></span><br><span class="line">    <span class="keyword">return</span> np.dot(a, b)</span><br><span class="line"></span><br><span class="line"><span class="comment"># For normalized vectors: inner product = cosine similarity</span></span><br><span class="line">a_norm = a / np.linalg.norm(a)</span><br><span class="line">b_norm = b / np.linalg.norm(b)</span><br><span class="line"></span><br><span class="line">print(dot_product(a_norm, b_norm))  <span class="comment"># Equals cosine_similarity(a_norm, b_norm)</span></span><br></pre></td></tr></table></figure>
+<h3 id="Comparing-the-Three-Metrics"><a href="#Comparing-the-Three-Metrics" class="headerlink" title="Comparing the Three Metrics"></a>Comparing the Three Metrics</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Formula Complexity</th>
+<th>Range</th>
+<th>Speed</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cosine</td>
+<td>O(d) + norm</td>
+<td>[-1, 1]</td>
+<td>Medium</td>
+<td>Text semantics, direction-sensitive</td>
+</tr>
+<tr>
+<td>Euclidean (L2)</td>
+<td>O(d)</td>
+<td>[0, ∞)</td>
+<td>Medium</td>
+<td>Image features, physical coordinates</td>
+</tr>
+<tr>
+<td>Inner Product</td>
+<td>O(d)</td>
+<td>Unbounded</td>
+<td>Fastest</td>
+<td>Normalized vectors, speed-critical</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The engineering decision is straightforward: use inner product for normalized text vectors (fastest computation), cosine or L2 for unnormalized vectors, and L2 for physical coordinates and image features. In most NLP applications, embeddings come pre-normalized, making inner product the performance-optimal choice.</p>
+<hr>
+<h2 id="The-Bottleneck-of-Exact-Search"><a href="#The-Bottleneck-of-Exact-Search" class="headerlink" title="The Bottleneck of Exact Search"></a>The Bottleneck of Exact Search</h2><p>The most intuitive search approach is brute force (FLAT): iterate through every vector, compute similarity for each, sort, and take the top K.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">brute_force_search</span><span class="params">(query, database, k=<span class="number">10</span>)</span>:</span></span><br><span class="line">    <span class="string">"""Brute force search"""</span></span><br><span class="line">    <span class="comment"># Compute all similarities</span></span><br><span class="line">    similarities = [cosine_similarity(query, vec) <span class="keyword">for</span> vec <span class="keyword">in</span> database]</span><br><span class="line">    <span class="comment"># Sort and take top-K</span></span><br><span class="line">    indices = np.argsort(similarities)[-k:]</span><br><span class="line">    <span class="keyword">return</span> indices, [similarities[i] <span class="keyword">for</span> i <span class="keyword">in</span> indices]</span><br></pre></td></tr></table></figure>
+<p>Time complexity is O(N × d), where N is the number of vectors and d is the dimension. No extra index structure is needed. This works fine when N is under 100K. But at millions of vectors, a single query takes seconds, far too slow for real-time retrieval.</p>
+<h3 id="The-Curse-of-Dimensionality"><a href="#The-Curse-of-Dimensionality" class="headerlink" title="The Curse of Dimensionality"></a>The Curse of Dimensionality</h3><p>High-dimensional space behaves very differently from our low-dimensional intuition. In 2D or 3D space, distance has clear physical meaning, and nearby points are genuinely close. In high-dimensional space (&gt;100 dimensions), distances between all vector pairs converge toward a uniform value, and the gap between nearest and farthest neighbors shrinks dramatically.</p>
+<p>Quantitatively, in a d-dimensional hypercube, the variance of distances between two random points is:</p>
+<script type="math/tex; mode=display">
+\text{Var}(d) \approx \frac{d}{12}</script><p>As d grows, the relative fluctuation of distances (standard deviation / mean) actually shrinks, meaning nearly all vectors fall on roughly the same distance shell. This creates a seemingly paradoxical situation: exact nearest neighbor search is computationally expensive, yet the “nearest” neighbor isn’t meaningfully closer than most other vectors. This observation is the theoretical foundation for ANN algorithms: since finding the absolute nearest neighbor isn’t necessary, finding an “approximately close” neighbor is good enough, and the algorithm can trade a small precision loss for an order-of-magnitude speedup.</p>
+<hr>
+<h2 id="HNSW-Graph-Based-Index"><a href="#HNSW-Graph-Based-Index" class="headerlink" title="HNSW: Graph-Based Index"></a>HNSW: Graph-Based Index</h2><p>HNSW (Hierarchical Navigable Small World), proposed by Malkov et al. in 2016, is the most widely used ANN algorithm today. Its design draws from skip lists, transplanting the multi-level indexing idea into a graph structure.</p>
+<h3 id="Multi-Layer-Graph-Structure"><a href="#Multi-Layer-Graph-Structure" class="headerlink" title="Multi-Layer Graph Structure"></a>Multi-Layer Graph Structure</h3><p>HNSW builds a multi-layer graph: the bottom layer (Layer 0) contains all nodes, and each successive layer randomly includes a subset of nodes, becoming sparser as you go up. Search starts from a single entry point at the top layer, greedily descending toward the target at each level, and finishes with a fine-grained local search at Layer 0 to return candidate results.</p>
+<p>Each node’s maximum layer is assigned by exponential decay probability: $p^l = 1 / (\ln M \times M^{level})$. Most nodes exist only in Layer 0, a few span multiple layers, and a tiny number appear at the highest layers. High-layer nodes act as long-range shortcuts for fast coarse positioning; low-layer nodes provide dense local connections for search precision. This structure brings search complexity close to O(log N).</p>
+<h3 id="Build-and-Search"><a href="#Build-and-Search" class="headerlink" title="Build and Search"></a>Build and Search</h3><p>When inserting a new element, first randomly determine its maximum layer l, then greedily search from the top-level entry point down to layer l. Starting from layer l, at each descending level, search for efConstruction nearest neighbor candidates, select M nearest neighbors to form connections, and maintain the edge count per node within M.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># HNSW build pseudocode</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">insert</span><span class="params">(q, hnsw, M=<span class="number">16</span>, ef_construction=<span class="number">200</span>, mL=<span class="number">1</span>/np.log<span class="params">(<span class="number">16</span>)</span>)</span>:</span></span><br><span class="line">    <span class="comment"># 1. Determine insertion layer</span></span><br><span class="line">    level = int(-np.log(np.random.random()) * mL)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 2. Search from top layer to entry point at target level</span></span><br><span class="line">    entry = hnsw.entry_point</span><br><span class="line">    <span class="keyword">for</span> l <span class="keyword">in</span> range(hnsw.max_level, level + <span class="number">1</span>):</span><br><span class="line">        entry = greedy_search(q, entry, ef=<span class="number">1</span>, layer=l)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 3. Insert from level downward</span></span><br><span class="line">    <span class="keyword">for</span> l <span class="keyword">in</span> range(level, <span class="number">-1</span>, <span class="number">-1</span>):</span><br><span class="line">        candidates = search_layer(q, entry, ef_construction, l)</span><br><span class="line">        neighbors = select_neighbors(q, candidates, M)</span><br><span class="line">        connect(q, neighbors, l)</span><br></pre></td></tr></table></figure>
+<p>Search follows a similar pattern: greedily descend from the top-level entry, picking the closest node at each layer as the entry to the next. Upon reaching Layer 0, expand the search with width ef and return the top K results.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">search</span><span class="params">(q, hnsw, ef=<span class="number">50</span>, k=<span class="number">10</span>)</span>:</span></span><br><span class="line">    entry = hnsw.entry_point</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Greedy descent from top layer</span></span><br><span class="line">    <span class="keyword">for</span> l <span class="keyword">in</span> range(hnsw.max_level, <span class="number">0</span>):</span><br><span class="line">        entry = greedy_search_layer(q, entry, ef=<span class="number">1</span>, layer=l)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Layer 0: expanded search</span></span><br><span class="line">    candidates = search_layer(q, entry, ef, layer=<span class="number">0</span>)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Return top-K</span></span><br><span class="line">    <span class="keyword">return</span> sorted(candidates, key=<span class="keyword">lambda</span> x: x.distance)[:k]</span><br></pre></td></tr></table></figure>
+<h3 id="Parameter-Tuning"><a href="#Parameter-Tuning" class="headerlink" title="Parameter Tuning"></a>Parameter Tuning</h3><p>HNSW has three key parameters that control the trade-offs between precision, memory, and build speed.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Effect</th>
+<th>Tuning Advice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M</td>
+<td>Higher = better precision, but more memory and build time</td>
+<td>16-32 works for most scenarios</td>
+</tr>
+<tr>
+<td>efConstruction</td>
+<td>Higher = better build quality, but slower build</td>
+<td>200-400 is sufficient for most cases</td>
+</tr>
+<tr>
+<td>ef</td>
+<td>Higher = better recall, but more query latency</td>
+<td>50-100 for online queries</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The ef parameter has the most direct impact on recall and latency. Here’s real benchmark data from the SIFT-1M dataset:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>ef Value</th>
+<th>Recall</th>
+<th>Latency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10</td>
+<td>70%</td>
+<td>1ms</td>
+</tr>
+<tr>
+<td>50</td>
+<td>95%</td>
+<td>5ms</td>
+</tr>
+<tr>
+<td>100</td>
+<td>98%</td>
+<td>10ms</td>
+</tr>
+<tr>
+<td>200</td>
+<td>99.5%</td>
+<td>20ms</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>For online query scenarios, ef between 50 and 100 typically satisfies both recall and latency requirements. If the business demands extremely high recall (&gt;99%), pushing ef above 200 works, at the cost of roughly doubled latency.</p>
+<hr>
+<h2 id="Inverted-File-Index-IVF"><a href="#Inverted-File-Index-IVF" class="headerlink" title="Inverted File Index (IVF)"></a>Inverted File Index (IVF)</h2><p>IVF (Inverted File Index) borrows from the inverted index concept in full-text search: partition the vector space via clustering first, then perform local search within each cluster.</p>
+<h3 id="Clustering-and-Search"><a href="#Clustering-and-Search" class="headerlink" title="Clustering and Search"></a>Clustering and Search</h3><p>During build, K-means clustering runs over all vectors to produce nlist cluster centers. Each vector is assigned to its nearest center, forming nlist inverted lists. At search time, find the nprobe nearest cluster centers to the query vector, then brute-force search only within those clusters’ inverted lists, and merge results for the final top K.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Cluster</th>
+<th>Contains</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C1</td>
+<td>vec1, vec5, vec8, vec12, …</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>vec3, vec7, vec11, …</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>vec2, vec4, vec6, …</td>
+</tr>
+</tbody>
+</table>
+</div>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># IVF build pseudocode</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">build_ivf</span><span class="params">(vectors, nlist=<span class="number">1024</span>)</span>:</span></span><br><span class="line">    <span class="comment"># K-means clustering</span></span><br><span class="line">    centroids = kmeans(vectors, nlist)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Assign vectors to clusters</span></span><br><span class="line">    clusters = &#123;i: [] <span class="keyword">for</span> i <span class="keyword">in</span> range(nlist)&#125;</span><br><span class="line">    <span class="keyword">for</span> vec <span class="keyword">in</span> vectors:</span><br><span class="line">        nearest = argmin(distance(vec, centroids))</span><br><span class="line">        clusters[nearest].append(vec)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> centroids, clusters</span><br><span class="line"></span><br><span class="line"><span class="comment"># IVF search pseudocode</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">search_ivf</span><span class="params">(query, centroids, clusters, nprobe=<span class="number">10</span>, k=<span class="number">10</span>)</span>:</span></span><br><span class="line">    <span class="comment"># Find nearest nprobe clusters</span></span><br><span class="line">    nearest_clusters = argsort(distance(query, centroids))[:nprobe]</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Search within those clusters</span></span><br><span class="line">    candidates = []</span><br><span class="line">    <span class="keyword">for</span> c <span class="keyword">in</span> nearest_clusters:</span><br><span class="line">        <span class="keyword">for</span> vec <span class="keyword">in</span> clusters[c]:</span><br><span class="line">            candidates.append((vec, distance(query, vec)))</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># Return top-K</span></span><br><span class="line">    <span class="keyword">return</span> sorted(candidates, key=<span class="keyword">lambda</span> x: x[<span class="number">1</span>])[:k]</span><br></pre></td></tr></table></figure>
+<h3 id="Parameters-and-Performance"><a href="#Parameters-and-Performance" class="headerlink" title="Parameters and Performance"></a>Parameters and Performance</h3><p>nlist controls the number of clusters, typically set to $\sqrt{N}$ (N = total vector count). nprobe controls how many clusters to probe during search, serving as the primary knob for the recall-latency trade-off. The higher the nprobe-to-nlist ratio, the higher the recall and the higher the latency.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>nprobe/nlist Ratio</th>
+<th>Recall</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1%</td>
+<td>60-70%</td>
+</tr>
+<tr>
+<td>5%</td>
+<td>85-90%</td>
+</tr>
+<tr>
+<td>10%</td>
+<td>92-96%</td>
+</tr>
+<tr>
+<td>20%</td>
+<td>95-98%</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>IVF’s strength lies in its simple implementation and fast build speed, making it suitable for build-time-sensitive scenarios. Its limitation is that it doesn’t compress vectors at all, so memory consumption remains O(Nd), the same as brute force.</p>
+<hr>
+<h2 id="Product-Quantization-Compression"><a href="#Product-Quantization-Compression" class="headerlink" title="Product Quantization Compression"></a>Product Quantization Compression</h2><p>The storage cost of high-dimensional vectors adds up quickly. A 1536-dimensional float32 vector takes 6KB each; a million of them need about 6GB of memory. When data scales further and memory becomes the primary bottleneck, vector compression becomes necessary.</p>
+<h3 id="Quantization-Basics"><a href="#Quantization-Basics" class="headerlink" title="Quantization Basics"></a>Quantization Basics</h3><p>Product Quantization (PQ) works by splitting high-dimensional vectors into multiple low-dimensional sub-vectors, then independently clustering and quantizing each subspace. Given a vector $\vec{x} \in \mathbb{R}^d$, split it into $m$ sub-vectors, each with dimension $d/m$. Each subspace uses K<em> cluster centers (typically K</em> = 256, mapping to an 8-bit index) for K-means quantization:</p>
+<script type="math/tex; mode=display">
+q^i(\vec{x}^i) = \arg\min_k ||\vec{x}^i - \vec{c}_k^i||^2</script><p>The quantized vector is represented as $[q^1, q^2, …, q^m]$, totaling m bytes. With d=1536 and m=48, the original vector needs 1536 × 4 = 6144 bytes, while the compressed version needs only 48 bytes, a 128x compression ratio. A million vectors drop from 6GB to roughly 48MB.</p>
+<h3 id="ADC-Distance-Computation"><a href="#ADC-Distance-Computation" class="headerlink" title="ADC Distance Computation"></a>ADC Distance Computation</h3><p>Once vectors are compressed, a direct question arises: how do you compute distances on compressed representations? PQ’s approach is to leave query vectors uncompressed and only compress database vectors. Before search, precompute the distances between the query vector and every codebook center in each subspace, producing an m × K* distance table. Then for each PQ-encoded vector, approximate the distance with m table lookups and additions.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">pq_distance</span><span class="params">(query, pq_code, codebooks, m=<span class="number">8</span>)</span>:</span></span><br><span class="line">    <span class="string">"""PQ distance computation"""</span></span><br><span class="line">    <span class="comment"># 1. Precompute distance table</span></span><br><span class="line">    <span class="comment"># distance_table[i][k] = distance(query segment i, center k in codebook i)</span></span><br><span class="line">    distance_table = precompute_distance_table(query, codebooks, m)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 2. Table lookup and accumulate</span></span><br><span class="line">    d = <span class="number">0</span></span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> range(m):</span><br><span class="line">        d += distance_table[i][pq_code[i]]</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> d</span><br></pre></td></tr></table></figure>
+<p>Distance table construction costs $O(d \times K^*)$, and per-vector distance lookup costs O(m). Compared to raw distance computation at O(d), PQ table lookup is much faster ($m \ll d$, typically m is just a fraction of d). The trade-off is that quantization introduces precision loss — PQ distances are approximate, not exact. In benchmarks, PQ alone typically achieves around 85% recall, suitable for scenarios that don’t demand extreme precision.</p>
+<hr>
+<h2 id="IVF-PQ-Combined-Optimization"><a href="#IVF-PQ-Combined-Optimization" class="headerlink" title="IVF-PQ: Combined Optimization"></a>IVF-PQ: Combined Optimization</h2><p>IVF and PQ each solve a different dimension of the problem: IVF narrows the search scope via clustering but doesn’t compress vectors; PQ compresses memory aggressively but requires full-table lookups. Combining them into IVF-PQ gives you both search acceleration and memory compression.</p>
+<p>During build, K-means first partitions the vector space into nlist clusters, then PQ compresses the vectors within each cluster. Search has three steps: find the nprobe nearest clusters using FLAT search over cluster centers, compute approximate distances using PQ table lookups within those clusters, and optionally rerank the top K candidates with original vectors to improve final precision.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">search_ivf_pq</span><span class="params">(query, nprobe=<span class="number">10</span>, k=<span class="number">10</span>, rerank=True)</span>:</span></span><br><span class="line">    <span class="comment"># 1. Find clusters</span></span><br><span class="line">    nearest_clusters = find_nearest_clusters(query, nprobe)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 2. PQ table lookup search</span></span><br><span class="line">    candidates = pq_search(query, nearest_clusters, k * rerank_factor)</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 3. Rerank (optional)</span></span><br><span class="line">    <span class="keyword">if</span> rerank:</span><br><span class="line">        candidates = rerank_with_original_vectors(query, candidates, k)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> candidates[:k]</span><br></pre></td></tr></table></figure>
+<p>Reranking is a notable design choice in IVF-PQ. PQ distances are approximate, so top K results ranked by PQ distance alone may not be the true top K. By keeping original vectors (or storing them separately) and recomputing exact distances on the PQ-shortlisted candidates, you can recover 3-5 percentage points of recall. The cost is extra distance computations and storage for original vectors, but since reranking only touches a small candidate set, the overhead stays manageable.</p>
+<hr>
+<h2 id="Algorithm-Performance-Comparison"><a href="#Algorithm-Performance-Comparison" class="headerlink" title="Algorithm Performance Comparison"></a>Algorithm Performance Comparison</h2><h3 id="Theoretical-Complexity"><a href="#Theoretical-Complexity" class="headerlink" title="Theoretical Complexity"></a>Theoretical Complexity</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>Build Complexity</th>
+<th>Search Complexity</th>
+<th>Space Complexity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FLAT</td>
+<td>O(1)</td>
+<td>O(Nd)</td>
+<td>O(Nd)</td>
+</tr>
+<tr>
+<td>IVF</td>
+<td>O(Ndnlist)</td>
+<td>O(nprobe × Nd/nlist)</td>
+<td>O(Nd)</td>
+</tr>
+<tr>
+<td>HNSW</td>
+<td>O(Nd × efConstruction × logN)</td>
+<td>O(d × ef × logN)</td>
+<td>O(Nd × M)</td>
+</tr>
+<tr>
+<td>PQ</td>
+<td>O(Nd × K*)</td>
+<td>O(dK* + Nm)</td>
+<td>O(Nm)</td>
+</tr>
+<tr>
+<td>IVF-PQ</td>
+<td>O(Nd × nlist × K*)</td>
+<td>O(nprobe × (dK* + N/nlist × m))</td>
+<td>O(Nm)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="Benchmark-Data"><a href="#Benchmark-Data" class="headerlink" title="Benchmark Data"></a>Benchmark Data</h3><p>The following data comes from benchmarks on the SIFT-1M dataset (128 dimensions, 1 million vectors):</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>Recall@10</th>
+<th>QPS</th>
+<th>Memory</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FLAT</td>
+<td>100%</td>
+<td>200</td>
+<td>512MB</td>
+</tr>
+<tr>
+<td>IVF (nlist=1024, nprobe=64)</td>
+<td>95%</td>
+<td>8000</td>
+<td>512MB</td>
+</tr>
+<tr>
+<td>HNSW (M=16, ef=64)</td>
+<td>96%</td>
+<td>15000</td>
+<td>700MB</td>
+</tr>
+<tr>
+<td>PQ (m=8)</td>
+<td>85%</td>
+<td>30000</td>
+<td>16MB</td>
+</tr>
+<tr>
+<td>IVF-PQ (nlist=1024, m=8)</td>
+<td>90%</td>
+<td>20000</td>
+<td>16MB</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>HNSW excels in both recall and speed, but its memory footprint is 1.4x that of FLAT. IVF-PQ trades 3% of the memory for 90% recall and 20,000 QPS, making it a practical choice for memory-constrained environments. When data scales past a billion vectors, DiskANN (Microsoft, 2019) offers a different approach: store vectors and indexes on SSD, keeping only cluster centers and hot data in memory, leveraging SSD’s high-concurrency random reads to support billion-scale retrieval with just 16GB of RAM.</p>
+<hr>
+<h2 id="Engineering-Best-Practices"><a href="#Engineering-Best-Practices" class="headerlink" title="Engineering Best Practices"></a>Engineering Best Practices</h2><h3 id="Index-Selection"><a href="#Index-Selection" class="headerlink" title="Index Selection"></a>Index Selection</h3><p>Data scale is the primary factor in choosing an index type. Under 100K vectors, FLAT exact search is sufficient — no need to introduce index complexity. Between 100K and 1M, choose HNSW if memory is plentiful (best speed and recall) or IVF-PQ if memory is tight. Above 1M, HNSW remains the top choice but memory pressure grows, and IVF-PQ’s cost-effectiveness becomes more apparent. At massive scale (billions+), consider DiskANN or a sharding strategy.</p>
+<h3 id="Parameter-Tuning-1"><a href="#Parameter-Tuning-1" class="headerlink" title="Parameter Tuning"></a>Parameter Tuning</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Parameter Adjustment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Improve recall</td>
+<td>Increase ef (HNSW) or nprobe (IVF)</td>
+</tr>
+<tr>
+<td>Reduce latency</td>
+<td>Decrease M and ef (HNSW); increase nlist and decrease nprobe (IVF)</td>
+</tr>
+<tr>
+<td>Reduce memory</td>
+<td>Enable PQ compression, or decrease HNSW’s M</td>
+</tr>
+<tr>
+<td>Speed up build</td>
+<td>Decrease HNSW’s efConstruction</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Parameter tuning is fundamentally a three-way trade-off between recall, latency, and memory. In practice, fix the memory budget first, then adjust ef or nprobe to balance recall against latency.</p>
+<h3 id="Common-Troubleshooting"><a href="#Common-Troubleshooting" class="headerlink" title="Common Troubleshooting"></a>Common Troubleshooting</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Where to Look</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Recall too low</td>
+<td>Increase ef/nprobe; check vector quality — poor vectors cause clustering to fail</td>
+</tr>
+<tr>
+<td>Latency too high</td>
+<td>Reduce candidate count; check for unnecessary reranking</td>
+</tr>
+<tr>
+<td>Memory exceeds expectations</td>
+<td>Confirm PQ compression is enabled; check if HNSW’s M is set too high</td>
+</tr>
+<tr>
+<td>Build takes too long</td>
+<td>Lower efConstruction; consider batched builds with index merging</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Troubleshooting typically follows a fixed path: first check if parameters are within reasonable ranges, then examine the data itself for anomalies (e.g., extremely skewed vector distributions), and only then consider switching algorithms. The choice of metric depends on data characteristics, the choice of algorithm depends on scale and resource constraints, and parameter tuning depends on the business’s tolerance for recall versus latency. Understanding the underlying principles matters because when the system exhibits atypical behavior, you can trace root causes back to math and algorithm mechanics rather than blindly tweaking parameters.</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Vector-Search/" rel="tag"><i class="fa fa-tag"></i> Vector Search</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2025/05/19/050_vector-database-deep-analysis-en/" rel="prev" title="Deep Dive into Vector Databases">
+      <i class="fa fa-chevron-left"></i> Deep Dive into Vector Databases
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2025/08/22/052_ai-concepts-guide-en/" rel="next" title="Making Sense of the AI Landscape: LLMs, Agents, MCP, and More">
+      Making Sense of the AI Landscape: LLMs, Agents, MCP, and More <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#"><span class="nav-number">1.</span> <span class="nav-text"></span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Similarity-Metrics"><span class="nav-number">2.</span> <span class="nav-text">Similarity Metrics</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Cosine-Similarity"><span class="nav-number">2.1.</span> <span class="nav-text">Cosine Similarity</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Euclidean-Distance"><span class="nav-number">2.2.</span> <span class="nav-text">Euclidean Distance</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Inner-Product"><span class="nav-number">2.3.</span> <span class="nav-text">Inner Product</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Comparing-the-Three-Metrics"><span class="nav-number">2.4.</span> <span class="nav-text">Comparing the Three Metrics</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#The-Bottleneck-of-Exact-Search"><span class="nav-number">3.</span> <span class="nav-text">The Bottleneck of Exact Search</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#The-Curse-of-Dimensionality"><span class="nav-number">3.1.</span> <span class="nav-text">The Curse of Dimensionality</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#HNSW-Graph-Based-Index"><span class="nav-number">4.</span> <span class="nav-text">HNSW: Graph-Based Index</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Multi-Layer-Graph-Structure"><span class="nav-number">4.1.</span> <span class="nav-text">Multi-Layer Graph Structure</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Build-and-Search"><span class="nav-number">4.2.</span> <span class="nav-text">Build and Search</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Parameter-Tuning"><span class="nav-number">4.3.</span> <span class="nav-text">Parameter Tuning</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Inverted-File-Index-IVF"><span class="nav-number">5.</span> <span class="nav-text">Inverted File Index (IVF)</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Clustering-and-Search"><span class="nav-number">5.1.</span> <span class="nav-text">Clustering and Search</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Parameters-and-Performance"><span class="nav-number">5.2.</span> <span class="nav-text">Parameters and Performance</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Product-Quantization-Compression"><span class="nav-number">6.</span> <span class="nav-text">Product Quantization Compression</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Quantization-Basics"><span class="nav-number">6.1.</span> <span class="nav-text">Quantization Basics</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ADC-Distance-Computation"><span class="nav-number">6.2.</span> <span class="nav-text">ADC Distance Computation</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#IVF-PQ-Combined-Optimization"><span class="nav-number">7.</span> <span class="nav-text">IVF-PQ: Combined Optimization</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Algorithm-Performance-Comparison"><span class="nav-number">8.</span> <span class="nav-text">Algorithm Performance Comparison</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Theoretical-Complexity"><span class="nav-number">8.1.</span> <span class="nav-text">Theoretical Complexity</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Benchmark-Data"><span class="nav-number">8.2.</span> <span class="nav-text">Benchmark Data</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Engineering-Best-Practices"><span class="nav-number">9.</span> <span class="nav-text">Engineering Best Practices</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Index-Selection"><span class="nav-number">9.1.</span> <span class="nav-text">Index Selection</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Parameter-Tuning-1"><span class="nav-number">9.2.</span> <span class="nav-text">Parameter Tuning</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Common-Troubleshooting"><span class="nav-number">9.3.</span> <span class="nav-text">Common Troubleshooting</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2025/06/30/051_vector-similarity-algorithm-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2025/06/30/051_vector-similarity-algorithm-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

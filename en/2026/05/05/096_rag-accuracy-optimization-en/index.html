@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="BackgroundMost developers who have built RAG systems have been through this cycle: The demo stage goes well — a few test cases, results look promising. Then you roll it out on real business data and a">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Optimizing RAG Accuracy from 60% to 85%">
+<meta property="og:url" content="https://donehub.github.io/en/2026/05/05/096_rag-accuracy-optimization-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="BackgroundMost developers who have built RAG systems have been through this cycle: The demo stage goes well — a few test cases, results look promising. Then you roll it out on real business data and a">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-05-04T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T09:13:08.691Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="RAG">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/05/05/096_rag-accuracy-optimization-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>Optimizing RAG Accuracy from 60% to 85% | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/05/05/096_rag-accuracy-optimization-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Optimizing RAG Accuracy from 60% to 85%
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-05-05 00:00:00" itemprop="dateCreated datePublished" datetime="2026-05-05T00:00:00+08:00">2026-05-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:13:08" itemprop="dateModified" datetime="2026-09-25T17:13:08+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/05/05/096_rag-accuracy-optimization-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/05/05/096_rag-accuracy-optimization-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="Background"><a href="#Background" class="headerlink" title="Background"></a>Background</h2><p>Most developers who have built RAG systems have been through this cycle:</p>
+<p>The demo stage goes well — a few test cases, results look promising. Then you roll it out on real business data and accuracy drops to 60% or worse. Users complain, and you can’t figure out where the problem is.</p>
+<p>I spent three consecutive weeks staring at bad case analysis spreadsheets every evening. I tweaked the prompt — no improvement. I swapped the LLM — no improvement. I adjusted TopK — still nothing. Eventually I realized the problem wasn’t in the LLM at all. It was in the entire pipeline upstream of it.</p>
+<p>This article walks through four optimization steps, each one delivering measurable accuracy gains, taking the system from 60% to 85%.</p>
+<a id="more"></a>
+<h2 id="The-Full-Pipeline-Optimization-Map"><a href="#The-Full-Pipeline-Optimization-Map" class="headerlink" title="The Full-Pipeline Optimization Map"></a>The Full-Pipeline Optimization Map</h2><p>Before touching any code, lay out the entire pipeline. A RAG system isn’t two black boxes labeled “retrieve” and “generate.” It’s a precision assembly line where any single weak link corrupts the final output.</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">User Input</span><br><span class="line">  │</span><br><span class="line">  ▼</span><br><span class="line">┌──────────────────────┐</span><br><span class="line">│  ① Query Processing   │  ← Step 2: Rewrite + Validate</span><br><span class="line">└──────────┬───────────┘</span><br><span class="line">           │</span><br><span class="line">           ▼</span><br><span class="line">┌──────────────────────┐</span><br><span class="line">│  ② Hybrid Retrieval   │  ← Step 3: Vector + BM25 + LambdaMART rerank</span><br><span class="line">│   (Vector + Keyword)  │</span><br><span class="line">└──────────┬───────────┘</span><br><span class="line">           │</span><br><span class="line">           ▼</span><br><span class="line">┌──────────────────────┐</span><br><span class="line">│  ③ Context Assembly   │  ← Pack retrieval results for the LLM</span><br><span class="line">└──────────┬───────────┘</span><br><span class="line">           │</span><br><span class="line">           ▼</span><br><span class="line">┌──────────────────────┐</span><br><span class="line">│  ④ LLM Generation     │  ← Prompt + Generation Strategy</span><br><span class="line">└──────────────────────┘</span><br><span class="line"></span><br><span class="line">        ↕ Cross-cutting ↕</span><br><span class="line"></span><br><span class="line">┌──────────────────────┐</span><br><span class="line">│  ⑤ Doc Chunking &amp;     │  ← Step 1: Foundation, offline phase</span><br><span class="line">│     Indexing          │</span><br><span class="line">└──────────────────────┘</span><br></pre></td></tr></table></figure>
+<p>Below, each stage is broken down in priority order, highest first.</p>
+<h2 id="Step-1-Document-Chunking"><a href="#Step-1-Document-Chunking" class="headerlink" title="Step 1: Document Chunking"></a>Step 1: Document Chunking</h2><h3 id="Why-Chunking-Is-the-Foundation"><a href="#Why-Chunking-Is-the-Foundation" class="headerlink" title="Why Chunking Is the Foundation"></a>Why Chunking Is the Foundation</h3><p>A lot of developers take the lazy route for document splitting: fixed token count, hard cut every 500 tokens, simple and brute-force. This works in a notebook, but it falls apart in production because a blind cut can split a single coherent piece of information in half:</p>
+<ul>
+<li>A complete knowledge point gets sliced mid-sentence</li>
+<li>A structured table gets separated into top half and bottom half</li>
+<li>A cause-and-effect pair gets split — the “because” in one chunk, the “so” in the next</li>
+</ul>
+<p>When retrieval runs, it pulls back fragments of incomplete information. The LLM never sees the full context, so there’s no chance it produces the right answer.</p>
+<p>It’s like looking up a word in a dictionary only to find the page torn in half. You see “this medicine is indicated for…” but the rest is gone. You know it’s indicated for something, but you don’t know what.</p>
+<h3 id="How-the-Industry-Does-It-Semantic-Aware-Dynamic-Chunking"><a href="#How-the-Industry-Does-It-Semantic-Aware-Dynamic-Chunking" class="headerlink" title="How the Industry Does It: Semantic-Aware Dynamic Chunking"></a>How the Industry Does It: Semantic-Aware Dynamic Chunking</h3><p>Instead of a rigid token counter, use NLP-based semantic awareness to drive dynamic splitting. The core principle is simple: never let a single semantic unit span two chunks.</p>
+<p>Here’s the three-step approach.</p>
+<h4 id="Step-1-Document-Structure-Parsing"><a href="#Step-1-Document-Structure-Parsing" class="headerlink" title="Step 1: Document Structure Parsing"></a>Step 1: Document Structure Parsing</h4><p>Before splitting, parse the skeleton structure of the document. This requires a proper parsing model, not just regex.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langchain.text_splitter <span class="keyword">import</span> RecursiveCharacterTextSplitter</span><br><span class="line"><span class="keyword">import</span> spacy</span><br><span class="line"></span><br><span class="line"><span class="comment"># Load Chinese NLP model</span></span><br><span class="line">nlp = spacy.load(<span class="string">"zh_core_web_sm"</span>)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">parse_document_structure</span><span class="params">(raw_text)</span>:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Parse the document's hierarchical structure, returning a structured section tree.</span></span><br><span class="line"><span class="string">    Identifies heading levels, paragraph boundaries, table regions, etc.</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    doc = nlp(raw_text)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># Split by sentence boundaries, preserving complete sentences</span></span><br><span class="line">    sentences = [sent.text <span class="keyword">for</span> sent <span class="keyword">in</span> doc.sents]</span><br><span class="line"></span><br><span class="line">    <span class="comment"># Identify headings (simplified here; real scenarios need more complex rules or models)</span></span><br><span class="line">    sections = []</span><br><span class="line">    current_section = &#123;<span class="string">"title"</span>: <span class="string">"default"</span>, <span class="string">"paragraphs"</span>: []&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> sent <span class="keyword">in</span> sentences:</span><br><span class="line">        <span class="keyword">if</span> is_heading(sent):  <span class="comment"># Check if it's a heading</span></span><br><span class="line">            <span class="keyword">if</span> current_section[<span class="string">"paragraphs"</span>]:</span><br><span class="line">                sections.append(current_section)</span><br><span class="line">            current_section = &#123;<span class="string">"title"</span>: sent, <span class="string">"paragraphs"</span>: []&#125;</span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            current_section[<span class="string">"paragraphs"</span>].append(sent)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> current_section[<span class="string">"paragraphs"</span>]:</span><br><span class="line">        sections.append(current_section)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> sections</span><br></pre></td></tr></table></figure>
+<h4 id="Step-2-Semantic-Integrity-Protection"><a href="#Step-2-Semantic-Integrity-Protection" class="headerlink" title="Step 2: Semantic Integrity Protection"></a>Step 2: Semantic Integrity Protection</h4><p>Once the structure is parsed, splitting must respect semantic integrity:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Headings stay with body text</td>
+<td>A heading must be bound to its paragraphs in the same chunk</td>
+</tr>
+<tr>
+<td>Cause-and-effect stays together</td>
+<td>“because…so…” and “if…then…” must remain in one chunk</td>
+</tr>
+<tr>
+<td>Tables stay whole</td>
+<td>Structured tables should be a single chunk, or split by row/column with structured decomposition</td>
+</tr>
+<tr>
+<td>Lists stay intact</td>
+<td>Ordered or unordered lists should stay in the same chunk wherever possible</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h4 id="Step-3-Overlapping-Context-Windows"><a href="#Step-3-Overlapping-Context-Windows" class="headerlink" title="Step 3: Overlapping Context Windows"></a>Step 3: Overlapping Context Windows</h4><p>Even with semantic-aware splitting, adjacent chunks can have semantic gaps at the boundaries. The fix is an overlap window: each chunk retains the first and last 10%–20% of its content as an overlap zone with neighboring chunks.</p>
+<p>The overlap between adjacent chunks is like the exchange zone in a relay race — two runners share a stretch of track together, so the baton doesn’t get dropped during the handoff.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">SemanticChunker</span>:</span></span><br><span class="line">    <span class="string">"""Semantic-aware document chunker"""</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">__init__</span><span class="params">(</span></span></span><br><span class="line"><span class="function"><span class="params">        self,</span></span></span><br><span class="line"><span class="function"><span class="params">        chunk_size: int = <span class="number">512</span>,        <span class="comment"># Target chunk size (token count)</span></span></span></span><br><span class="line"><span class="function"><span class="params">        overlap_ratio: float = <span class="number">0.15</span>,  <span class="comment"># Overlap ratio 15%</span></span></span></span><br><span class="line"><span class="function"><span class="params">        min_chunk_size: int = <span class="number">100</span>,    <span class="comment"># Minimum chunk size</span></span></span></span><br><span class="line"><span class="function"><span class="params">    )</span>:</span></span><br><span class="line">        self.chunk_size = chunk_size</span><br><span class="line">        self.overlap_tokens = int(chunk_size * overlap_ratio)  <span class="comment"># ~77 tokens</span></span><br><span class="line">        self.min_chunk_size = min_chunk_size</span><br><span class="line">        self.nlp = spacy.load(<span class="string">"zh_core_web_sm"</span>)</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">chunk_document</span><span class="params">(self, text: str)</span> -&gt; list[dict]:</span></span><br><span class="line">        <span class="string">"""</span></span><br><span class="line"><span class="string">        Perform semantic-aware chunking on the document.</span></span><br><span class="line"><span class="string">        Returns a list of chunks, each containing content and metadata.</span></span><br><span class="line"><span class="string">        """</span></span><br><span class="line">        <span class="comment"># 1. Parse document structure</span></span><br><span class="line">        sections = self._parse_structure(text)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 2. Initial split along structure boundaries</span></span><br><span class="line">        raw_chunks = self._split_by_structure(sections)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 3. Secondary split for oversized chunks (sentence-level granularity)</span></span><br><span class="line">        refined_chunks = self._refine_chunks(raw_chunks)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 4. Add overlap windows</span></span><br><span class="line">        final_chunks = self._add_overlap(refined_chunks)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> final_chunks</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">_split_by_structure</span><span class="params">(self, sections: list)</span> -&gt; list[str]:</span></span><br><span class="line">        <span class="string">"""Split along document structure boundaries, preserving heading-paragraph integrity"""</span></span><br><span class="line">        chunks = []</span><br><span class="line">        <span class="keyword">for</span> section <span class="keyword">in</span> sections:</span><br><span class="line">            <span class="comment"># Bind heading + its paragraphs as one unit</span></span><br><span class="line">            section_text = <span class="string">f"<span class="subst">&#123;section[<span class="string">'title'</span>]&#125;</span>\n"</span> + <span class="string">"\n"</span>.join(</span><br><span class="line">                section[<span class="string">"paragraphs"</span>]</span><br><span class="line">            )</span><br><span class="line">            chunks.append(section_text)</span><br><span class="line">        <span class="keyword">return</span> chunks</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">_refine_chunks</span><span class="params">(self, raw_chunks: list[str])</span> -&gt; list[str]:</span></span><br><span class="line">        <span class="string">"""Secondary split for oversized chunks along sentence boundaries"""</span></span><br><span class="line">        refined = []</span><br><span class="line">        <span class="keyword">for</span> chunk <span class="keyword">in</span> raw_chunks:</span><br><span class="line">            doc = self.nlp(chunk)</span><br><span class="line">            sentences = [sent.text <span class="keyword">for</span> sent <span class="keyword">in</span> doc.sents]</span><br><span class="line"></span><br><span class="line">            current_chunk = <span class="string">""</span></span><br><span class="line">            <span class="keyword">for</span> sent <span class="keyword">in</span> sentences:</span><br><span class="line">                <span class="comment"># If adding this sentence exceeds chunk_size and we already have content</span></span><br><span class="line">                <span class="keyword">if</span> (</span><br><span class="line">                    len(self._tokenize(current_chunk + sent))</span><br><span class="line">                    &gt; self.chunk_size</span><br><span class="line">                    <span class="keyword">and</span> current_chunk</span><br><span class="line">                ):</span><br><span class="line">                    refined.append(current_chunk.strip())</span><br><span class="line">                    current_chunk = sent</span><br><span class="line">                <span class="keyword">else</span>:</span><br><span class="line">                    current_chunk += sent</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> current_chunk <span class="keyword">and</span> len(current_chunk.strip()) &gt; self.min_chunk_size:</span><br><span class="line">                refined.append(current_chunk.strip())</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> refined</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">_add_overlap</span><span class="params">(self, chunks: list[str])</span> -&gt; list[dict]:</span></span><br><span class="line">        <span class="string">"""Add head/tail overlap windows between adjacent chunks"""</span></span><br><span class="line">        result = []</span><br><span class="line">        <span class="keyword">for</span> i, chunk <span class="keyword">in</span> enumerate(chunks):</span><br><span class="line">            <span class="comment"># Head overlap: take the tail of the previous chunk</span></span><br><span class="line">            head_overlap = <span class="string">""</span></span><br><span class="line">            <span class="keyword">if</span> i &gt; <span class="number">0</span>:</span><br><span class="line">                prev_tokens = self._tokenize(chunks[i - <span class="number">1</span>])</span><br><span class="line">                head_overlap = self._detokenize(</span><br><span class="line">                    prev_tokens[-self.overlap_tokens:]</span><br><span class="line">                )</span><br><span class="line"></span><br><span class="line">            <span class="comment"># Tail overlap: take the head of the next chunk</span></span><br><span class="line">            tail_overlap = <span class="string">""</span></span><br><span class="line">            <span class="keyword">if</span> i &lt; len(chunks) - <span class="number">1</span>:</span><br><span class="line">                next_tokens = self._tokenize(chunks[i + <span class="number">1</span>])</span><br><span class="line">                tail_overlap = self._detokenize(</span><br><span class="line">                    next_tokens[:self.overlap_tokens]</span><br><span class="line">                )</span><br><span class="line"></span><br><span class="line">            result.append(&#123;</span><br><span class="line">                <span class="string">"content"</span>: chunk,</span><br><span class="line">                <span class="string">"metadata"</span>: &#123;</span><br><span class="line">                    <span class="string">"head_overlap"</span>: head_overlap,</span><br><span class="line">                    <span class="string">"tail_overlap"</span>: tail_overlap,</span><br><span class="line">                    <span class="string">"chunk_index"</span>: i,</span><br><span class="line">                &#125;,</span><br><span class="line">            &#125;)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> result</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">_tokenize</span><span class="params">(self, text: str)</span> -&gt; list[str]:</span></span><br><span class="line">        <span class="string">"""Simple tokenization (use tiktoken or similar in production)"""</span></span><br><span class="line">        <span class="keyword">return</span> text.split()</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">_detokenize</span><span class="params">(self, tokens: list[str])</span> -&gt; str:</span></span><br><span class="line">        <span class="keyword">return</span> <span class="string">" "</span>.join(tokens)</span><br></pre></td></tr></table></figure>
+<h3 id="Impact-of-This-Step"><a href="#Impact-of-This-Step" class="headerlink" title="Impact of This Step"></a>Impact of This Step</h3><p>On top of the fixed-token baseline, without touching the LLM at all, switching from brute-force splitting to semantic-aware dynamic chunking plus overlap windows delivers a 10–15 percentage point accuracy gain. That’s why I call it the highest ROI optimization in the entire pipeline.</p>
+<h2 id="Step-2-Query-Processing"><a href="#Step-2-Query-Processing" class="headerlink" title="Step 2: Query Processing"></a>Step 2: Query Processing</h2><h3 id="Real-User-Queries-Can-Be-Brutally-Vague"><a href="#Real-User-Queries-Can-Be-Brutally-Vague" class="headerlink" title="Real User Queries Can Be Brutally Vague"></a>Real User Queries Can Be Brutally Vague</h3><p>In lab testing, we tend to use well-formed questions: “What is this product’s refund policy?”</p>
+<p>Real users, on the other hand, type things like:</p>
+<ul>
+<li>“how refund”</li>
+<li>“invoice rules”</li>
+<li>“validity period”</li>
+<li>“can return?”</li>
+</ul>
+<p>Two or three characters, semantically extremely vague. If you run “invoice rules” through vector retrieval, the embedding model will produce a vector, but that vector points in a highly uncertain direction in semantic space. It might match “how to issue invoices,” or “time limits for invoice issuance,” or even “instructions for using the invoicing system.”</p>
+<p>Direct retrieval on queries like these will never achieve high accuracy.</p>
+<h3 id="The-Standard-Approach-Query-Expansion"><a href="#The-Standard-Approach-Query-Expansion" class="headerlink" title="The Standard Approach: Query Expansion"></a>The Standard Approach: Query Expansion</h3><p>The conventional solution is to use a small model to expand the user’s raw query into several synonymous or near-synonymous rewrites, run retrieval on each, then merge the results.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">expand_query</span><span class="params">(original_query: str)</span> -&gt; list[str]:</span></span><br><span class="line">    <span class="string">"""Use an LLM to expand the user's query"""</span></span><br><span class="line">    prompt = <span class="string">f"""</span></span><br><span class="line"><span class="string">    The user entered a short query: "<span class="subst">&#123;original_query&#125;</span>"</span></span><br><span class="line"><span class="string">    Generate 3 semantically equivalent but differently phrased rewrites,</span></span><br><span class="line"><span class="string">    to help retrieve relevant information more comprehensively.</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">    Requirements:</span></span><br><span class="line"><span class="string">    1. Rewrites must preserve the original meaning</span></span><br><span class="line"><span class="string">    2. Cover different phrasing angles</span></span><br><span class="line"><span class="string">    3. One rewrite per line, numbered</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">    Example:</span></span><br><span class="line"><span class="string">    User input: "how refund"</span></span><br><span class="line"><span class="string">    Rewrites:</span></span><br><span class="line"><span class="string">    1. How to apply for a refund, what's the refund process?</span></span><br><span class="line"><span class="string">    2. What conditions must be met for a refund, and how long does it take?</span></span><br><span class="line"><span class="string">    3. Where do I submit a refund request, and what documents are needed?</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    response = llm.generate(prompt)</span><br><span class="line">    <span class="keyword">return</span> parse_expansions(response)</span><br></pre></td></tr></table></figure>
+<p>The approach is sound, but there’s a serious pitfall lurking here.</p>
+<h3 id="The-Pitfall-Hallucination-in-the-Rewrite-Model"><a href="#The-Pitfall-Hallucination-in-the-Rewrite-Model" class="headerlink" title="The Pitfall: Hallucination in the Rewrite Model"></a>The Pitfall: Hallucination in the Rewrite Model</h3><p>If the expansion model hallucinates, your entire retrieval gets derailed.</p>
+<p>Consider these examples:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Original Query</th>
+<th>Correct Expansion</th>
+<th>Hallucinated Expansion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>how refund</td>
+<td>How to apply for a refund</td>
+<td>How to pay ← <strong>Opposite meaning!</strong></td>
+</tr>
+<tr>
+<td>invoice rules</td>
+<td>Rules for issuing invoices</td>
+<td>Process for not issuing invoices</td>
+</tr>
+<tr>
+<td>validity period</td>
+<td>Product validity period</td>
+<td>What to do if expired ← <strong>Semantic drift</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>“how refund” gets expanded to “how to pay” — one asks about refunds, the other about charges, completely opposite meanings. When this hallucinated expansion enters the retrieval pipeline, it doesn’t help — it introduces noise and pushes the correct answer out of the Top-K.</p>
+<p>The elaborate retrieval system you built gets sabotaged by its own query expansion module.</p>
+<h3 id="The-Safety-Net-Cosine-Similarity-Validation"><a href="#The-Safety-Net-Cosine-Similarity-Validation" class="headerlink" title="The Safety Net: Cosine Similarity Validation"></a>The Safety Net: Cosine Similarity Validation</h3><p>A defense layer is mandatory here: validate every expanded query against the original using semantic similarity scoring.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> sentence_transformers <span class="keyword">import</span> SentenceTransformer, util</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">QueryRewriter</span>:</span></span><br><span class="line">    <span class="string">"""Query expander with semantic validation"""</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># Similarity threshold: empirically validated for general use</span></span><br><span class="line">    SIMILARITY_THRESHOLD = <span class="number">0.8</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">__init__</span><span class="params">(self)</span>:</span></span><br><span class="line">        self.embed_model = SentenceTransformer(<span class="string">"BAAI/bge-large-zh-v1.5"</span>)</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">safe_expand</span><span class="params">(self, original_query: str)</span> -&gt; list[str]:</span></span><br><span class="line">        <span class="string">"""</span></span><br><span class="line"><span class="string">        Safe expansion: expand + semantic validation, filtering out rewrites</span></span><br><span class="line"><span class="string">        that drift from the original meaning.</span></span><br><span class="line"><span class="string">        """</span></span><br><span class="line">        <span class="comment"># 1. Generate expansions via LLM</span></span><br><span class="line">        expansions = self._llm_expand(original_query)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 2. Compute the original query's embedding</span></span><br><span class="line">        original_embedding = self.embed_model.encode(</span><br><span class="line">            original_query, convert_to_tensor=<span class="literal">True</span></span><br><span class="line">        )</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 3. Validate each expansion</span></span><br><span class="line">        valid_expansions = []</span><br><span class="line">        <span class="keyword">for</span> exp <span class="keyword">in</span> expansions:</span><br><span class="line">            exp_embedding = self.embed_model.encode(</span><br><span class="line">                exp, convert_to_tensor=<span class="literal">True</span></span><br><span class="line">            )</span><br><span class="line">            cosine_sim = util.cos_sim(</span><br><span class="line">                original_embedding, exp_embedding</span><br><span class="line">            ).item()</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> cosine_sim &gt;= self.SIMILARITY_THRESHOLD:</span><br><span class="line">                <span class="comment"># Passes the threshold, keep it</span></span><br><span class="line">                valid_expansions.append(exp)</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                <span class="comment"># Below threshold, the rewrite drifted from the original, discard</span></span><br><span class="line">                print(</span><br><span class="line">                    <span class="string">f"[Filtered] '<span class="subst">&#123;exp&#125;</span>' similarity to original query: <span class="subst">&#123;cosine_sim:<span class="number">.3</span>f&#125;</span>, "</span></span><br><span class="line">                    <span class="string">f"below threshold <span class="subst">&#123;self.SIMILARITY_THRESHOLD&#125;</span>, discarded"</span></span><br><span class="line">                )</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 4. Fallback: if all expansions are filtered, use the original query</span></span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> valid_expansions:</span><br><span class="line">            valid_expansions = [original_query]</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> valid_expansions</span><br></pre></td></tr></table></figure>
+<p>Where does the 0.8 threshold come from?</p>
+<p>It’s an empirically validated value for general-purpose scenarios:</p>
+<ul>
+<li><strong>≥ 0.8</strong>: The rewrite preserves the original meaning, safe to use</li>
+<li><strong>0.6 ~ 0.8</strong>: Some semantic drift, needs business-specific judgment</li>
+<li><strong>&lt; 0.6</strong>: The rewrite has essentially drifted from the original meaning</li>
+</ul>
+<p>Your mileage will vary depending on the domain. The recommended approach is to take 100 real user queries, manually label expansion quality, plot the similarity distribution, and find the optimal cutoff point.</p>
+<h3 id="Value-of-This-Step"><a href="#Value-of-This-Step" class="headerlink" title="Value of This Step"></a>Value of This Step</h3><p>This step’s core value isn’t about raising the ceiling — it’s about holding the floor. It prevents the system from injecting noise through its own expansion module. Without this defense layer, the query expansion module is essentially a random noise injector, and system behavior becomes unpredictable.</p>
+<h2 id="Step-3-Hybrid-Retrieval-and-Reranking"><a href="#Step-3-Hybrid-Retrieval-and-Reranking" class="headerlink" title="Step 3: Hybrid Retrieval and Reranking"></a>Step 3: Hybrid Retrieval and Reranking</h2><h3 id="The-Problem-Merging-Scores-from-Two-Dimensions"><a href="#The-Problem-Merging-Scores-from-Two-Dimensions" class="headerlink" title="The Problem: Merging Scores from Two Dimensions"></a>The Problem: Merging Scores from Two Dimensions</h3><p>Everyone knows RAG needs hybrid retrieval: vector retrieval (Dense Retrieval) + keyword retrieval (BM25 Sparse Retrieval). Vector retrieval excels at semantic matching, BM25 excels at exact keyword matching — they complement each other.</p>
+<p>But here’s the problem.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Retrieval Method</th>
+<th>Score Range</th>
+<th>Example Score</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vector retrieval (cosine similarity)</td>
+<td>[0, 1]</td>
+<td>0.87</td>
+</tr>
+<tr>
+<td>BM25</td>
+<td>[0, +∞)</td>
+<td>15.3</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Vector retrieval scores are cosine similarity values between 0 and 1. BM25 scores can be tens or even hundreds. The two dimensions have completely different scales, and merging them requires resolving this scale conflict.</p>
+<p>The naive approach is normalization followed by weighted sum:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Naive approach (not recommended)</span></span><br><span class="line">final_score = <span class="number">0.7</span> * normalize(vector_score) + <span class="number">0.3</span> * normalize(bm25_score)</span><br></pre></td></tr></table></figure>
+<p>Both 0.7 and 0.3 are pulled out of thin air.</p>
+<p>Different query types have completely different optimal weight distributions:</p>
+<ul>
+<li>For precise keyword queries like “which clause covers breach of contract,” BM25 should carry more weight</li>
+<li>For semantically vague queries like “who is this product suitable for,” vector retrieval should carry more weight</li>
+</ul>
+<p>A fixed weight guessed from intuition means applying one strategy to every scenario — the results speak for themselves.</p>
+<h3 id="Industry-Solution-LambdaMART-Learning-to-Rank"><a href="#Industry-Solution-LambdaMART-Learning-to-Rank" class="headerlink" title="Industry Solution: LambdaMART Learning to Rank"></a>Industry Solution: LambdaMART Learning to Rank</h3><p>The industry standard is to use a Learning to Rank model, and LambdaMART is one of the most mature and widely adopted algorithms in this space.</p>
+<p>LambdaMART’s core idea: don’t rely on humans to guess weights — let the model learn them.</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">                  ┌──────────────┐</span><br><span class="line">Vector score ────→│              │</span><br><span class="line">                  │  LambdaMART  │──→ Unified score</span><br><span class="line">BM25 score ──────→│    Model     │</span><br><span class="line">                  │              │</span><br><span class="line">Other features ──→│              │</span><br><span class="line">(doc length,     └──────────────┘</span><br><span class="line"> title match,</span><br><span class="line"> position info)</span><br></pre></td></tr></table></figure>
+<p>What it does: take features from all retrieval channels (vector score, BM25 score, document length, title match score, position info, etc.) and map them to a single scoring dimension, producing a principled composite ranking score.</p>
+<h4 id="Why-LambdaMART"><a href="#Why-LambdaMART" class="headerlink" title="Why LambdaMART"></a>Why LambdaMART</h4><p>Learning to rank falls into three categories:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Representative Algorithms</th>
+<th>Characteristics</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pointwise</td>
+<td>Linear regression, Logistic regression</td>
+<td>Score each document independently, ignoring relative ordering</td>
+</tr>
+<tr>
+<td>Pairwise</td>
+<td>RankSVM, RankNet</td>
+<td>Optimize relative ordering of document pairs</td>
+</tr>
+<tr>
+<td>Listwise</td>
+<td>LambdaMART, LambdaRank</td>
+<td>Directly optimize ranking list metrics (e.g., NDCG)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>LambdaMART is a Listwise method — it directly optimizes ranking quality metrics like NDCG rather than scoring documents one at a time or in pairs. This works best for information retrieval because users care about the quality of the entire result list, not the absolute score of any single document.</p>
+<h4 id="Implementation"><a href="#Implementation" class="headerlink" title="Implementation"></a>Implementation</h4><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> lightgbm <span class="keyword">as</span> lgb</span><br><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">HybridRetriever</span>:</span></span><br><span class="line">    <span class="string">"""LambdaMART-based hybrid retrieval reranker"""</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">__init__</span><span class="params">(self)</span>:</span></span><br><span class="line">        self.lambdamart_model = <span class="literal">None</span></span><br><span class="line">        self.vector_retriever = VectorRetriever()</span><br><span class="line">        self.bm25_retriever = BM25Retriever()</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">retrieve</span><span class="params">(self, query: str, top_k: int = <span class="number">10</span>)</span> -&gt; list[dict]:</span></span><br><span class="line">        <span class="string">"""Hybrid retrieval + LambdaMART reranking"""</span></span><br><span class="line"></span><br><span class="line">        <span class="comment"># 1. Dual-channel recall</span></span><br><span class="line">        vector_results = self.vector_retriever.search(query, top_k=<span class="number">50</span>)</span><br><span class="line">        bm25_results = self.bm25_retriever.search(query, top_k=<span class="number">50</span>)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 2. Merge candidate sets (dedup)</span></span><br><span class="line">        candidates = self._merge_candidates(vector_results, bm25_results)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 3. Build feature matrix</span></span><br><span class="line">        features = self._build_features(query, candidates)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 4. LambdaMART reranking</span></span><br><span class="line">        reranked_scores = self.lambdamart_model.predict(features)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 5. Sort by reranking scores, return Top-K</span></span><br><span class="line">        sorted_indices = np.argsort(-reranked_scores)</span><br><span class="line">        <span class="keyword">return</span> [candidates[i] <span class="keyword">for</span> i <span class="keyword">in</span> sorted_indices[:top_k]]</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">_build_features</span><span class="params">(self, query: str, candidates: list)</span> -&gt; np.ndarray:</span></span><br><span class="line">        <span class="string">"""</span></span><br><span class="line"><span class="string">        Build feature vectors for each candidate document.</span></span><br><span class="line"><span class="string">        These features are LambdaMART's input.</span></span><br><span class="line"><span class="string">        """</span></span><br><span class="line">        features = []</span><br><span class="line">        <span class="keyword">for</span> doc <span class="keyword">in</span> candidates:</span><br><span class="line">            feature = [</span><br><span class="line">                doc[<span class="string">"vector_score"</span>],           <span class="comment"># Vector similarity score</span></span><br><span class="line">                doc[<span class="string">"bm25_score"</span>],             <span class="comment"># BM25 score</span></span><br><span class="line">                doc[<span class="string">"title_match_score"</span>],      <span class="comment"># Title match score</span></span><br><span class="line">                doc[<span class="string">"doc_length"</span>],             <span class="comment"># Document length</span></span><br><span class="line">                doc[<span class="string">"query_doc_overlap"</span>],      <span class="comment"># Keyword overlap rate between query and document</span></span><br><span class="line">                doc[<span class="string">"position_in_doc"</span>],        <span class="comment"># Position of matching passage within the document</span></span><br><span class="line">                doc[<span class="string">"section_level"</span>],          <span class="comment"># Section hierarchy level</span></span><br><span class="line">            ]</span><br><span class="line">            features.append(feature)</span><br><span class="line">        <span class="keyword">return</span> np.array(features)</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">train</span><span class="params">(self, train_data: lgb.Dataset, params: dict)</span>:</span></span><br><span class="line">        <span class="string">"""Train the LambdaMART model"""</span></span><br><span class="line">        params.update(&#123;</span><br><span class="line">            <span class="string">"objective"</span>: <span class="string">"lambdarank"</span>,     <span class="comment"># Learning to rank objective</span></span><br><span class="line">            <span class="string">"metric"</span>: <span class="string">"ndcg"</span>,              <span class="comment"># Optimize NDCG metric</span></span><br><span class="line">            <span class="string">"ndcg_eval_at"</span>: [<span class="number">5</span>, <span class="number">10</span>],       <span class="comment"># Evaluate at Top-5 and Top-10</span></span><br><span class="line">            <span class="string">"learning_rate"</span>: <span class="number">0.05</span>,</span><br><span class="line">            <span class="string">"num_leaves"</span>: <span class="number">31</span>,</span><br><span class="line">            <span class="string">"max_depth"</span>: <span class="number">6</span>,</span><br><span class="line">            <span class="string">"min_data_in_leaf"</span>: <span class="number">50</span>,</span><br><span class="line">        &#125;)</span><br><span class="line">        self.lambdamart_model = lgb.train(params, train_data)</span><br></pre></td></tr></table></figure>
+<p>Training data labeling isn’t complicated either: for a batch of real queries, label each candidate document’s relevance grade (0=irrelevant, 1=partially relevant, 2=fully relevant) and format it for learning-to-rank training.</p>
+<h3 id="Impact-of-This-Step-1"><a href="#Impact-of-This-Step-1" class="headerlink" title="Impact of This Step"></a>Impact of This Step</h3><p>Compared to fixed-weight linear fusion, LambdaMART reranking typically improves Recall@10 by 5–10 percentage points, with even more pronounced gains in NDCG@10. It’s also a lightweight model — inference latency is in the millisecond range, so it doesn’t affect production performance.</p>
+<h2 id="Step-4-Evaluation-Metric-Decomposition"><a href="#Step-4-Evaluation-Metric-Decomposition" class="headerlink" title="Step 4: Evaluation Metric Decomposition"></a>Step 4: Evaluation Metric Decomposition</h2><h3 id="Why-“85-Accuracy”-Isn’t-Convincing"><a href="#Why-“85-Accuracy”-Isn’t-Convincing" class="headerlink" title="Why “85% Accuracy” Isn’t Convincing"></a>Why “85% Accuracy” Isn’t Convincing</h3><p>Boss: What’s the system accuracy? You: 85%.</p>
+<p>Boss: What about the other 15%? You: Uh…</p>
+<p>Quoting an overall accuracy number is meaningless on its own because you don’t know where the failures are: did retrieval miss the right answer? Did retrieval find it but the LLM failed to use it? Did the LLM just make something up?</p>
+<p>Problems in different stages require completely different fixes. You need to break the metrics apart.</p>
+<h3 id="Two-Core-Metrics"><a href="#Two-Core-Metrics" class="headerlink" title="Two Core Metrics"></a>Two Core Metrics</h3><p>For RAG system evaluation, tracking two metrics is sufficient.</p>
+<h4 id="Metric-1-Context-Recall"><a href="#Metric-1-Context-Recall" class="headerlink" title="Metric 1: Context Recall"></a>Metric 1: Context Recall</h4><blockquote>
+<p><strong>Definition</strong>: Does the correct answer to the user’s question appear in the Top-N retrieved chunks?</p>
+</blockquote>
+<p>In other words: did the retrieval stage find the “clues to the right answer”?</p>
+<ul>
+<li>If the correct answer isn’t in the Top-N → retrieval has a problem → optimize document chunking, query expansion, retrieval strategy</li>
+<li>If the correct answer is in the Top-N but the final answer is wrong → retrieval is fine, the problem is in the generation stage</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">compute_context_recall</span><span class="params">(</span></span></span><br><span class="line"><span class="function"><span class="params">    question: str,</span></span></span><br><span class="line"><span class="function"><span class="params">    ground_truth: str,</span></span></span><br><span class="line"><span class="function"><span class="params">    retrieved_chunks: list[str],</span></span></span><br><span class="line"><span class="function"><span class="params">    evaluator_llm</span></span></span><br><span class="line"><span class="function"><span class="params">)</span> -&gt; float:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Compute Context Recall.</span></span><br><span class="line"><span class="string">    Core idea: check whether key information from the ground truth</span></span><br><span class="line"><span class="string">    appears in the retrieved chunks.</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    prompt = <span class="string">f"""</span></span><br><span class="line"><span class="string">    Question: <span class="subst">&#123;question&#125;</span></span></span><br><span class="line"><span class="string">    Ground truth: <span class="subst">&#123;ground_truth&#125;</span></span></span><br><span class="line"><span class="string">    Retrieved context:</span></span><br><span class="line"><span class="string">    <span class="subst">&#123;<span class="string">""</span>.join([<span class="string">f"[<span class="subst">&#123;i+<span class="number">1</span>&#125;</span>] <span class="subst">&#123;chunk&#125;</span>"</span> <span class="keyword">for</span> i, chunk <span class="keyword">in</span> enumerate(retrieved_chunks)])&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">    Judge: how much of the key information in the ground truth can be found</span></span><br><span class="line"><span class="string">    in the retrieved context?</span></span><br><span class="line"><span class="string">    Return a score between 0 and 1.</span></span><br><span class="line"><span class="string">    Scoring criteria:</span></span><br><span class="line"><span class="string">    - 1.0: All key information found in context</span></span><br><span class="line"><span class="string">    - 0.5: Some key information found</span></span><br><span class="line"><span class="string">    - 0.0: Key information completely absent</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    score = evaluator_llm.generate(prompt)</span><br><span class="line">    <span class="keyword">return</span> float(score)</span><br></pre></td></tr></table></figure>
+<h4 id="Metric-2-Faithfulness"><a href="#Metric-2-Faithfulness" class="headerlink" title="Metric 2: Faithfulness"></a>Metric 2: Faithfulness</h4><blockquote>
+<p><strong>Definition</strong>: Is the LLM’s generated answer faithful to the retrieved sources? Or did it make things up?</p>
+</blockquote>
+<p>This is what we commonly call the hallucination rate. If the retrieved sources clearly say A, but the LLM says B, that’s unfaithful.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">compute_faithfulness</span><span class="params">(</span></span></span><br><span class="line"><span class="function"><span class="params">    answer: str,</span></span></span><br><span class="line"><span class="function"><span class="params">    retrieved_chunks: list[str],</span></span></span><br><span class="line"><span class="function"><span class="params">    evaluator_llm</span></span></span><br><span class="line"><span class="function"><span class="params">)</span> -&gt; float:</span></span><br><span class="line">    <span class="string">"""</span></span><br><span class="line"><span class="string">    Compute Faithfulness.</span></span><br><span class="line"><span class="string">    Core idea: check whether every claim in the answer can be</span></span><br><span class="line"><span class="string">    traced back to the retrieved sources.</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    <span class="comment"># 1. Decompose the answer into independent claims</span></span><br><span class="line">    claims_prompt = <span class="string">f"""</span></span><br><span class="line"><span class="string">    Decompose the following answer into independent factual claims:</span></span><br><span class="line"><span class="string">    <span class="subst">&#123;answer&#125;</span></span></span><br><span class="line"><span class="string">    One claim per line.</span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    claims = evaluator_llm.generate(claims_prompt).strip().split(<span class="string">"\n"</span>)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 2. Check each claim against the retrieved sources</span></span><br><span class="line">    context = <span class="string">"\n"</span>.join(retrieved_chunks)</span><br><span class="line">    supported_count = <span class="number">0</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> claim <span class="keyword">in</span> claims:</span><br><span class="line">        check_prompt = <span class="string">f"""</span></span><br><span class="line"><span class="string">        Claim: <span class="subst">&#123;claim&#125;</span></span></span><br><span class="line"><span class="string">        Context sources:</span></span><br><span class="line"><span class="string">        <span class="subst">&#123;context&#125;</span></span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">        Can this claim be supported by the context sources?</span></span><br><span class="line"><span class="string">        Answer "yes" or "no".</span></span><br><span class="line"><span class="string">        """</span></span><br><span class="line">        result = evaluator_llm.generate(check_prompt).strip().lower()</span><br><span class="line">        <span class="keyword">if</span> result == <span class="string">"yes"</span>:</span><br><span class="line">            supported_count += <span class="number">1</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 3. Faithfulness = supported claims / total claims</span></span><br><span class="line">    <span class="keyword">return</span> supported_count / len(claims) <span class="keyword">if</span> claims <span class="keyword">else</span> <span class="number">0.0</span></span><br></pre></td></tr></table></figure>
+<h3 id="Driving-Optimization-with-Decomposed-Metrics"><a href="#Driving-Optimization-with-Decomposed-Metrics" class="headerlink" title="Driving Optimization with Decomposed Metrics"></a>Driving Optimization with Decomposed Metrics</h3><p>Once you monitor these two metrics, precise problem localization becomes possible:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th style="text-align:center">Context Recall</th>
+<th style="text-align:center">Faithfulness</th>
+<th>Diagnosis</th>
+<th>Optimization Direction</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">High</td>
+<td style="text-align:center">High</td>
+<td>✅ System is healthy</td>
+<td>Maintain status quo</td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>Low</strong></td>
+<td style="text-align:center">High</td>
+<td>Retrieval missed the target, generation is fine</td>
+<td>Optimize chunking, query expansion, retrieval strategy</td>
+</tr>
+<tr>
+<td style="text-align:center">High</td>
+<td style="text-align:center"><strong>Low</strong></td>
+<td>Retrieval found the right stuff, but the LLM hallucinated</td>
+<td>Optimize prompt, add citation constraints, try a different model</td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>Low</strong></td>
+<td style="text-align:center"><strong>Low</strong></td>
+<td>Problems across the pipeline</td>
+<td>End-to-end systematic debugging</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>This is how you engineer the system. Not blindly tuning parameters against a single aggregate number, but using decomposed metrics to pinpoint the failing stage and optimize surgically.</p>
+<h2 id="Results-Cumulative-Gains-from-Four-Steps"><a href="#Results-Cumulative-Gains-from-Four-Steps" class="headerlink" title="Results: Cumulative Gains from Four Steps"></a>Results: Cumulative Gains from Four Steps</h2><p>Stringing the four optimization steps together, here’s what a typical gain curve looks like:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">Accuracy</span><br><span class="line">  │</span><br><span class="line">  │                                          ● 85%</span><br><span class="line">  │                                    ●─────┘</span><br><span class="line">  │                              ●─────┘</span><br><span class="line">  │  ● 60%               ●─────┘</span><br><span class="line">  │  │  Baseline    ●─────┘</span><br><span class="line">  │  │              │</span><br><span class="line">  │  │    +15pp     │ +5pp</span><br><span class="line">  │  │  (Chunking)  │(Hybrid rerank)</span><br><span class="line">  │  │              │</span><br><span class="line">  │  ●────────●─────●</span><br><span class="line">  │           │</span><br><span class="line">  │     Hold the floor</span><br><span class="line">  │    (Query validation)</span><br><span class="line">  └────────────────────────────────→</span><br><span class="line">     Baseline  Step 1  Step 2  Step 3  Step 4</span><br><span class="line">                               (Metric decomposition)</span><br></pre></td></tr></table></figure>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Optimization Step</th>
+<th>Core Action</th>
+<th>Typical Gain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Step 1: Chunking</td>
+<td>Semantic-aware dynamic splitting + overlap windows</td>
+<td><strong>+10–15pp</strong></td>
+</tr>
+<tr>
+<td>Step 2: Query validation</td>
+<td>Expansion + cosine similarity ≥ 0.8 fallback</td>
+<td>Hold the floor, prevent regression</td>
+</tr>
+<tr>
+<td>Step 3: Hybrid reranking</td>
+<td>LambdaMART unified scoring</td>
+<td><strong>+5–10pp</strong> (Recall@10)</td>
+</tr>
+<tr>
+<td>Step 4: Metric decomposition</td>
+<td>Separate monitoring of Context Recall + Faithfulness</td>
+<td>Precise localization, continuous iteration</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="Closing-Thoughts"><a href="#Closing-Thoughts" class="headerlink" title="Closing Thoughts"></a>Closing Thoughts</h2><p>The four optimization steps share a common trait: none of them require a bigger model or more expensive GPUs. They’re pure engineering improvements extracted from the existing pipeline. Document chunking solves the information fragmentation problem. Query validation holds the floor on input quality. LambdaMART reranking gives multi-channel retrieval scores a principled way to merge. Metric decomposition turns problem localization from guesswork into precise diagnosis.</p>
+<p>Going from 60% to 85% after these four steps isn’t surprising. What I find more valuable is the methodology this process established: lay out the full pipeline, decompose it by priority, and quantify the gain at each step. Getting a RAG system from demo to production doesn’t come from a single breakthrough — it comes from engineering discipline applied across the entire pipeline.</p>
+<hr>
+<p><strong>References</strong>:</p>
+<ul>
+<li><a href="https://www.anthropic.com/news/contextual-retrieval" target="_blank" rel="noopener">Anthropic Contextual Retrieval</a></li>
+<li><a href="https://github.com/explodinggradients/ragas" target="_blank" rel="noopener">RAGAS — RAG Evaluation Framework</a></li>
+<li><a href="https://lightgbm.readthedocs.io/en/latest/parameters.html#learning-rate-parameters" target="_blank" rel="noopener">LightGBM LambdaRank Documentation</a></li>
+<li><a href="https://www.sbert.net/" target="_blank" rel="noopener">Sentence Transformers</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/RAG/" rel="tag"><i class="fa fa-tag"></i> RAG</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/04/30/095_multi-agent-decision-and-evaluation-en/" rel="prev" title="Designing and Evaluating Multi-Agent Systems">
+      <i class="fa fa-chevron-left"></i> Designing and Evaluating Multi-Agent Systems
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2026/05/14/097_dram-nand-flash-deep-analysis-en/" rel="next" title="The Storage Chip Duo: A Complete Analysis of DRAM and NAND Flash">
+      The Storage Chip Duo: A Complete Analysis of DRAM and NAND Flash <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Background"><span class="nav-number">1.</span> <span class="nav-text">Background</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#The-Full-Pipeline-Optimization-Map"><span class="nav-number">2.</span> <span class="nav-text">The Full-Pipeline Optimization Map</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Step-1-Document-Chunking"><span class="nav-number">3.</span> <span class="nav-text">Step 1: Document Chunking</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Why-Chunking-Is-the-Foundation"><span class="nav-number">3.1.</span> <span class="nav-text">Why Chunking Is the Foundation</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#How-the-Industry-Does-It-Semantic-Aware-Dynamic-Chunking"><span class="nav-number">3.2.</span> <span class="nav-text">How the Industry Does It: Semantic-Aware Dynamic Chunking</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Step-1-Document-Structure-Parsing"><span class="nav-number">3.2.1.</span> <span class="nav-text">Step 1: Document Structure Parsing</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Step-2-Semantic-Integrity-Protection"><span class="nav-number">3.2.2.</span> <span class="nav-text">Step 2: Semantic Integrity Protection</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Step-3-Overlapping-Context-Windows"><span class="nav-number">3.2.3.</span> <span class="nav-text">Step 3: Overlapping Context Windows</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Impact-of-This-Step"><span class="nav-number">3.3.</span> <span class="nav-text">Impact of This Step</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Step-2-Query-Processing"><span class="nav-number">4.</span> <span class="nav-text">Step 2: Query Processing</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Real-User-Queries-Can-Be-Brutally-Vague"><span class="nav-number">4.1.</span> <span class="nav-text">Real User Queries Can Be Brutally Vague</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#The-Standard-Approach-Query-Expansion"><span class="nav-number">4.2.</span> <span class="nav-text">The Standard Approach: Query Expansion</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#The-Pitfall-Hallucination-in-the-Rewrite-Model"><span class="nav-number">4.3.</span> <span class="nav-text">The Pitfall: Hallucination in the Rewrite Model</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#The-Safety-Net-Cosine-Similarity-Validation"><span class="nav-number">4.4.</span> <span class="nav-text">The Safety Net: Cosine Similarity Validation</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Value-of-This-Step"><span class="nav-number">4.5.</span> <span class="nav-text">Value of This Step</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Step-3-Hybrid-Retrieval-and-Reranking"><span class="nav-number">5.</span> <span class="nav-text">Step 3: Hybrid Retrieval and Reranking</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#The-Problem-Merging-Scores-from-Two-Dimensions"><span class="nav-number">5.1.</span> <span class="nav-text">The Problem: Merging Scores from Two Dimensions</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Industry-Solution-LambdaMART-Learning-to-Rank"><span class="nav-number">5.2.</span> <span class="nav-text">Industry Solution: LambdaMART Learning to Rank</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Why-LambdaMART"><span class="nav-number">5.2.1.</span> <span class="nav-text">Why LambdaMART</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Implementation"><span class="nav-number">5.2.2.</span> <span class="nav-text">Implementation</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Impact-of-This-Step-1"><span class="nav-number">5.3.</span> <span class="nav-text">Impact of This Step</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Step-4-Evaluation-Metric-Decomposition"><span class="nav-number">6.</span> <span class="nav-text">Step 4: Evaluation Metric Decomposition</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Why-“85-Accuracy”-Isn’t-Convincing"><span class="nav-number">6.1.</span> <span class="nav-text">Why “85% Accuracy” Isn’t Convincing</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Two-Core-Metrics"><span class="nav-number">6.2.</span> <span class="nav-text">Two Core Metrics</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Metric-1-Context-Recall"><span class="nav-number">6.2.1.</span> <span class="nav-text">Metric 1: Context Recall</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Metric-2-Faithfulness"><span class="nav-number">6.2.2.</span> <span class="nav-text">Metric 2: Faithfulness</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Driving-Optimization-with-Decomposed-Metrics"><span class="nav-number">6.3.</span> <span class="nav-text">Driving Optimization with Decomposed Metrics</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Results-Cumulative-Gains-from-Four-Steps"><span class="nav-number">7.</span> <span class="nav-text">Results: Cumulative Gains from Four Steps</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Closing-Thoughts"><span class="nav-number">8.</span> <span class="nav-text">Closing Thoughts</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/05/05/096_rag-accuracy-optimization-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/05/05/096_rag-accuracy-optimization-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

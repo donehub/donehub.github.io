@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="After Anthropic open-sourced Claude Code, a common question from the community was: why not use LangChain or LangGraph? These two frameworks are the de facto standard in agent development. Building so">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Why Claude Code Doesn&#39;t Use LangChain">
+<meta property="og:url" content="https://donehub.github.io/en/2026/04/15/090_claude-code-why-no-langchain-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="After Anthropic open-sourced Claude Code, a common question from the community was: why not use LangChain or LangGraph? These two frameworks are the de facto standard in agent development. Building so">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-04-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T10:16:43.017Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Architecture">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/04/15/090_claude-code-why-no-langchain-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>Why Claude Code Doesn't Use LangChain | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/04/15/090_claude-code-why-no-langchain-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Why Claude Code Doesn't Use LangChain
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-04-15 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-15T00:00:00+08:00">2026-04-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 18:16:43" itemprop="dateModified" datetime="2026-09-25T18:16:43+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/04/15/090_claude-code-why-no-langchain-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/04/15/090_claude-code-why-no-langchain-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>After Anthropic open-sourced Claude Code, a common question from the community was: why not use LangChain or LangGraph? These two frameworks are the de facto standard in agent development. Building something from scratch instead of using them must have a reason. After reading the source, the reasons are more specific than most people guess. It’s not that these frameworks are bad — Claude Code’s product form and LangChain’s design assumptions are just fundamentally mismatched.</p>
+<a id="more"></a>
+<h2 id="Product-Form-Determines-Architecture"><a href="#Product-Form-Determines-Architecture" class="headerlink" title="Product Form Determines Architecture"></a>Product Form Determines Architecture</h2><p>Before getting into the technical analysis, it’s worth clarifying the most fundamental difference between Claude Code and most agents built with LangChain. LangChain addresses this scenario: a developer builds an application, a user submits a request, the application returns a result. The entire process follows a request-response model where second-level latency is perfectly acceptable.</p>
+<p>Claude Code faces a completely different scenario: the user works in a continuously interactive terminal. Every keystroke, every command expects immediate feedback. While the model is thinking, the user needs to see progress in real time. Tool call results need to appear on the terminal within milliseconds. This is a latency-sensitive CLI interaction scenario, not a web application where you can afford to wait.</p>
+<p>This difference in product form directly drives the architectural fork.</p>
+<h2 id="The-Serial-Problem-with-ReAct"><a href="#The-Serial-Problem-with-ReAct" class="headerlink" title="The Serial Problem with ReAct"></a>The Serial Problem with ReAct</h2><p>LangChain and LangGraph both base their core execution logic on the ReAct pattern (Reasoning + Acting): the model completes a full round of thinking, outputs which tools and parameters to call, the framework parses that output, executes the tools, appends results to context, and feeds it back to the model for the next round. The loop is logically clean, but it has an inherent problem. Every step is serial. The model must wait for tool execution to finish before continuing to think. The user must wait for the model’s complete output before seeing tools start running.</p>
+<p>For web applications or background batch processing, this serial execution doesn’t create noticeable experience issues. But in a CLI interaction scenario, the user stares at the terminal waiting for the model’s complete output, then waits for tools to start executing. That dead time directly affects the experience. As task complexity increases and multiple tools need to be called in sequence, this waiting compounds into significant latency.</p>
+<h3 id="The-Streaming-State-Machine"><a href="#The-Streaming-State-Machine" class="headerlink" title="The Streaming State Machine"></a>The Streaming State Machine</h3><p>Claude Code implements a streaming state machine using AsyncGenerator. The core logic lives in <code>src/query.ts</code>, roughly 1,730 lines. It uses a <code>while (true)</code> loop with state assignment to drive the entire agent:</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">async</span> <span class="function"><span class="keyword">function</span>* <span class="title">query</span>(<span class="params">params: QueryParams</span>): <span class="title">AsyncGenerator</span>&lt;<span class="title">QueryUpdate</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">let</span> state: State = &#123;</span><br><span class="line">    messages: [...],</span><br><span class="line">    toolUseContext: &#123;...&#125;,</span><br><span class="line">    turnCount: <span class="number">0</span>,</span><br><span class="line">    transition: <span class="literal">undefined</span>,</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">    <span class="comment">// Phase 1: Message compression (automatic Token overflow handling)</span></span><br><span class="line">    <span class="comment">// Phase 2: Streaming API call (immediate tool execution)</span></span><br><span class="line">    <span class="comment">// Phase 3: Decision point (continue or stop)</span></span><br><span class="line">    <span class="comment">// Phase 4: Tool orchestration (parallel for reads, serial for writes)</span></span><br><span class="line">    <span class="comment">// Phase 5: State update</span></span><br><span class="line"></span><br><span class="line">    state = next  <span class="comment">// Loop driven by assignment</span></span><br><span class="line">    <span class="keyword">continue</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>The key difference: tools don’t wait for the model to finish outputting before they start executing. During the model’s streaming output, as soon as a complete <code>tool_use</code> block is detected, execution triggers immediately. What users perceive is that model thinking and tool execution happen simultaneously, not sequentially.</p>
+<h3 id="StreamingToolExecutor"><a href="#StreamingToolExecutor" class="headerlink" title="StreamingToolExecutor"></a>StreamingToolExecutor</h3><p>This capability is powered by the StreamingToolExecutor. As the model begins streaming output, the Executor parses the output stream in real time. Once it identifies a complete <code>tool_use</code> block (tool name and parameters both present), it immediately starts tool execution without waiting for the model’s current turn to finish.</p>
+<p>The latency difference is clear. ReAct’s total latency is the sum of model generation time and tool execution time. Claude Code’s latency is the maximum of the two, because their execution timelines overlap. While the model is still generating subsequent text, the Read tool is already reading files. For tasks requiring multiple sequential tool calls, this difference gets amplified.</p>
+<h2 id="API-Native-Feature-Utilization"><a href="#API-Native-Feature-Utilization" class="headerlink" title="API Native Feature Utilization"></a>API Native Feature Utilization</h2><h3 id="The-Adaptation-Cost-of-General-Frameworks"><a href="#The-Adaptation-Cost-of-General-Frameworks" class="headerlink" title="The Adaptation Cost of General Frameworks"></a>The Adaptation Cost of General Frameworks</h3><p>LangChain needs to support model APIs from OpenAI, Anthropic, Google, and others, so it builds an abstraction layer between them. This abstraction’s value is reducing the cost of switching model providers. The price is that each provider’s unique capabilities get flattened or delayed in support.</p>
+<p>Anthropic’s API has several capabilities that Claude Code relies on heavily:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+<th>Significance for Claude Code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prompt Caching</td>
+<td>Prompt cache; ~90% token cost reduction on cache hits</td>
+<td>Large system prompt means caching directly affects costs</td>
+</tr>
+<tr>
+<td>Native tool_use blocks</td>
+<td>Structured tool call blocks directly in model output</td>
+<td>No text parsing needed; more reliable than OutputParser</td>
+</tr>
+<tr>
+<td>Native streaming tool_use</td>
+<td>Tool call blocks can trigger immediately during streaming</td>
+<td>Core capability enabling streaming execution</td>
+</tr>
+<tr>
+<td>Extended Thinking</td>
+<td>Chain-of-thought output</td>
+<td>Visualization of reasoning for complex tasks</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>LangChain eventually added support for these features, but the timeliness and precision lag behind native integration. Take Prompt Caching as an example: when Anthropic launched this capability in late 2024, LangChain took weeks to adapt, and the initial implementation had imprecise cache boundary划分.</p>
+<h3 id="Concrete-Benefits-of-Native-Integration"><a href="#Concrete-Benefits-of-Native-Integration" class="headerlink" title="Concrete Benefits of Native Integration"></a>Concrete Benefits of Native Integration</h3><p>Claude Code uses the Anthropic SDK directly, giving precise control over cache boundary placement. The system prompt is split into two regions: the static region (role definition, system rules, tool descriptions) uses global caching, and the dynamic region (current environment, user memory) uses session-level caching.</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Static cacheable region - reused across sessions</span></span><br><span class="line"><span class="keyword">const</span> systemPrompt = &#123;</span><br><span class="line">  <span class="keyword">type</span>: <span class="string">'text'</span>,</span><br><span class="line">  text: <span class="string">`...`</span>,</span><br><span class="line">  cache_control: &#123; <span class="keyword">type</span>: <span class="string">'ephemeral'</span> &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Dynamic region - differs per session</span></span><br><span class="line"><span class="keyword">const</span> dynamicPrompt = &#123;</span><br><span class="line">  <span class="keyword">type</span>: <span class="string">'text'</span>,</span><br><span class="line">  text: <span class="string">`...`</span>,</span><br><span class="line">  cache_control: &#123; <span class="keyword">type</span>: <span class="string">'ephemeral'</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>The first call bills at full token cost. On subsequent calls, the static region is fully cached. Given that Claude Code’s system prompt typically runs tens of thousands of tokens, this caching mechanism has a major cost impact.</p>
+<p>For tool calls, Anthropic API’s native <code>tool_use</code> blocks mean Claude Code doesn’t need any text parsing. The model output directly contains structured tool names and parameters that the framework can execute immediately. When LangChain lacked native tool_use support, it needed an OutputParser to extract tool call information from the model’s natural language output. That parsing process is inherently fragile — slight format variations from the model can cause parse failures.</p>
+<h2 id="Performance-The-Cost-of-Abstraction-Layers"><a href="#Performance-The-Cost-of-Abstraction-Layers" class="headerlink" title="Performance: The Cost of Abstraction Layers"></a>Performance: The Cost of Abstraction Layers</h2><p>A single LangChain agent call passes through this abstraction chain from user code to actual API request: User Code → Chain → AgentExecutor → LLM → Memory → Tools → OutputParser → API Call. Each layer has its own processing logic: parameter validation, state serialization, callback triggering, logging. For web applications, this overhead is a small fraction of the total request cycle. But CLI interaction scenarios have very low latency tolerance — every second the user waits in the terminal is perceptible.</p>
+<p>Claude Code’s call chain is: User Input → query() AsyncGenerator → Anthropic SDK → Tool Execution. No intermediate abstraction layers. API responses stream directly to the rendering layer, and tool execution results flow back in real time.</p>
+<h3 id="Tool-Orchestration-Concurrency-Strategy"><a href="#Tool-Orchestration-Concurrency-Strategy" class="headerlink" title="Tool Orchestration Concurrency Strategy"></a>Tool Orchestration Concurrency Strategy</h3><p>Claude Code implements automated concurrency control in tool orchestration. The framework checks each tool’s <code>isReadOnly</code> and <code>isConcurrencySafe</code> declarations to determine which tools can run in parallel and which must be serial. Read-only tools (Read, Grep, Glob, WebFetch) run in parallel by default. Write tools (FileEdit, Write, Bash) are strictly serial.</p>
+<p>LangChain executes all tools serially by default. Parallel execution requires manual developer configuration. This difference becomes significant with many tools: a task that needs to read five files simultaneously gets done in parallel by Claude Code, while LangChain waits through five serial reads by default.</p>
+<h2 id="Controllability-The-Precision-of-Building-Your-Own"><a href="#Controllability-The-Precision-of-Building-Your-Own" class="headerlink" title="Controllability: The Precision of Building Your Own"></a>Controllability: The Precision of Building Your Own</h2><p>When using LangChain or LangGraph, the framework’s internal decision processes are opaque to developers. Tool execution order, error recovery strategies, token overflow handling — these critical behaviors are encapsulated inside the framework. Developers can only adjust through limited configuration interfaces. When you hit an edge case the framework doesn’t cover, you’re stuck either working around the framework or waiting for an update.</p>
+<p>Claude Code chose to build from scratch, trading that effort for control precision at every stage.</p>
+<p><strong>Permission system.</strong> Tool permission checks aren’t a simple allow/deny toggle. It’s a four-stage decision pipeline: deny rules at highest priority, then the tool’s own permission check, then allow rule matching, and finally asking the user. This pipeline can control down to specific operation types within specific tools.</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">checkPermissions</span>(<span class="params">tool, input, context</span>) </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (matchesDenyRule(tool.name)) <span class="keyword">return</span> &#123; behavior: <span class="string">'deny'</span> &#125;</span><br><span class="line">  <span class="keyword">if</span> (tool.checkPermissions) &#123;</span><br><span class="line">    <span class="keyword">const</span> result = <span class="keyword">await</span> tool.checkPermissions(input, context)</span><br><span class="line">    <span class="keyword">if</span> (result.behavior !== <span class="string">'passthrough'</span>) <span class="keyword">return</span> result</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">if</span> (matchesAllowRule(tool.name, input)) <span class="keyword">return</span> &#123; behavior: <span class="string">'allow'</span> &#125;</span><br><span class="line">  <span class="keyword">return</span> &#123; behavior: <span class="string">'ask'</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>Context compression.</strong> When conversation history exceeds the token limit, Claude Code uses four-level progressive compression: first remove redundant content from old messages (Snip), then modify already-cached message content (Micro), then progressively summarize historical messages (Collapse), and finally generate a complete summary through the model (Auto Compact). Each level differs in compression intensity and cost. The system automatically selects the appropriate level based on current context length. LangChain’s default approach is truncation or simple summary — there’s a precision gap.</p>
+<p><strong>Hook system.</strong> Users can inject custom logic before and after tool execution (run safety checks before Bash execution, run tests after FileEdit). This mechanism is configured through settings.json with no source code changes needed. Implementing the same in LangChain requires class inheritance or callback wrapping — higher complexity.</p>
+<h2 id="Capability-Mapping"><a href="#Capability-Mapping" class="headerlink" title="Capability Mapping"></a>Capability Mapping</h2><p>LangChain and LangGraph provide certain capabilities. Claude Code replaces each with its own implementation:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>LangChain/LangGraph Capability</th>
+<th>Claude Code’s Replacement</th>
+<th>Corresponding File</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Agent loop (ReAct)</td>
+<td>AsyncGenerator state machine</td>
+<td><code>src/query.ts</code></td>
+</tr>
+<tr>
+<td>Tool definition</td>
+<td>Tool type + buildTool()</td>
+<td><code>src/Tool.ts</code></td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>Channel system + file memory</td>
+<td><code>src/state/</code>, <code>src/memdir/</code></td>
+</tr>
+<tr>
+<td>OutputParser</td>
+<td>Native tool_use blocks</td>
+<td>No parsing needed</td>
+</tr>
+<tr>
+<td>Callbacks</td>
+<td>Hook system</td>
+<td><code>src/hooks/</code></td>
+</tr>
+<tr>
+<td>StateGraph (LangGraph)</td>
+<td>State object + state assignment</td>
+<td><code>src/query.ts</code></td>
+</tr>
+<tr>
+<td>Checkpoint (LangGraph)</td>
+<td>Message history + filesystem</td>
+<td><code>src/assistant/</code></td>
+</tr>
+<tr>
+<td>Multi-agent orchestration</td>
+<td>AgentTool + sub-agent system</td>
+<td><code>src/tools/AgentTool/</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Claude Code didn’t build from scratch because it was missing capabilities. Everything LangChain can do, it can do too — just differently. The differences lie mainly in execution model (streaming vs. serial), control precision (native integration vs. framework abstraction), and performance characteristics (zero intermediate layers vs. multi-layer abstraction).</p>
+<h2 id="When-You-Should-Use-LangChain"><a href="#When-You-Should-Use-LangChain" class="headerlink" title="When You Should Use LangChain"></a>When You Should Use LangChain</h2><p>After discussing Claude Code’s choices, it’s worth stating objectively: not using LangChain doesn’t mean LangChain is bad. Claude Code’s custom-built path has prerequisites: a top-tier engineering team capable of maintaining a custom architecture, support for only a single model API, and a product form that’s extremely latency-sensitive.</p>
+<p>If your scenario doesn’t meet these conditions, LangChain or LangGraph is probably the better choice. Small teams doing rapid validation benefit from LangChain’s out-of-the-box capabilities, saving significant infrastructure setup time. When you need multi-model support, LangChain’s model abstraction layer is a genuine advantage. For latency-insensitive web applications, ReAct’s serial problem has minimal impact. When you need to visualize agent flows, LangGraph’s StateGraph has a ready-made solution. Without a dedicated infrastructure team, building from scratch means handling error recovery, caching strategies, permission control, and all the details yourself.</p>
+<p>Claude Code chose to build from scratch because its product positioning and team conditions made the investment worthwhile. For most teams, using LangChain to focus energy on business logic rather than reimplementing an agent framework is probably the more pragmatic choice.</p>
+<h2 id="Wrapping-Up"><a href="#Wrapping-Up" class="headerlink" title="Wrapping Up"></a>Wrapping Up</h2><p>The core reason Claude Code doesn’t use LangChain comes down to a mismatch between product form and framework design assumptions. LangChain is designed for general agent development scenarios, pursuing cross-model compatibility and development efficiency. Claude Code targets a specific CLI interaction scenario, pursuing maximum response speed and control precision. The former is a general-purpose tool. The latter is a specialized system optimized for a specific use case.</p>
+<p>There’s no absolute right or wrong here. The key judgment is whether your product form justifies building a dedicated agent framework. If the answer is yes, Claude Code’s path provides a reference. If the answer is no, LangChain remains the more efficient starting point.</p>
+<hr>
+<p><strong>Series Navigation:</strong></p>
+<ul>
+<li>Previous: <a href="/2026/04/07/089_claude-code-architecture-overview/">Claude Code Architecture Overview</a></li>
+<li>Next: <a href="/2026/04/06/077_claude-code-async-generator-state-machine/">Breaking the ReAct Myth: Async Generator State Machine</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Architecture/" rel="tag"><i class="fa fa-tag"></i> Architecture</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/04/07/089_claude-code-architecture-overview-en/" rel="prev" title="Claude Code Architecture Overview">
+      <i class="fa fa-chevron-left"></i> Claude Code Architecture Overview
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2026/04/17/091_hermes-agent-introduction-en/" rel="next" title="Hermes Agent: The AI Assistant That Actually Remembers You">
+      Hermes Agent: The AI Assistant That Actually Remembers You <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Product-Form-Determines-Architecture"><span class="nav-number">1.</span> <span class="nav-text">Product Form Determines Architecture</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#The-Serial-Problem-with-ReAct"><span class="nav-number">2.</span> <span class="nav-text">The Serial Problem with ReAct</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#The-Streaming-State-Machine"><span class="nav-number">2.1.</span> <span class="nav-text">The Streaming State Machine</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#StreamingToolExecutor"><span class="nav-number">2.2.</span> <span class="nav-text">StreamingToolExecutor</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#API-Native-Feature-Utilization"><span class="nav-number">3.</span> <span class="nav-text">API Native Feature Utilization</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#The-Adaptation-Cost-of-General-Frameworks"><span class="nav-number">3.1.</span> <span class="nav-text">The Adaptation Cost of General Frameworks</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Concrete-Benefits-of-Native-Integration"><span class="nav-number">3.2.</span> <span class="nav-text">Concrete Benefits of Native Integration</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Performance-The-Cost-of-Abstraction-Layers"><span class="nav-number">4.</span> <span class="nav-text">Performance: The Cost of Abstraction Layers</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Tool-Orchestration-Concurrency-Strategy"><span class="nav-number">4.1.</span> <span class="nav-text">Tool Orchestration Concurrency Strategy</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Controllability-The-Precision-of-Building-Your-Own"><span class="nav-number">5.</span> <span class="nav-text">Controllability: The Precision of Building Your Own</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Capability-Mapping"><span class="nav-number">6.</span> <span class="nav-text">Capability Mapping</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#When-You-Should-Use-LangChain"><span class="nav-number">7.</span> <span class="nav-text">When You Should Use LangChain</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Wrapping-Up"><span class="nav-number">8.</span> <span class="nav-text">Wrapping Up</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/04/15/090_claude-code-why-no-langchain-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/04/15/090_claude-code-why-no-langchain-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

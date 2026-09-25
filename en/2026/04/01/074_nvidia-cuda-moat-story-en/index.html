@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="It Starts with a Compute ShortageIn 2026, scrambling for compute has become the norm in the AI industry. China’s compute crunch traces back to one dependency: AI needs GPUs, and for high-end GPUs, NVI">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CUDA: How NVIDIA Built a Twenty-Year Moat, One Layer at a Time">
+<meta property="og:url" content="https://donehub.github.io/en/2026/04/01/074_nvidia-cuda-moat-story-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="It Starts with a Compute ShortageIn 2026, scrambling for compute has become the norm in the AI industry. China’s compute crunch traces back to one dependency: AI needs GPUs, and for high-end GPUs, NVI">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-03-31T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T09:16:01.063Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="GPU">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/04/01/074_nvidia-cuda-moat-story-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>CUDA: How NVIDIA Built a Twenty-Year Moat, One Layer at a Time | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/04/01/074_nvidia-cuda-moat-story-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          CUDA: How NVIDIA Built a Twenty-Year Moat, One Layer at a Time
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-04-01 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-01T00:00:00+08:00">2026-04-01</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:16:01" itemprop="dateModified" datetime="2026-09-25T17:16:01+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/04/01/074_nvidia-cuda-moat-story-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/04/01/074_nvidia-cuda-moat-story-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="It-Starts-with-a-Compute-Shortage"><a href="#It-Starts-with-a-Compute-Shortage" class="headerlink" title="It Starts with a Compute Shortage"></a>It Starts with a Compute Shortage</h2><p>In 2026, scrambling for compute has become the norm in the AI industry. China’s compute crunch traces back to one dependency: AI needs GPUs, and for high-end GPUs, NVIDIA is virtually the only option. Many people know NVIDIA sells graphics cards, but fewer are familiar with CUDA. CUDA is NVIDIA’s most critical competitive moat — one that took twenty full years to build. Understanding how CUDA got here is the key to understanding today’s compute market.</p>
+<h2 id=""><a href="#" class="headerlink" title=""></a><a id="more"></a></h2><h2 id="What-CUDA-Actually-Is"><a href="#What-CUDA-Actually-Is" class="headerlink" title="What CUDA Actually Is"></a>What CUDA Actually Is</h2><p>CUDA stands for Compute Unified Device Architecture. It’s essentially a programming interface and development toolkit that lets developers use languages like C and C++ to directly harness GPUs for general-purpose computation.</p>
+<p>Here’s an analogy: a GPU is like a muscle, with massive parallel compute power. CUDA is the nervous system that directs that muscle — it’s what schedules work across thousands of cores. Without CUDA, a GPU can only render game graphics. With CUDA, it can run AI training, scientific simulations, and other complex workloads. CUDA’s core contribution was turning the GPU from a graphics rendering tool into a general-purpose computing device.</p>
+<h2 id="The-GPU-World-Before-2006"><a href="#The-GPU-World-Before-2006" class="headerlink" title="The GPU World Before 2006"></a>The GPU World Before 2006</h2><p>Before CUDA, GPUs had exactly one job: rendering graphics. If you wanted to use a GPU for scientific computing like matrix multiplication, you had to disguise your computation as a graphics rendering task. This approach was called GPGPU (General Purpose GPU). It’s like wanting to hire a chef to cook a meal but only being able to communicate by ordering dishes — you’d describe the color and shape of what you want on the plate. Incredibly inefficient and painful.</p>
+<h2 id="Jensen-Huang’s-Big-Bet"><a href="#Jensen-Huang’s-Big-Bet" class="headerlink" title="Jensen Huang’s Big Bet"></a>Jensen Huang’s Big Bet</h2><p>In 2006, NVIDIA CEO Jensen Huang made a decision that looked insane at the time: invest roughly $10 billion into building the CUDA platform. For a company with a market cap of just a few tens of billions at the time, this was essentially betting the entire company. Wall Street’s skepticism was overwhelming. Investors couldn’t understand why a gaming GPU company was burning cash on a general-purpose computing platform with no clear future. Jensen’s thesis was simple: GPUs shouldn’t be limited to gaming.</p>
+<p>The G80 architecture (GeForce 8800 GTX) was the first CUDA-capable GPU. It introduced the unified shader architecture, allowing all GPU cores to execute arbitrary compute tasks rather than being confined to drawing triangles. This architectural design established the foundational paradigm for GPU computing over the next twenty years.</p>
+<h2 id="The-Long-Cold-Start"><a href="#The-Long-Cold-Start" class="headerlink" title="The Long Cold Start"></a>The Long Cold Start</h2><p>CUDA didn’t take off after launch. Instead, it endured six or seven years of near-indifference. From 2006 to 2008, almost nobody was using it — just a handful of researchers experimenting. From 2008 to 2010, academia started paying attention, but industry remained unmoved. From 2010 to 2012, NVIDIA’s stock price languished, and investor skepticism never let up.</p>
+<p>During this period, NVIDIA did three things that mattered. First, it made the CUDA toolkit free — any developer could download and use it with no licensing fees. Second, it funded university education programs, pushing CUDA into computer science curricula to cultivate the next generation of developers. Third, it kept iterating on hardware architecture: from Fermi to Kepler to Maxwell, each generation brought meaningful improvements to CUDA’s performance and capabilities. Those six years of investment were like planting a tree — no fruit visible above ground, but roots quietly anchoring deep in the soil.</p>
+<h2 id="AlexNet-Changed-Everything"><a href="#AlexNet-Changed-Everything" class="headerlink" title="AlexNet Changed Everything"></a>AlexNet Changed Everything</h2><p>In 2012, the ImageNet image recognition competition hit a turning point. Graduate student Alex Krizhevsky used two GTX 580 GPUs to train a deep neural network called AlexNet. The error rate dropped to 15.3%, while traditional methods were still above 26%. Training time went from months to weeks. Hardware cost went from millions of dollars to a few thousand.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Comparison</th>
+<th>AlexNet</th>
+<th>Traditional Methods</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Error rate</td>
+<td>15.3%</td>
+<td>26%+</td>
+</tr>
+<tr>
+<td>Training time</td>
+<td>Weeks</td>
+<td>Months to years</td>
+</tr>
+<tr>
+<td>Hardware cost</td>
+<td>A few thousand dollars</td>
+<td>Millions of dollars</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The critical point is that AlexNet’s implementation was deeply dependent on CUDA. Without CUDA’s parallel computing capability, this experiment couldn’t have been completed in any reasonable timeframe. This single result convinced AI researchers worldwide that GPU + CUDA + deep neural networks was the breakthrough path for AI. From that day on, CUDA went from being a researcher’s experimental tool to the standard setup for AI research.</p>
+<h2 id="Twenty-Years-of-Iterative-Accumulation"><a href="#Twenty-Years-of-Iterative-Accumulation" class="headerlink" title="Twenty Years of Iterative Accumulation"></a>Twenty Years of Iterative Accumulation</h2><p>CUDA evolved from 1.0 to 14.x over twenty years of continuous iteration, with each major version delivering real capability gains.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>CUDA Version</th>
+<th>Year</th>
+<th>Key Feature</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1.0</td>
+<td>2006</td>
+<td>Foundational programming model</td>
+</tr>
+<tr>
+<td>2.0</td>
+<td>2008</td>
+<td>Double-precision floating-point support</td>
+</tr>
+<tr>
+<td>4.0</td>
+<td>2011</td>
+<td>Dynamic parallelism</td>
+</tr>
+<tr>
+<td>6.0</td>
+<td>2014</td>
+<td>Unified memory</td>
+</tr>
+<tr>
+<td>8.0</td>
+<td>2016</td>
+<td>Volta architecture optimization</td>
+</tr>
+<tr>
+<td>10.0</td>
+<td>2018</td>
+<td>Turing architecture, Tensor Cores</td>
+</tr>
+<tr>
+<td>11.0</td>
+<td>2020</td>
+<td>Ampere architecture, Multi-Instance GPU</td>
+</tr>
+<tr>
+<td>12.0</td>
+<td>2022</td>
+<td>Hopper architecture, H100</td>
+</tr>
+<tr>
+<td>14.x</td>
+<td>2026</td>
+<td>Rubin architecture support</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>By 2026, the numbers from twenty years of accumulation are substantial: over 5 million developers, more than 3,000 optimized operators, tens of millions of CUDA-dependent projects on GitHub, and over 95% of AI academic papers defaulting to CUDA. These numbers weren’t built overnight — they’re the natural result of two decades of hardware and software iteration, generation after generation.</p>
+<h2 id="A-Multi-Layered-Nested-Moat"><a href="#A-Multi-Layered-Nested-Moat" class="headerlink" title="A Multi-Layered, Nested Moat"></a>A Multi-Layered, Nested Moat</h2><p>CUDA’s moat isn’t just about technical leadership — it’s a multi-layered, nested system that makes it nearly impossible for competitors to enter. The outermost layer is ecosystem network effects: 5 million developers worldwide are fluent in CUDA, academic papers default to CUDA, every open-source project is built on CUDA, and newcomers to AI learn CUDA first. One layer in is software stack depth: over 3,000 highly optimized operator libraries, plus core compute libraries like cuDNN, cuBLAS, and NCCL, and toolchains like TensorRT and RAPIDS — an extraordinarily complete development ecosystem. Deeper still is the talent and knowledge accumulation: twenty years of GPU programming experts, compiler teams, and performance optimization experience. Even deeper is the hardware manufacturing gap: 3nm process leading competitors by two to three generations, HBM3e memory technology, and NVLink high-speed interconnect — all held by NVIDIA. The innermost layer is architecture design capability: while some papers are publicly available for reference, catching up still requires massive investment in both talent and capital.</p>
+<p>These five layers are nested — each one builds on the layer before it. Even if a competitor breaks through one layer, four more are waiting.</p>
+<h2 id="Software-Stack-Lock-In"><a href="#Software-Stack-Lock-In" class="headerlink" title="Software Stack Lock-In"></a>Software Stack Lock-In</h2><p>NVIDIA has built a complete software stack from the hardware layer up to the frameworks developers use. At the bottom sits NVIDIA GPU hardware. Above that, CUDA Runtime and Driver API provide the programming interface. Then come the core compute libraries: cuDNN, cuBLAS, NCCL, cuSPARSE. Above those are performance optimization tools: TensorRT, RAPIDS, Numba. At the top are the deep learning frameworks developers work with directly: PyTorch, TensorFlow, JAX.</p>
+<p>The key issue: every single layer is deeply optimized only for NVIDIA hardware. PyTorch’s CUDA optimization is the most complete; AMD’s ROCm support is always incomplete. cuDNN’s performance far exceeds any alternative implementation — AMD still doesn’t have a comparable compute library. NCCL’s multi-GPU communication is mature and stable; AMD’s RCCL still has a long list of unfixed bugs. Even if developers want to choose different hardware, the entire software ecosystem won’t support them.</p>
+<h2 id="The-Cost-of-Developer-Migration"><a href="#The-Cost-of-Developer-Migration" class="headerlink" title="The Cost of Developer Migration"></a>The Cost of Developer Migration</h2><p>Suppose an AI company wants to migrate its infrastructure from NVIDIA to AMD. The challenges are daunting. Half a million lines of CUDA code need to be rewritten from scratch. The team needs retraining. CI/CD pipelines need to be rebuilt. Third-party open-source library compatibility needs to be verified one by one. Performance and stability will inevitably degrade during migration.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Challenge Dimension</th>
+<th>Specifics</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Code assets</td>
+<td>Hundreds of thousands of lines of CUDA code need full rewrite</td>
+</tr>
+<tr>
+<td>Talent pool</td>
+<td>Team is expert in CUDA, needs retraining</td>
+</tr>
+<tr>
+<td>Infrastructure</td>
+<td>CI/CD is entirely NVIDIA GPU-based, needs rebuild</td>
+</tr>
+<tr>
+<td>Third-party dependencies</td>
+<td>Open-source libraries are CUDA-bound, migration compatibility is poor</td>
+</tr>
+<tr>
+<td>Migration risk</td>
+<td>More bugs and performance degradation during migration</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The migration cost is so high that the vast majority of companies simply can’t afford the switch. Developer lock-in isn’t about CUDA being technically perfect — it’s about the cost of switching to an entirely different ecosystem being unbearably high.</p>
+<h2 id="Academia’s-Self-Reinforcing-Loop"><a href="#Academia’s-Self-Reinforcing-Loop" class="headerlink" title="Academia’s Self-Reinforcing Loop"></a>Academia’s Self-Reinforcing Loop</h2><p>Academia’s CUDA binding deserves its own section. A researcher writes their experiment code in CUDA. The paper gets published and the code goes open-source. Subsequent researchers who want to reproduce the results must use CUDA, then write more CUDA code themselves. This loop continuously reinforces itself, and the result is that 95% of AI papers default to CUDA. If you want to publish, reproduce others’ results, or use open-source models, you need NVIDIA GPUs. Academia is firmly locked into the CUDA ecosystem.</p>
+<h2 id="Why-Competitors-Can’t-Catch-Up"><a href="#Why-Competitors-Can’t-Catch-Up" class="headerlink" title="Why Competitors Can’t Catch Up"></a>Why Competitors Can’t Catch Up</h2><p>AMD launched ROCm (Radeon Open Compute) in 2016 as a CUDA counterpart. The gap is obvious: CUDA has been accumulating since 2006, with 5 million developers and 3,000+ operator libraries. ROCm started a full decade later, has an estimated fewer than 50,000 developers, around 200 operator libraries, and its stability and compatibility are nowhere near production-ready. Much CUDA code can’t be directly ported to ROCm. Documentation is incomplete. Community activity is low.</p>
+<p>Intel is in an even worse position. oneAPI didn’t arrive until 2020 — 14 years behind CUDA. Intel’s own GPU hardware performance can’t keep up, no developer wants to invest in learning yet another new API, and its market share is negligible.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Comparison</th>
+<th>CUDA</th>
+<th>ROCm</th>
+<th>oneAPI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Launch year</td>
+<td>2006</td>
+<td>2016</td>
+<td>2020</td>
+</tr>
+<tr>
+<td>Developer count</td>
+<td>5 million+</td>
+<td>Under 50,000</td>
+<td>Negligible</td>
+</tr>
+<tr>
+<td>Operator library</td>
+<td>3000+</td>
+<td>~200</td>
+<td>Negligible</td>
+</tr>
+<tr>
+<td>Stability</td>
+<td>Very high</td>
+<td>Frequent bugs</td>
+<td>Unverified</td>
+</tr>
+<tr>
+<td>Framework support</td>
+<td>Native-level</td>
+<td>Incomplete adaptation</td>
+<td>Almost none</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>There’s a cruel paradox in the catching-up game. Even if AMD matched CUDA’s 2022 level today, CUDA would already be at version 14.x in 2026, and NVIDIA would have shipped the Rubin architecture. NVIDIA iterates annually; AMD chases annually. The gap always exists. The catcher’s dilemma: you’re always catching up to a past target.</p>
+<h2 id="The-Hardware-Gap"><a href="#The-Hardware-Gap" class="headerlink" title="The Hardware Gap"></a>The Hardware Gap</h2><p>CUDA’s moat isn’t only software — hardware is an equally high wall. NVIDIA has built a deep partnership with TSMC. Every GPU generation gets the most advanced process available. H100 uses 4nm, B200 uses 4NP, and the Rubin R100 goes straight to 3nm, expected to enter mass production in H2 2026. TSMC’s most advanced process is allocated to NVIDIA first — a partnership built on massive order volumes and long-term trust.</p>
+<p>High-end AI training also requires HBM (High Bandwidth Memory), the most advanced memory packaging technology, produced by SK Hynix and Samsung. H100 ships with 80GB HBM3 at 3.35 TB/s bandwidth. B200 has 192GB HBM3e at 8 TB/s. B300 and Rubin push further. NVIDIA gets priority HBM supply, so competitors start from a generation behind on memory specs.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>GPU</th>
+<th>Memory Spec</th>
+<th>Bandwidth</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>H100</td>
+<td>80GB HBM3</td>
+<td>3.35 TB/s</td>
+</tr>
+<tr>
+<td>B200</td>
+<td>192GB HBM3e</td>
+<td>8 TB/s</td>
+</tr>
+<tr>
+<td>B300</td>
+<td>192GB+ HBM3e</td>
+<td>8 TB/s+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Multi-GPU training needs high-speed interconnect. NVLink 4.0 delivers 900 GB/s bandwidth; NVLink 5.0 will reach 1.8 TB/s. AMD’s Infinity Fabric sits at around 400 GB/s, with a clear gap in both performance and stability. Hardware-level leadership means that even if a competitor’s software ecosystem catches up, the physical performance gap remains unbridgeable.</p>
+<h2 id="A-Moat-Dug-Over-Twenty-Years"><a href="#A-Moat-Dug-Over-Twenty-Years" class="headerlink" title="A Moat Dug Over Twenty Years"></a>A Moat Dug Over Twenty Years</h2><p>Back to the original question: how was CUDA’s moat dug, step by step? The core logic isn’t complicated. Jensen Huang bet on a direction almost nobody believed in back in 2006 — that GPUs could become general-purpose computing tools. Through six years of cold start, NVIDIA quietly cultivated the first generation of developers with free tools and university programs. In 2012, AlexNet proved the value of that bet, and academia began its large-scale shift to CUDA. Over the next ten years, NVIDIA built out the complete software stack ecosystem. By the time large models exploded in 2022, CUDA was everywhere — the de facto standard for AI infrastructure.</p>
+<p>What competitors face isn’t a technical advantage from some brilliant design. It’s the ecosystem depth that comes from twenty years of sustained investment. Five million developers, 3,000 operator libraries, 95% of papers bound to CUDA — the time cost behind those numbers is what the moat really means. Replicating all of that would take an equally long time. And NVIDIA isn’t standing still.</p>
+<hr>
+<h2 id="References"><a href="#References" class="headerlink" title="References"></a>References</h2><ul>
+<li><a href="https://www.forbes.com/sites/jenniferhicks/2024/03/15/nvidias-10-billion-bet-how-cuda-changed-computing-forever/" target="_blank" rel="noopener">NVIDIA’s $10 Billion Bet: How CUDA Changed Computing Forever</a></li>
+<li><a href="https://www.wired.com/story/jensen-huang-nvidia-cuda-bet-company/" target="_blank" rel="noopener">Jensen Huang Remembers the ‘Bet the Company’ Moment</a></li>
+<li><a href="https://www.businessinsider.com/nvidia-cuda-jensen-huang-trillion-dollar-company-2023-5" target="_blank" rel="noopener">How NVIDIA’s CUDA Gamble Made It a Trillion-Dollar Company</a></li>
+<li><a href="https://developer.nvidia.com/blog/cuda-origin-story/" target="_blank" rel="noopener">CUDA’s Origin Story: From G80 to AI Revolution</a></li>
+<li><a href="https://www.anandtech.com/article/2374/nvidia-g80-architecture" target="_blank" rel="noopener">The G80: NVIDIA’s Revolutionary Architecture</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/GPU/" rel="tag"><i class="fa fa-tag"></i> GPU</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/04/01/073_chrome-devtools-mcp-guide-en/" rel="prev" title="Getting Started with Chrome DevTools MCP: Letting AI Assistants Drive the Browser">
+      <i class="fa fa-chevron-left"></i> Getting Started with Chrome DevTools MCP: Letting AI Assistants Drive the Browser
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2026/04/01/072_china-gpu-self-develop-challenges-en/" rel="next" title="China's GPU Challenge: Twenty Years of Catching Up, and How Far Is Left?">
+      China's GPU Challenge: Twenty Years of Catching Up, and How Far Is Left? <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#It-Starts-with-a-Compute-Shortage"><span class="nav-number">1.</span> <span class="nav-text">It Starts with a Compute Shortage</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#"><span class="nav-number">2.</span> <span class="nav-text"></span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#What-CUDA-Actually-Is"><span class="nav-number">3.</span> <span class="nav-text">What CUDA Actually Is</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#The-GPU-World-Before-2006"><span class="nav-number">4.</span> <span class="nav-text">The GPU World Before 2006</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Jensen-Huang’s-Big-Bet"><span class="nav-number">5.</span> <span class="nav-text">Jensen Huang’s Big Bet</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#The-Long-Cold-Start"><span class="nav-number">6.</span> <span class="nav-text">The Long Cold Start</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#AlexNet-Changed-Everything"><span class="nav-number">7.</span> <span class="nav-text">AlexNet Changed Everything</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Twenty-Years-of-Iterative-Accumulation"><span class="nav-number">8.</span> <span class="nav-text">Twenty Years of Iterative Accumulation</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#A-Multi-Layered-Nested-Moat"><span class="nav-number">9.</span> <span class="nav-text">A Multi-Layered, Nested Moat</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Software-Stack-Lock-In"><span class="nav-number">10.</span> <span class="nav-text">Software Stack Lock-In</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#The-Cost-of-Developer-Migration"><span class="nav-number">11.</span> <span class="nav-text">The Cost of Developer Migration</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Academia’s-Self-Reinforcing-Loop"><span class="nav-number">12.</span> <span class="nav-text">Academia’s Self-Reinforcing Loop</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Why-Competitors-Can’t-Catch-Up"><span class="nav-number">13.</span> <span class="nav-text">Why Competitors Can’t Catch Up</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#The-Hardware-Gap"><span class="nav-number">14.</span> <span class="nav-text">The Hardware Gap</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#A-Moat-Dug-Over-Twenty-Years"><span class="nav-number">15.</span> <span class="nav-text">A Moat Dug Over Twenty Years</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#References"><span class="nav-number">16.</span> <span class="nav-text">References</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/04/01/074_nvidia-cuda-moat-story-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/04/01/074_nvidia-cuda-moat-story-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="Claude Code’s Computer Use feature lets AI directly operate the desktop environment: clicking buttons, typing text, taking screenshots to analyze interface state. Giving AI screen access plus mouse an">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Computer Use — Nine Security Gates for Desktop Control">
+<meta property="og:url" content="https://donehub.github.io/en/2026/04/06/079_claude-code-computer-use-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="Claude Code’s Computer Use feature lets AI directly operate the desktop environment: clicking buttons, typing text, taking screenshots to analyze interface state. Giving AI screen access plus mouse an">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-04-05T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T10:15:19.515Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Computer Use">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/04/06/079_claude-code-computer-use-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>Computer Use — Nine Security Gates for Desktop Control | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/04/06/079_claude-code-computer-use-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Computer Use — Nine Security Gates for Desktop Control
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-04-06 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-06T00:00:00+08:00">2026-04-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 18:15:19" itemprop="dateModified" datetime="2026-09-25T18:15:19+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Claude-Code/" itemprop="url" rel="index"><span itemprop="name">Claude Code</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/04/06/079_claude-code-computer-use-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/04/06/079_claude-code-computer-use-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Claude Code’s Computer Use feature lets AI directly operate the desktop environment: clicking buttons, typing text, taking screenshots to analyze interface state. Giving AI screen access plus mouse and keyboard control introduces real risks: accidental file deletion, misclicks, sensitive data leaks. To address this, Claude Code implements a nine-layer security gate system where each layer can independently intercept dangerous operations. Under the hood, a Python Bridge handles the cross-language work — a TypeScript proxy drives a Python executor that performs the actual desktop interactions.</p>
+<a id="more"></a>
+<h2 id="Overall-Architecture-and-the-Python-Choice"><a href="#Overall-Architecture-and-the-Python-Choice" class="headerlink" title="Overall Architecture and the Python Choice"></a>Overall Architecture and the Python Choice</h2><p>Computer Use follows a typical cross-language proxy pattern. Claude Code (TypeScript) handles strategy decisions and permission control; a Python process executes the actual desktop operations. The two communicate via JSON-RPC over stdio. The split keeps responsibilities clear: TypeScript handles security and model interaction, Python handles platform API calls.</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Claude Code (TypeScript)</span><br><span class="line">    ↓ JSON-RPC over stdio</span><br><span class="line">Python Bridge (computer_controller.py)</span><br><span class="line">    ↓ Platform Abstraction</span><br><span class="line">Desktop Environment</span><br></pre></td></tr></table></figure>
+<p>The core reason for choosing Python over TypeScript native for desktop operations is ecosystem maturity. Libraries like pyautogui, PyObjC, and xdotool have been running stably for years with consistent cross-platform interfaces. Implementing desktop operations in TypeScript through native addons would significantly increase maintenance cost.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Factor</th>
+<th>Python Approach</th>
+<th>TypeScript Native</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Library ecosystem</td>
+<td>pyautogui/PyObjC — mature and stable</td>
+<td>Requires native addons, fragmented ecosystem</td>
+</tr>
+<tr>
+<td>Cross-platform consistency</td>
+<td>Unified interface across 3 platforms</td>
+<td>Each platform needs separate wrapping</td>
+</tr>
+<tr>
+<td>Development iteration speed</td>
+<td>Pure Python, fast to modify</td>
+<td>Compile native code, slow iteration</td>
+</tr>
+<tr>
+<td>Maintenance cost</td>
+<td>Community-maintained, frequent updates</td>
+<td>Self-maintained, adapt to each system’s API changes</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="24-Desktop-Operation-Tools"><a href="#24-Desktop-Operation-Tools" class="headerlink" title="24 Desktop Operation Tools"></a>24 Desktop Operation Tools</h2><p>Computer Use provides 24 tools covering four categories: input, display, file, and process. Input tools handle mouse clicks, double-clicks, drag-and-drop, scroll wheel, keyboard shortcuts, single key presses, text input, and clipboard paste. Display tools handle screenshots, screen dimensions, window list queries, window activation, and window position/size retrieval. File tools include read, write, delete, list directory, move, copy, and file info. Process tools provide process list queries, launching new processes, and terminating processes.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Tools</th>
+<th>Core Capabilities</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Input</td>
+<td>9</td>
+<td>Mouse click/drag/scroll, keyboard input/shortcuts, clipboard paste</td>
+</tr>
+<tr>
+<td>Display</td>
+<td>6</td>
+<td>Screenshot, screen size, window list/activate/position/size</td>
+</tr>
+<tr>
+<td>File</td>
+<td>7</td>
+<td>Read/write/delete/list/move/copy, file info queries</td>
+</tr>
+<tr>
+<td>Process</td>
+<td>3</td>
+<td>Process list, launch process, terminate process</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Taking the mouse click tool as an example, tool definitions describe parameter structure via JSON Schema, including coordinates, button type, and click count. Claude Code registers these definitions as callable tools, and the model initiates calls through <code>tool_use</code> when desktop operations are needed.</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/ComputerUseTool/tools.ts</span></span><br><span class="line"><span class="keyword">const</span> computer_mouse_click = &#123;</span><br><span class="line">  name: <span class="string">'computer_mouse_click'</span>,</span><br><span class="line">  inputSchema: &#123;</span><br><span class="line">    <span class="keyword">type</span>: <span class="string">'object'</span>,</span><br><span class="line">    properties: &#123;</span><br><span class="line">      x: &#123; <span class="keyword">type</span>: <span class="string">'number'</span>, description: <span class="string">'X coordinate'</span> &#125;,</span><br><span class="line">      y: &#123; <span class="keyword">type</span>: <span class="string">'number'</span>, description: <span class="string">'Y coordinate'</span> &#125;,</span><br><span class="line">      button: &#123;</span><br><span class="line">        <span class="keyword">type</span>: <span class="string">'string'</span>,</span><br><span class="line">        <span class="keyword">enum</span>: [<span class="string">'left'</span>, <span class="string">'right'</span>, <span class="string">'middle'</span>],</span><br><span class="line">        <span class="keyword">default</span>: <span class="string">'left'</span></span><br><span class="line">      &#125;,</span><br><span class="line">      clicks: &#123; <span class="keyword">type</span>: <span class="string">'number'</span>, <span class="keyword">default</span>: <span class="number">1</span> &#125;,</span><br><span class="line">    &#125;,</span><br><span class="line">    required: [<span class="string">'x'</span>, <span class="string">'y'</span>],</span><br><span class="line">  &#125;,</span><br><span class="line">  description: <span class="string">'Click at the specified coordinates'</span>,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="Nine-Security-Gates"><a href="#Nine-Security-Gates" class="headerlink" title="Nine Security Gates"></a>Nine Security Gates</h2><p>Security design is the heart of the Computer Use system. Nine gates progress from outside to inside, each capable of independently intercepting operations. This isn’t theoretical — it’s an actual check chain in the code. Operations must pass all gates to execute; any gate returning deny immediately terminates the operation.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Name</th>
+<th>Interception Rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Gate 1</td>
+<td>Feature gate</td>
+<td>tengu_computer_use Feature Flag must be enabled</td>
+</tr>
+<tr>
+<td>Gate 2</td>
+<td>User consent</td>
+<td>First-time use shows confirmation dialog, user must authorize</td>
+</tr>
+<tr>
+<td>Gate 3</td>
+<td>Action type check</td>
+<td>Write operations require additional write permission confirmation</td>
+</tr>
+<tr>
+<td>Gate 4</td>
+<td>Path constraints</td>
+<td>File operations restricted to allowlisted directories; .git, .claude, system directories blocked</td>
+</tr>
+<tr>
+<td>Gate 5</td>
+<td>Dangerous command filter</td>
+<td>Blocks rm -rf, killall, etc.; password managers and banking apps blocked</td>
+</tr>
+<tr>
+<td>Gate 6</td>
+<td>Screen boundary check</td>
+<td>Mouse coordinates must be within screen resolution; window operations must target visible windows</td>
+</tr>
+<tr>
+<td>Gate 7</td>
+<td>Rate limiting</td>
+<td>Max 10 operations per second; 3 consecutive failures trigger auto-pause</td>
+</tr>
+<tr>
+<td>Gate 8</td>
+<td>Screenshot content analysis</td>
+<td>Detects password fields, private info, and other sensitive content; detects error dialogs</td>
+</tr>
+<tr>
+<td>Gate 9</td>
+<td>Real-time monitoring</td>
+<td>User can Ctrl+C interrupt at any time; operation logs output in real time</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>In code, the <code>gateComputerUseAction</code> function executes all checks in order, returning allow, deny, or ask. The first seven gates complete before execution; Gate 8 runs after screenshot capture; Gate 9 spans the entire operation lifecycle.</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/ComputerUseTool/security.ts</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">gateComputerUseAction</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  action: ComputerUseAction,</span></span></span><br><span class="line"><span class="function"><span class="params">  context: ToolUseContext,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">GateResult</span> </span>&#123;</span><br><span class="line">  <span class="comment">// Gate 1: Feature Gate</span></span><br><span class="line">  <span class="keyword">if</span> (!feature(<span class="string">'tengu_computer_use'</span>)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; action: <span class="string">'deny'</span>, reason: <span class="string">'Feature not enabled'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Gate 2: User Consent</span></span><br><span class="line">  <span class="keyword">if</span> (!context.computerUseConsent) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; action: <span class="string">'ask'</span>, reason: <span class="string">'First-time use requires consent'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Gate 3: Action Type</span></span><br><span class="line">  <span class="keyword">if</span> (isWriteAction(action) &amp;&amp; !context.computerUseWriteConsent) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; action: <span class="string">'ask'</span>, reason: <span class="string">'Write operation requires confirmation'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Gate 4: Path Constraint</span></span><br><span class="line">  <span class="keyword">if</span> (action.type === <span class="string">'file'</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (!isInAllowedDirectory(action.path, context.allowedDirectories)) &#123;</span><br><span class="line">      <span class="keyword">return</span> &#123; action: <span class="string">'deny'</span>, reason: <span class="string">'Path not in allowed directories'</span> &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Gate 5: Dangerous Command</span></span><br><span class="line">  <span class="keyword">if</span> (isDangerousCommand(action)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; action: <span class="string">'deny'</span>, reason: <span class="string">'Dangerous command blocked'</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Gate 6: Screen Boundary</span></span><br><span class="line">  <span class="keyword">if</span> (action.type === <span class="string">'mouse'</span>) &#123;</span><br><span class="line">    <span class="keyword">const</span> screenSize = getScreenSize()</span><br><span class="line">    <span class="keyword">if</span> (action.x &lt; <span class="number">0</span> || action.x &gt; screenSize.width ||</span><br><span class="line">        action.y &lt; <span class="number">0</span> || action.y &gt; screenSize.height) &#123;</span><br><span class="line">      <span class="keyword">return</span> &#123; action: <span class="string">'deny'</span>, reason: <span class="string">'Coordinates out of screen bounds'</span> &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Gate 7: Rate Limit</span></span><br><span class="line">  <span class="keyword">if</span> (isRateLimited(context.computerUseHistory)) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123; action: <span class="string">'wait'</span>, reason: <span class="string">'Rate limit exceeded'</span>, waitTime: <span class="number">1000</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Gate 8: Screenshot Analysis (performed after capture)</span></span><br><span class="line">  <span class="comment">// Gate 9: Real-time Monitoring (handled by interrupt mechanism)</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> &#123; action: <span class="string">'allow'</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="Cross-Language-Communication-Bridge"><a href="#Cross-Language-Communication-Bridge" class="headerlink" title="Cross-Language Communication Bridge"></a>Cross-Language Communication Bridge</h2><p>Communication between TypeScript and Python is based on JSON-RPC 2.0 protocol over stdio transport. The TypeScript side constructs standard JSON-RPC requests (with method, params, id), writes them to the Python process’s stdin, then reads responses from stdout. This design avoids HTTP overhead while keeping the protocol standardized.</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/ComputerUseTool/bridge.ts</span></span><br><span class="line"><span class="keyword">interface</span> BridgeMessage &#123;</span><br><span class="line">  jsonrpc: <span class="string">'2.0'</span></span><br><span class="line">  id: <span class="built_in">number</span></span><br><span class="line">  method: <span class="built_in">string</span></span><br><span class="line">  params: Record&lt;<span class="built_in">string</span>, unknown&gt;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">interface</span> BridgeResponse &#123;</span><br><span class="line">  jsonrpc: <span class="string">'2.0'</span></span><br><span class="line">  id: <span class="built_in">number</span></span><br><span class="line">  result?: unknown</span><br><span class="line">  error?: &#123; code: <span class="built_in">number</span>; message: <span class="built_in">string</span> &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">callBridge</span>(<span class="params">method: <span class="built_in">string</span>, params: unknown</span>): <span class="title">Promise</span>&lt;<span class="title">unknown</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> message: BridgeMessage = &#123;</span><br><span class="line">    jsonrpc: <span class="string">'2.0'</span>,</span><br><span class="line">    id: nextId++,</span><br><span class="line">    method,</span><br><span class="line">    params,</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Write to stdin</span></span><br><span class="line">  bridgeProcess.stdin.write(<span class="built_in">JSON</span>.stringify(message) + <span class="string">'\n'</span>)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Read from stdout</span></span><br><span class="line">  <span class="keyword">const</span> response = <span class="keyword">await</span> readBridgeResponse()</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (response.error) &#123;</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> BridgeError(response.error.code, response.error.message)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> response.result</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>The Python-side ComputerController maintains a method-name-to-handler mapping table, loops reading JSON-RPC requests from stdin, dispatches to the corresponding handler, and writes results or errors back to stdout. Each request is handled independently — exceptions don’t crash the entire process.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># computer_controller.py</span></span><br><span class="line"><span class="keyword">import</span> json</span><br><span class="line"><span class="keyword">import</span> sys</span><br><span class="line"><span class="keyword">from</span> typing <span class="keyword">import</span> Any</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">ComputerController</span>:</span></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">__init__</span><span class="params">(self)</span>:</span></span><br><span class="line">        self.handlers = &#123;</span><br><span class="line">            <span class="string">'computer_mouse_click'</span>: self.mouse_click,</span><br><span class="line">            <span class="string">'computer_keyboard_type'</span>: self.keyboard_type,</span><br><span class="line">            <span class="string">'computer_screen_capture'</span>: self.screen_capture,</span><br><span class="line">            <span class="comment"># ... 24 handlers</span></span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">run</span><span class="params">(self)</span>:</span></span><br><span class="line">        <span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">            line = sys.stdin.readline()</span><br><span class="line">            <span class="keyword">if</span> <span class="keyword">not</span> line:</span><br><span class="line">                <span class="keyword">break</span></span><br><span class="line"></span><br><span class="line">            request = json.loads(line)</span><br><span class="line">            method = request[<span class="string">'method'</span>]</span><br><span class="line">            params = request[<span class="string">'params'</span>]</span><br><span class="line">            id = request[<span class="string">'id'</span>]</span><br><span class="line"></span><br><span class="line">            <span class="keyword">try</span>:</span><br><span class="line">                handler = self.handlers[method]</span><br><span class="line">                result = handler(**params)</span><br><span class="line">                response = &#123;</span><br><span class="line">                    <span class="string">'jsonrpc'</span>: <span class="string">'2.0'</span>,</span><br><span class="line">                    <span class="string">'id'</span>: id,</span><br><span class="line">                    <span class="string">'result'</span>: result</span><br><span class="line">                &#125;</span><br><span class="line">            <span class="keyword">except</span> Exception <span class="keyword">as</span> e:</span><br><span class="line">                response = &#123;</span><br><span class="line">                    <span class="string">'jsonrpc'</span>: <span class="string">'2.0'</span>,</span><br><span class="line">                    <span class="string">'id'</span>: id,</span><br><span class="line">                    <span class="string">'error'</span>: &#123;<span class="string">'code'</span>: <span class="number">1</span>, <span class="string">'message'</span>: str(e)&#125;</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">            sys.stdout.write(json.dumps(response) + <span class="string">'\n'</span>)</span><br><span class="line">            sys.stdout.flush()</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">mouse_click</span><span class="params">(self, x: int, y: int, button: str = <span class="string">'left'</span>)</span>:</span></span><br><span class="line">        <span class="keyword">import</span> pyautogui</span><br><span class="line">        pyautogui.click(x, y, button=button)</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">screen_capture</span><span class="params">(self)</span> -&gt; str:</span></span><br><span class="line">        <span class="keyword">import</span> pyautogui</span><br><span class="line">        <span class="keyword">import</span> base64</span><br><span class="line">        screenshot = pyautogui.screenshot()</span><br><span class="line">        <span class="comment"># Return base64 encoded</span></span><br><span class="line">        <span class="keyword">return</span> base64.b64encode(screenshot).decode(<span class="string">'utf-8'</span>)</span><br></pre></td></tr></table></figure>
+<h2 id="Screenshot-Analysis-and-Window-Management"><a href="#Screenshot-Analysis-and-Window-Management" class="headerlink" title="Screenshot Analysis and Window Management"></a>Screenshot Analysis and Window Management</h2><p>Screenshots are Computer Use’s primary way of perceiving the environment. When the model decides to take a screenshot, the <code>computer_screen_capture</code> tool calls <code>pyautogui.screenshot()</code> through the Python Bridge, encodes the PNG as Base64, and returns it to Claude Code. It gets injected as an image block into the current conversation context, where the model analyzes it through multimodal capabilities. Before injection, the system runs local OCR to detect sensitive keywords (password, secret, api key, token, etc.) and blurs sensitive regions if any are found.</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/tools/ComputerUseTool/screenshotFilter.ts</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">filterScreenshot</span>(<span class="params"></span></span></span><br><span class="line"><span class="function"><span class="params">  base64Image: <span class="built_in">string</span>,</span></span></span><br><span class="line"><span class="function"><span class="params"></span>): <span class="title">Promise</span>&lt;<span class="title">FilterResult</span>&gt; </span>&#123;</span><br><span class="line">  <span class="comment">// 1. Use local OCR to detect sensitive text</span></span><br><span class="line">  <span class="keyword">const</span> detectedText = <span class="keyword">await</span> localOcrDetect(base64Image)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 2. Check for sensitive keywords</span></span><br><span class="line">  <span class="keyword">const</span> sensitiveKeywords = [<span class="string">'password'</span>, <span class="string">'secret'</span>, <span class="string">'api key'</span>, <span class="string">'token'</span>]</span><br><span class="line">  <span class="keyword">const</span> foundSensitive = sensitiveKeywords.some(<span class="function"><span class="params">k</span> =&gt;</span></span><br><span class="line">    detectedText.toLowerCase().includes(k)</span><br><span class="line">  )</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (foundSensitive) &#123;</span><br><span class="line">    <span class="keyword">return</span> &#123;</span><br><span class="line">      action: <span class="string">'blur'</span>,</span><br><span class="line">      regions: findSensitiveRegions(detectedText),</span><br><span class="line">      reason: <span class="string">'Sensitive content detected'</span>,</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> &#123; action: <span class="string">'allow'</span> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Window management involves handling API differences across three platforms. The system defines a unified WindowInfo interface (with id, title, process, position, size, visible fields), and each platform adapter converts native window info into this format. Before activating a window, the system checks if it belongs to a sensitive application (password managers, banking apps, etc.) and refuses activation if so.</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Window list return format</span></span><br><span class="line"><span class="keyword">interface</span> WindowInfo &#123;</span><br><span class="line">  id: <span class="built_in">number</span></span><br><span class="line">  title: <span class="built_in">string</span></span><br><span class="line">  process: <span class="built_in">string</span></span><br><span class="line">  position: &#123; x: <span class="built_in">number</span>; y: <span class="built_in">number</span> &#125;</span><br><span class="line">  size: &#123; width: <span class="built_in">number</span>; height: <span class="built_in">number</span> &#125;</span><br><span class="line">  visible: <span class="built_in">boolean</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Security check for window activation</span></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">activateWindow</span>(<span class="params">windowId: <span class="built_in">number</span></span>): <span class="title">Promise</span>&lt;<span class="title">void</span>&gt; </span>&#123;</span><br><span class="line">  <span class="comment">// 1. Check if window exists</span></span><br><span class="line">  <span class="keyword">const</span> <span class="built_in">window</span> = <span class="keyword">await</span> getWindowInfo(windowId)</span><br><span class="line">  <span class="keyword">if</span> (!<span class="built_in">window</span>) &#123;</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> <span class="built_in">Error</span>(<span class="string">'Window not found'</span>)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 2. Check if window belongs to a sensitive app</span></span><br><span class="line">  <span class="keyword">const</span> sensitiveApps = [<span class="string">'Keychain Access'</span>, <span class="string">'1Password'</span>, <span class="string">'Banking App'</span>]</span><br><span class="line">  <span class="keyword">if</span> (sensitiveApps.some(<span class="function"><span class="params">app</span> =&gt;</span> <span class="built_in">window</span>.title.includes(app))) &#123;</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> <span class="built_in">Error</span>(<span class="string">'Cannot activate sensitive application'</span>)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 3. Execute activation</span></span><br><span class="line">  <span class="keyword">await</span> callBridge(<span class="string">'computer_window_activate'</span>, &#123; window_id: windowId &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="Audit-Logs-and-Interrupt-Mechanism"><a href="#Audit-Logs-and-Interrupt-Mechanism" class="headerlink" title="Audit Logs and Interrupt Mechanism"></a>Audit Logs and Interrupt Mechanism</h2><p>All Computer Use operations are logged to an audit trail, including timestamp, action type, parameters, execution result (success/deny/error), rejection reason, and duration, with optional post-action screenshots. Logs persist in JSONL format to <code>.claude/computer_use_history.jsonl</code> for post-incident investigation and debugging.</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">interface</span> ComputerUseLogEntry &#123;</span><br><span class="line">  timestamp: <span class="built_in">number</span></span><br><span class="line">  action: <span class="built_in">string</span></span><br><span class="line">  params: Record&lt;<span class="built_in">string</span>, unknown&gt;</span><br><span class="line">  result: <span class="string">'success'</span> | <span class="string">'deny'</span> | <span class="string">'error'</span></span><br><span class="line">  reason?: <span class="built_in">string</span></span><br><span class="line">  duration: <span class="built_in">number</span></span><br><span class="line">  screenshot?: <span class="built_in">string</span>  <span class="comment">// Post-action screenshot (optional)</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Log persistence to file</span></span><br><span class="line"><span class="keyword">const</span> LOG_PATH = <span class="string">'.claude/computer_use_history.jsonl'</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">appendLog</span>(<span class="params">entry: ComputerUseLogEntry</span>): <span class="title">Promise</span>&lt;<span class="title">void</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> logLine = <span class="built_in">JSON</span>.stringify(entry) + <span class="string">'\n'</span></span><br><span class="line">  <span class="keyword">await</span> fs.appendFile(LOG_PATH, logLine)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>The interrupt mechanism is the last line of defense in the security system. When the user presses Ctrl+C, the TypeScript process notifies the Python Bridge to stop execution, moves the mouse to a safe position, and records the interrupt event in the audit log. The Python side maintains an <code>emergency_stop</code> flag — upon receiving the stop signal, it exits the main loop and restores the mouse to preset safe coordinates. This design ensures the user can immediately reclaim control even in extreme situations.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># computer_controller.py</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">ComputerController</span>:</span></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">__init__</span><span class="params">(self)</span>:</span></span><br><span class="line">        self.emergency_stop = <span class="literal">False</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">run</span><span class="params">(self)</span>:</span></span><br><span class="line">        <span class="keyword">while</span> <span class="keyword">not</span> self.emergency_stop:</span><br><span class="line">            <span class="comment"># ... handle requests</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">stop</span><span class="params">(self)</span>:</span></span><br><span class="line">        self.emergency_stop = <span class="literal">True</span></span><br><span class="line">        <span class="comment"># Restore mouse to safe position</span></span><br><span class="line">        pyautogui.moveTo(self.safe_x, self.safe_y)</span><br></pre></td></tr></table></figure>
+<h2 id="Three-Platform-Adaptation"><a href="#Three-Platform-Adaptation" class="headerlink" title="Three-Platform Adaptation"></a>Three-Platform Adaptation</h2><p>Window operation APIs differ significantly across the three platforms. Windows uses ctypes to call Win32 APIs (GetForegroundWindow, GetWindowTextW). macOS uses PyObjC to access NSWorkspace. Linux depends on the xdotool command-line tool. Each platform adapter must implement the full interface: window retrieval, activation, position queries, and size queries.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># platform/windows.py</span></span><br><span class="line"><span class="keyword">import</span> pyautogui</span><br><span class="line"><span class="keyword">import</span> ctypes</span><br><span class="line"><span class="keyword">from</span> ctypes <span class="keyword">import</span> wintypes</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_active_window</span><span class="params">()</span>:</span></span><br><span class="line">    <span class="string">"""Get the active window"""</span></span><br><span class="line">    hwnd = ctypes.windll.user32.GetForegroundWindow()</span><br><span class="line">    <span class="keyword">return</span> hwnd</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_window_title</span><span class="params">(hwnd)</span>:</span></span><br><span class="line">    <span class="string">"""Get window title"""</span></span><br><span class="line">    length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)</span><br><span class="line">    title = ctypes.create_unicode_buffer(length + <span class="number">1</span>)</span><br><span class="line">    ctypes.windll.user32.GetWindowTextW(hwnd, title, length + <span class="number">1</span>)</span><br><span class="line">    <span class="keyword">return</span> title.value</span><br></pre></td></tr></table></figure>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># platform/macos.py</span></span><br><span class="line"><span class="keyword">import</span> pyautogui</span><br><span class="line"><span class="keyword">from</span> AppKit <span class="keyword">import</span> NSWorkspace, NSRunningApplication</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_active_window</span><span class="params">()</span>:</span></span><br><span class="line">    <span class="string">"""Get the active window"""</span></span><br><span class="line">    workspace = NSWorkspace.sharedWorkspace()</span><br><span class="line">    app = workspace.activeApplication()</span><br><span class="line">    <span class="keyword">return</span> app.localizedName()</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">activate_window</span><span class="params">(title)</span>:</span></span><br><span class="line">    <span class="string">"""Activate a window"""</span></span><br><span class="line">    workspace = NSWorkspace.sharedWorkspace()</span><br><span class="line">    apps = workspace.runningApplications()</span><br><span class="line">    <span class="keyword">for</span> app <span class="keyword">in</span> apps:</span><br><span class="line">        <span class="keyword">if</span> app.localizedName() == title:</span><br><span class="line">            app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps)</span><br><span class="line">            <span class="keyword">break</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># platform/linux.py</span></span><br><span class="line"><span class="keyword">import</span> pyautogui</span><br><span class="line"><span class="keyword">import</span> subprocess</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_active_window</span><span class="params">()</span>:</span></span><br><span class="line">    <span class="string">"""Get the active window"""</span></span><br><span class="line">    result = subprocess.run(</span><br><span class="line">        [<span class="string">'xdotool'</span>, <span class="string">'getactivewindow'</span>],</span><br><span class="line">        capture_output=<span class="literal">True</span>,</span><br><span class="line">        text=<span class="literal">True</span></span><br><span class="line">    )</span><br><span class="line">    <span class="keyword">return</span> int(result.stdout.strip())</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_window_title</span><span class="params">(window_id)</span>:</span></span><br><span class="line">    <span class="string">"""Get window title"""</span></span><br><span class="line">    result = subprocess.run(</span><br><span class="line">        [<span class="string">'xdotool'</span>, <span class="string">'getwindowname'</span>, str(window_id)],</span><br><span class="line">        capture_output=<span class="literal">True</span>,</span><br><span class="line">        text=<span class="literal">True</span></span><br><span class="line">    )</span><br><span class="line">    <span class="keyword">return</span> result.stdout.strip()</span><br></pre></td></tr></table></figure>
+<h2 id="Key-Source-File-Index"><a href="#Key-Source-File-Index" class="headerlink" title="Key Source File Index"></a>Key Source File Index</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/tools/ComputerUseTool/ComputerUseTool.ts</code></td>
+<td>Tool definitions, permission checks, security gates</td>
+</tr>
+<tr>
+<td><code>src/tools/ComputerUseTool/bridge.ts</code></td>
+<td>Python Bridge communication</td>
+</tr>
+<tr>
+<td><code>src/tools/ComputerUseTool/security.ts</code></td>
+<td>Nine-layer security gate implementation</td>
+</tr>
+<tr>
+<td><code>src/tools/ComputerUseTool/tools.ts</code></td>
+<td>24 tool definitions</td>
+</tr>
+<tr>
+<td><code>src/tools/ComputerUseTool/screenshotFilter.ts</code></td>
+<td>Screenshot content filtering</td>
+</tr>
+<tr>
+<td><code>computer_controller.py</code></td>
+<td>Python executor entry point</td>
+</tr>
+<tr>
+<td><code>platform/windows.py</code></td>
+<td>Windows platform adapter</td>
+</tr>
+<tr>
+<td><code>platform/macos.py</code></td>
+<td>macOS platform adapter</td>
+</tr>
+<tr>
+<td><code>platform/linux.py</code></td>
+<td>Linux platform adapter</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<p><strong>Series Navigation:</strong></p>
+<ul>
+<li>Previous: <a href="/2026/04/06/078_claude-code-channel-system/">Channel System: Controlling Your Agent from Any IM App</a></li>
+<li>Next: <a href="/2026/04/06/086_claude-code-terminal-ui/">Terminal UI: Building a TUI with React and Ink</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Computer-Use/" rel="tag"><i class="fa fa-tag"></i> Computer Use</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/04/06/078_claude-code-channel-system-en/" rel="prev" title="The Channel System — Controlling Your Agent from Any IM App">
+      <i class="fa fa-chevron-left"></i> The Channel System — Controlling Your Agent from Any IM App
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2026/04/06/077_claude-code-async-generator-state-machine-en/" rel="next" title="Breaking the ReAct Pattern — The Async Generator State Machine">
+      Breaking the ReAct Pattern — The Async Generator State Machine <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Overall-Architecture-and-the-Python-Choice"><span class="nav-number">1.</span> <span class="nav-text">Overall Architecture and the Python Choice</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#24-Desktop-Operation-Tools"><span class="nav-number">2.</span> <span class="nav-text">24 Desktop Operation Tools</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Nine-Security-Gates"><span class="nav-number">3.</span> <span class="nav-text">Nine Security Gates</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Cross-Language-Communication-Bridge"><span class="nav-number">4.</span> <span class="nav-text">Cross-Language Communication Bridge</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Screenshot-Analysis-and-Window-Management"><span class="nav-number">5.</span> <span class="nav-text">Screenshot Analysis and Window Management</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Audit-Logs-and-Interrupt-Mechanism"><span class="nav-number">6.</span> <span class="nav-text">Audit Logs and Interrupt Mechanism</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Three-Platform-Adaptation"><span class="nav-number">7.</span> <span class="nav-text">Three-Platform Adaptation</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Key-Source-File-Index"><span class="nav-number">8.</span> <span class="nav-text">Key Source File Index</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/04/06/079_claude-code-computer-use-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/04/06/079_claude-code-computer-use-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

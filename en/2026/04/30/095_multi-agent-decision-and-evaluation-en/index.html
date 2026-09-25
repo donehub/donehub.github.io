@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="“The more complex the task, the more you should use multi-Agent” — sounds reasonable, but this sentence hides a massive trap. Many people jump straight into multi-Agent architectures on impulse, only">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Designing and Evaluating Multi-Agent Systems">
+<meta property="og:url" content="https://donehub.github.io/en/2026/04/30/095_multi-agent-decision-and-evaluation-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="“The more complex the task, the more you should use multi-Agent” — sounds reasonable, but this sentence hides a massive trap. Many people jump straight into multi-Agent architectures on impulse, only">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-04-29T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T10:17:01.922Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Multi-Agent">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/04/30/095_multi-agent-decision-and-evaluation-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>Designing and Evaluating Multi-Agent Systems | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/04/30/095_multi-agent-decision-and-evaluation-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Designing and Evaluating Multi-Agent Systems
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-04-30 00:00:00" itemprop="dateCreated datePublished" datetime="2026-04-30T00:00:00+08:00">2026-04-30</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 18:17:01" itemprop="dateModified" datetime="2026-09-25T18:17:01+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/04/30/095_multi-agent-decision-and-evaluation-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/04/30/095_multi-agent-decision-and-evaluation-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>“The more complex the task, the more you should use multi-Agent” — sounds reasonable, but this sentence hides a massive trap. Many people jump straight into multi-Agent architectures on impulse, only to end up with exploding latency, runaway costs, and logs that look like alphabet soup. Then they discover a single Agent with a tool call would have done the job. The previous post covered Multi-Agent design principles. This one takes a different angle: when should you use multi-Agent? And after you’ve built it, how do you evaluate whether the design is any good?</p>
+<hr>
+<a id="more"></a>
+<h2 id="1-Complexity-Isn’t-the-Decision-Criterion"><a href="#1-Complexity-Isn’t-the-Decision-Criterion" class="headerlink" title="1. Complexity Isn’t the Decision Criterion"></a>1. Complexity Isn’t the Decision Criterion</h2><p>When most people hear “multi-Agent,” they picture this: a central orchestrator Agent sitting in the middle, with code-writing, testing, and documentation Agents branching off, each doing their own thing. Impressive to look at.</p>
+<p>Impressive doesn’t mean effective. Complexity has never been a valid reason to choose multi-Agent. The real decision criteria come down to two dimensions: concurrency benefit and context constraints.</p>
+<p>One table to make it clear:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Scenario Characteristic</th>
+<th>Single Agent Enough?</th>
+<th>Go Multi-Agent?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Steps are strictly sequential, each depends on the previous result</td>
+<td>Yes</td>
+<td>No, pure waste</td>
+</tr>
+<tr>
+<td>Multiple subtasks are independent and can run concurrently</td>
+<td>No</td>
+<td>Yes, clear parallelism benefit</td>
+</tr>
+<tr>
+<td>Single task overflows the model’s context window</td>
+<td>No</td>
+<td>Yes, must split</td>
+</tr>
+<tr>
+<td>Subtasks need frequent exchange of intermediate state</td>
+<td>Barely</td>
+<td>Caution, communication overhead may eat the benefit</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>But this table is too coarse. Real decisions are much more complex. Let’s break it down.</p>
+<hr>
+<h2 id="2-Four-Decision-Dimensions"><a href="#2-Four-Decision-Dimensions" class="headerlink" title="2. Four Decision Dimensions"></a>2. Four Decision Dimensions</h2><h3 id="2-1-Task-Dependency-Graph-Linear-or-Fan-Out"><a href="#2-1-Task-Dependency-Graph-Linear-or-Fan-Out" class="headerlink" title="2.1 Task Dependency Graph: Linear or Fan-Out?"></a>2.1 Task Dependency Graph: Linear or Fan-Out?</h3><p>This is the most critical criterion. <strong>Linear dependency</strong> means tasks have a strict ordering: A’s output is B’s input, B’s output is C’s input. When a user asks “where’s my refund,” you identify intent, then query the order database, then compose the reply. These three steps must be sequential — there’s no room for parallelism.</p>
+<p><strong>Fan-out dependency</strong> means one task can be split into multiple unrelated subtasks that execute simultaneously. “Scan this codebase for security issues” — injection vulnerability scanning, memory leak detection, and code style checking have zero data dependency between them. They can all start at the same time.</p>
+<p>Drawn as diagrams, the difference looks like this:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Linear dependency (single Agent):</span><br><span class="line">Intent recognition → Query database → Compose reply</span><br><span class="line">       A      →       B        →      C</span><br><span class="line"></span><br><span class="line">Fan-out dependency (multi-Agent):</span><br><span class="line">              ┌→ Security scan ──┐</span><br><span class="line">Orchestrator ─┤→ Performance analysis ─┤→ Consolidate</span><br><span class="line">              └→ Style check ──┘</span><br></pre></td></tr></table></figure>
+<p>The judgment is straightforward: if your task dependency graph draws as a straight line, use a single Agent. If it looks like a fan, consider multi-Agent.</p>
+<h3 id="2-2-Is-the-Context-Window-a-Hard-Bottleneck"><a href="#2-2-Is-the-Context-Window-a-Hard-Bottleneck" class="headerlink" title="2.2 Is the Context Window a Hard Bottleneck?"></a>2.2 Is the Context Window a Hard Bottleneck?</h3><p>Some tasks look linear but carry so much data that a single model can’t handle it. Even when tasks are sequential, you still need to find ways to split them.</p>
+<p>Example: you’re given a 500,000-line codebase and asked to generate complete API documentation. This isn’t a parallel task — you need to understand the overall architecture to write good docs. But 500,000 lines of code won’t fit into any model’s context window.</p>
+<p>Here, multi-Agent’s value isn’t parallel acceleration — it’s context slicing:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Agent-1: Scan the controller layer, extract interface definitions</span><br><span class="line">Agent-2: Scan the service layer, extract business logic</span><br><span class="line">Agent-3: Scan the entity layer, extract data models</span><br><span class="line">Orchestrator Agent: Takes the three sliced reports, merges and generates documentation</span><br></pre></td></tr></table></figure>
+<p>Each Agent only needs to process its own layer of code, dramatically reducing context pressure. The orchestrator receives three refined reports instead of hundreds of thousands of lines of raw code.</p>
+<p>Rule of thumb: estimate the context token count your task needs. If it exceeds 60% of the model’s window, consider splitting. Reserve 40% headroom for system prompts, tool calls, and intermediate reasoning.</p>
+<h3 id="2-3-Does-the-Latency-Budget-Allow-It"><a href="#2-3-Does-the-Latency-Budget-Allow-It" class="headerlink" title="2.3 Does the Latency Budget Allow It?"></a>2.3 Does the Latency Budget Allow It?</h3><p>This is the most easily overlooked criterion. The latency formula for multi-Agent systems is unforgiving:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Total latency &#x3D; max(sub-Agent latencies) + orchestrator planning latency</span><br><span class="line">              + orchestrator consolidation latency + communication overhead</span><br></pre></td></tr></table></figure>
+<p>Note it uses <code>max</code>, not <code>sum</code>, because sub-Agents run in parallel — total latency depends on the slowest one. But don’t forget the three fixed overhead terms that follow.</p>
+<p>In real production environments, a single LLM call typically takes 2-8 seconds. A three-tier multi-Agent system needs at least one model call each for planning and consolidation, plus sub-Agent execution time. End-to-end latency easily exceeds 15 seconds.</p>
+<p>Compare with a single-Agent approach:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Single Agent: Intent recognition (2s) → Tool call (1s) → Summary reply (2s) &#x3D; 5s</span><br><span class="line">Multi-Agent: Planning (3s) + max(3 sub-Agents) (4s) + Consolidation (3s) + Comm (1s) &#x3D; 11s</span><br></pre></td></tr></table></figure>
+<p>In practice: if your scenario is real-time user-facing interaction (chatbot, customer service), latency budgets are typically under 5 seconds. Multi-Agent will almost certainly time out in this case — single Agent + tool calls is the more pragmatic choice. If it’s a background batch task (code audit, report generation), the latency budget is generous, and multi-Agent has room to shine.</p>
+<h3 id="2-4-Can-the-Token-Budget-Handle-It"><a href="#2-4-Can-the-Token-Budget-Handle-It" class="headerlink" title="2.4 Can the Token Budget Handle It?"></a>2.4 Can the Token Budget Handle It?</h3><p>Token consumption in multi-Agent systems doesn’t grow linearly — it jumps in steps.</p>
+<p>Every Agent invocation costs you:</p>
+<ul>
+<li>System prompt (same every time, but billed every time)</li>
+<li>Context injection (task description, history)</li>
+<li>Model inference (output tokens)</li>
+</ul>
+<p>Suppose you have one orchestrator + 5 sub-Agents, each Agent’s system prompt is 2,000 tokens, task descriptions average 1,000 tokens, and output averages 1,500 tokens. A full round of execution costs roughly:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Orchestrator: 2000 + 1000 + 1500 &#x3D; 4500</span><br><span class="line">Sub-Agents ×5: (2000 + 1000 + 1500) × 5 &#x3D; 22500</span><br><span class="line">Consolidation: 2000 + 3000 (sub-Agent results) + 2000 &#x3D; 7000</span><br><span class="line">Total: ~34,000 tokens</span><br></pre></td></tr></table></figure>
+<p>A single Agent doing the same task might need only 5,000-8,000 tokens.</p>
+<p>In practice, do the math first: if your system handles high-concurrency requests (say, hundreds per second), the token cost difference gets amplified hundreds of times. How many times more expensive is multi-Agent versus single Agent? Can your budget absorb that multiplier?</p>
+<hr>
+<h2 id="3-Decision-Walkthroughs-for-Four-Real-Scenarios"><a href="#3-Decision-Walkthroughs-for-Four-Real-Scenarios" class="headerlink" title="3. Decision Walkthroughs for Four Real Scenarios"></a>3. Decision Walkthroughs for Four Real Scenarios</h2><p>Theory only goes so far. Let’s run four real scenarios through the decision process.</p>
+<h3 id="3-1-Customer-Service-Chatbot"><a href="#3-1-Customer-Service-Chatbot" class="headerlink" title="3.1 Customer Service Chatbot"></a>3.1 Customer Service Chatbot</h3><p>User asks: “Where’s my refund for order #12345?”</p>
+<p><strong>Dependency graph</strong>: Identify intent → Query order → Reply. Strictly linear, no parallelism possible.</p>
+<p><strong>Context analysis</strong>: A single conversation’s context is tiny, nowhere near the window limit.</p>
+<p><strong>Latency analysis</strong>: User is waiting for a reply, latency budget is 3 seconds.</p>
+<p><strong>Token analysis</strong>: High-concurrency scenario (thousands of users consulting simultaneously), cost-sensitive.</p>
+<p>All four criteria point to single Agent. Going multi-Agent would be over-engineering.</p>
+<h3 id="3-2-Enterprise-Code-Security-Audit"><a href="#3-2-Enterprise-Code-Security-Audit" class="headerlink" title="3.2 Enterprise Code Security Audit"></a>3.2 Enterprise Code Security Audit</h3><p>Requirement: Scan a 100,000-line codebase and output a security vulnerability report.</p>
+<p><strong>Dependency graph</strong>: Injection scanning, memory leak detection, dependency vulnerability checking, code style review — four subtasks are completely independent.</p>
+<p><strong>Context analysis</strong>: 100,000 lines of code far exceeds any single model’s window. Must slice.</p>
+<p><strong>Latency analysis</strong>: Background batch processing, user can wait minutes, latency budget is generous.</p>
+<p><strong>Token analysis</strong>: Low concurrency (might run a few times a day), cost is manageable.</p>
+<p>All four criteria point to multi-Agent.</p>
+<h3 id="3-3-Long-Document-Summarization"><a href="#3-3-Long-Document-Summarization" class="headerlink" title="3.3 Long Document Summarization"></a>3.3 Long Document Summarization</h3><p>Requirement: Condense a 200-page technical document into a 5-page summary.</p>
+<p>At first glance, 200 pages definitely won’t fit in context, so multi-Agent splitting seems right.</p>
+<p>But think more carefully: document summarization has global coherence requirements. You can’t have Agent-A summarize pages 1-50, Agent-B summarize pages 51-100, then stitch them together. The resulting summary will have massive duplication, omissions, and logical breaks.</p>
+<p>A better approach is <strong>single Agent + iterative segmented strategy</strong>:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Round 1: Single Agent processes pages 1-50, produces intermediate summary A</span><br><span class="line">Round 2: Single Agent carries summary A, processes pages 51-100, produces intermediate summary B</span><br><span class="line">Round 3: Single Agent carries summary B, processes pages 101-150, produces intermediate summary C</span><br><span class="line">Round 4: Single Agent carries summary C, processes pages 151-200, produces final summary</span><br></pre></td></tr></table></figure>
+<p>Each round preserves the essence of prior context, maintaining coherence. This produces much better results than multi-Agent parallel splitting.</p>
+<p><strong>Lesson</strong>: Context overflow doesn’t automatically mean multi-Agent. Sometimes <strong>sequential segmentation + state passing</strong> suits coherence-dependent tasks better than parallel splitting.</p>
+<h3 id="3-4-Multilingual-Translation-Pipeline"><a href="#3-4-Multilingual-Translation-Pipeline" class="headerlink" title="3.4 Multilingual Translation Pipeline"></a>3.4 Multilingual Translation Pipeline</h3><p>Requirement: Translate a technical document into English, Japanese, and Korean.</p>
+<p><strong>Surface analysis</strong>: Three languages are independent, can run in parallel — looks like multi-Agent territory.</p>
+<p><strong>Deeper analysis</strong>: The prerequisite steps for translation (terminology extraction, style normalization) are shared. If three Agents each extract terminology independently, the resulting translations will have inconsistent style.</p>
+<p><strong>Optimal approach</strong>: Hybrid architecture.</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Phase 1 (single Agent): Extract terminology + define translation style guide</span><br><span class="line">Phase 2 (multi-Agent parallel): Three Agents translate three languages, sharing the terminology</span><br><span class="line">Phase 3 (single Agent): Review consistency across all three translations</span><br></pre></td></tr></table></figure>
+<p><strong>Lesson</strong>: Most tasks aren’t purely “use multi-Agent” or “don’t.” They use multi-Agent at certain pipeline stages and not others. Hybrid architecture is the most common production pattern.</p>
+<hr>
+<h2 id="4-How-to-Evaluate-Whether-a-Multi-Agent-Design-Is-Any-Good"><a href="#4-How-to-Evaluate-Whether-a-Multi-Agent-Design-Is-Any-Good" class="headerlink" title="4. How to Evaluate Whether a Multi-Agent Design Is Any Good?"></a>4. How to Evaluate Whether a Multi-Agent Design Is Any Good?</h2><p>Choosing the right scenario is just step one. Even with the right decision, a multi-Agent system can still be badly designed. Here’s an evaluation framework scoring across five dimensions.</p>
+<h3 id="4-1-Task-Decomposition-Quality"><a href="#4-1-Task-Decomposition-Quality" class="headerlink" title="4.1 Task Decomposition Quality"></a>4.1 Task Decomposition Quality</h3><p>This is the most fundamental and most critical dimension. If decomposition is wrong, everything built on top is a house of cards. <strong>Good decomposition</strong> has three traits:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Trait</th>
+<th>Description</th>
+<th>Counter-example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Low coupling between subtasks</td>
+<td>Each sub-Agent can do its work independently, doesn’t need another’s output</td>
+<td>Agent-A needs Agent-B’s output before it can start</td>
+</tr>
+<tr>
+<td>Moderate subtask granularity</td>
+<td>Not too coarse (one Agent can’t finish) and not too fine (splitting too finely makes communication overhead eat the benefit)</td>
+<td>Splitting “query database” into “establish connection,” “send SQL,” “parse result” as three Agents</td>
+</tr>
+<tr>
+<td>Clear subtask boundaries</td>
+<td>Each Agent’s responsibility is explicit, no two Agents doing the same thing</td>
+<td>Both the security Agent and the performance Agent scanning the same function in the same code</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Quick check</strong>: Take a piece of paper and write down each sub-Agent’s task. If you find two sub-Agent task descriptions overlap more than 30%, your decomposition has problems.</p>
+<h3 id="4-2-Communication-Overhead-Ratio"><a href="#4-2-Communication-Overhead-Ratio" class="headerlink" title="4.2 Communication Overhead Ratio"></a>4.2 Communication Overhead Ratio</h3><p>Total cost of a multi-Agent system = compute cost + communication cost.</p>
+<p>Communication cost includes:</p>
+<ul>
+<li>Tokens for the orchestrator passing task descriptions to sub-Agents</li>
+<li>Tokens for sub-Agents returning results to the orchestrator</li>
+<li>Tokens for the orchestrator consolidating all results</li>
+<li>If sub-Agents communicate with each other (not recommended), cross-communication tokens too</li>
+</ul>
+<p><strong>Healthy system</strong>: Communication overhead accounts for under 20% of total token consumption.</p>
+<p><strong>Problematic system</strong>: Communication overhead exceeds 40%. You’re spending a lot of tokens on Agents “passing notes” instead of doing real work.</p>
+<p>Calculation:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Communication overhead ratio &#x3D; (task dispatch tokens + result return tokens</span><br><span class="line">                              + consolidation tokens) &#x2F; total token consumption × 100%</span><br></pre></td></tr></table></figure>
+<p>If this ratio comes out high, either subtasks are split too finely (too many small Agents passing messages) or result compression isn’t done well (sub-Agents bring back overly verbose information).</p>
+<h3 id="4-3-Parallel-Efficiency"><a href="#4-3-Parallel-Efficiency" class="headerlink" title="4.3 Parallel Efficiency"></a>4.3 Parallel Efficiency</h3><p>The core value of multi-Agent is parallelism. If parallel efficiency is low, multi-Agent serves no purpose.</p>
+<p><strong>Parallel efficiency</strong> definition:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Parallel efficiency &#x3D; Single-Agent sequential completion time &#x2F; Multi-Agent parallel completion time</span><br></pre></td></tr></table></figure>
+<p>Theoretically, N Agents running in parallel should yield efficiency close to N. In practice, that’s hard to achieve because:</p>
+<ul>
+<li>Sub-Agent workloads are unbalanced (the slowest one determines total time)</li>
+<li>Orchestrator planning and consolidation have fixed latency</li>
+<li>Communication carries network overhead</li>
+</ul>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Parallel Efficiency</th>
+<th>Assessment</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&gt; 2.0x</td>
+<td>Excellent</td>
+<td>Multi-Agent approach is worth the investment</td>
+</tr>
+<tr>
+<td>1.5x - 2.0x</td>
+<td>Mediocre</td>
+<td>Depends on scenario — if cost-sensitive, consider single Agent</td>
+</tr>
+<tr>
+<td>&lt; 1.5x</td>
+<td>Poor</td>
+<td>Multi-Agent benefit doesn’t cover extra overhead, fall back to single Agent</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Key to improving parallel efficiency</strong>: Balance each sub-Agent’s workload as much as possible. If one sub-Agent finishes in 1 second and another takes 10 seconds, your parallel efficiency is being dragged down by the straggler.</p>
+<h3 id="4-4-Fault-Tolerance-and-Observability"><a href="#4-4-Fault-Tolerance-and-Observability" class="headerlink" title="4.4 Fault Tolerance and Observability"></a>4.4 Fault Tolerance and Observability</h3><p>This is the dimension where engineering implementations most often fall apart. <strong>Fault tolerance</strong> assessment checklist:</p>
+<ul>
+<li>When a sub-Agent times out or fails, what happens? Does the whole system fail outright, or can it degrade gracefully?</li>
+<li>When a sub-Agent returns a wrong result (hallucination), can the orchestrator detect it?</li>
+<li>Is there a maximum retry count? Is there an upper bound on retry token costs?</li>
+</ul>
+<p><strong>Observability</strong> assessment checklist:</p>
+<ul>
+<li>When something breaks, can you identify in the logs which Agent failed at which step?</li>
+<li>Is every Agent’s input and output fully recorded?</li>
+<li>Can you replay a complete execution for debugging?</li>
+</ul>
+<p>A harsh reality: most multi-Agent system logs are a mess. The orchestrator calls 5 sub-Agents, each sub-Agent calls various tools, and when something goes wrong you see only a generic “execution failed” with no way to trace which step was hallucinating.</p>
+<p><strong>Good design</strong>: Assign each Agent execution a unique trace ID, tag all logs with it, enable end-to-end tracing.</p>
+<h3 id="4-5-Diminishing-Returns-Point"><a href="#4-5-Diminishing-Returns-Point" class="headerlink" title="4.5 Diminishing Returns Point"></a>4.5 Diminishing Returns Point</h3><p>This is the dimension that requires the most engineering intuition. The number of sub-Agents in a multi-Agent system isn’t “more is better.” There’s a diminishing returns point — past it, the parallel benefit of adding another Agent is less than the added communication overhead and coordination cost.</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">      Benefit</span><br><span class="line">       ↑</span><br><span class="line">       │        ╭───────── Benefit curve</span><br><span class="line">       │      ╱</span><br><span class="line">       │    ╱</span><br><span class="line">       │  ╱</span><br><span class="line">       │╱</span><br><span class="line">       ├──────────────────→ Number of Agents</span><br><span class="line">       ↑</span><br><span class="line">Diminishing returns point</span><br></pre></td></tr></table></figure>
+<p><strong>Rule of thumb</strong>: In most scenarios, keeping sub-Agent count between 3-8 is reasonable. Beyond 10, coordination costs rise sharply.</p>
+<p><strong>How to find this point?</strong> The most reliable method is benchmarking.</p>
+<ol>
+<li>Start with 2 sub-Agents, record execution time and token consumption</li>
+<li>Gradually increase to 3, 4, 5…</li>
+<li>Plot “Agent count vs end-to-end latency” and “Agent count vs token cost” curves</li>
+<li>Find the inflection point where latency stops decreasing significantly but token cost keeps rising</li>
+</ol>
+<p>That inflection point is your optimal Agent count.</p>
+<hr>
+<h2 id="5-A-Complete-Evaluation-Checklist"><a href="#5-A-Complete-Evaluation-Checklist" class="headerlink" title="5. A Complete Evaluation Checklist"></a>5. A Complete Evaluation Checklist</h2><p>Distill the five dimensions above into an actionable checklist. For any multi-Agent system design, score it against this table:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">Task decomposition quality              □ Pass  □ Fail</span><br><span class="line">├─ Low coupling between subtasks?       □ Yes   □ No</span><br><span class="line">├─ Moderate granularity?                □ Yes   □ No</span><br><span class="line">└─ Clear boundaries?                    □ Yes   □ No</span><br><span class="line"></span><br><span class="line">Communication overhead ratio            □ Pass  □ Fail</span><br><span class="line">├─ Communication token ratio &lt; 20%?     □ Yes   □ No</span><br><span class="line">└─ Sub-Agent results compressed?        □ Yes   □ No</span><br><span class="line"></span><br><span class="line">Parallel efficiency                     □ Pass  □ Fail</span><br><span class="line">├─ Parallel speedup &gt; 1.5x?            □ Yes   □ No</span><br><span class="line">└─ Sub-Agent workloads balanced?        □ Yes   □ No</span><br><span class="line"></span><br><span class="line">Fault tolerance &amp; observability         □ Pass  □ Fail</span><br><span class="line">├─ Sub-Agent failure allows degradation? □ Yes  □ No</span><br><span class="line">├─ Each Agent has a trace ID?           □ Yes   □ No</span><br><span class="line">└─ Can replay complete execution?       □ Yes   □ No</span><br><span class="line"></span><br><span class="line">Marginal returns                        □ Pass  □ Fail</span><br><span class="line">├─ Sub-Agent count in reasonable range (3-8)? □ Yes □ No</span><br><span class="line">└─ Benchmarking done to find optimum?   □ Yes   □ No</span><br></pre></td></tr></table></figure>
+<p>All 5 dimensions pass — this is a qualified multi-Agent system design. 1-2 failing — needs targeted optimization. 3 or more failing — go back and reconsider whether this scenario actually needs multi-Agent at all.</p>
+<hr>
+<h2 id="Final-Thoughts"><a href="#Final-Thoughts" class="headerlink" title="Final Thoughts"></a>Final Thoughts</h2><p>Multi-Agent systems aren’t a silver bullet. The scenarios where they’re truly irreplaceable are when you hit two ceilings at once: a single model’s context can’t hold the data, and sequential execution latency is intolerable. Hitting just one of those, single Agent plus segmented strategy or async tool calls is usually enough.</p>
+<p>Evaluating a multi-Agent system design comes down to five core dimensions: whether task decomposition is loosely coupled, whether communication overhead is controllable, whether parallel efficiency meets targets, whether fault tolerance and observability are solid, and whether sub-Agent count has passed the diminishing returns point. All of these have concrete quantitative metrics — no need to rely on gut feeling.</p>
+<p>From an engineering practice perspective, multi-Agent system success rarely depends on how elegant the architecture design is. It depends on whether communication overhead control and fault tolerance handling are solid. A system where communication overhead exceeds 40% — no matter how beautiful the architecture diagram — will pay for it in cost and latency once it hits production.</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Multi-Agent/" rel="tag"><i class="fa fa-tag"></i> Multi-Agent</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/04/27/094_agent-memory-what-to-store-en/" rel="prev" title="What Should an Agent Memory System Actually Store?">
+      <i class="fa fa-chevron-left"></i> What Should an Agent Memory System Actually Store?
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2026/05/05/096_rag-accuracy-optimization-en/" rel="next" title="Optimizing RAG Accuracy from 60% to 85%">
+      Optimizing RAG Accuracy from 60% to 85% <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-Complexity-Isn’t-the-Decision-Criterion"><span class="nav-number">1.</span> <span class="nav-text">1. Complexity Isn’t the Decision Criterion</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-Four-Decision-Dimensions"><span class="nav-number">2.</span> <span class="nav-text">2. Four Decision Dimensions</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-Task-Dependency-Graph-Linear-or-Fan-Out"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 Task Dependency Graph: Linear or Fan-Out?</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-Is-the-Context-Window-a-Hard-Bottleneck"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 Is the Context Window a Hard Bottleneck?</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-Does-the-Latency-Budget-Allow-It"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 Does the Latency Budget Allow It?</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-Can-the-Token-Budget-Handle-It"><span class="nav-number">2.4.</span> <span class="nav-text">2.4 Can the Token Budget Handle It?</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-Decision-Walkthroughs-for-Four-Real-Scenarios"><span class="nav-number">3.</span> <span class="nav-text">3. Decision Walkthroughs for Four Real Scenarios</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-Customer-Service-Chatbot"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 Customer Service Chatbot</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-Enterprise-Code-Security-Audit"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 Enterprise Code Security Audit</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-Long-Document-Summarization"><span class="nav-number">3.3.</span> <span class="nav-text">3.3 Long Document Summarization</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-Multilingual-Translation-Pipeline"><span class="nav-number">3.4.</span> <span class="nav-text">3.4 Multilingual Translation Pipeline</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-How-to-Evaluate-Whether-a-Multi-Agent-Design-Is-Any-Good"><span class="nav-number">4.</span> <span class="nav-text">4. How to Evaluate Whether a Multi-Agent Design Is Any Good?</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-Task-Decomposition-Quality"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 Task Decomposition Quality</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-Communication-Overhead-Ratio"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 Communication Overhead Ratio</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-Parallel-Efficiency"><span class="nav-number">4.3.</span> <span class="nav-text">4.3 Parallel Efficiency</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-Fault-Tolerance-and-Observability"><span class="nav-number">4.4.</span> <span class="nav-text">4.4 Fault Tolerance and Observability</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-Diminishing-Returns-Point"><span class="nav-number">4.5.</span> <span class="nav-text">4.5 Diminishing Returns Point</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-A-Complete-Evaluation-Checklist"><span class="nav-number">5.</span> <span class="nav-text">5. A Complete Evaluation Checklist</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Final-Thoughts"><span class="nav-number">6.</span> <span class="nav-text">Final Thoughts</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/04/30/095_multi-agent-decision-and-evaluation-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/04/30/095_multi-agent-decision-and-evaluation-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

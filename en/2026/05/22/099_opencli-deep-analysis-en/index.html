@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="BackgroundWhen I was researching Chrome DevTools MCP previously, the core problem it solved was letting AI control a browser. But that approach had inherent limitations: you had to configure an MCP Se">
+<meta property="og:type" content="article">
+<meta property="og:title" content="OpenCLI Deep Dive: Letting AI Code Agents Control Any Website">
+<meta property="og:url" content="https://donehub.github.io/en/2026/05/22/099_opencli-deep-analysis-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="BackgroundWhen I was researching Chrome DevTools MCP previously, the core problem it solved was letting AI control a browser. But that approach had inherent limitations: you had to configure an MCP Se">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-05-21T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-25T09:17:01.977Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="OpenCLI">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/05/22/099_opencli-deep-analysis-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>OpenCLI Deep Dive: Letting AI Code Agents Control Any Website | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/05/22/099_opencli-deep-analysis-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          OpenCLI Deep Dive: Letting AI Code Agents Control Any Website
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-05-22 00:00:00" itemprop="dateCreated datePublished" datetime="2026-05-22T00:00:00+08:00">2026-05-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-25 17:17:01" itemprop="dateModified" datetime="2026-09-25T17:17:01+08:00">2026-09-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/05/22/099_opencli-deep-analysis-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/05/22/099_opencli-deep-analysis-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="Background"><a href="#Background" class="headerlink" title="Background"></a>Background</h2><p>When I was researching Chrome DevTools MCP previously, the core problem it solved was letting AI control a browser. But that approach had inherent limitations: you had to configure an MCP Server, depend on Chrome’s debug port, and write a separate adapter for each platform.</p>
+<p>OpenCLI reimagines this from scratch, and goes further. It doesn’t just let AI control a browser — it turns any website into a standardized command-line tool. With 22K+ stars on GitHub, it’s clearly hitting a real need.</p>
+<p>This article covers three things: what OpenCLI is, how its architecture is designed, and — the most important part — how to use it within Code Agents like Claude Code.</p>
+<h2 id=""><a href="#" class="headerlink" title=""></a><a id="more"></a></h2><h2 id="What-Is-OpenCLI"><a href="#What-Is-OpenCLI" class="headerlink" title="What Is OpenCLI"></a>What Is OpenCLI</h2><p>OpenCLI is an AI-native CLI runtime framework that turns any website, browser session, or Electron application into a standardized command-line interface. A comparison makes its positioning clearer:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Traditional Approach</th>
+<th>OpenCLI Approach</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Post to Xiaohongshu</td>
+<td>Open browser → log in → upload image → write copy → publish</td>
+<td><code>opencli xiaohongshu publish --title &quot;xxx&quot; --content &quot;xxx&quot;</code></td>
+</tr>
+<tr>
+<td>Check Bilibili views</td>
+<td>Open Bilibili creator center → refresh → check data</td>
+<td><code>opencli bilibili stats</code></td>
+</tr>
+<tr>
+<td>Tell Claude Code “publish an article for me”</td>
+<td>Claude Code can’t do it</td>
+<td>Claude Code does it directly through OpenCLI</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The core difference: traditional approaches require manual browser interaction every time. OpenCLI wraps those operations into deterministic CLI commands with zero LLM runtime cost.</p>
+<hr>
+<h2 id="Architecture-Breakdown"><a href="#Architecture-Breakdown" class="headerlink" title="Architecture Breakdown"></a>Architecture Breakdown</h2><h3 id="Overall-Architecture"><a href="#Overall-Architecture" class="headerlink" title="Overall Architecture"></a>Overall Architecture</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line">┌──────────────────────────────────────────────────────┐</span><br><span class="line">│                   User &#x2F; AI Agent                     │</span><br><span class="line">│              (Claude Code &#x2F; Cursor etc.)              │</span><br><span class="line">└──────────────────────┬───────────────────────────────┘</span><br><span class="line">                       │ CLI commands</span><br><span class="line">                       ▼</span><br><span class="line">┌──────────────────────────────────────────────────────┐</span><br><span class="line">│                   OpenCLI CLI Layer                    │</span><br><span class="line">│  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐  │</span><br><span class="line">│  │  Plugin     │  │  Adapter     │  │  Session    │  │</span><br><span class="line">│  │  Loader     │  │  Resolver    │  │  Manager    │  │</span><br><span class="line">│  └─────────────┘  └──────────────┘  └─────────────┘  │</span><br><span class="line">└──────────────────────┬───────────────────────────────┘</span><br><span class="line">                       │</span><br><span class="line">          ┌────────────┴────────────┐</span><br><span class="line">          ▼                         ▼</span><br><span class="line">┌────────────────────┐   ┌────────────────────────┐</span><br><span class="line">│  YAML Adapter      │   │  CDP Communication     │</span><br><span class="line">│  Engine            │   │  Chrome DevTools        │</span><br><span class="line">│  (Compile-time     │   │  Protocol injection     │</span><br><span class="line">│   intelligence)    │   │                         │</span><br><span class="line">│  Deterministic     │   │                         │</span><br><span class="line">│  command output    │   │                         │</span><br><span class="line">└────────────────────┘   └────────────────────────┘</span><br><span class="line">                                      │</span><br><span class="line">                                      ▼</span><br><span class="line">                          ┌───────────────────────┐</span><br><span class="line">                          │  Chrome Extension      │</span><br><span class="line">                          │  (Playwright MCP       │</span><br><span class="line">                          │   Bridge)              │</span><br><span class="line">                          └───────────┬───────────┘</span><br><span class="line">                                      │</span><br><span class="line">                                      ▼</span><br><span class="line">                          ┌───────────────────────┐</span><br><span class="line">                          │  Logged-in Chrome      │</span><br><span class="line">                          │  (Your real user       │</span><br><span class="line">                          │   session)             │</span><br><span class="line">                          └───────────────────────┘</span><br></pre></td></tr></table></figure>
+<p>The architecture has four layers top to bottom: users and AI agents interact with OpenCLI through CLI commands; the CLI layer handles plugin loading, adapter resolution, and session management; the middle layer is the YAML Adapter engine and CDP communication; the bottom layer connects to a real browser instance through a Chrome extension. Each layer has clearly defined responsibilities — let’s break down the key design decisions.</p>
+<h3 id="Compile-Time-Intelligence-vs-Runtime-Intelligence"><a href="#Compile-Time-Intelligence-vs-Runtime-Intelligence" class="headerlink" title="Compile-Time Intelligence vs Runtime Intelligence"></a>Compile-Time Intelligence vs Runtime Intelligence</h3><p>The most interesting architectural choice in OpenCLI is where it draws the line between compile-time and runtime intelligence.</p>
+<p>Runtime intelligence means having the LLM understand page structure and decide on actions in real-time every time a command executes. This is flexible, but costs tokens on every invocation and produces inconsistent results — the same command executed twice might yield different LLM decisions.</p>
+<p>Compile-time intelligence is OpenCLI’s choice: the Adapter parses the page structure exactly once during development, producing a deterministic YAML definition. All subsequent CLI calls run against this YAML — zero LLM cost, predictable results. This design drives OpenCLI’s runtime cost toward zero while ensuring execution consistency and debuggability.</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># An Adapter example: get Bilibili video play count</span></span><br><span class="line"><span class="attr">name:</span> <span class="string">bilibili-stats</span></span><br><span class="line"><span class="attr">target:</span> <span class="string">https://member.bilibili.com/platform/home</span></span><br><span class="line"><span class="attr">steps:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">navigate</span></span><br><span class="line">    <span class="attr">url:</span> <span class="string">"https://member.bilibili.com/platform/home"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">extract</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">".data-overview .total-views"</span></span><br><span class="line">    <span class="attr">output:</span> <span class="string">total_views</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">extract</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">".data-overview .total-fans"</span></span><br><span class="line">    <span class="attr">output:</span> <span class="string">total_fans</span></span><br></pre></td></tr></table></figure>
+<p>Once this YAML is defined, every execution uses deterministic DOM selector matching — no LLM involvement. The tradeoff is that when a website redesigns its UI, selectors need manual updating. But for most stable platforms, this maintenance cost is acceptable.</p>
+<h3 id="Why-CDP-over-Selenium-Playwright"><a href="#Why-CDP-over-Selenium-Playwright" class="headerlink" title="Why CDP over Selenium/Playwright"></a>Why CDP over Selenium/Playwright</h3><p>OpenCLI chose Chrome DevTools Protocol (CDP) over traditional Selenium or Playwright for practical reasons.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Selenium/Playwright</th>
+<th>CDP + Chrome Instance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Login state</td>
+<td>Must maintain cookies separately</td>
+<td>Directly reuses your active Chrome</td>
+</tr>
+<tr>
+<td>Security</td>
+<td>Must store credentials</td>
+<td>Zero credential storage</td>
+</tr>
+<tr>
+<td>Authenticity</td>
+<td>Headless browser can be detected</td>
+<td>Real browser instance</td>
+</tr>
+<tr>
+<td>Development cost</td>
+<td>Full automation scripts needed</td>
+<td>YAML declarative definitions</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The key insight is reusing login state. You’re already logged into Zhihu, Bilibili, and Xiaohongshu in your browser. OpenCLI connects directly to that running Chrome instance via CDP — no re-login, no API keys, no password storage. This design makes OpenCLI’s security model clean: it stores no credentials at all; all authentication relies on the browser’s own session management.</p>
+<h3 id="The-Browser-Extension’s-Role"><a href="#The-Browser-Extension’s-Role" class="headerlink" title="The Browser Extension’s Role"></a>The Browser Extension’s Role</h3><p>CDP alone can only control Chrome from the outside, but OpenCLI needs bidirectional communication — it needs to both control the page and relay page structure back to the CLI. A Chrome extension serves as this bridge.</p>
+<p>The Playwright MCP Bridge extension handles four things: receiving CLI instructions (click, type, navigate), executing corresponding operations in the page, returning structured DOM snapshots (not screenshots — semantic DOM trees), and maintaining session state (bind/unbind tabs). This extension is lightweight, following a micro-daemon pattern that auto-loads when OpenCLI starts.</p>
+<h3 id="Session-Binding-Mechanism"><a href="#Session-Binding-Mechanism" class="headerlink" title="Session Binding Mechanism"></a>Session Binding Mechanism</h3><p>Sessions are the bridge connecting CLI commands to specific browser tabs in OpenCLI.</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Bind a logged-in browser tab to a session</span></span><br><span class="line">opencli browser my-blog <span class="built_in">bind</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># List bound sessions</span></span><br><span class="line">opencli browser list</span><br><span class="line"></span><br><span class="line"><span class="comment"># Unbind</span></span><br><span class="line">opencli browser my-blog unbind</span><br></pre></td></tr></table></figure>
+<p>Once bound, all CLI commands targeting that platform execute within that logged-in tab. This design lets OpenCLI manage sessions across multiple platforms simultaneously, without interference.</p>
+<hr>
+<h2 id="Installation-and-Quick-Start"><a href="#Installation-and-Quick-Start" class="headerlink" title="Installation and Quick Start"></a>Installation and Quick Start</h2><p>Requirements: Node.js &gt;= 20.0.0, Chrome / Chromium / Brave / Edge browser.</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Install OpenCLI globally</span></span><br><span class="line">npm install -g @jackwener/opencli</span><br><span class="line"></span><br><span class="line"><span class="comment"># Auto-configuration (detects Chrome instances, installs extension)</span></span><br><span class="line">opencli setup</span><br></pre></td></tr></table></figure>
+<p><code>opencli setup</code> does four things: detects local Chrome debug ports, downloads and loads the Playwright MCP Bridge extension, verifies CLI-to-browser connectivity, and initializes the <code>~/.opencli</code> configuration directory.</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># List built-in adapters</span></span><br><span class="line">opencli list</span><br><span class="line"></span><br><span class="line"><span class="comment"># Run a platform command (using Bilibili as example)</span></span><br><span class="line">opencli bilibili stats</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="Using-OpenCLI-in-Code-Agents"><a href="#Using-OpenCLI-in-Code-Agents" class="headerlink" title="Using OpenCLI in Code Agents"></a>Using OpenCLI in Code Agents</h2><p>This section is the heart of the article. OpenCLI’s real power isn’t in manually typing commands — it’s in enabling AI Code Agents to control any website through it.</p>
+<h3 id="The-Capability-Boundary-of-Code-Agents"><a href="#The-Capability-Boundary-of-Code-Agents" class="headerlink" title="The Capability Boundary of Code Agents"></a>The Capability Boundary of Code Agents</h3><p>Code Agents like Claude Code and Cursor are natively powerful: they can write code, read files, run tests, use git. But they have a clear boundary: they can’t operate web pages.</p>
+<p>The friction this causes in real work is bigger than you might expect. A typical scenario is syncing a tech blog to Zhihu, WeChat Official Account, and Xiaohongshu. Claude Code can write the article quickly, but publishing requires manually operating three different platform backends — login, copy, paste, adjust formatting — repeated three times per article. OpenCLI breaks through this boundary.</p>
+<h3 id="Three-Integration-Methods"><a href="#Three-Integration-Methods" class="headerlink" title="Three Integration Methods"></a>Three Integration Methods</h3><p><strong>Direct CLI invocation</strong> is the simplest approach. Claude Code can already execute shell commands — just tell it to run <code>opencli</code> commands in conversation, no extra configuration needed.</p>
+<p><strong>Installing the OpenCLI Skill</strong> gives better integration. OpenCLI provides a Skill definition tailored for AI agents. After installation, the agent understands and uses OpenCLI more accurately:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Install OpenCLI skill in Claude Code</span></span><br><span class="line">npx skills add jackwener/opencli</span><br></pre></td></tr></table></figure>
+<p>After installation, Claude Code automatically recognizes available OpenCLI commands when handling browser-related tasks — no manual specification each time.</p>
+<p><strong>Custom commands in .claude/commands</strong> suits high-frequency operations. Combined with Claude Code’s custom command system, you can wrap frequently used OpenCLI operations into slash commands:</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># .claude/commands/publish-blog.md</span></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">Publish</span> <span class="string">blog</span> <span class="string">to</span> <span class="string">multiple</span> <span class="string">platforms</span></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"></span><br><span class="line"><span class="attr">Execute the following commands to publish the blog:</span></span><br><span class="line"><span class="number">1</span><span class="string">.</span> <span class="string">opencli</span> <span class="string">zhihu</span> <span class="string">publish</span> <span class="string">--title</span> <span class="string">"<span class="template-variable">&#123;&#123;title&#125;&#125;</span>"</span> <span class="string">--content</span> <span class="string">"<span class="template-variable">&#123;&#123;content&#125;&#125;</span>"</span></span><br><span class="line"><span class="number">2</span><span class="string">.</span> <span class="string">opencli</span> <span class="string">weixin</span> <span class="string">publish</span> <span class="string">--title</span> <span class="string">"<span class="template-variable">&#123;&#123;title&#125;&#125;</span>"</span> <span class="string">--content</span> <span class="string">"<span class="template-variable">&#123;&#123;content&#125;&#125;</span>"</span></span><br><span class="line"><span class="number">3</span><span class="string">.</span> <span class="string">opencli</span> <span class="string">xiaohongshu</span> <span class="string">publish</span> <span class="string">--title</span> <span class="string">"<span class="template-variable">&#123;&#123;title&#125;&#125;</span>"</span> <span class="string">--content</span> <span class="string">"<span class="template-variable">&#123;&#123;content&#125;&#125;</span>"</span></span><br></pre></td></tr></table></figure>
+<p>After that, just type <code>/publish-blog</code> in Claude Code to publish everywhere in one shot.</p>
+<h3 id="Real-Workflows"><a href="#Real-Workflows" class="headerlink" title="Real Workflows"></a>Real Workflows</h3><p><strong>Blog syndication</strong> is the most straightforward use case:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">You: Publish source&#x2F;_posts&#x2F;opencli-deep-analysis.md to Zhihu, Xiaohongshu, and Bilibili</span><br><span class="line"></span><br><span class="line">Claude Code&#39;s execution flow:</span><br><span class="line">1. Read the Markdown file content</span><br><span class="line">2. Adjust format per platform (Zhihu supports Markdown,</span><br><span class="line">   Xiaohongshu needs short copy + images, Bilibili articles</span><br><span class="line">   have a specific structure)</span><br><span class="line">3. Execute opencli zhihu publish --title &quot;...&quot; --content &quot;...&quot;</span><br><span class="line">4. Execute opencli xiaohongshu publish --title &quot;...&quot; --content &quot;...&quot;</span><br><span class="line">5. Execute opencli bilibili publish --title &quot;...&quot; --content &quot;...&quot;</span><br><span class="line">6. Return publishing results from each platform</span><br></pre></td></tr></table></figure>
+<p>No browser tab needs to be opened during the entire process.</p>
+<p><strong>Data monitoring</strong> is also practical:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">You: Check my data across platforms for the past week</span><br><span class="line"></span><br><span class="line">Claude Code:</span><br><span class="line">&gt; opencli bilibili stats --period 7d</span><br><span class="line">&gt; opencli zhihu stats --period 7d</span><br><span class="line">&gt; opencli xiaohongshu stats --period 7d</span><br><span class="line"></span><br><span class="line">Summary output:</span><br><span class="line">| Platform | Views   | Likes | Comments |</span><br><span class="line">|----------|---------|-------|----------|</span><br><span class="line">| Bilibili | 12,340  | 456   | 89       |</span><br><span class="line">| Zhihu    | 8,920   | 312   | 56       |</span><br><span class="line">| Xiaohongshu | 15,600 | 890 | 123      |</span><br></pre></td></tr></table></figure>
+<p><strong>Community moderation automation</strong> can drastically reduce repetitive work:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">You: Check if there are pending posts in the community admin</span><br><span class="line"></span><br><span class="line">Claude Code:</span><br><span class="line">&gt; opencli nomad-community pending-reviews</span><br><span class="line"></span><br><span class="line">Returns 3 pending items, displayed one by one...</span><br><span class="line"></span><br><span class="line">You: Approve all</span><br><span class="line"></span><br><span class="line">Claude Code:</span><br><span class="line">&gt; opencli nomad-community approve --all</span><br></pre></td></tr></table></figure>
+<h3 id="Under-the-Hood-How-Agents-Operate-the-Browser"><a href="#Under-the-Hood-How-Agents-Operate-the-Browser" class="headerlink" title="Under the Hood: How Agents Operate the Browser"></a>Under the Hood: How Agents Operate the Browser</h3><p>Understanding the underlying flow of Claude Code operating the browser through OpenCLI helps with debugging and writing custom plugins. The full call chain works like this:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Claude Code initiates conversation</span><br><span class="line">  → OpenCLI CLI parses the command</span><br><span class="line">    → Finds the corresponding Adapter definition (YAML&#x2F;TS)</span><br><span class="line">      → Connects to Chrome instance via CDP</span><br><span class="line">        → Extension executes operations in the page</span><br><span class="line">          → Returns structured DOM snapshot</span><br><span class="line">            → Adapter parses the snapshot to extract data</span><br><span class="line">              → CLI returns results to Claude Code</span><br></pre></td></tr></table></figure>
+<p>The structured DOM snapshot is key to understanding all of this. OpenCLI doesn’t take screenshots for the AI — it converts the page into semantic structured text:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">[button] &quot;Publish Article&quot; (clickable, enabled)</span><br><span class="line">[textbox] &quot;Title&quot; value&#x3D;&quot;OpenCLI Deep Dive&quot; (editable)</span><br><span class="line">[textarea] &quot;Article Body&quot; (editable, placeholder&#x3D;&quot;Enter content...&quot;)</span><br><span class="line">[link] &quot;Preview&quot; href&#x3D;&quot;&#x2F;preview&quot;</span><br></pre></td></tr></table></figure>
+<p>This format is extremely LLM-friendly: token consumption is far lower than screenshots, information density is higher, and it can directly target interactive elements. Compared to Computer Use’s screenshot approach, the DOM snapshot approach has clear advantages in both cost and precision.</p>
+<hr>
+<h2 id="Plugin-Development"><a href="#Plugin-Development" class="headerlink" title="Plugin Development"></a>Plugin Development</h2><p>Built-in adapters cover mainstream platforms, but your own website or a niche platform needs a custom plugin.</p>
+<h3 id="Directory-Structure"><a href="#Directory-Structure" class="headerlink" title="Directory Structure"></a>Directory Structure</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">~&#x2F;.opencli&#x2F;plugins&#x2F;</span><br><span class="line">└── my-custom-plugin&#x2F;</span><br><span class="line">    ├── plugin.yaml        # Plugin metadata</span><br><span class="line">    ├── adapters&#x2F;</span><br><span class="line">    │   ├── list.yaml      # List command</span><br><span class="line">    │   ├── publish.yaml   # Publish command</span><br><span class="line">    │   └── stats.yaml     # Stats command</span><br><span class="line">    └── README.md</span><br></pre></td></tr></table></figure>
+<h3 id="Writing-an-Adapter"><a href="#Writing-an-Adapter" class="headerlink" title="Writing an Adapter"></a>Writing an Adapter</h3><p>Here’s an example — extracting an article list from a website’s admin panel:</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># plugin.yaml</span></span><br><span class="line"><span class="attr">name:</span> <span class="string">my-blog-admin</span></span><br><span class="line"><span class="attr">version:</span> <span class="number">1.0</span><span class="number">.0</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">Personal</span> <span class="string">blog</span> <span class="string">admin</span> <span class="string">CLI</span></span><br><span class="line"><span class="attr">base_url:</span> <span class="string">https://myblog.com/admin</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># adapters/list.yaml</span></span><br><span class="line"><span class="attr">name:</span> <span class="string">articles</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">List</span> <span class="string">all</span> <span class="string">articles</span></span><br><span class="line"><span class="attr">target:</span> <span class="string">"https://myblog.com/admin/articles"</span></span><br><span class="line"><span class="attr">steps:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">navigate</span></span><br><span class="line">    <span class="attr">url:</span> <span class="string">"https://myblog.com/admin/articles"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">wait</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">".article-table tbody tr"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">extract</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">".article-table tbody tr"</span></span><br><span class="line">    <span class="attr">fields:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">title</span></span><br><span class="line">        <span class="attr">selector:</span> <span class="string">".article-title"</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">status</span></span><br><span class="line">        <span class="attr">selector:</span> <span class="string">".article-status"</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">published_at</span></span><br><span class="line">        <span class="attr">selector:</span> <span class="string">".published-date"</span></span><br><span class="line">    <span class="attr">output:</span> <span class="string">articles</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">format</span></span><br><span class="line">    <span class="attr">template:</span> <span class="string">"<span class="template-variable">&#123;&#123;title&#125;&#125;</span> | <span class="template-variable">&#123;&#123;status&#125;&#125;</span> | <span class="template-variable">&#123;&#123;published_at&#125;&#125;</span>"</span></span><br><span class="line">    <span class="attr">output:</span> <span class="string">articles</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># adapters/publish.yaml</span></span><br><span class="line"><span class="attr">name:</span> <span class="string">publish</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">Publish</span> <span class="string">a</span> <span class="string">new</span> <span class="string">article</span></span><br><span class="line"><span class="attr">target:</span> <span class="string">"https://myblog.com/admin/articles/new"</span></span><br><span class="line"><span class="attr">inputs:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">title</span></span><br><span class="line">    <span class="attr">type:</span> <span class="string">string</span></span><br><span class="line">    <span class="attr">required:</span> <span class="literal">true</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">content</span></span><br><span class="line">    <span class="attr">type:</span> <span class="string">string</span></span><br><span class="line">    <span class="attr">required:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">steps:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">navigate</span></span><br><span class="line">    <span class="attr">url:</span> <span class="string">"https://myblog.com/admin/articles/new"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">input</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">"#article-title"</span></span><br><span class="line">    <span class="attr">value:</span> <span class="string">"<span class="template-variable">&#123;&#123;title&#125;&#125;</span>"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">input</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">"#article-content"</span></span><br><span class="line">    <span class="attr">value:</span> <span class="string">"<span class="template-variable">&#123;&#123;content&#125;&#125;</span>"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">click</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">"#publish-button"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">wait</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">".publish-success"</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">action:</span> <span class="string">extract</span></span><br><span class="line">    <span class="attr">selector:</span> <span class="string">".success-message"</span></span><br><span class="line">    <span class="attr">output:</span> <span class="string">result</span></span><br></pre></td></tr></table></figure>
+<p>After writing the plugin, symlink it to the OpenCLI plugins directory:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Linux/Mac</span></span><br><span class="line">ln -s /path/to/my-custom-plugin ~/.opencli/plugins/my-blog-admin</span><br><span class="line"></span><br><span class="line"><span class="comment"># Windows (PowerShell)</span></span><br><span class="line">New-Item -ItemType Junction -Path <span class="string">"<span class="variable">$env</span>:USERPROFILE\.opencli\plugins\my-blog-admin"</span> -Target <span class="string">"D:\path\to\my-custom-plugin"</span></span><br></pre></td></tr></table></figure>
+<p>Then you can use it directly:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># List articles</span></span><br><span class="line">opencli my-blog-admin articles</span><br><span class="line"></span><br><span class="line"><span class="comment"># Publish an article</span></span><br><span class="line">opencli my-blog-admin publish --title <span class="string">"OpenCLI Deep Dive"</span> --content <span class="string">"..."</span></span><br></pre></td></tr></table></figure>
+<h3 id="Calling-Custom-Plugins-from-Claude-Code"><a href="#Calling-Custom-Plugins-from-Claude-Code" class="headerlink" title="Calling Custom Plugins from Claude Code"></a>Calling Custom Plugins from Claude Code</h3><p>Once custom plugins are written, Claude Code can use them too:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">You: Use the my-blog-admin plugin to list all published articles</span><br><span class="line">Claude Code: Executes opencli my-blog-admin articles, returns...</span><br><span class="line"></span><br><span class="line">You: Sync the article titled &quot;xxx&quot; to Zhihu</span><br><span class="line">Claude Code:</span><br><span class="line">1. Execute opencli my-blog-admin articles to get article content</span><br><span class="line">2. Extract the target article&#39;s content</span><br><span class="line">3. Execute opencli zhihu publish to publish to Zhihu</span><br></pre></td></tr></table></figure>
+<hr>
+<h2 id="Comparison"><a href="#Comparison" class="headerlink" title="Comparison"></a>Comparison</h2><p>There are quite a few solutions for letting AI operate web pages. Here’s a structured comparison:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Solution</th>
+<th>Login State</th>
+<th>LLM Cost</th>
+<th>Dev Barrier</th>
+<th>Stability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OpenCLI</td>
+<td>Reuses Chrome</td>
+<td>Zero runtime cost</td>
+<td>YAML declarative</td>
+<td>Deterministic execution</td>
+</tr>
+<tr>
+<td>Chrome DevTools MCP</td>
+<td>Reuses Chrome</td>
+<td>Token cost per invocation</td>
+<td>Requires MCP config</td>
+<td>LLM real-time decisions</td>
+</tr>
+<tr>
+<td>Playwright scripts</td>
+<td>Must maintain cookies</td>
+<td>None</td>
+<td>Full programming</td>
+<td>Highest, but high dev cost</td>
+</tr>
+<tr>
+<td>Browser Use framework</td>
+<td>Separate login needed</td>
+<td>Token cost per invocation</td>
+<td>Python code</td>
+<td>Depends on LLM judgment</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The table makes OpenCLI’s sweet spot clear: when you need a deterministic, zero-runtime-cost website operation solution that reuses browser login state, it’s the optimal choice. If your scenario demands high flexibility (target page structure changes frequently) or cross-browser compatibility, Playwright scripts are better. For ad-hoc, one-off browser operations, Chrome DevTools MCP has lower setup cost.</p>
+<hr>
+<h2 id="Limitations-and-Boundaries"><a href="#Limitations-and-Boundaries" class="headerlink" title="Limitations and Boundaries"></a>Limitations and Boundaries</h2><p>OpenCLI isn’t universal — several scenarios aren’t a good fit.</p>
+<p>High-frequency trading or ultra-real-time operations aren’t suitable. CDP communication has latency — it can’t match direct API calls. If your scenario requires sub-second response for trading operations, OpenCLI’s latency is unacceptable.</p>
+<p>Large-scale concurrent scraping also isn’t the right use case. OpenCLI depends on a real Chrome instance, and one Chrome instance can only operate one page at a time. If you need to scrape dozens of pages simultaneously, use traditional headless browser solutions.</p>
+<p>Production environments requiring extreme stability need careful consideration. When a website redesigns, Adapter selectors break and need manual updating. For internal systems or platforms with stable APIs, this isn’t a big deal. For third-party platforms that redesign frequently, maintenance costs climb.</p>
+<p>On the security side, OpenCLI reusing browser login state means it can operate any website you’re logged into. Use it only within trusted AI agents (like local Claude Code) — not in cloud or shared environments. For publishing operations, have the agent generate a preview first, confirm manually, then execute.</p>
+<p>Platform anti-bot detection is another real concern. Some platforms detect automated behavior. OpenCLI runs against a real browser instance, which fares better than headless browsers, but excessively rapid operations can still trigger risk controls. Pacing operations and avoiding large bursts of activity in short windows is the basic strategy.</p>
+<hr>
+<h2 id="Personal-Assessment"><a href="#Personal-Assessment" class="headerlink" title="Personal Assessment"></a>Personal Assessment</h2><p>OpenCLI’s value lies in its clear positioning: between LLM-driven browser operations and traditional automation scripts, it substitutes compile-time intelligence for runtime intelligence, driving cost close to zero. This design choice makes it especially well-suited for Code Agent scenarios, where every tool call has a cost and deterministic execution matters more than flexibility.</p>
+<p>It won’t replace traditional automation solutions like Playwright or Selenium — those have their own advantages in stability and flexibility. OpenCLI fills a gap: letting AI agents manipulate websites at minimal cost while reusing the user’s real login state.</p>
+<p>For content creators and multi-platform operators, pairing Claude Code with OpenCLI eliminates mountains of repetitive browser work. For developers, the YAML declarative plugin development barrier is far lower than writing full automation scripts. The tool’s actual value depends on how much repetitive web operation work you need automated.</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/OpenCLI/" rel="tag"><i class="fa fa-tag"></i> OpenCLI</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/05/16/098_trendradar-hot-news-aggregator-guide-en/" rel="prev" title="TrendRadar: Stop Doomscrolling, See Only the News You Actually Care About">
+      <i class="fa fa-chevron-left"></i> TrendRadar: Stop Doomscrolling, See Only the News You Actually Care About
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2026/05/23/100_Flipbook%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90-%E5%BD%93%E6%B5%8F%E8%A7%88%E5%99%A8%E4%B8%8D%E5%86%8D%E9%9C%80%E8%A6%81HTML-en/" rel="next" title="Flipbook Deep Dive: When Browsers No Longer Need HTML">
+      Flipbook Deep Dive: When Browsers No Longer Need HTML <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Background"><span class="nav-number">1.</span> <span class="nav-text">Background</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#"><span class="nav-number">2.</span> <span class="nav-text"></span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#What-Is-OpenCLI"><span class="nav-number">3.</span> <span class="nav-text">What Is OpenCLI</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Architecture-Breakdown"><span class="nav-number">4.</span> <span class="nav-text">Architecture Breakdown</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Overall-Architecture"><span class="nav-number">4.1.</span> <span class="nav-text">Overall Architecture</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Compile-Time-Intelligence-vs-Runtime-Intelligence"><span class="nav-number">4.2.</span> <span class="nav-text">Compile-Time Intelligence vs Runtime Intelligence</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Why-CDP-over-Selenium-Playwright"><span class="nav-number">4.3.</span> <span class="nav-text">Why CDP over Selenium&#x2F;Playwright</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#The-Browser-Extension’s-Role"><span class="nav-number">4.4.</span> <span class="nav-text">The Browser Extension’s Role</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Session-Binding-Mechanism"><span class="nav-number">4.5.</span> <span class="nav-text">Session Binding Mechanism</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Installation-and-Quick-Start"><span class="nav-number">5.</span> <span class="nav-text">Installation and Quick Start</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Using-OpenCLI-in-Code-Agents"><span class="nav-number">6.</span> <span class="nav-text">Using OpenCLI in Code Agents</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#The-Capability-Boundary-of-Code-Agents"><span class="nav-number">6.1.</span> <span class="nav-text">The Capability Boundary of Code Agents</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Three-Integration-Methods"><span class="nav-number">6.2.</span> <span class="nav-text">Three Integration Methods</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Real-Workflows"><span class="nav-number">6.3.</span> <span class="nav-text">Real Workflows</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Under-the-Hood-How-Agents-Operate-the-Browser"><span class="nav-number">6.4.</span> <span class="nav-text">Under the Hood: How Agents Operate the Browser</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Plugin-Development"><span class="nav-number">7.</span> <span class="nav-text">Plugin Development</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Directory-Structure"><span class="nav-number">7.1.</span> <span class="nav-text">Directory Structure</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Writing-an-Adapter"><span class="nav-number">7.2.</span> <span class="nav-text">Writing an Adapter</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Calling-Custom-Plugins-from-Claude-Code"><span class="nav-number">7.3.</span> <span class="nav-text">Calling Custom Plugins from Claude Code</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Comparison"><span class="nav-number">8.</span> <span class="nav-text">Comparison</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Limitations-and-Boundaries"><span class="nav-number">9.</span> <span class="nav-text">Limitations and Boundaries</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Personal-Assessment"><span class="nav-number">10.</span> <span class="nav-text">Personal Assessment</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">209</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">88</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/05/22/099_opencli-deep-analysis-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/05/22/099_opencli-deep-analysis-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
