@@ -1,5 +1,5 @@
 ---
-title: The Complete Guide to Blog SEO Optimization: From Webmaster Verification to Search Engine Indexing
+title: "The Complete Guide to Blog SEO Optimization: From Webmaster Verification to Search Engine Indexing"
 date: 2021-01-14
 tags: SEO
 categories: Blog Setup

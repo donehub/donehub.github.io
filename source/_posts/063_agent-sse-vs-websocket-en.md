@@ -1,5 +1,5 @@
 ---
-title: SSE vs WebSocket for Agent Applications: A Protocol Selection Analysis
+title: "SSE vs WebSocket for Agent Applications: A Protocol Selection Analysis"
 date: 2026-01-12
 tags: [Agent]
 categories: AI

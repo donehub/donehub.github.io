@@ -1,5 +1,5 @@
 ---
-title: Cross-Session Memory: Four Types and Auto-Extraction
+title: "Cross-Session Memory: Four Types and Auto-Extraction"
 date: 2026-04-06
 tags: Memory
 categories: Claude Code

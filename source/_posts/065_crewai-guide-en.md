@@ -1,5 +1,5 @@
 ---
-title: Getting Started with CrewAI: Building a Multi-Agent Collaboration System from Scratch
+title: "Getting Started with CrewAI: Building a Multi-Agent Collaboration System from Scratch"
 date: 2026-02-10
 tags: AI Tools
 categories: AI

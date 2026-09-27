@@ -1,5 +1,5 @@
 ---
-title: Agent Context Compression: The Full Engineering Picture for Long-Task State Management
+title: "Agent Context Compression: The Full Engineering Picture for Long-Task State Management"
 date: 2026-02-01
 tags: [Context Compression]
 categories: AI

@@ -1,5 +1,5 @@
 ---
-title: The Skills System: Conditional Activation and Dynamic Discovery
+title: "The Skills System: Conditional Activation and Dynamic Discovery"
 date: 2026-04-06
 tags: Skills
 categories: Claude Code
