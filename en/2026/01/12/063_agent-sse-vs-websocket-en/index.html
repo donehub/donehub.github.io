@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="BackgroundBuilding an Agent application inevitably raises a protocol design question: which real-time communication protocol should connect your frontend and backend? Two mainstream options exist: SSE">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SSE vs WebSocket for Agent Applications: A Protocol Selection Analysis">
+<meta property="og:url" content="https://donehub.github.io/en/2026/01/12/063_agent-sse-vs-websocket-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:description" content="BackgroundBuilding an Agent application inevitably raises a protocol design question: which real-time communication protocol should connect your frontend and backend? Two mainstream options exist: SSE">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-01-11T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-27T08:09:00.579Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="Agent">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/01/12/063_agent-sse-vs-websocket-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>SSE vs WebSocket for Agent Applications: A Protocol Selection Analysis | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/01/12/063_agent-sse-vs-websocket-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          SSE vs WebSocket for Agent Applications: A Protocol Selection Analysis
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-01-12 00:00:00" itemprop="dateCreated datePublished" datetime="2026-01-12T00:00:00+08:00">2026-01-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-27 16:09:00" itemprop="dateModified" datetime="2026-09-27T16:09:00+08:00">2026-09-27</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/01/12/063_agent-sse-vs-websocket-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/01/12/063_agent-sse-vs-websocket-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="Background"><a href="#Background" class="headerlink" title="Background"></a>Background</h2><p>Building an Agent application inevitably raises a protocol design question: which real-time communication protocol should connect your frontend and backend? Two mainstream options exist: SSE (Server-Sent Events) and WebSocket. In practice, many teams start with WebSocket, run it for a while, discover the connection management complexity and operational overhead, and end up switching back to SSE. This doesn’t mean WebSocket is bad; the two protocols have distinctly different fitness levels for the Agent use case.</p>
+<p>This article analyzes the choice from three angles: protocol mechanics, Agent communication patterns, and engineering practice.</p>
+<a id="more"></a>
+<h2 id="Agent-Communication-Patterns"><a href="#Agent-Communication-Patterns" class="headerlink" title="Agent Communication Patterns"></a>Agent Communication Patterns</h2><p>Before picking a protocol, you need to understand how Agent applications actually communicate. Protocols serve scenarios; choosing without understanding the scenario is pointless.</p>
+<h3 id="Typical-Agent-Interaction-Flow"><a href="#Typical-Agent-Interaction-Flow" class="headerlink" title="Typical Agent Interaction Flow"></a>Typical Agent Interaction Flow</h3><p>A typical Agent conversation works like this: the user sends a message to the server, the server forwards the request to the LLM for inference (which can take 10 to 60 seconds), content generates token by token during inference, the server pushes tokens to the frontend as they arrive to create a typewriter effect, and once generation completes, the connection closes, waiting for the user’s next message.</p>
+<p>This flow has several defining characteristics:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Characteristic</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Request-response</strong></td>
+<td>User sends one message, Agent replies with a block of text, naturally turn-based</td>
+</tr>
+<tr>
+<td><strong>Slow server, fast client</strong></td>
+<td>LLM inference takes 10-60 seconds, user types a few characters</td>
+</tr>
+<tr>
+<td><strong>Streaming output</strong></td>
+<td>Content generates token by token, needs real-time push to frontend</td>
+</tr>
+<tr>
+<td><strong>Primarily unidirectional push</strong></td>
+<td>During inference, the client only receives data; no need to send mid-stream</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>These characteristics point directly toward a unidirectional push protocol.</p>
+<h3 id="Communication-Asymmetry"><a href="#Communication-Asymmetry" class="headerlink" title="Communication Asymmetry"></a>Communication Asymmetry</h3><p>In Agent interactions, communication between client and server is asymmetric. The client sends short content (one user message); the server returns long content (potentially thousands of tokens), pushed continuously one token at a time. During inference, the client has nothing to send—it just waits and renders. This “send once, receive continuously” pattern is key to understanding the protocol choice.</p>
+<h2 id="How-SSE-Works"><a href="#How-SSE-Works" class="headerlink" title="How SSE Works"></a>How SSE Works</h2><p>SSE (Server-Sent Events) is an HTTP-based server push technology. It lets the server keep an HTTP response open and continuously push data to the client instead of closing the connection immediately.</p>
+<h3 id="Protocol-Format"><a href="#Protocol-Format" class="headerlink" title="Protocol Format"></a>Protocol Format</h3><p>The request is a standard HTTP request. The response header uses <code>Content-Type: text/event-stream</code> to identify this as an SSE stream:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">HTTP&#x2F;1.1 200 OK</span><br><span class="line">Content-Type: text&#x2F;event-stream</span><br><span class="line">Cache-Control: no-cache</span><br><span class="line">Connection: keep-alive</span><br></pre></td></tr></table></figure>
+<p>The response body is a continuous data stream. Each message starts with <code>data:</code> and ends with two newline characters <code>\n\n</code>:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">data: &#123;&quot;content&quot;: &quot;Hello&quot;&#125;</span><br><span class="line"></span><br><span class="line">data: &#123;&quot;content&quot;: &quot;, &quot;&#125;</span><br><span class="line"></span><br><span class="line">data: &#123;&quot;content&quot;: &quot;I&quot;&#125;</span><br><span class="line"></span><br><span class="line">data: &#123;&quot;content&quot;: &quot; am&quot;&#125;</span><br><span class="line"></span><br><span class="line">data: &#123;&quot;content&quot;: &quot; an&quot;&#125;</span><br><span class="line"></span><br><span class="line">data: &#123;&quot;content&quot;: &quot; AI&quot;&#125;</span><br><span class="line"></span><br><span class="line">data: &#123;&quot;content&quot;: &quot; assistant&quot;&#125;</span><br><span class="line"></span><br><span class="line">data: [DONE]</span><br></pre></td></tr></table></figure>
+<p>The frontend receives these messages one by one, concatenates and renders them to create the typewriter effect.</p>
+<h3 id="Frontend-Usage"><a href="#Frontend-Usage" class="headerlink" title="Frontend Usage"></a>Frontend Usage</h3><p>Browsers provide the <code>EventSource</code> API:</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> eventSource = <span class="keyword">new</span> EventSource(<span class="string">'/api/chat/stream?message=hello'</span>);</span><br><span class="line"></span><br><span class="line">eventSource.onmessage = <span class="function">(<span class="params">event</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (event.data === <span class="string">'[DONE]'</span>) &#123;</span><br><span class="line">    eventSource.close();</span><br><span class="line">    <span class="keyword">return</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">const</span> data = <span class="built_in">JSON</span>.parse(event.data);</span><br><span class="line">  appendToChat(data.content);</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">eventSource.onerror = <span class="function"><span class="params">()</span> =&gt;</span> &#123;</span><br><span class="line">  <span class="comment">// Browser handles reconnection automatically</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>No handshake, no frame parsing, no heartbeat maintenance. Reconnection and event ID tracking are built into the browser.</p>
+<h3 id="Core-Features"><a href="#Core-Features" class="headerlink" title="Core Features"></a>Core Features</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Unidirectional</strong></td>
+<td>Server-to-client push only</td>
+</tr>
+<tr>
+<td><strong>HTTP-based</strong></td>
+<td>Runs on standard HTTP, compatible with existing infrastructure</td>
+</tr>
+<tr>
+<td><strong>Auto-reconnect</strong></td>
+<td>Native browser support</td>
+</tr>
+<tr>
+<td><strong>Lightweight</strong></td>
+<td>No protocol upgrade or handshake required</td>
+</tr>
+<tr>
+<td><strong>Text format</strong></td>
+<td>UTF-8 text only, no binary support</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="How-WebSocket-Works"><a href="#How-WebSocket-Works" class="headerlink" title="How WebSocket Works"></a>How WebSocket Works</h2><p>WebSocket “upgrades” an HTTP connection into a full-duplex communication channel where both client and server can send messages at any time.</p>
+<h3 id="Protocol-Format-1"><a href="#Protocol-Format-1" class="headerlink" title="Protocol Format"></a>Protocol Format</h3><p>WebSocket connection establishment happens in two steps. First, the HTTP upgrade handshake:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; Client initiates</span><br><span class="line">GET &#x2F;chat HTTP&#x2F;1.1</span><br><span class="line">Upgrade: websocket</span><br><span class="line">Connection: Upgrade</span><br><span class="line">Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ&#x3D;&#x3D;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; Server confirms</span><br><span class="line">HTTP&#x2F;1.1 101 Switching Protocols</span><br><span class="line">Upgrade: websocket</span><br><span class="line">Connection: Upgrade</span><br><span class="line">Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo&#x3D;</span><br></pre></td></tr></table></figure>
+<p>After the handshake, the HTTP connection upgrades to a WebSocket connection, and subsequent data transfers via WebSocket frames. The second step is full-duplex communication where both sides can exchange messages freely:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; Client can send anytime</span><br><span class="line">→ &#123;&quot;type&quot;: &quot;message&quot;, &quot;content&quot;: &quot;Hello&quot;&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; Server can also send anytime</span><br><span class="line">← &#123;&quot;type&quot;: &quot;message&quot;, &quot;content&quot;: &quot;Hello, how can I help?&quot;&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; Both sides send simultaneously, no blocking</span><br></pre></td></tr></table></figure>
+<h3 id="Frontend-Usage-1"><a href="#Frontend-Usage-1" class="headerlink" title="Frontend Usage"></a>Frontend Usage</h3><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> ws = <span class="keyword">new</span> WebSocket(<span class="string">'wss://example.com/chat'</span>);</span><br><span class="line"></span><br><span class="line">ws.onopen = <span class="function"><span class="params">()</span> =&gt;</span> &#123;</span><br><span class="line">  ws.send(<span class="built_in">JSON</span>.stringify(&#123; <span class="attr">message</span>: <span class="string">'Hello'</span> &#125;));</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">ws.onmessage = <span class="function">(<span class="params">event</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> data = <span class="built_in">JSON</span>.parse(event.data);</span><br><span class="line">  appendToChat(data.content);</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">ws.onclose = <span class="function">(<span class="params">event</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="comment">// Reconnection logic must be implemented manually</span></span><br><span class="line">  reconnect();</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">ws.onerror = <span class="function">(<span class="params">err</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="built_in">console</span>.error(<span class="string">'WebSocket error:'</span>, err);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>Compared to SSE, WebSocket requires you to handle connection lifecycle management, reconnection, and heartbeat keep-alive yourself, which adds significant code and maintenance overhead.</p>
+<h3 id="Core-Features-1"><a href="#Core-Features-1" class="headerlink" title="Core Features"></a>Core Features</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Full-duplex</strong></td>
+<td>Both sides can send messages simultaneously</td>
+</tr>
+<tr>
+<td><strong>Independent protocol</strong></td>
+<td>After handshake,脱离 HTTP, uses its own frame format (RFC 6455)</td>
+</tr>
+<tr>
+<td><strong>Low overhead</strong></td>
+<td>Frame header is 2-14 bytes, smaller than HTTP headers</td>
+</tr>
+<tr>
+<td><strong>No auto-reconnect</strong></td>
+<td>Must be implemented manually after disconnection</td>
+</tr>
+<tr>
+<td><strong>Binary support</strong></td>
+<td>Can transmit both text and binary data</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="SSE-vs-WebSocket-Comparison"><a href="#SSE-vs-WebSocket-Comparison" class="headerlink" title="SSE vs WebSocket Comparison"></a>SSE vs WebSocket Comparison</h2><h3 id="Protocol-Characteristics"><a href="#Protocol-Characteristics" class="headerlink" title="Protocol Characteristics"></a>Protocol Characteristics</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>SSE</th>
+<th>WebSocket</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Communication direction</strong></td>
+<td>Unidirectional (server → client)</td>
+<td>Full-duplex</td>
+</tr>
+<tr>
+<td><strong>Protocol basis</strong></td>
+<td>Standard HTTP</td>
+<td>Independent protocol after HTTP upgrade</td>
+</tr>
+<tr>
+<td><strong>Connection method</strong></td>
+<td>Standard HTTP long connection</td>
+<td>Requires protocol upgrade handshake</td>
+</tr>
+<tr>
+<td><strong>Auto-reconnect</strong></td>
+<td>Native browser support</td>
+<td>Must be implemented manually</td>
+</tr>
+<tr>
+<td><strong>Data format</strong></td>
+<td>Text only (UTF-8)</td>
+<td>Text + binary</td>
+</tr>
+<tr>
+<td><strong>Firewall traversal</strong></td>
+<td>Excellent (uses HTTP channel)</td>
+<td>Fair (may be blocked by proxies)</td>
+</tr>
+<tr>
+<td><strong>Load balancing</strong></td>
+<td>Standard HTTP LB works</td>
+<td>Requires sticky sessions</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="Development-Complexity"><a href="#Development-Complexity" class="headerlink" title="Development Complexity"></a>Development Complexity</h3><p>Implementing the same “streaming chat” feature shows a significant difference between the two approaches.</p>
+<p><strong>SSE Backend (Spring Boot):</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@GetMapping</span>(value = <span class="string">"/chat/stream"</span>, produces = MediaType.TEXT_EVENT_STREAM_VALUE)</span><br><span class="line"><span class="keyword">public</span> Flux&lt;ServerSentEvent&lt;String&gt;&gt; stream(<span class="meta">@RequestParam</span> String message) &#123;</span><br><span class="line">    <span class="keyword">return</span> chatService.streamResponse(message)</span><br><span class="line">        .map(content -&gt; ServerSentEvent.&lt;String&gt;builder()</span><br><span class="line">            .data(content)</span><br><span class="line">            .build());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>SSE Frontend:</strong></p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> es = <span class="keyword">new</span> EventSource(<span class="string">`/api/chat/stream?message=<span class="subst">$&#123;msg&#125;</span>`</span>);</span><br><span class="line">es.onmessage = <span class="function">(<span class="params">e</span>) =&gt;</span> appendToChat(e.data);</span><br></pre></td></tr></table></figure>
+<p><strong>WebSocket Backend (Spring Boot):</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@ServerEndpoint</span>(<span class="string">"/chat"</span>)</span><br><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ChatWebSocket</span> </span>&#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Map&lt;String, Session&gt; sessions = <span class="keyword">new</span> ConcurrentHashMap&lt;&gt;();</span><br><span class="line"></span><br><span class="line">    <span class="meta">@OnOpen</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onOpen</span><span class="params">(Session session)</span> </span>&#123;</span><br><span class="line">        sessions.put(session.getId(), session);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@OnMessage</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onMessage</span><span class="params">(String message, Session session)</span> </span>&#123;</span><br><span class="line">        chatService.streamResponse(message).subscribe(content -&gt; &#123;</span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                session.getBasicRemote().sendText(content);</span><br><span class="line">            &#125; <span class="keyword">catch</span> (IOException e) &#123;</span><br><span class="line">                <span class="comment">// Exception handling required</span></span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@OnClose</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onClose</span><span class="params">(Session session)</span> </span>&#123;</span><br><span class="line">        sessions.remove(session.getId());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@OnError</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onError</span><span class="params">(Session session, Throwable error)</span> </span>&#123;</span><br><span class="line">        sessions.remove(session.getId());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>WebSocket Frontend:</strong></p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> ws = <span class="keyword">new</span> WebSocket(<span class="string">'wss://example.com/chat'</span>);</span><br><span class="line">ws.onopen = <span class="function"><span class="params">()</span> =&gt;</span> ws.send(<span class="built_in">JSON</span>.stringify(&#123; <span class="attr">message</span>: msg &#125;));</span><br><span class="line">ws.onmessage = <span class="function">(<span class="params">e</span>) =&gt;</span> appendToChat(e.data);</span><br><span class="line">ws.onclose = <span class="function"><span class="params">()</span> =&gt;</span> &#123;</span><br><span class="line">    setTimeout(<span class="function"><span class="params">()</span> =&gt;</span> reconnect(), <span class="number">3000</span>);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>With SSE, the backend is a standard HTTP endpoint and the frontend uses the browser’s built-in <code>EventSource</code>. With WebSocket, you need to manage Session lifecycles, handle connection states, and implement reconnection logic. The code volume difference is obvious.</p>
+<h3 id="Operational-Complexity"><a href="#Operational-Complexity" class="headerlink" title="Operational Complexity"></a>Operational Complexity</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Ops Dimension</th>
+<th>SSE</th>
+<th>WebSocket</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Nginx config</strong></td>
+<td>Almost no changes needed</td>
+<td>Requires <code>Upgrade</code> header configuration</td>
+</tr>
+<tr>
+<td><strong>Load balancing</strong></td>
+<td>Standard HTTP balancing works</td>
+<td>Requires sticky sessions</td>
+</tr>
+<tr>
+<td><strong>CDN support</strong></td>
+<td>Native support</td>
+<td>Not supported</td>
+</tr>
+<tr>
+<td><strong>Monitoring</strong></td>
+<td>Same as HTTP endpoints</td>
+<td>Requires dedicated monitoring setup</td>
+</tr>
+<tr>
+<td><strong>Horizontal scaling</strong></td>
+<td>Stateless, scale directly</td>
+<td>Stateful connections, need session sync</td>
+</tr>
+<tr>
+<td><strong>Debugging</strong></td>
+<td>View directly in DevTools Network tab</td>
+<td>Requires dedicated debugging tools</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>SSE’s operational cost is essentially equivalent to a standard HTTP endpoint. WebSocket requires maintaining a separate long-connection infrastructure, including connection management, heartbeat detection, and session synchronization.</p>
+<h2 id="Why-SSE-Became-the-Standard-for-LLM-Applications"><a href="#Why-SSE-Became-the-Standard-for-LLM-Applications" class="headerlink" title="Why SSE Became the Standard for LLM Applications"></a>Why SSE Became the Standard for LLM Applications</h2><p>Every major LLM provider—OpenAI, Anthropic, Google, Alibaba, and ByteDance—chose SSE for streaming output. This choice has clear technical reasoning behind it.</p>
+<h3 id="LLM-Inference-Is-a-Unidirectional-Data-Flow"><a href="#LLM-Inference-Is-a-Unidirectional-Data-Flow" class="headerlink" title="LLM Inference Is a Unidirectional Data Flow"></a>LLM Inference Is a Unidirectional Data Flow</h3><p>LLM text generation is an auto-regressive process: the input prompt goes through inference to produce the first token, that token gets appended, inference produces the second token, and the cycle continues. Each token depends on all preceding tokens; the process is unidirectional and sequential. From a communication standpoint, this is a unidirectional data flow: the server continuously produces data, the client continuously receives it. SSE’s design purpose is exactly server-to-client unidirectional push.</p>
+<h3 id="The-Bidirectional-Channel-Sits-Idle-During-Inference"><a href="#The-Bidirectional-Channel-Sits-Idle-During-Inference" class="headerlink" title="The Bidirectional Channel Sits Idle During Inference"></a>The Bidirectional Channel Sits Idle During Inference</h3><p>WebSocket’s core advantage is full-duplex communication. But during LLM inference, after the user sends a message and inference begins, the server continuously pushes tokens until inference completes. The client has nothing to send during inference and can only send the next message after inference finishes. Inference can take tens of seconds; during that time, WebSocket’s bidirectional channel is mostly half-idle.</p>
+<h3 id="SSE-Inherits-the-Entire-HTTP-Ecosystem"><a href="#SSE-Inherits-the-Entire-HTTP-Ecosystem" class="headerlink" title="SSE Inherits the Entire HTTP Ecosystem"></a>SSE Inherits the Entire HTTP Ecosystem</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Auto-reconnect</td>
+<td>Built into <code>EventSource</code></td>
+</tr>
+<tr>
+<td>Firewall traversal</td>
+<td>Uses HTTP channel, no extra ports needed</td>
+</tr>
+<tr>
+<td>Horizontal scaling</td>
+<td>Essentially HTTP requests, stateless</td>
+</tr>
+<tr>
+<td>CDN acceleration</td>
+<td>Standard HTTP responses</td>
+</tr>
+<tr>
+<td>Monitoring and ops</td>
+<td>Reuses existing HTTP monitoring stack</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>These aren’t SSE’s own design advantages; they exist because SSE IS HTTP, inheriting 30 years of accumulated HTTP infrastructure.</p>
+<h3 id="What-the-Major-Providers-Chose"><a href="#What-the-Major-Providers-Chose" class="headerlink" title="What the Major Providers Chose"></a>What the Major Providers Chose</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Streaming Protocol</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OpenAI (GPT-4o)</td>
+<td>SSE</td>
+</tr>
+<tr>
+<td>Anthropic (Claude)</td>
+<td>SSE</td>
+</tr>
+<tr>
+<td>Google (Gemini)</td>
+<td>SSE</td>
+</tr>
+<tr>
+<td>Alibaba (Qwen)</td>
+<td>SSE</td>
+</tr>
+<tr>
+<td>ByteDance (Doubao)</td>
+<td>SSE</td>
+</tr>
+<tr>
+<td>Meta (Llama)</td>
+<td>SSE</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The consistency across providers validates SSE’s fitness for LLM streaming from an engineering practice standpoint.</p>
+<h2 id="Layered-Selection-Guide"><a href="#Layered-Selection-Guide" class="headerlink" title="Layered Selection Guide"></a>Layered Selection Guide</h2><p>SSE is the optimal choice for LLM streaming output, but WebSocket retains irreplaceable value in other scenarios. The selection criterion is the communication pattern, not the protocol’s perceived sophistication.</p>
+<p>Real-time communication scenarios break into three layers by interaction complexity:</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Scenario Type</th>
+<th>Recommended Protocol</th>
+<th>Typical Applications</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Layer 1</td>
+<td>Streaming text output</td>
+<td>SSE</td>
+<td>AI chat, notification push, data streams</td>
+</tr>
+<tr>
+<td>Layer 2</td>
+<td>Bidirectional real-time interaction</td>
+<td>WebSocket</td>
+<td>Multi-user collaboration, real-time games, voice assistants</td>
+</tr>
+<tr>
+<td>Layer 3</td>
+<td>Point-to-point audio/video</td>
+<td>WebRTC</td>
+<td>Video calls, screen sharing</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>SSE fits Layer 1 scenarios. The common thread: client sends a request, server continuously pushes data, and the client doesn’t need to send data mid-processing. Representative products include ChatGPT, Claude, Qwen, and Copilot.</p>
+<p>WebSocket fits Layer 2 scenarios. The common thread: client and server need to exchange messages simultaneously and at any time, with multi-party state requiring real-time synchronization. Take collaborative document editing: while Person A is typing, Person B is also typing, and both need to see each other’s operations in real time. Both sides are continuously sending data here; WebSocket is mandatory.</p>
+<p>WebRTC fits Layer 3 scenarios requiring ultra-low-latency point-to-point transmission involving audio/video media streams. This layer has little relevance to LLM applications.</p>
+<p>Complex Agent applications can also mix protocols. SSE handles LLM inference result streaming (the bulk of data volume), while WebSocket handles control commands like canceling inference mid-stream, switching models, or adjusting parameters. Each protocol plays to its strengths, though architectural complexity increases.</p>
+<h2 id="Implementation-SSE-Streaming-Chat-Endpoint"><a href="#Implementation-SSE-Streaming-Chat-Endpoint" class="headerlink" title="Implementation: SSE Streaming Chat Endpoint"></a>Implementation: SSE Streaming Chat Endpoint</h2><h3 id="Backend-Spring-Boot-WebFlux"><a href="#Backend-Spring-Boot-WebFlux" class="headerlink" title="Backend: Spring Boot + WebFlux"></a>Backend: Spring Boot + WebFlux</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@RestController</span></span><br><span class="line"><span class="meta">@RequestMapping</span>(<span class="string">"/api/chat"</span>)</span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ChatController</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> ChatService chatService;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@GetMapping</span>(value = <span class="string">"/stream"</span>, produces = MediaType.TEXT_EVENT_STREAM_VALUE)</span><br><span class="line">    <span class="keyword">public</span> Flux&lt;ServerSentEvent&lt;ChatStreamResponse&gt;&gt; stream(</span><br><span class="line">            <span class="meta">@RequestParam</span> String message,</span><br><span class="line">            <span class="meta">@RequestParam</span>(required = <span class="keyword">false</span>) String sessionId) &#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> chatService.streamChat(message, sessionId)</span><br><span class="line">            .map(content -&gt; ServerSentEvent.&lt;ChatStreamResponse&gt;builder()</span><br><span class="line">                .event(<span class="string">"message"</span>)</span><br><span class="line">                .data(<span class="keyword">new</span> ChatStreamResponse(content))</span><br><span class="line">                .build())</span><br><span class="line">            .concatWith(Flux.just(</span><br><span class="line">                ServerSentEvent.&lt;ChatStreamResponse&gt;builder()</span><br><span class="line">                    .event(<span class="string">"done"</span>)</span><br><span class="line">                    .data(<span class="keyword">new</span> ChatStreamResponse(<span class="string">"[DONE]"</span>))</span><br><span class="line">                    .build()</span><br><span class="line">            ));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Nginx configuration to ensure SSE responses aren’t buffered:</p>
+<figure class="highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">location</span> /api/chat/stream &#123;</span><br><span class="line">    <span class="attribute">proxy_pass</span> http://backend;</span><br><span class="line">    <span class="attribute">proxy_set_header</span> Connection <span class="string">''</span>;</span><br><span class="line">    <span class="attribute">proxy_http_version</span> <span class="number">1</span>.<span class="number">1</span>;</span><br><span class="line">    <span class="attribute">chunked_transfer_encoding</span> <span class="literal">off</span>;</span><br><span class="line">    <span class="attribute">proxy_buffering</span> <span class="literal">off</span>;</span><br><span class="line">    <span class="attribute">proxy_cache</span> <span class="literal">off</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="Frontend-fetch-ReadableStream"><a href="#Frontend-fetch-ReadableStream" class="headerlink" title="Frontend: fetch + ReadableStream"></a>Frontend: fetch + ReadableStream</h3><p>In real applications, <code>fetch</code> + <code>ReadableStream</code> offers more flexibility than <code>EventSource</code>, because <code>EventSource</code> only supports GET requests, and user messages can be long enough that POST is more appropriate.</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">ChatStream</span> </span>&#123;</span><br><span class="line">  <span class="keyword">constructor</span>() &#123;</span><br><span class="line">    <span class="keyword">this</span>.abortController = <span class="literal">null</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">async</span> sendMessage(message, onChunk, onDone) &#123;</span><br><span class="line">    <span class="keyword">this</span>.abortController = <span class="keyword">new</span> AbortController();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">const</span> response = <span class="keyword">await</span> fetch(<span class="string">`/api/chat/stream?message=<span class="subst">$&#123;<span class="built_in">encodeURIComponent</span>(message)&#125;</span>`</span>, &#123;</span><br><span class="line">      signal: <span class="keyword">this</span>.abortController.signal,</span><br><span class="line">    &#125;);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">const</span> reader = response.body.getReader();</span><br><span class="line">    <span class="keyword">const</span> decoder = <span class="keyword">new</span> TextDecoder();</span><br><span class="line">    <span class="keyword">let</span> buffer = <span class="string">''</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">      <span class="keyword">const</span> &#123; done, value &#125; = <span class="keyword">await</span> reader.read();</span><br><span class="line">      <span class="keyword">if</span> (done) <span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">      buffer += decoder.decode(value, &#123; <span class="attr">stream</span>: <span class="literal">true</span> &#125;);</span><br><span class="line">      <span class="keyword">const</span> lines = buffer.split(<span class="string">'\n'</span>);</span><br><span class="line">      buffer = lines.pop();</span><br><span class="line"></span><br><span class="line">      <span class="keyword">for</span> (<span class="keyword">const</span> line <span class="keyword">of</span> lines) &#123;</span><br><span class="line">        <span class="keyword">if</span> (line.startsWith(<span class="string">'data:'</span>)) &#123;</span><br><span class="line">          <span class="keyword">const</span> data = line.slice(<span class="number">5</span>).trim();</span><br><span class="line">          <span class="keyword">if</span> (data === <span class="string">'[DONE]'</span>) &#123;</span><br><span class="line">            onDone?.();</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">          &#125;</span><br><span class="line">          <span class="keyword">const</span> parsed = <span class="built_in">JSON</span>.parse(data);</span><br><span class="line">          onChunk?.(parsed.content);</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  cancel() &#123;</span><br><span class="line">    <span class="keyword">this</span>.abortController?.abort();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Usage example</span></span><br><span class="line"><span class="keyword">const</span> chat = <span class="keyword">new</span> ChatStream();</span><br><span class="line">chat.sendMessage(<span class="string">'Tell me about yourself'</span>,</span><br><span class="line">  (chunk) =&gt; &#123;</span><br><span class="line">    <span class="built_in">document</span>.getElementById(<span class="string">'chat-box'</span>).innerText += chunk;</span><br><span class="line">  &#125;,</span><br><span class="line">  () =&gt; &#123;</span><br><span class="line">    <span class="built_in">console</span>.log(<span class="string">'Generation complete'</span>);</span><br><span class="line">  &#125;</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+<h2 id="Frequently-Asked-Questions"><a href="#Frequently-Asked-Questions" class="headerlink" title="Frequently Asked Questions"></a>Frequently Asked Questions</h2><p>Browsers limit HTTP connections per domain; Chrome allows 6. Opening multiple SSE connections simultaneously can exhaust this quota. The fix is using HTTP/2 (multiplexed, no connection limit) or merging multiple SSE streams into one (distinguished by event type). Also, the <code>EventSource</code> API only supports GET requests; using <code>fetch</code> + <code>ReadableStream</code> to parse SSE-format data supports POST, which is what most Agent applications actually use.</p>
+<p><code>EventSource</code> reconnects automatically, but the <code>fetch</code> approach needs manual reconnection logic; exponential backoff works well. WebSocket frames do have lower overhead (2-14 bytes vs HTTP chunked encoding), but in the LLM streaming scenario, the bottleneck is inference speed (tens of milliseconds to seconds per token), so the network transmission overhead difference is negligible.</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Agent/" rel="tag"><i class="fa fa-tag"></i> Agent</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/01/05/062_spring-ai-deep-analysis-en/" rel="prev" title="Spring AI Deep Analysis">
+      <i class="fa fa-chevron-left"></i> Spring AI Deep Analysis
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2026/02/01/064-agent-context-compression-deep-analysis-en/" rel="next" title="Agent Context Compression: The Full Engineering Picture for Long-Task State Management">
+      Agent Context Compression: The Full Engineering Picture for Long-Task State Management <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Background"><span class="nav-number">1.</span> <span class="nav-text">Background</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Agent-Communication-Patterns"><span class="nav-number">2.</span> <span class="nav-text">Agent Communication Patterns</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Typical-Agent-Interaction-Flow"><span class="nav-number">2.1.</span> <span class="nav-text">Typical Agent Interaction Flow</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Communication-Asymmetry"><span class="nav-number">2.2.</span> <span class="nav-text">Communication Asymmetry</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#How-SSE-Works"><span class="nav-number">3.</span> <span class="nav-text">How SSE Works</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Protocol-Format"><span class="nav-number">3.1.</span> <span class="nav-text">Protocol Format</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Frontend-Usage"><span class="nav-number">3.2.</span> <span class="nav-text">Frontend Usage</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Core-Features"><span class="nav-number">3.3.</span> <span class="nav-text">Core Features</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#How-WebSocket-Works"><span class="nav-number">4.</span> <span class="nav-text">How WebSocket Works</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Protocol-Format-1"><span class="nav-number">4.1.</span> <span class="nav-text">Protocol Format</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Frontend-Usage-1"><span class="nav-number">4.2.</span> <span class="nav-text">Frontend Usage</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Core-Features-1"><span class="nav-number">4.3.</span> <span class="nav-text">Core Features</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SSE-vs-WebSocket-Comparison"><span class="nav-number">5.</span> <span class="nav-text">SSE vs WebSocket Comparison</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Protocol-Characteristics"><span class="nav-number">5.1.</span> <span class="nav-text">Protocol Characteristics</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Development-Complexity"><span class="nav-number">5.2.</span> <span class="nav-text">Development Complexity</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Operational-Complexity"><span class="nav-number">5.3.</span> <span class="nav-text">Operational Complexity</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Why-SSE-Became-the-Standard-for-LLM-Applications"><span class="nav-number">6.</span> <span class="nav-text">Why SSE Became the Standard for LLM Applications</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#LLM-Inference-Is-a-Unidirectional-Data-Flow"><span class="nav-number">6.1.</span> <span class="nav-text">LLM Inference Is a Unidirectional Data Flow</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#The-Bidirectional-Channel-Sits-Idle-During-Inference"><span class="nav-number">6.2.</span> <span class="nav-text">The Bidirectional Channel Sits Idle During Inference</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SSE-Inherits-the-Entire-HTTP-Ecosystem"><span class="nav-number">6.3.</span> <span class="nav-text">SSE Inherits the Entire HTTP Ecosystem</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#What-the-Major-Providers-Chose"><span class="nav-number">6.4.</span> <span class="nav-text">What the Major Providers Chose</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Layered-Selection-Guide"><span class="nav-number">7.</span> <span class="nav-text">Layered Selection Guide</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Implementation-SSE-Streaming-Chat-Endpoint"><span class="nav-number">8.</span> <span class="nav-text">Implementation: SSE Streaming Chat Endpoint</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Backend-Spring-Boot-WebFlux"><span class="nav-number">8.1.</span> <span class="nav-text">Backend: Spring Boot + WebFlux</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Frontend-fetch-ReadableStream"><span class="nav-number">8.2.</span> <span class="nav-text">Frontend: fetch + ReadableStream</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Frequently-Asked-Questions"><span class="nav-number">9.</span> <span class="nav-text">Frequently Asked Questions</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">218</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">89</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/01/12/063_agent-sse-vs-websocket-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/01/12/063_agent-sse-vs-websocket-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>

@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/avicon.jpg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-16x16-next">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next">
+  <link rel="mask-icon" href="/images/avicon.jpg" color="#222">
+  <meta name="google-site-verification" content="8GnrAdfl7gO-GxPzgsB1kmX6vAeJLAX8B8-vFdpAmi4">
+  <meta name="baidu-site-verification" content="codeva-WylAz2Lt8x">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"donehub.github.io","root":"/","scheme":"Mist","version":"7.7.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta property="og:type" content="article">
+<meta property="og:title" content="Getting Started with CrewAI: Building a Multi-Agent Collaboration System from Scratch">
+<meta property="og:url" content="https://donehub.github.io/en/2026/02/10/065_crewai-guide-en/index.html">
+<meta property="og:site_name" content="DoneHub">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-02-09T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-27T08:09:04.725Z">
+<meta property="article:author" content="Zou Rongsheng">
+<meta property="article:tag" content="AI Tools">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://donehub.github.io/en/2026/02/10/065_crewai-guide-en/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+<meta name="page-lang" content="en">
+<style>
+/* Header Language Switcher */
+.menu-item-languages { position: relative; cursor: pointer; }
+.lang-switch-btn {
+  display: flex; align-items: center; gap: 4px;
+  color: inherit; text-decoration: none; font-size: 14px;
+  line-height: 20px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit;
+}
+.lang-switch-btn:hover { color: #fc6423; }
+.lang-switch-btn .fa { font-size: 16px; }
+.lang-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: #fff; border: 1px solid #ddd; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); min-width: 120px;
+  z-index: 1000; overflow: hidden; padding-top: 4px;
+}
+.menu-item-languages:hover .lang-dropdown { display: block; }
+.lang-dropdown a {
+  display: block; padding: 8px 16px; color: #555;
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.lang-dropdown a:hover { background: #f5f5f5; color: #222; }
+.lang-dropdown a.active { color: #fc6423; font-weight: 600; }
+@media (max-width: 767px) {
+  .menu-item-languages { margin-top: 5px; }
+  .lang-dropdown { position: static; box-shadow: none; border: none; padding-left: 20px; }
+  .menu-item-languages:hover .lang-dropdown { display: block; }
+}
+</style>
+<script>
+(function() {
+  var LANGS = ['zh-CN', 'en'];
+  var LANG_HOME = { 'zh-CN': '/', 'en': '/en/' };
+  var STORAGE_KEY = 'donehub_lang';
+
+  function storeLang(lang) {
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+  }
+
+  function getStoredLang() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return null; }
+  }
+
+  function detectBrowserLang() {
+    var raw = (navigator.language || navigator.userLanguage || 'zh-CN').toLowerCase();
+    if (raw.indexOf('en') === 0) return 'en';
+    return 'zh-CN';
+  }
+
+  function currentLang() {
+    var meta = document.querySelector('meta[name="page-lang"]');
+    return (meta && meta.content) || 'zh-CN';
+  }
+
+  function currentPathname() {
+    return window.location.pathname;
+  }
+
+  // --- Auto redirect (only on first visit, never chosen a language) ---
+  var stored = getStoredLang();
+  var pageLang = currentLang();
+  var pathname = currentPathname();
+
+  // Always store current page language as visited
+  storeLang(pageLang);
+
+  // If user has never chosen a language, detect and redirect
+  if (!stored) {
+    var browserLang = detectBrowserLang();
+    // Only redirect if browser language differs from current page language
+    // and we are on a homepage (not a specific post)
+    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+      window.location.href = LANG_HOME[browserLang] || '/';
+      return;
+    }
+  }
+
+  // --- Header language dropdown ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var current = currentLang();
+    var langNames = { 'zh-CN': '中文', 'en': 'English' };
+
+    // Update button text to reflect current page language
+    var langCurrent = document.querySelector('.lang-current');
+    if (langCurrent && langNames[current]) {
+      langCurrent.textContent = langNames[current];
+    }
+
+    // Highlight active language option in dropdown
+    var options = document.querySelectorAll('.lang-dropdown a');
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].getAttribute('data-lang') === current) {
+        options[i].classList.add('active');
+      }
+    }
+
+    // Click handler: switch language
+    var dropdown = document.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('click', function(e) {
+      var target = e.target.closest('a[data-lang]');
+      if (!target) return;
+      e.preventDefault();
+      var lang = target.getAttribute('data-lang');
+      storeLang(lang);
+      window.location.href = target.getAttribute('href');
+    });
+  });
+})();
+</script>
+
+  <title>Getting Started with CrewAI: Building a Multi-Agent Collaboration System from Scratch | DoneHub</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="DoneHub" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">DoneHub</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+      <li class="menu-item menu-item-languages">
+        <a class="lang-switch-btn" role="button" title="Language">
+          <i class="fa fa-language fa-fw"></i>
+          <span class="lang-current">中文</span>
+          <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
+        </a>
+        <div class="lang-dropdown">
+          
+            <a href="/" data-lang="zh-CN">中文</a>
+          
+            <a href="/en/" data-lang="en">English</a>
+          
+        </div>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocorrect="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://donehub.github.io/en/2026/02/10/065_crewai-guide-en/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Zou Rongsheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="DoneHub">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Getting Started with CrewAI: Building a Multi-Agent Collaboration System from Scratch
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-02-10 00:00:00" itemprop="dateCreated datePublished" datetime="2026-02-10T00:00:00+08:00">2026-02-10</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-09-27 16:09:04" itemprop="dateModified" datetime="2026-09-27T16:09:04+08:00">2026-09-27</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/AI/" itemprop="url" rel="index"><span itemprop="name">AI</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="fa fa-comment-o"></i>
+      </span>
+      <span class="post-meta-item-text">Valine: </span>
+    
+    <a title="valine" href="/en/2026/02/10/065_crewai-guide-en/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/en/2026/02/10/065_crewai-guide-en/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <hr>
+<a id="more"></a>
+<p>CrewAI is a Python framework for orchestrating autonomous AI agents. Its core selling point is making multiple Agents work together like a team. It doesn’t depend on LangChain or any other framework; it’s built from the ground up, and the official claim is performance 5x faster than LangGraph. The framework offers two orchestration modes: Crews handle autonomous collaboration, and Flows handle precise workflow control. For scenarios requiring multi-role collaboration (report generation, data analysis, virtual teams), CrewAI’s learning curve is noticeably gentler than LangGraph’s.</p>
+<p>Compared to similar frameworks, CrewAI’s strengths are simplicity and independence; its weakness is a relatively young community. LangGraph is more feature-complete but comes with more boilerplate and tight LangChain coupling. Autogen excels at conversational agents but lacks workflow concepts. ChatDev has workflow concepts but limited customization. If you need to quickly stand up a multi-role collaboration system rather than building complex stateful graphs, CrewAI is the lowest-friction option available today.</p>
+<h2 id="Core-Concepts"><a href="#Core-Concepts" class="headerlink" title="Core Concepts"></a>Core Concepts</h2><p>CrewAI’s architecture revolves around four concepts: Agent, Task, Crew, and Tools. Understanding their relationships is essential for using the framework.</p>
+<p>An Agent represents a role, the most basic execution unit in the system. Each Agent requires a role (identity), goal (objective), and backstory (background story). Backstory determines the Agent’s personality and behavior patterns. You can also specify available tools, which LLM to use, and whether tasks can be delegated to other Agents via allow_delegation.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> crewai <span class="keyword">import</span> Agent</span><br><span class="line"></span><br><span class="line">agent = Agent(</span><br><span class="line">    role=<span class="string">"Senior Data Analyst"</span>,</span><br><span class="line">    goal=<span class="string">"Analyze data and provide insights"</span>,</span><br><span class="line">    backstory=<span class="string">"You are a seasoned analyst skilled at discovering key trends from massive datasets..."</span>,</span><br><span class="line">    verbose=<span class="literal">True</span>,</span><br><span class="line">    allow_delegation=<span class="literal">True</span>,</span><br><span class="line">    tools=[],</span><br><span class="line">    llm=...,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>A Task defines specific work an Agent must complete, including description (task description), expected_output (expected output format), agent (executor), and output_file (output file path). Tasks and Agents have a many-to-many relationship, but typically one Task binds to one specific Agent.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> crewai <span class="keyword">import</span> Task</span><br><span class="line"></span><br><span class="line">task = Task(</span><br><span class="line">    description=<span class="string">"Analyze sales data and identify growth trends"</span>,</span><br><span class="line">    expected_output=<span class="string">"A report with 5 key findings"</span>,</span><br><span class="line">    agent=agent,</span><br><span class="line">    output_file=<span class="string">"report.md"</span>,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>A Crew is a collection of Agents and Tasks, defining how the entire team collaborates. CrewAI offers two process modes: sequential (tasks execute one after another) suits task chains with clear workflows; hierarchical (automatically assigns a Manager Agent to coordinate) suits scenarios requiring dynamic decision-making.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> crewai <span class="keyword">import</span> Crew, Process</span><br><span class="line"></span><br><span class="line">crew = Crew(</span><br><span class="line">    agents=[agent1, agent2, agent3],</span><br><span class="line">    tasks=[task1, task2, task3],</span><br><span class="line">    process=Process.sequential,</span><br><span class="line">    verbose=<span class="literal">True</span>,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>Tools extend an Agent’s capability boundary, letting Agents search the web, read/write files, call external APIs, and more. The framework includes a set of built-in tools and supports custom ones.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> crewai_tools <span class="keyword">import</span> SerperDevTool, FileReadTool</span><br><span class="line"></span><br><span class="line">search_tool = SerperDevTool()</span><br><span class="line">file_tool = FileReadTool()</span><br><span class="line"></span><br><span class="line">agent = Agent(</span><br><span class="line">    role=<span class="string">"Researcher"</span>,</span><br><span class="line">    tools=[search_tool, file_tool],</span><br><span class="line">    ...</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>The overall workflow works like this: you register a set of Agents and a set of Tasks in a Crew, and the Crew assigns Tasks to corresponding Agents based on the selected process mode. In sequential mode, Tasks flow through in definition order; in hierarchical mode, the Manager Agent receives all tasks and dynamically decomposes and distributes them. Each Agent can call its own tools for external information during task execution, passing results to the next step upon completion.</p>
+<h2 id="Installation-and-Environment-Setup"><a href="#Installation-and-Environment-Setup" class="headerlink" title="Installation and Environment Setup"></a>Installation and Environment Setup</h2><p>CrewAI requires Python 3.10 through 3.13, and uv is the recommended package manager. Basic installation needs only <code>pip install crewai</code>; if you want the built-in tool set (search, file operations, etc.), run <code>pip install &#39;crewai[tools]&#39;</code>. With uv, the corresponding commands are <code>uv pip install crewai</code> and <code>uv pip install &#39;crewai[tools]&#39;</code>.</p>
+<p>After installation, use the CLI to create a project skeleton:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">crewai create crew my_project</span><br></pre></td></tr></table></figure>
+<p>The generated project structure:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">my_project&#x2F;</span><br><span class="line">├── .env                    # Environment variables</span><br><span class="line">├── pyproject.toml          # Project configuration</span><br><span class="line">└── src&#x2F;my_project&#x2F;</span><br><span class="line">    ├── main.py             # Entry point</span><br><span class="line">    ├── crew.py             # Crew definition</span><br><span class="line">    ├── tools&#x2F;              # Custom tools</span><br><span class="line">    └── config&#x2F;</span><br><span class="line">        ├── agents.yaml     # Agent configuration</span><br><span class="line">        └── tasks.yaml      # Task configuration</span><br></pre></td></tr></table></figure>
+<p>Windows users will likely hit two issues during installation. First, <code>ModuleNotFoundError: tiktoken</code>; fix it by installing embedding dependencies: <code>uv pip install &#39;crewai[embeddings]&#39;</code>. Second, a Rust compilation error with tiktoken; skip compilation and install the prebuilt package directly: <code>uv pip install tiktoken --prefer-binary</code>. If neither works, you’ll need to install Visual C++ Build Tools first.</p>
+<h2 id="Connecting-LLM-Services"><a href="#Connecting-LLM-Services" class="headerlink" title="Connecting LLM Services"></a>Connecting LLM Services</h2><p>This is where most beginners get stuck. CrewAI defaults to connecting to <code>https://api.openai.com/v1</code>. If you’re using a different LLM service (Alibaba Bailian, DeepSeek, Zhipu, etc.), you must explicitly specify base_url, or you’ll get <code>Connection refused</code> or <code>Invalid API key</code> errors.</p>
+<p>CrewAI interfaces with LLMs through LangChain’s ChatModel abstraction, so you essentially need to construct a correct ChatOpenAI or ChatAnthropic instance and pass it to the Agent’s llm parameter. The differences between providers come down to three fields: model name, api_key, and base_url.</p>
+<p>OpenAI official is the simplest; no base_url needed:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langchain_openai <span class="keyword">import</span> ChatOpenAI</span><br><span class="line"></span><br><span class="line">llm = ChatOpenAI(</span><br><span class="line">    model=<span class="string">"gpt-4o"</span>,</span><br><span class="line">    api_key=<span class="string">"sk-xxxxx"</span>,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>Anthropic Claude uses a separate package:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langchain_anthropic <span class="keyword">import</span> ChatAnthropic</span><br><span class="line"></span><br><span class="line">llm = ChatAnthropic(</span><br><span class="line">    model=<span class="string">"claude-sonnet-4-6"</span>,</span><br><span class="line">    api_key=<span class="string">"sk-ant-xxxxx"</span>,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>Alibaba Bailian Coding Plan supports both OpenAI and Anthropic protocols simultaneously, with different base_urls. The OpenAI-compatible endpoint is <code>https://coding.dashscope.aliyuncs.com/v1</code>, and the Anthropic-compatible endpoint is <code>https://coding.dashscope.aliyuncs.com/apps/anthropic</code>. Both protocols can call the Qwen model series; your choice depends on which SDK you prefer.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># OpenAI-compatible protocol</span></span><br><span class="line"><span class="keyword">from</span> langchain_openai <span class="keyword">import</span> ChatOpenAI</span><br><span class="line"></span><br><span class="line">llm = ChatOpenAI(</span><br><span class="line">    model=<span class="string">"qwen-max"</span>,</span><br><span class="line">    api_key=<span class="string">"your_dashscope_key"</span>,</span><br><span class="line">    base_url=<span class="string">"https://coding.dashscope.aliyuncs.com/v1"</span>,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Anthropic-compatible protocol</span></span><br><span class="line"><span class="keyword">from</span> langchain_anthropic <span class="keyword">import</span> ChatAnthropic</span><br><span class="line"></span><br><span class="line">llm = ChatAnthropic(</span><br><span class="line">    model=<span class="string">"qwen-max"</span>,</span><br><span class="line">    api_key=<span class="string">"your_dashscope_key"</span>,</span><br><span class="line">    base_url=<span class="string">"https://coding.dashscope.aliyuncs.com/apps/anthropic"</span>,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>DeepSeek and Zhipu AI both support the OpenAI protocol; you only need to change base_url. DeepSeek’s address is <code>https://api.deepseek.com/v1</code>, and Zhipu AI’s address is <code>https://open.bigmodel.cn/api/paas/v4/</code>. Local model Ollama works the same way: address is <code>http://localhost:11434/v1</code>, and api_key can be any value.</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>base_url</th>
+<th>Compatible Protocol</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OpenAI</td>
+<td>Default (no config needed)</td>
+<td>Native</td>
+</tr>
+<tr>
+<td>Anthropic</td>
+<td>Default (no config needed)</td>
+<td>Native</td>
+</tr>
+<tr>
+<td>Alibaba Bailian Coding Plan</td>
+<td><code>https://coding.dashscope.aliyuncs.com/v1</code></td>
+<td>OpenAI / Anthropic</td>
+</tr>
+<tr>
+<td>DeepSeek</td>
+<td><code>https://api.deepseek.com/v1</code></td>
+<td>OpenAI</td>
+</tr>
+<tr>
+<td>Zhipu AI</td>
+<td><code>https://open.bigmodel.cn/api/paas/v4/</code></td>
+<td>OpenAI</td>
+</tr>
+<tr>
+<td>Ollama</td>
+<td><code>http://localhost:11434/v1</code></td>
+<td>OpenAI</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>In production projects, managing provider parameters through a configuration file avoids repeating values in every Agent:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># config/llm_config.py</span></span><br><span class="line"><span class="keyword">import</span> os</span><br><span class="line"><span class="keyword">from</span> langchain_openai <span class="keyword">import</span> ChatOpenAI</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_llm</span><span class="params">(provider: str = <span class="string">"dashscope"</span>)</span>:</span></span><br><span class="line">    configs = &#123;</span><br><span class="line">        <span class="string">"openai"</span>: &#123;</span><br><span class="line">            <span class="string">"model"</span>: <span class="string">"gpt-4o"</span>,</span><br><span class="line">            <span class="string">"api_key"</span>: os.getenv(<span class="string">"OPENAI_API_KEY"</span>),</span><br><span class="line">            <span class="string">"base_url"</span>: <span class="literal">None</span>,</span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="string">"dashscope"</span>: &#123;</span><br><span class="line">            <span class="string">"model"</span>: <span class="string">"qwen-max"</span>,</span><br><span class="line">            <span class="string">"api_key"</span>: os.getenv(<span class="string">"DASHSCOPE_API_KEY"</span>),</span><br><span class="line">            <span class="string">"base_url"</span>: <span class="string">"https://coding.dashscope.aliyuncs.com/v1"</span>,</span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="string">"deepseek"</span>: &#123;</span><br><span class="line">            <span class="string">"model"</span>: <span class="string">"deepseek-chat"</span>,</span><br><span class="line">            <span class="string">"api_key"</span>: os.getenv(<span class="string">"DEEPSEEK_API_KEY"</span>),</span><br><span class="line">            <span class="string">"base_url"</span>: <span class="string">"https://api.deepseek.com/v1"</span>,</span><br><span class="line">        &#125;,</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    config = configs.get(provider)</span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> config <span class="keyword">or</span> <span class="keyword">not</span> config[<span class="string">"api_key"</span>]:</span><br><span class="line">        <span class="keyword">raise</span> ValueError(<span class="string">f"Please configure the API Key for <span class="subst">&#123;provider&#125;</span>"</span>)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> ChatOpenAI(</span><br><span class="line">        model=config[<span class="string">"model"</span>],</span><br><span class="line">        api_key=config[<span class="string">"api_key"</span>],</span><br><span class="line">        base_url=config[<span class="string">"base_url"</span>],</span><br><span class="line">    )</span><br></pre></td></tr></table></figure>
+<p>One-line invocation when using it; switching models is straightforward:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">llm = get_llm()              <span class="comment"># Default to Alibaba Bailian</span></span><br><span class="line">llm = get_llm(<span class="string">"openai"</span>)      <span class="comment"># Switch to OpenAI</span></span><br></pre></td></tr></table></figure>
+<p>Reference this configuration in an Agent:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> crewai <span class="keyword">import</span> Agent</span><br><span class="line"><span class="keyword">from</span> config.llm_config <span class="keyword">import</span> get_llm</span><br><span class="line"></span><br><span class="line">agent = Agent(</span><br><span class="line">    role=<span class="string">"Analyst"</span>,</span><br><span class="line">    goal=<span class="string">"Analyze data"</span>,</span><br><span class="line">    backstory=<span class="string">"You are a seasoned analyst"</span>,</span><br><span class="line">    llm=get_llm(<span class="string">"dashscope"</span>),</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<h2 id="Project-Structure-Breakdown"><a href="#Project-Structure-Breakdown" class="headerlink" title="Project Structure Breakdown"></a>Project Structure Breakdown</h2><p>CrewAI’s CLI generates a standardized project structure. Understanding each file’s responsibility helps you get up to speed faster.</p>
+<p><code>config/agents.yaml</code> defines all Agent role information. The file uses YAML format to describe each Agent’s role, goal, and backstory, with support for placeholders like <code>{topic}</code> for dynamic runtime substitution.</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">researcher:</span></span><br><span class="line">  <span class="attr">role:</span> <span class="string">&gt;</span></span><br><span class="line">    <span class="string">&#123;topic&#125;</span> <span class="string">Senior</span> <span class="string">Researcher</span></span><br><span class="line">  <span class="attr">goal:</span> <span class="string">&gt;</span></span><br><span class="line">    <span class="string">Deeply</span> <span class="string">research</span> <span class="string">the</span> <span class="string">latest</span> <span class="string">developments</span> <span class="string">in</span> <span class="string">the</span> <span class="string">&#123;topic&#125;</span> <span class="string">field</span></span><br><span class="line">  <span class="attr">backstory:</span> <span class="string">&gt;</span></span><br><span class="line">    <span class="string">You</span> <span class="string">are</span> <span class="string">an</span> <span class="string">experienced</span> <span class="string">researcher</span> <span class="string">skilled</span> <span class="string">at</span> <span class="string">discovering</span> <span class="string">cutting-edge</span> <span class="string">technology</span> <span class="string">trends.</span></span><br><span class="line">    <span class="string">You</span> <span class="string">are</span> <span class="string">known</span> <span class="string">for</span> <span class="string">finding</span> <span class="string">the</span> <span class="string">most</span> <span class="string">relevant</span> <span class="string">information</span> <span class="string">and</span> <span class="string">presenting</span> <span class="string">it</span> <span class="string">clearly</span> <span class="string">and</span> <span class="string">concisely.</span></span><br><span class="line"></span><br><span class="line"><span class="attr">analyst:</span></span><br><span class="line">  <span class="attr">role:</span> <span class="string">&gt;</span></span><br><span class="line">    <span class="string">&#123;topic&#125;</span> <span class="string">Data</span> <span class="string">Analyst</span></span><br><span class="line">  <span class="attr">goal:</span> <span class="string">&gt;</span></span><br><span class="line">    <span class="string">Analyze</span> <span class="string">research</span> <span class="string">data</span> <span class="string">and</span> <span class="string">generate</span> <span class="string">insight</span> <span class="string">reports</span></span><br><span class="line">  <span class="attr">backstory:</span> <span class="string">&gt;</span></span><br><span class="line">    <span class="string">You</span> <span class="string">are</span> <span class="string">a</span> <span class="string">meticulous</span> <span class="string">analyst</span> <span class="string">skilled</span> <span class="string">at</span> <span class="string">transforming</span> <span class="string">complex</span> <span class="string">data</span> <span class="string">into</span> <span class="string">actionable</span> <span class="string">insights.</span></span><br></pre></td></tr></table></figure>
+<p><code>config/tasks.yaml</code> defines all Task descriptions and expected outputs, also supporting placeholders and dynamic Agent binding.</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">research_task:</span></span><br><span class="line">  <span class="attr">description:</span> <span class="string">&gt;</span></span><br><span class="line">    <span class="string">Conduct</span> <span class="string">comprehensive</span> <span class="string">research</span> <span class="string">on</span> <span class="string">&#123;topic&#125;,</span> <span class="string">finding</span> <span class="string">the</span> <span class="string">latest</span> <span class="string">and</span> <span class="string">most</span> <span class="string">relevant</span> <span class="string">information.</span></span><br><span class="line">  <span class="attr">expected_output:</span> <span class="string">&gt;</span></span><br><span class="line">    <span class="string">A</span> <span class="string">bullet-point</span> <span class="string">list</span> <span class="string">with</span> <span class="number">10</span> <span class="string">key</span> <span class="string">findings</span></span><br><span class="line">  <span class="attr">agent:</span> <span class="string">researcher</span></span><br><span class="line"></span><br><span class="line"><span class="attr">analysis_task:</span></span><br><span class="line">  <span class="attr">description:</span> <span class="string">&gt;</span></span><br><span class="line">    <span class="string">Analyze</span> <span class="string">research</span> <span class="string">findings</span> <span class="string">and</span> <span class="string">generate</span> <span class="string">a</span> <span class="string">detailed</span> <span class="string">analysis</span> <span class="string">report.</span></span><br><span class="line">  <span class="attr">expected_output:</span> <span class="string">&gt;</span></span><br><span class="line">    <span class="string">A</span> <span class="string">complete</span> <span class="string">Markdown-formatted</span> <span class="string">report</span></span><br><span class="line">  <span class="attr">agent:</span> <span class="string">analyst</span></span><br><span class="line">  <span class="attr">output_file:</span> <span class="string">report.md</span></span><br></pre></td></tr></table></figure>
+<p><code>crew.py</code> is the project core, using a decorator pattern to assemble agents.yaml and tasks.yaml configurations into an executable Crew. <code>@CrewBase</code> marks the class, <code>@agent</code> and <code>@task</code> mark methods, and <code>@crew</code> marks the final Crew assembly method. The framework automatically reads configuration files and injects contents into <code>self.agents_config</code> and <code>self.tasks_config</code>.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> crewai <span class="keyword">import</span> Agent, Crew, Process, Task</span><br><span class="line"><span class="keyword">from</span> crewai.project <span class="keyword">import</span> CrewBase, agent, crew, task</span><br><span class="line"></span><br><span class="line"><span class="meta">@CrewBase</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">MyCrew</span><span class="params">()</span>:</span></span><br><span class="line"></span><br><span class="line"><span class="meta">    @agent</span></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">researcher</span><span class="params">(self)</span> -&gt; Agent:</span></span><br><span class="line">        <span class="keyword">return</span> Agent(</span><br><span class="line">            config=self.agents_config[<span class="string">'researcher'</span>],</span><br><span class="line">            verbose=<span class="literal">True</span>,</span><br><span class="line">        )</span><br><span class="line"></span><br><span class="line"><span class="meta">    @agent</span></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">analyst</span><span class="params">(self)</span> -&gt; Agent:</span></span><br><span class="line">        <span class="keyword">return</span> Agent(</span><br><span class="line">            config=self.agents_config[<span class="string">'analyst'</span>],</span><br><span class="line">            verbose=<span class="literal">True</span>,</span><br><span class="line">        )</span><br><span class="line"></span><br><span class="line"><span class="meta">    @task</span></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">research_task</span><span class="params">(self)</span> -&gt; Task:</span></span><br><span class="line">        <span class="keyword">return</span> Task(config=self.tasks_config[<span class="string">'research_task'</span>])</span><br><span class="line"></span><br><span class="line"><span class="meta">    @task</span></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">analysis_task</span><span class="params">(self)</span> -&gt; Task:</span></span><br><span class="line">        <span class="keyword">return</span> Task(</span><br><span class="line">            config=self.tasks_config[<span class="string">'analysis_task'</span>],</span><br><span class="line">            output_file=<span class="string">'report.md'</span>,</span><br><span class="line">        )</span><br><span class="line"></span><br><span class="line"><span class="meta">    @crew</span></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">crew</span><span class="params">(self)</span> -&gt; Crew:</span></span><br><span class="line">        <span class="keyword">return</span> Crew(</span><br><span class="line">            agents=self.agents,</span><br><span class="line">            tasks=self.tasks,</span><br><span class="line">            process=Process.sequential,</span><br><span class="line">            verbose=<span class="literal">True</span>,</span><br><span class="line">        )</span><br></pre></td></tr></table></figure>
+<p><code>main.py</code> is the entry point, passing dynamic parameters and launching Crew execution:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> my_crew.crew <span class="keyword">import</span> MyCrew</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">run</span><span class="params">()</span>:</span></span><br><span class="line">    inputs = &#123;<span class="string">'topic'</span>: <span class="string">'AI Agents'</span>&#125;</span><br><span class="line">    MyCrew().crew().kickoff(inputs=inputs)</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">"__main__"</span>:</span><br><span class="line">    run()</span><br></pre></td></tr></table></figure>
+<p>Two ways to run: <code>crewai run</code> (CLI) or <code>python src/my_crew/main.py</code> (direct Python execution).</p>
+<h2 id="Hands-On-Building-a-One-Person-Company-Agent-Team"><a href="#Hands-On-Building-a-One-Person-Company-Agent-Team" class="headerlink" title="Hands-On: Building a One-Person Company Agent Team"></a>Hands-On: Building a One-Person Company Agent Team</h2><p>Suppose you want to develop a “Life Planner” app, but you’re the only person on the team. You can use CrewAI to build a virtual team: a CEO handles decisions and coordination, a CTO handles technical architecture, a Product Manager handles requirements analysis, an Engineer handles code implementation, and a Tester handles quality assurance.</p>
+<p>The project splits directories by responsibility. The agents directory holds each role’s definition, tasks holds task definitions, crews holds team collaboration logic, and config holds LLM configuration and project parameters.</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">life-planner-crew&#x2F;</span><br><span class="line">├── .env</span><br><span class="line">├── main.py</span><br><span class="line">├── agents&#x2F;</span><br><span class="line">│   ├── ceo_agent.py</span><br><span class="line">│   ├── cto_agent.py</span><br><span class="line">│   ├── product_manager.py</span><br><span class="line">│   └── backend_engineer.py</span><br><span class="line">├── tasks&#x2F;</span><br><span class="line">│   ├── requirement_tasks.py</span><br><span class="line">│   ├── development_tasks.py</span><br><span class="line">│   └── test_tasks.py</span><br><span class="line">├── crews&#x2F;</span><br><span class="line">│   └── development_crew.py</span><br><span class="line">└── config&#x2F;</span><br><span class="line">    ├── llm_config.py</span><br><span class="line">    └── project_config.py</span><br></pre></td></tr></table></figure>
+<p>The LLM configuration strategy is assigning models by role. Decision-making Agents (CEO, CTO) use models with stronger reasoning (like qwen-max); execution Agents (Engineer, Tester) use faster models (like qwen-turbo). This balances cost and quality.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># config/llm_config.py</span></span><br><span class="line"><span class="keyword">import</span> os</span><br><span class="line"><span class="keyword">from</span> langchain_openai <span class="keyword">import</span> ChatOpenAI</span><br><span class="line"></span><br><span class="line">DASHSCOPE_API_KEY = os.getenv(<span class="string">"DASHSCOPE_API_KEY"</span>)</span><br><span class="line">DASHSCOPE_BASE_URL = <span class="string">"https://coding.dashscope.aliyuncs.com/v1"</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_default_llm</span><span class="params">()</span>:</span></span><br><span class="line">    <span class="string">"""Used by decision-making Agents"""</span></span><br><span class="line">    <span class="keyword">return</span> ChatOpenAI(</span><br><span class="line">        model=<span class="string">"qwen-max"</span>,</span><br><span class="line">        api_key=DASHSCOPE_API_KEY,</span><br><span class="line">        base_url=DASHSCOPE_BASE_URL,</span><br><span class="line">    )</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_efficient_llm</span><span class="params">()</span>:</span></span><br><span class="line">    <span class="string">"""Used by execution Agents"""</span></span><br><span class="line">    <span class="keyword">return</span> ChatOpenAI(</span><br><span class="line">        model=<span class="string">"qwen-turbo"</span>,</span><br><span class="line">        api_key=DASHSCOPE_API_KEY,</span><br><span class="line">        base_url=DASHSCOPE_BASE_URL,</span><br><span class="line">    )</span><br></pre></td></tr></table></figure>
+<p>The CEO Agent definition needs to be detailed because its backstory directly impacts decision quality. <code>allow_delegation=True</code> lets the CEO delegate tasks to other Agents, which is key in hierarchical mode.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># agents/ceo_agent.py</span></span><br><span class="line"><span class="keyword">from</span> crewai <span class="keyword">import</span> Agent</span><br><span class="line"><span class="keyword">from</span> config.llm_config <span class="keyword">import</span> get_default_llm</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">create_ceo_agent</span><span class="params">()</span>:</span></span><br><span class="line">    <span class="keyword">return</span> Agent(</span><br><span class="line">        role=<span class="string">"CEO - Chief Executive Officer"</span>,</span><br><span class="line">        goal=<span class="string">"""</span></span><br><span class="line"><span class="string">        Responsible for:</span></span><br><span class="line"><span class="string">        1. Strategic decisions and goal setting</span></span><br><span class="line"><span class="string">        2. Team coordination and resource allocation</span></span><br><span class="line"><span class="string">        3. Resolving disagreements within the Agent team</span></span><br><span class="line"><span class="string">        4. Ensuring project completion on time and to quality standards</span></span><br><span class="line"><span class="string">        """</span>,</span><br><span class="line">        backstory=<span class="string">"""</span></span><br><span class="line"><span class="string">        You are an experienced technology entrepreneur.</span></span><br><span class="line"><span class="string">        Decisive but a good listener, focused on business value.</span></span><br><span class="line"><span class="string">        """</span>,</span><br><span class="line">        verbose=<span class="literal">True</span>,</span><br><span class="line">        allow_delegation=<span class="literal">True</span>,</span><br><span class="line">        llm=get_default_llm(),</span><br><span class="line">    )</span><br></pre></td></tr></table></figure>
+<p>The backend engineer uses the efficient model because its tasks lean toward execution rather than decision-making:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># agents/backend_engineer.py</span></span><br><span class="line"><span class="keyword">from</span> config.llm_config <span class="keyword">import</span> get_efficient_llm</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">create_backend_engineer_agent</span><span class="params">()</span>:</span></span><br><span class="line">    <span class="keyword">return</span> Agent(</span><br><span class="line">        role=<span class="string">"Backend Engineer"</span>,</span><br><span class="line">        goal=<span class="string">"Implement APIs and database logic"</span>,</span><br><span class="line">        backstory=<span class="string">"You focus on Node.js backend development"</span>,</span><br><span class="line">        verbose=<span class="literal">True</span>,</span><br><span class="line">        allow_delegation=<span class="literal">False</span>,</span><br><span class="line">        llm=get_efficient_llm(),</span><br><span class="line">    )</span><br></pre></td></tr></table></figure>
+<p>The Crew assembly uses hierarchical mode, with the CEO acting as the manager role:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># crews/development_crew.py</span></span><br><span class="line"><span class="keyword">from</span> crewai <span class="keyword">import</span> Crew, Process</span><br><span class="line"><span class="keyword">from</span> agents <span class="keyword">import</span> (</span><br><span class="line">    create_ceo_agent,</span><br><span class="line">    create_cto_agent,</span><br><span class="line">    create_product_manager,</span><br><span class="line">    create_backend_engineer,</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">create_development_crew</span><span class="params">()</span>:</span></span><br><span class="line">    ceo = create_ceo_agent()</span><br><span class="line">    cto = create_cto_agent()</span><br><span class="line">    pm = create_product_manager()</span><br><span class="line">    backend = create_backend_engineer()</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> Crew(</span><br><span class="line">        agents=[ceo, cto, pm, backend],</span><br><span class="line">        tasks=[],  <span class="comment"># Added dynamically</span></span><br><span class="line">        process=Process.hierarchical,</span><br><span class="line">        manager_llm=<span class="string">"qwen-max"</span>,</span><br><span class="line">        manager_agent=ceo,</span><br><span class="line">        verbose=<span class="literal">True</span>,</span><br><span class="line">    )</span><br></pre></td></tr></table></figure>
+<h2 id="Pitfalls-and-Debugging"><a href="#Pitfalls-and-Debugging" class="headerlink" title="Pitfalls and Debugging"></a>Pitfalls and Debugging</h2><p>LLM connection failures are the most common issue, typically showing as <code>ConnectionError: Failed to connect to api.openai.com</code>. The root cause is forgetting to configure base_url. With Alibaba Bailian, you must explicitly set <code>base_url=&quot;https://coding.dashscope.aliyuncs.com/v1&quot;</code>; just filling in api_key isn’t enough.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Wrong</span></span><br><span class="line">llm = ChatOpenAI(model=<span class="string">"qwen-max"</span>, api_key=<span class="string">"xxx"</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Correct</span></span><br><span class="line">llm = ChatOpenAI(</span><br><span class="line">    model=<span class="string">"qwen-max"</span>,</span><br><span class="line">    api_key=<span class="string">"xxx"</span>,</span><br><span class="line">    base_url=<span class="string">"https://coding.dashscope.aliyuncs.com/v1"</span>,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>Malformed API Keys also trigger authentication failures. Three directions to investigate: check whether the Key was fully copied (no extra spaces or truncation), confirm the environment variable name matches what the code reads, and ensure the <code>.env</code> file loads correctly. Use <code>python-dotenv</code>‘s <code>load_dotenv()</code> to load explicitly, then verify with <code>os.getenv()</code> print:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> dotenv <span class="keyword">import</span> load_dotenv</span><br><span class="line">load_dotenv()</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> os</span><br><span class="line">print(os.getenv(<span class="string">"DASHSCOPE_API_KEY"</span>))</span><br></pre></td></tr></table></figure>
+<p>When Agent output doesn’t match expectations, the problem usually lies in the backstory definition. A vague backstory gives the Agent no sense of direction. The more specific the backstory, including tech stack preferences, working principles, and output standards, the more stable the Agent’s behavior.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Vague — Agent behavior is unpredictable</span></span><br><span class="line">backstory=<span class="string">"You are a programmer"</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># Specific — Agent behavior has clear boundaries</span></span><br><span class="line">backstory=<span class="string">"""</span></span><br><span class="line"><span class="string">You are a backend engineer focused on Node.js development.</span></span><br><span class="line"><span class="string">Skilled in RESTful API design, following Clean Code principles,</span></span><br><span class="line"><span class="string">prioritizing code maintainability, using TypeScript and NestJS.</span></span><br><span class="line"><span class="string">"""</span></span><br></pre></td></tr></table></figure>
+<p>For debugging, enabling <code>verbose=True</code> on both Agent and Crew shows the complete execution process, including the Agent’s chain of thought, task assignments, and tool call details. This is invaluable for diagnosing issues.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">agent = Agent(role=<span class="string">"Analyst"</span>, verbose=<span class="literal">True</span>)</span><br><span class="line">crew = Crew(agents=[agent], verbose=<span class="literal">True</span>)</span><br></pre></td></tr></table></figure>
+<h2 id="Learning-Resources"><a href="#Learning-Resources" class="headerlink" title="Learning Resources"></a>Learning Resources</h2><ul>
+<li><a href="https://docs.crewai.com" target="_blank" rel="noopener">CrewAI Official Documentation</a></li>
+<li><a href="https://github.com/crewAIInc/crewAI" target="_blank" rel="noopener">CrewAI GitHub</a></li>
+<li><a href="https://github.com/crewAIInc/crewAI-examples" target="_blank" rel="noopener">CrewAI Examples Repository</a></li>
+<li><a href="https://python.langchain.com" target="_blank" rel="noopener">LangChain Documentation</a></li>
+</ul>
+<hr>
+<blockquote>
+<p>Author: AI Technology Explorer<br>Date: 2026-03-31</p>
+<p>Written based on CrewAI v1.12+ and Alibaba Bailian Coding Plan service</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/AI-Tools/" rel="tag"><i class="fa fa-tag"></i> AI Tools</a>
+          </div>
+
+        
+<div class="post-share">
+  <!-- 自定义分享按钮 -->
+  <div class="share-title">分享到</div>
+  <div class="custom-share-btns">
+    <button class="cs-btn cs-btn-qrcode" onclick="openShareModal()">
+      <span class="cs-icon">📱</span>
+      <span class="cs-label">二维码</span>
+    </button>
+    <button class="cs-btn cs-btn-copy" id="csCopyBtn" onclick="copyPageUrl()">
+      <span class="cs-icon">🔗</span>
+      <span class="cs-label" id="csCopyLabel">复制链接</span>
+    </button>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="cs-modal-overlay" id="csModalOverlay" onclick="closeShareModal(event)">
+    <div class="cs-modal" onclick="event.stopPropagation()">
+      <button class="cs-modal-close" onclick="closeShareModal()">&times;</button>
+      <div class="cs-modal-title" id="csModalTitle">扫描二维码分享</div>
+      <div class="cs-modal-hint" id="csModalHint"></div>
+      <div class="cs-qrcode" id="csQrcode"></div>
+      <button class="cs-copy-img-btn" id="csCopyImgBtn" onclick="copyQrcodeImage()">
+        <span id="csCopyImgLabel">📋 复制为图片</span>
+      </button>
+      <div class="cs-modal-url" id="csModalUrl"></div>
+    </div>
+  </div>
+
+  <!-- 原有 social-share.js -->
+  <div class="social-share" data-sites="wechat,weibo,qzone,qq,douban"></div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/css/share.min.css">
+<script pjax src="https://cdn.jsdelivr.net/npm/social-share.js@1.0.16/dist/js/social-share.min.js"></script>
+<script pjax src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+/* 自定义分享按钮 */
+.custom-share-btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.cs-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.cs-btn:active { transform: scale(0.96); }
+.cs-btn-qrcode:hover { border-color: #2563eb; color: #2563eb; }
+.cs-btn-copy:hover { border-color: #f59e0b; color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); }
+.cs-icon { font-size: 16px; line-height: 1; }
+.cs-label { white-space: nowrap; }
+
+/* 弹窗 */
+.cs-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.cs-modal-overlay.active { display: flex; }
+.cs-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: csFadeIn 0.2s ease;
+}
+@keyframes csFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cs-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.cs-modal-close:hover { color: #333; }
+.cs-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+.cs-modal-hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.cs-qrcode {
+  display: inline-block;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.cs-qrcode img { display: block; }
+.cs-copy-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s;
+}
+.cs-copy-img-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f0f4ff;
+}
+.cs-copy-img-btn:active { transform: scale(0.96); }
+.cs-modal-url {
+  font-size: 12px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .cs-btn {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  .cs-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .cs-btn-copy:hover { border-color: #fbbf24; color: #fbbf24; }
+  .cs-modal {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .cs-modal-title { color: #e2e8f0; }
+  .cs-modal-hint { color: #94a3b8; }
+  .cs-qrcode { border-color: #334155; }
+  .cs-modal-close { color: #64748b; }
+  .cs-modal-close:hover { color: #e2e8f0; }
+  .cs-modal-url { color: #64748b; }
+  .cs-copy-img-btn {
+    background: #0f172a;
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .cs-copy-img-btn:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e293b;
+  }
+}
+
+/* 移动端 */
+@media (max-width: 500px) {
+  .custom-share-btns { gap: 8px; }
+  .cs-btn { padding: 7px 14px; font-size: 13px; }
+  .cs-modal { padding: 22px 20px 18px; }
+}
+</style>
+
+<script pjax>
+(function() {
+  var qrcodeInstance = null;
+
+  window.openShareModal = function() {
+    var overlay = document.getElementById('csModalOverlay');
+    var title = document.getElementById('csModalTitle');
+    var hint = document.getElementById('csModalHint');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var urlEl = document.getElementById('csModalUrl');
+    var pageUrl = window.location.href;
+
+    title.textContent = '扫描二维码分享';
+    hint.textContent = '用手机扫码即可在手机上打开本篇文章';
+    urlEl.textContent = pageUrl;
+
+    // 清除旧二维码
+    qrcodeEl.innerHTML = '';
+
+    // 生成新二维码
+    if (typeof QRCode !== 'undefined') {
+      qrcodeInstance = new QRCode(qrcodeEl, {
+        text: pageUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a2e',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeShareModal = function(e) {
+    if (e && e.target !== e.currentTarget && e.type === 'click') return;
+    var overlay = document.getElementById('csModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('csModalOverlay');
+      if (overlay.classList.contains('active')) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  window.copyPageUrl = function() {
+    var btn = document.getElementById('csCopyBtn');
+    var label = document.getElementById('csCopyLabel');
+    var pageUrl = window.location.href;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pageUrl).then(function() {
+        showCopied(btn, label);
+      }).catch(function() {
+        fallbackCopy(pageUrl, btn, label);
+      });
+    } else {
+      fallbackCopy(pageUrl, btn, label);
+    }
+  };
+
+  function fallbackCopy(text, btn, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopied(btn, label); }
+    catch(e) { label.textContent = '复制失败'; }
+    document.body.removeChild(ta);
+  }
+
+  function showCopied(btn, label) {
+    label.textContent = '✅ 已复制';
+    btn.classList.add('cs-copied');
+    setTimeout(function() {
+      label.textContent = '复制链接';
+      btn.classList.remove('cs-copied');
+    }, 2000);
+  }
+
+  window.copyQrcodeImage = function() {
+    var btn = document.getElementById('csCopyImgBtn');
+    var label = document.getElementById('csCopyImgLabel');
+    var qrcodeEl = document.getElementById('csQrcode');
+    var canvas = qrcodeEl.querySelector('canvas');
+
+    if (!canvas) {
+      // qrcodejs 可能用 img 标签渲染，尝试从 img 获取
+      var img = qrcodeEl.querySelector('img');
+      if (img) {
+        // 创建 canvas 从 img 绘制
+        canvas = document.createElement('canvas');
+        canvas.width = img.width || 200;
+        canvas.height = img.height || 200;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+      }
+    }
+
+    if (!canvas) { label.textContent = '❌ 生成失败'; return; }
+
+    canvas.toBlob(function(blob) {
+      if (!blob) { label.textContent = ' 生成失败'; return; }
+
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        var item = new ClipboardItem({ 'image/png': blob });
+        navigator.clipboard.write([item]).then(function() {
+          label.textContent = '✅ 已复制';
+          setTimeout(function() { label.textContent = ' 复制为图片'; }, 2000);
+        }).catch(function() {
+          label.textContent = '❌ 复制失败';
+          setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+        });
+      } else {
+        // fallback: 下载图片
+        var url = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'qrcode.png';
+        a.click();
+        label.textContent = '️ 已下载';
+        setTimeout(function() { label.textContent = '📋 复制为图片'; }, 2000);
+      }
+    }, 'image/png');
+  };
+})();
+</script>
+
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/en/2026/02/01/064-agent-context-compression-deep-analysis-en/" rel="prev" title="Agent Context Compression: The Full Engineering Picture for Long-Task State Management">
+      <i class="fa fa-chevron-left"></i> Agent Context Compression: The Full Engineering Picture for Long-Task State Management
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/en/2026/02/11/066_multi-agent-system-design-en/" rel="next" title="Multi-Agent System Design Principles">
+      Multi-Agent System Design Principles <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="valine-comments"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Core-Concepts"><span class="nav-number">1.</span> <span class="nav-text">Core Concepts</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Installation-and-Environment-Setup"><span class="nav-number">2.</span> <span class="nav-text">Installation and Environment Setup</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Connecting-LLM-Services"><span class="nav-number">3.</span> <span class="nav-text">Connecting LLM Services</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Project-Structure-Breakdown"><span class="nav-number">4.</span> <span class="nav-text">Project Structure Breakdown</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Hands-On-Building-a-One-Person-Company-Agent-Team"><span class="nav-number">5.</span> <span class="nav-text">Hands-On: Building a One-Person Company Agent Team</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Pitfalls-and-Debugging"><span class="nav-number">6.</span> <span class="nav-text">Pitfalls and Debugging</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Learning-Resources"><span class="nav-number">7.</span> <span class="nav-text">Learning Resources</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Zou Rongsheng"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Zou Rongsheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">218</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">89</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/donehub" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;donehub" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://gitlab.com/donelab" title="GitLab → https:&#x2F;&#x2F;gitlab.com&#x2F;donelab" rel="noopener" target="_blank"><i class="fa fa-fw fa-gitlab"></i>GitLab</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:stablecarter@gmail.com" title="E-Mail → mailto:stablecarter@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+  <div class="languages">
+    <label class="lang-select-label">
+      <i class="fa fa-language"></i>
+      <span>English</span>
+      <i class="fa fa-angle-up" aria-hidden="true"></i>
+    </label>
+    <select class="lang-select" data-canonical="">
+      
+        <option value="zh-CN" data-href="/2026/02/10/065_crewai-guide-en/" selected="">
+          zh-CN
+        </option>
+      
+        <option value="en" data-href="/en/2026/02/10/065_crewai-guide-en/" selected="">
+          English
+        </option>
+      
+    </select>
+  </div>
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Zou Rongsheng</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/theme-next/theme-next-pjax@0/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/lozad@1/dist/lozad.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.getAttribute('pjax') !== null) {
+      script.setAttribute('pjax', '');
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+  <script pjax>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+
+<script>
+NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
+  NexT.utils.getScript('//unpkg.com/valine/dist/Valine.min.js', () => {
+    var GUEST = ['nick', 'mail', 'link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item => {
+      return GUEST.includes(item);
+    });
+    new Valine({
+      el         : '#valine-comments',
+      verify     : false,
+      notify     : false,
+      appId      : 'e1rlrL10LAnwowqgQjT6zsWH-gzGzoHsz',
+      appKey     : 'WwnfQwCHnYIEshkQjuCm5qmR',
+      placeholder: "Just go go",
+      avatar     : 'mm',
+      meta       : guest,
+      pageSize   : '10' || 10,
+      visitor    : false,
+      lang       : '' || 'zh-cn',
+      path       : location.pathname,
+      recordIP   : false,
+      serverURLs : ''
+    });
+  }, window.Valine);
+});
+</script>
+
+    </div>
+</body>
+</html>
