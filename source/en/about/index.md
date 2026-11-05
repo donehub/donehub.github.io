@@ -2,6 +2,7 @@
 title: About
 lang: en
 type: about
+comments: false
 ---
 
-About this blog...
+Someone who enjoys coding.

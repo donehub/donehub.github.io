@@ -34,12 +34,12 @@
       <li class="menu-item menu-item-languages">
         <a class="lang-switch-btn" role="button" title="Language">
           <i class="fa fa-language fa-fw"></i>
-          <span class="lang-current">中文</span>
+          <span class="lang-current">{{ language_name(current_lang()) }}</span>
           <i class="fa fa-angle-down fa-fw" style="font-size:12px"></i>
         </a>
         <div class="lang-dropdown">
           {% for lang in languages %}
-            <a href="{{ lang_home(lang) }}" data-lang="{{ lang }}">{% if lang == 'en' %}English{% else %}中文{% endif %}</a>
+            <a href="{{ i18n_path(lang) }}" data-lang="{{ lang }}">{% if lang == 'en' %}English{% else %}中文{% endif %}</a>
           {% endfor %}
         </div>
       </li>

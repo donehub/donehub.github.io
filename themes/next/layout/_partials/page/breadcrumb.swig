@@ -1,4 +1,10 @@
-{%- set paths = page.path.split('/') %}
+{%- set segments = page_path_segments() %}
+{%- set paths = segments.paths %}
+{%- set lang_prefix = segments.prefix %}
+{%- set base = '' %}
+{%- if lang_prefix %}
+  {%- set base = '/' + lang_prefix %}
+{%- endif %}
 {%- set count = paths.length %}
 {%- if count > 2 %}
   {%- set current = 0 %}
@@ -11,13 +17,13 @@
           <li>{{ path | upper }}</li>
         {% else %}
           {%- if link == '' %}
-            {%- set link = '/' + path %}
-          {% else %}
+            {%- set link = base + '/' + path %}
+          {%- else %}
             {%- set link = link + '/' + path %}
           {%- endif %}
           {%- if path.includes('.html') %}
             <li>{{ path | replace('.html', '') | upper }}</li>
-          {% else %}
+          {%- else %}
             <li><a href="{{ url_for(link) }}/">{{ path | upper }}</a></li>
           {%- endif %}
         {%- endif %}

@@ -67,12 +67,60 @@ hexo.extend.helper.register('canonical', function() {
 });
 
 /**
- * Get page path given a certain language tag
+ * Get page path for a given language tag.
+ *
+ * Derives the current path from `this.url`, rewrites the language prefix,
+ * and handles the `-en` filename suffix used for English post files.
+ * The `-en` suffix is only added/removed on post pages (YYYY/MM/DD/slug).
  */
-hexo.extend.helper.register('i18n_path', function(language) {
-  const { path, lang } = this.page;
-  const base = path.startsWith(lang) ? path.slice(lang.length + 1) : path;
-  return this.url_for(`${this.languages.indexOf(language) === 0 ? '' : '/' + language}/${base}`);
+hexo.extend.helper.register('i18n_path', function (language) {
+  var urlStr = this.url || '';
+  var pathname = urlStr;
+  try { pathname = new URL(urlStr).pathname; } catch (e) { /* keep as-is */ }
+  if (!pathname) pathname = '/';
+
+  var languages = this.languages || [];
+  var defaultLang = languages[0] || 'zh-CN';
+
+  // Strip index.html for cleaner manipulation; re-append later
+  var hasIndexHtml = /\/index\.html$/.test(pathname);
+  var workPath = pathname.replace(/\/index\.html$/, '/');
+
+  // Determine current page language from URL pathname
+  var pathWithoutLang = workPath;
+  for (var i = 0; i < languages.length; i++) {
+    var l = languages[i];
+    var prefix = '/' + l + '/';
+    if (workPath.indexOf(prefix) === 0) {
+      pathWithoutLang = workPath.slice(l.length + 1);
+      break;
+    }
+  }
+
+  // Detect if this is a post page (path starts with /YYYY/MM/DD/ or YYYY/MM/DD/)
+  var isPost = /^\/?\d{4}\/\d{2}\/\d{2}\//.test(pathWithoutLang);
+
+  var targetPath;
+  if (language === defaultLang) {
+    // Switching to default lang: remove `-en` suffix from last segment (posts only)
+    targetPath = isPost ? pathWithoutLang.replace(/-en(\/?)$/, '$1') : pathWithoutLang;
+  } else {
+    // Switching to non-default lang
+    if (isPost) {
+      // Add `-en` suffix to post slug if not present
+      var withSuffix = /-en(\/?)$/.test(pathWithoutLang) ? pathWithoutLang : pathWithoutLang.replace(/(\/?)$/, '-en$1');
+      targetPath = '/' + language + withSuffix;
+    } else {
+      // Non-post: just add language prefix
+      targetPath = '/' + language + pathWithoutLang;
+    }
+  }
+
+  if (hasIndexHtml) {
+    targetPath = targetPath.replace(/\/$/, '') + '/index.html';
+  }
+
+  return this.url_for(targetPath);
 });
 
 /**

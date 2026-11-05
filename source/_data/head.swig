@@ -71,8 +71,8 @@
   if (!stored) {
     var browserLang = detectBrowserLang();
     // Only redirect if browser language differs from current page language
-    // and we are on a homepage (not a specific post)
-    if (browserLang !== pageLang && /^\/(en\/)?(\d|page|tags|categories|about|$)/.test(pathname)) {
+    // and we are on the actual homepage (not posts, archives, or other pages)
+    if (browserLang !== pageLang && /^\/(en\/)?(index\.html)?$/.test(pathname)) {
       window.location.href = LANG_HOME[browserLang] || '/';
       return;
     }

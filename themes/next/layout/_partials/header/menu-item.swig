@@ -3,6 +3,7 @@
   {%- set itemURL = value.split('||')[0] | trim %}
   {%- if not itemURL.startsWith('http') %}
     {%- set itemURL = itemURL | replace('//', '/') %}
+    {%- set itemURL = lang_url(itemURL) %}
   {%- endif %}
   <li class="menu-item menu-item-{{ itemName | replace(' ', '-') }}">
 
@@ -15,7 +16,7 @@
     {%- set menuBadge = '' %}
     {%- if theme.menu_settings.badges %}
       {%- set badges = {
-        archives  : site.posts.length,
+        archives  : lang_post_count(current_lang()),
         categories: site.categories.length,
         tags      : site.tags.length
         }

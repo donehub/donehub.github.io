@@ -57,5 +57,10 @@ hexo.extend.helper.register('next_url', function(path, text, options = {}) {
     }
   }
 
-  return htmlTag(tag, attrs, decodeURI(text), false);
+  try {
+    text = decodeURI(text);
+  } catch (e) {
+    // text contains invalid percent-encoded sequences, use as-is
+  }
+  return htmlTag(tag, attrs, text, false);
 });

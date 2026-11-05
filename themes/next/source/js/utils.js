@@ -212,7 +212,11 @@ NexT.utils = {
       var target = element.querySelector('a[href]');
       if (!target) return;
       var isSamePath = target.pathname === location.pathname || target.pathname === location.pathname.replace('index.html', '');
-      var isSubPath = !CONFIG.root.startsWith(target.pathname) && location.pathname.startsWith(target.pathname);
+      // Home (`/`, `/en/`, `/zh-CN/`…) is a prefix of every page under it, so it
+      // must never count as a parent section, otherwise it stays highlighted on
+      // every page of that language.
+      var isHome = element.classList.contains('menu-item-home');
+      var isSubPath = !isHome && !CONFIG.root.startsWith(target.pathname) && location.pathname.startsWith(target.pathname);
       element.classList.toggle('menu-item-active', target.hostname === location.hostname && (isSamePath || isSubPath));
     });
   },

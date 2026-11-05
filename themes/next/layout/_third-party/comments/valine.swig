@@ -1,5 +1,14 @@
 {%- set valine_uri = theme.vendors.valine or '//unpkg.com/valine/dist/Valine.min.js' %}
 
+{#- Valine only ships en / zh-cn UI strings; follow the page language #}
+{%- if theme.valine.language %}
+  {%- set valine_lang = theme.valine.language %}
+{%- elif current_lang() === 'en' %}
+  {%- set valine_lang = 'en' %}
+{%- else %}
+  {%- set valine_lang = 'zh-cn' %}
+{%- endif %}
+
 <script>
 NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
   NexT.utils.getScript('{{ valine_uri }}', () => {
@@ -19,7 +28,7 @@ NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
       meta       : guest,
       pageSize   : '{{ theme.valine.pageSize }}' || 10,
       visitor    : {{ theme.valine.visitor }},
-      lang       : '{{ theme.valine.language }}' || 'zh-cn',
+      lang       : '{{ valine_lang }}',
       path       : location.pathname,
       recordIP   : {{ theme.valine.recordIP }},
       serverURLs : '{{ theme.valine.serverURLs }}'
